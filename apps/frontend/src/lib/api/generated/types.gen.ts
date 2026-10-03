@@ -1648,6 +1648,12 @@ export type GapFinalEvent = {
      */
     candidate_count: number;
     stop_reason: GapStopReason;
+    /**
+     * Job Id
+     *
+     * Job row that keeps the result for the user.
+     */
+    job_id?: string | null;
 };
 
 /**
@@ -1795,6 +1801,14 @@ export type Job = {
      * Created At
      */
     created_at: string;
+    /**
+     * Result
+     *
+     * Job result: stage and counts; gap search keeps its candidates here.
+     */
+    result?: {
+        [key: string]: unknown;
+    } | null;
 };
 
 /**
@@ -1873,7 +1887,7 @@ export type JobEvent = ({
 /**
  * JobKind
  */
-export type JobKind = 'document_extraction';
+export type JobKind = 'document_extraction' | 'gap_search';
 
 /**
  * JobProgressEvent
@@ -3587,6 +3601,10 @@ export type ExplainPathErrors = {
      */
     401: ErrorResponse;
     /**
+     * consent_required (no active consent of the needed type) or forbidden.
+     */
+    403: ErrorResponse;
+    /**
      * not_found
      */
     404: ErrorResponse;
@@ -3627,6 +3645,10 @@ export type ChatErrors = {
      * sign_in_required: guest, or the session expired.
      */
     401: ErrorResponse;
+    /**
+     * consent_required (no active consent of the needed type) or forbidden.
+     */
+    403: ErrorResponse;
     /**
      * not_found
      */
@@ -3805,7 +3827,7 @@ export type GapSearchError = GapSearchErrors[keyof GapSearchErrors];
 
 export type GapSearchResponses = {
     /**
-     * Stream of GapSearchEvent (progress, candidate..., final).
+     * Stream of GapSearchEvent (progress..., candidate..., final | error).
      */
     200: GapSearchEvent;
 };

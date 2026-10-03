@@ -1205,6 +1205,16 @@
               }
             }
           },
+          "403": {
+            "description": "consent_required (no active consent of the needed type) or forbidden.",
+            "content": {
+              "text/event-stream": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
           "404": {
             "description": "not_found",
             "content": {
@@ -1254,7 +1264,7 @@
           "chat"
         ],
         "summary": "Post Chat",
-        "description": "Send a message; streams the structured agent reply.",
+        "description": "Send a message to Dr. Wu (an AI system); streams the checked structured reply.",
         "operationId": "chat",
         "requestBody": {
           "content": {
@@ -1279,6 +1289,16 @@
           },
           "401": {
             "description": "sign_in_required: guest, or the session expired.",
+            "content": {
+              "text/event-stream": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "consent_required (no active consent of the needed type) or forbidden.",
             "content": {
               "text/event-stream": {
                 "schema": {
@@ -1521,7 +1541,7 @@
           "gap-search"
         ],
         "summary": "Post Gap Search",
-        "description": "Agent progress and pending_review candidate edges for a missing link.",
+        "description": "Agent progress and pending_review candidate edges for a missing link.\n\nQueries are built from the two nodes' public graph terms only, never from user data.",
         "operationId": "gapSearch",
         "requestBody": {
           "content": {
@@ -1535,7 +1555,7 @@
         },
         "responses": {
           "200": {
-            "description": "Stream of GapSearchEvent (progress, candidate..., final).",
+            "description": "Stream of GapSearchEvent (progress..., candidate..., final | error).",
             "content": {
               "text/event-stream": {
                 "schema": {
@@ -5099,6 +5119,19 @@
           },
           "stop_reason": {
             "$ref": "#/components/schemas/GapStopReason"
+          },
+          "job_id": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "uuid"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Job Id",
+            "description": "Job row that keeps the result for the user."
           }
         },
         "type": "object",
@@ -5319,6 +5352,19 @@
             "type": "string",
             "format": "date-time",
             "title": "Created At"
+          },
+          "result": {
+            "anyOf": [
+              {
+                "additionalProperties": true,
+                "type": "object"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Result",
+            "description": "Job result: stage and counts; gap search keeps its candidates here."
           }
         },
         "type": "object",
@@ -5450,7 +5496,8 @@
       "JobKind": {
         "type": "string",
         "enum": [
-          "document_extraction"
+          "document_extraction",
+          "gap_search"
         ],
         "title": "JobKind"
       },

@@ -208,7 +208,7 @@ export const explainPath = <ThrowOnError extends boolean = false>(options: Optio
 /**
  * Post Chat
  *
- * Send a message; streams the structured agent reply.
+ * Send a message to Dr. Wu (an AI system); streams the checked structured reply.
  */
 export const chat = <ThrowOnError extends boolean = false>(options: Options<ChatData, ThrowOnError, ChatResponse>): Promise<ServerSentEventsResult<ChatResponses>> => (options.client ?? client).sse.post<ChatResponses, ChatErrors, ThrowOnError>({
     url: '/chat',
@@ -244,6 +244,8 @@ export const getChatSession = <ThrowOnError extends boolean = false>(options: Op
  * Post Gap Search
  *
  * Agent progress and pending_review candidate edges for a missing link.
+ *
+ * Queries are built from the two nodes' public graph terms only, never from user data.
  */
 export const gapSearch = <ThrowOnError extends boolean = false>(options: Options<GapSearchData, ThrowOnError, GapSearchResponse>): Promise<ServerSentEventsResult<GapSearchResponses>> => (options.client ?? client).sse.post<GapSearchResponses, GapSearchErrors, ThrowOnError>({
     url: '/gap-search',
