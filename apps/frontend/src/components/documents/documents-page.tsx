@@ -1,0 +1,150 @@
+"use client";
+
+import Link from "next/link";
+import { useCallback, useEffect, useRef, useState } from "react";
+
+import { routeGlobalError } from "@/components/account/api-errors";
+import { SessionLoading, SignInPrompt } from "@/components/account/sign-in-prompt";
+import { useGate } from "@/components/providers/gate-provider";
+import { useSession } from "@/components/providers/session-provider";
+import { apiFetch } from "@/lib/api/fetch";
+import type { Document } from "@/lib/api/generated/types.gen";
+import { takePendingUploads } from "@/lib/handoff";
+
+import { DocumentList } from "./document-list";
+import { DropZone } from "./drop-zone";
+import { UPLOADS_PER_HOUR } from "./errors";
+import { UploadProgress } from "./upload-progress";
+import { useUploads } from "./use-uploads";
+
+const STEPS = [
+  ["Upload", "Your file goes to Amber's own server, never to a third party."],
+  ["Personal details removed", "Names, birth dates, addresses and patient IDs are redacted before any AI model sees the text."],
+  ["Original deleted", "The file itself is deleted right after its text is extracted."],
+  ["You review", "Each finding is shown next to the sentence it came from. Only what you confirm goes into your profile."],
+] as const;
+
+export function DocumentsPage() {
+  const { user, status } = useSession();
+  const { requireConsent } = useGate();
+  const [documents, setDocuments] = useState<Document[] | null>(null);
+  const [listError, setListError] = useState<string | null>(null);
+  const pending = useRef<File[] | null>(null);
+  const uploadsRef = useRef<HTMLElement>(null);
+
+  const loadDocuments = useCallback(async () => {
+    try {
+      setDocuments(await apiFetch<Document[]>("/documents", { quiet: true, cache: "no-store" }));
+      setListError(null);
+    } catch (e) {
+      const err = routeGlobalError(e);
+      setListError(
+        err?.code === "not_implemented"
+          ? "Your documents list is not available yet."
+          : err?.code === "network_error"
+            ? "Amber's server is not reachable, so your documents cannot be listed right now."
+            : "Your documents could not be loaded.",
+      );
+    }
+  }, []);
+
+  const { items, add, dismiss } = useUploads({ onDone: () => void loadDocuments() });
+
+  const handleFiles = useCallback(
+    async (files: File[]) => {
+      if (await requireConsent("upload", "Uploading a report needs an account.")) add(files);
+    },
+    [add, requireConsent],
+  );
+
+  // Bring a new upload's progress into view.
+  const count = items.length;
+  useEffect(() => {
+    if (count > 0) uploadsRef.current?.scrollIntoView({ behavior: "smooth", block: "start" });
+  }, [count]);
+
+  // Files handed over from the landing page or chat (in memory only).
+  useEffect(() => {
+    if (pending.current === null) pending.current = takePendingUploads();
+  }, []);
+
+  useEffect(() => {
+    if (status === "loading" || !pending.current?.length) return;
+    const files = pending.current;
+    pending.current = [];
+    void handleFiles(files);
+  }, [status, handleFiles]);
+
+  useEffect(() => {
+    // eslint-disable-next-line react-hooks/set-state-in-effect -- fetch on sign-in, state set after await
+    if (user) void loadDocuments();
+  }, [user, loadDocuments]);
+
+  if (status === "loading") return <SessionLoading />;
+  if (!user) {
+    return (
+      <SignInPrompt
+        title="Sign in to upload a report"
+        description="Reading documents uses AI that runs on your own ChatGPT plan, so it needs an account. Exploring the atlas stays open to everyone."
+        returnTo="/documents"
+      />
+    );
+  }
+
+  return (
+    <div className="space-y-10">
+      <div className="grid gap-6 lg:grid-cols-[minmax(0,1fr)_320px]">
+        <DropZone onFiles={(f) => void handleFiles(f)} />
+        <aside aria-labelledby="how-h" className="rounded-xl border bg-card p-5">
+          <h2 id="how-h" className="text-sm font-semibold">
+            What happens to your file
+          </h2>
+          <ol className="mt-3 space-y-3">
+            {STEPS.map(([title, body], i) => (
+              <li key={title} className="flex gap-3 text-sm">
+                <span className="flex size-5 shrink-0 items-center justify-center rounded-full border font-mono text-[10.5px] text-muted-foreground">
+                  {i + 1}
+                </span>
+                <span>
+                  <span className="block font-medium">{title}</span>
+                  <span className="block text-muted-foreground">{body}</span>
+                </span>
+              </li>
+            ))}
+          </ol>
+          <p className="mt-4 border-t pt-3 text-xs text-muted-foreground">
+            Up to {UPLOADS_PER_HOUR} uploads per hour.{" "}
+            <Link href="/privacy#health-data" className="underline underline-offset-2 hover:text-foreground">
+              How we handle health data
+            </Link>
+          </p>
+        </aside>
+      </div>
+
+      {items.length > 0 && (
+        <section ref={uploadsRef} aria-labelledby="uploads-h" className="scroll-mt-20 space-y-3">
+          <h2 id="uploads-h" className="text-lg font-semibold tracking-tight">
+            Reading your {items.length === 1 ? "document" : "documents"}
+          </h2>
+          <ul className="space-y-3" aria-live="polite">
+            {items.map((it) => (
+              <UploadProgress key={it.key} item={it} onDismiss={() => dismiss(it.key)} />
+            ))}
+          </ul>
+        </section>
+      )}
+
+      <section aria-labelledby="docs-h" className="space-y-3">
+        <div>
+          <h2 id="docs-h" className="text-lg font-semibold tracking-tight">
+            Your documents
+          </h2>
+          <p className="text-sm text-muted-foreground">
+            Only the extracted findings are kept, never the file. Deleting a document deletes its findings.
+          </p>
+        </div>
+        <DocumentList documents={documents} error={listError} onChanged={() => void loadDocuments()} />
+      </section>
+    </div>
+  );
+}
