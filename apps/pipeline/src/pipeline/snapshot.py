@@ -7,7 +7,7 @@ import logging
 import shutil
 from typing import Any
 
-from pipeline.build import FINAL, read_graph
+from pipeline.build import FINAL, read_graph, require_validated
 from pipeline.config import settings
 from pipeline.contracts import load_scope, now_iso, sha256_file
 from pipeline.load import pipeline_commit, source_versions
@@ -20,7 +20,7 @@ TABLES = ("nodes", "synonyms", "edges", "evidence", "clusters", "mechanisms")
 
 def run() -> dict[str, Any]:
     tables = read_graph(FINAL)
-    version = tables["nodes"]["data_version"][0]
+    version = require_validated(tables)
     out = SNAPSHOT / version
     out.mkdir(parents=True, exist_ok=True)
     files = {}

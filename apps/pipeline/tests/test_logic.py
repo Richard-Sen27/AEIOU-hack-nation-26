@@ -424,3 +424,60 @@ def test_stage3_report_counts():
         2,
     )
     assert validate._report_counts({"checked": 5, "passed": 4, "rejected": 1}) == (5, 4, 1)
+
+
+def test_inferred_edges_are_capped_below_high_and_weight_never_exceeds_tier():
+    nodes = _nodes(("MONDO:1", "disease"), ("MONDO:2", "disease"), ("HGNC:1", "gene"))
+    rows = [
+        assertion(
+            "MONDO:1",
+            "MONDO:2",
+            "similar_symptoms",
+            tier="curated_db",
+            source_type="hpo",
+            origin="inferred",
+            features={"weight": 0.9, "score": 0.9},
+        ),
+        assertion(
+            "MONDO:1",
+            "MONDO:2",
+            "similar_symptoms",
+            tier="curated_db",
+            source_type="orphanet",
+            origin="inferred",
+            features={"weight": 0.9, "score": 0.9},
+        ),
+        # an observed row cannot raise or lower its tier weight
+        assertion(
+            "MONDO:1",
+            "HGNC:1",
+            "caused_by_variant_in",
+            tier="llm_inferred",
+            source_type="x",
+            features={"weight": 1.0},
+        ),
+    ]
+    t = build.merge(nodes, EMPTY_SYN, _assertions(rows))
+    e = {r["relation"]: r for r in t["edges"].iter_rows(named=True)}
+    sim = e["similar_symptoms"]
+    assert sim["confidence"] == pytest.approx(build.INFERRED_CONFIDENCE_CAP)
+    f = json.loads(sim["features"])
+    assert f["confidence_raw"] == pytest.approx(0.99) and f["confidence_cap"] == 0.79
+    assert e["caused_by_variant_in"]["confidence"] == pytest.approx(0.3)
+    assert build.evidence_weight("llm_inferred", {"weight": 0.9}, "inferred") == pytest.approx(0.3)
+
+
+def test_load_refuses_unvalidated_graph(tmp_path, monkeypatch):
+    monkeypatch.setattr(build, "FINAL", tmp_path)
+    tables = {"nodes": pl.DataFrame({"data_version": ["2026-01-01.1"]})}
+    with pytest.raises(SystemExit):
+        build.require_validated(tables)
+    (tmp_path / "validation.json").write_text(
+        json.dumps({"ok": True, "data_version": "2026-01-01.0"})
+    )
+    with pytest.raises(SystemExit):
+        build.require_validated(tables)
+    (tmp_path / "validation.json").write_text(
+        json.dumps({"ok": True, "data_version": "2026-01-01.1"})
+    )
+    assert build.require_validated(tables) == "2026-01-01.1"

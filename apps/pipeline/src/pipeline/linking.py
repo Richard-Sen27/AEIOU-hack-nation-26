@@ -172,9 +172,11 @@ async def run(scope: Scope) -> None:
                             f"{item['name']} ({item['id']}) linked to {chosen} "
                             f"({decision['method']})"
                         ),
+                        origin="observed" if decision["method"] == "exact_label" else "inferred",
                         features={
                             "linked_by": decision["method"],
                             "link_confidence": decision.get("confidence"),
+                            "candidate": cands[0] if cands else None,
                             "weight": 0.9 * float(decision.get("confidence") or 0),
                         },
                     )

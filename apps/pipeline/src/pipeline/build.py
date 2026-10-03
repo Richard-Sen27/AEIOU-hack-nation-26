@@ -39,10 +39,21 @@ ORIGIN_RANK = {o.value: i for i, o in enumerate(Origin)}  # observed wins over i
 DROP_FEATURE_KEYS = {"weight", "curated_file"}
 
 
-def evidence_weight(tier: str, features: dict | None) -> float:
-    if features and isinstance(features.get("weight"), int | float):
-        return max(0.0, min(1.0, float(features["weight"])))
-    return TIER_WEIGHTS[EvidenceTier(tier)]
+# Hypotheses (edges whose evidence is all inferred) keep a score-based confidence so strong ones
+# pass the 0.6 threshold, but are capped below "High" (0.8): a hypothesis is never shown as High.
+INFERRED_CONFIDENCE_CAP = 0.79
+
+
+def evidence_weight(tier: str, features: dict | None, origin: str = "observed") -> float:
+    """Tier weight; inferred rows may carry a lower score-based weight, never above the tier."""
+    base = TIER_WEIGHTS[EvidenceTier(tier)]
+    if (
+        origin == Origin.inferred.value
+        and features
+        and isinstance(features.get("weight"), int | float)
+    ):
+        return max(0.0, min(base, float(features["weight"])))
+    return base
 
 
 def merge_features(items: list[dict]) -> dict[str, Any] | None:
@@ -187,7 +198,7 @@ def merge(
             if polarity == "contradicts":
                 n_contra += 1
             else:
-                support.append(evidence_weight(a["tier"], f))
+                support.append(evidence_weight(a["tier"], f, origins[-1]))
             feats.append(f)
             evidence.append(
                 {
@@ -203,6 +214,15 @@ def merge(
                 }
             )
         origin = min(origins, key=lambda o: ORIGIN_RANK[o])
+        confidence = compute_confidence(support, n_contra)
+        merged = merge_features(feats)
+        if origin == Origin.inferred.value:
+            merged = {
+                **(merged or {}),
+                "confidence_raw": confidence,
+                "confidence_cap": INFERRED_CONFIDENCE_CAP,
+            }
+            confidence = min(confidence, INFERRED_CONFIDENCE_CAP)
         status = EdgeStatus.active.value
         if origin in (Origin.user_contributed.value, Origin.patient_reported.value):
             status = EdgeStatus.pending_review.value
@@ -213,12 +233,10 @@ def merge(
                 "target_id": tgt,
                 "relation": rel,
                 "family": RELATION_FAMILY[Relation(rel)].value,
-                "confidence": compute_confidence(support, n_contra),
+                "confidence": confidence,
                 "origin": origin,
                 "status": status,
-                "features": json.dumps(merge_features(feats), sort_keys=True)
-                if merge_features(feats)
-                else None,
+                "features": json.dumps(merged, sort_keys=True) if merged else None,
                 "n_evidence": len(seen),
                 "n_contradicting": n_contra,
             }
@@ -264,10 +282,23 @@ def read_graph(root: Path = FINAL) -> dict[str, pl.DataFrame]:
     return {p.stem: pl.read_parquet(p) for p in root.glob("*.parquet")}
 
 
+def require_validated(tables: dict[str, pl.DataFrame]) -> str:
+    """The graph's data_version, or exit unless Stage 6 passed for exactly this version."""
+    version = tables["nodes"]["data_version"][0]
+    report_file = FINAL / "validation.json"
+    report = json.loads(report_file.read_text()) if report_file.exists() else {}
+    if not report.get("ok") or report.get("data_version") != version:
+        raise SystemExit(
+            f"refusing: validation for data_version {version} has not passed "
+            f"(validation.json: ok={report.get('ok')}, data_version={report.get('data_version')})"
+        )
+    return version
+
+
 def content_hash(tables: dict[str, pl.DataFrame]) -> str:
     h = hashlib.sha256()
     for name in sorted(tables):
-        df = tables[name]
+        df = tables[name].drop("retrieved_at", "data_version", strict=False)
         if df.height:
             h.update(name.encode())
             h.update(str(df.hash_rows(seed=0).sort().to_list()).encode())

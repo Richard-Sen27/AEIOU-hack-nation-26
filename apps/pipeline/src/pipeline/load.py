@@ -11,7 +11,7 @@ from typing import Any
 
 import polars as pl
 
-from pipeline.build import FINAL, read_graph
+from pipeline.build import FINAL, read_graph, require_validated
 from pipeline.config import settings
 from pipeline.paths import GRAPH, RAW, ROOT
 
@@ -61,6 +61,8 @@ INSERT INTO ingestion_runs (data_version, pipeline_commit, source_versions, coun
   ON CONFLICT (data_version) DO UPDATE
   SET pipeline_commit = EXCLUDED.pipeline_commit, source_versions = EXCLUDED.source_versions,
       counts = EXCLUDED.counts, created_at = now();
+-- Only the run whose graph is loaded stays recorded (older versions no longer exist here).
+DELETE FROM ingestion_runs WHERE data_version <> :'version';
 COMMIT;
 """
 
@@ -141,7 +143,7 @@ def psql(script: str, variables: dict[str, str] | None = None) -> None:
 
 def run() -> dict[str, Any]:
     tables = read_graph(FINAL)
-    version = tables["nodes"]["data_version"][0]
+    version = require_validated(tables)
     paths = export_csv(tables)
     staging = []
     for name, ddl in STAGING_DDL.items():
