@@ -1,7 +1,7 @@
 from typing import Annotated
 
-from fastapi import APIRouter, Query
-from fastapi.responses import Response
+from fastapi import APIRouter, Query, Request
+from fastapi.responses import Response, StreamingResponse
 
 from backend.api.deps import DB, LensDep
 from backend.api.errors import responses
@@ -69,15 +69,24 @@ async def list_clusters() -> list[ClusterSummary]:
     return graph.clusters()
 
 
+ATLAS_CACHE_CONTROL = "public, max-age=60, must-revalidate"
+
+
 @router.get(
     "/atlas.json",
     response_model=AtlasLayout,
-    responses=responses(501),
+    responses={304: {"description": "Not modified (If-None-Match matched the ETag)."}}
+    | responses(501),
     operation_id="getAtlas",
 )
-async def get_atlas() -> AtlasLayout:
-    """Compact whole-graph layout for the Atlas view."""
-    return graph.atlas_layout()
+async def get_atlas(request: Request) -> Response:
+    """Compact whole-graph layout for the Atlas view (ETag keyed on data_version)."""
+    body, etag = graph.atlas_payload()
+    headers = {"ETag": etag, "Cache-Control": ATLAS_CACHE_CONTROL}
+    match = request.headers.get("if-none-match", "")
+    if etag in [t.strip().removeprefix("W/") for t in match.split(",")]:
+        return Response(status_code=304, headers=headers)
+    return Response(body, media_type="application/json", headers=headers)
 
 
 @router.get(
@@ -113,8 +122,8 @@ async def export_graph(
 ) -> Response:
     """CSV or GraphML of the subgraph around a node."""
     result = export.export_graph(node, depth=depth, format=format)
-    return Response(
-        result.content,
+    return StreamingResponse(
+        result.chunks(),
         media_type=result.media_type,
         headers={"Content-Disposition": f'attachment; filename="{result.filename}"'},
     )
