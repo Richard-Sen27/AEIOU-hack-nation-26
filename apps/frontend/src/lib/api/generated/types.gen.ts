@@ -131,6 +131,12 @@ export type AgentReply = {
      * Always set by the server: the reply comes from an AI system.
      */
     ai_notice?: string | null;
+    /**
+     * Kind
+     *
+     * Set by the server: answer (default), emergency (call emergency services, no graph answer) or declined (part of the question crossed the medical boundary and was declined; graph context may still follow).
+     */
+    kind?: 'answer' | 'emergency' | 'declined';
 };
 
 /**
@@ -477,6 +483,8 @@ export type ChatErrorEvent = {
 export type ChatEvent = ({
     type: 'status';
 } & ChatStatusEvent) | ({
+    type: 'uncertainty';
+} & ChatUncertaintyEvent) | ({
     type: 'summary_delta';
 } & ChatSummaryDeltaEvent) | ({
     type: 'chips';
@@ -666,6 +674,22 @@ export type ChatSummaryDeltaEvent = {
      * Text
      *
      * Next chunk of the summary.
+     */
+    text: string;
+};
+
+/**
+ * ChatUncertaintyEvent
+ */
+export type ChatUncertaintyEvent = {
+    /**
+     * Type
+     */
+    type?: 'uncertainty';
+    /**
+     * Text
+     *
+     * One-line uncertainty statement; sent before the summary.
      */
     text: string;
 };

@@ -2716,6 +2716,17 @@
             ],
             "title": "Ai Notice",
             "description": "Always set by the server: the reply comes from an AI system."
+          },
+          "kind": {
+            "type": "string",
+            "enum": [
+              "answer",
+              "emergency",
+              "declined"
+            ],
+            "title": "Kind",
+            "description": "Set by the server: answer (default), emergency (call emergency services, no graph answer) or declined (part of the question crossed the medical boundary and was declined; graph context may still follow).",
+            "default": "answer"
           }
         },
         "type": "object",
@@ -3297,6 +3308,9 @@
             "$ref": "#/components/schemas/ChatStatusEvent"
           },
           {
+            "$ref": "#/components/schemas/ChatUncertaintyEvent"
+          },
+          {
             "$ref": "#/components/schemas/ChatSummaryDeltaEvent"
           },
           {
@@ -3334,7 +3348,8 @@
             "final": "#/components/schemas/ChatFinalEvent",
             "follow_up": "#/components/schemas/ChatFollowUpEvent",
             "status": "#/components/schemas/ChatStatusEvent",
-            "summary_delta": "#/components/schemas/ChatSummaryDeltaEvent"
+            "summary_delta": "#/components/schemas/ChatSummaryDeltaEvent",
+            "uncertainty": "#/components/schemas/ChatUncertaintyEvent"
           }
         }
       },
@@ -3624,6 +3639,26 @@
           "text"
         ],
         "title": "ChatSummaryDeltaEvent"
+      },
+      "ChatUncertaintyEvent": {
+        "properties": {
+          "type": {
+            "type": "string",
+            "const": "uncertainty",
+            "title": "Type",
+            "default": "uncertainty"
+          },
+          "text": {
+            "type": "string",
+            "title": "Text",
+            "description": "One-line uncertainty statement; sent before the summary."
+          }
+        },
+        "type": "object",
+        "required": [
+          "text"
+        ],
+        "title": "ChatUncertaintyEvent"
       },
       "Chip": {
         "properties": {
