@@ -6,7 +6,7 @@ never written to the graph tables:
 - open user flags (edge_flag_counts()): such an edge is presented as ``under_review`` with
   ``flagged = true`` and can no longer support a path;
 - shared contributions (shared_contributions()): patient-reported phenotype links and
-  user-contributed assets as their own nodes/edges (ids ``CONTRIB:<12 hex>`` / ``c_<12 hex>``),
+  contributed assets as their own nodes/edges (ids ``CONTRIB:<12 hex>`` / ``c_<12 hex>``),
   always ``pending_review`` with the patient-reported tier weight, never feeding other edges.
 
 Use ``get_node`` / ``get_edge`` for overlay-aware, effective lookups.
@@ -29,6 +29,7 @@ from sqlalchemy import text
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from backend.api.errors import not_found
+from backend.api.services.contributions import origin_for
 from backend.schemas.common import Lens
 from backend.schemas.enums import (
     CONTRADICTION_PENALTY,
@@ -507,7 +508,8 @@ def build_contribution_overlay(
     store: GraphStore, rows: Iterable[Mapping[str, Any]]
 ) -> tuple[dict[str, Node], dict[str, Edge]]:
     """Phenotype profiles aggregate into patient_reported disease->phenotype edges (no patient
-    nodes); assets become user_contributed registry-type nodes linked to their diseases."""
+    nodes); assets become registry-type nodes linked to their diseases. Each carries its
+    contribution's own origin (contributions.origin_for: patient_reported for both)."""
     phenotypes: dict[tuple[str, str], Counter] = defaultdict(Counter)
     nodes: dict[str, Node] = {}
     edges: dict[str, Edge] = {}
@@ -527,6 +529,7 @@ def build_contribution_overlay(
                 if hp in store.nodes:
                     phenotypes[(disease, hp)]["absent_reports"] += 1
         elif kind == ContributionKind.asset and payload.get("name"):
+            origin = origin_for(kind)
             diseases = [d for d in payload.get("disease_ids") or () if d in store.nodes]
             nid = _overlay_id(CONTRIB_NODE_PREFIX, str(row["id"]))
             anchor = store.nodes[diseases[0]] if diseases else None
@@ -543,7 +546,7 @@ def build_contribution_overlay(
                 url=payload.get("url"),
                 attrs={
                     "kind": payload.get("asset_type") or "other",
-                    "origin": Origin.user_contributed.value,
+                    "origin": origin.value,
                     "status": EdgeStatus.pending_review.value,
                     "contributed": True,
                 },
@@ -556,9 +559,9 @@ def build_contribution_overlay(
                     Relation.about,
                     disease,
                     EdgeFamily.research,
-                    Origin.user_contributed,
+                    origin,
                     1,
-                    {"label": "user-contributed asset"},
+                    {"label": "contributed asset"},
                     store.data_version,
                 )
                 edges[edge.id] = edge

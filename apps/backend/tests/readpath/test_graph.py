@@ -186,13 +186,16 @@ async def test_contributions_overlay_appears_and_disappears(client, make_user, c
         await refresh_overlays()
         hood = (await client.get("/neighborhood/MONDO:9900010")).json()
         overlay = [e for e in hood["edges"] if e["id"].startswith("c_")]
-        assert {e["origin"] for e in overlay} == {"patient_reported", "user_contributed"}
+        assert {e["origin"] for e in overlay} == {"patient_reported"}  # as the API reports them
         assert all(e["status"] == "pending_review" for e in overlay)
         assert all(e["confidence"] == pytest.approx(0.2) for e in overlay)
         pheno = next(e for e in overlay if e["relation"] == "has_phenotype")
         assert pheno["target_id"] == "HP:0001250" and pheno["features"]["reports"] == 1
         asset = next(n for n in hood["nodes"] if n["id"].startswith("CONTRIB:"))
         assert asset["type"] == NodeType.registry and asset["attrs"]["contributed"] is True
+        assert asset["attrs"]["origin"] == "patient_reported"
+        mine = (await user.client.get("/contributions")).json()
+        assert {c["origin"] for c in mine} == {"patient_reported"}
         assert not any(n["type"] == "patient" for n in hood["nodes"])
         # other edges' confidence untouched
         base = graph_service.get_graph().edges[DEMO["low_confidence_edge_id"]]
