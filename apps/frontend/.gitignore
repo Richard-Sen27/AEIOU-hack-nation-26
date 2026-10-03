@@ -45,7 +45,8 @@ next-env.d.ts
 /.next-*/
 
 # playwright
-/test-results/
-/playwright-report/
+
+test-results*/
+playwright-report*/
 /playwright/.cache/
 /e2e/screenshots/
