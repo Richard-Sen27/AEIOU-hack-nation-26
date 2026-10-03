@@ -1,5 +1,27 @@
 name: atlas
 
+# Default: `docker compose up -d db` starts only Postgres (API and frontend run in dev mode).
+# Everything in Docker: `docker compose --profile app up -d --build --wait` adds migrations,
+# API and frontend. Pipeline on demand: `docker compose run --rm pipeline all`.
+# Host ports default to the standard ones; override with ATLAS_DB_PORT, ATLAS_API_PORT and
+# ATLAS_FRONTEND_PORT. Browser-facing URLs stay http://127.0.0.1:<port>, never localhost.
+# Secrets come from apps/backend/.env (created by `make setup`), never from this file.
+
+x-backend: &backend
+  build:
+    context: ../../apps/backend
+  image: amber-backend:local
+  env_file:
+    - path: ../../apps/backend/.env
+      required: true
+  environment: &backend-env
+    DATABASE_URL: postgresql+asyncpg://atlas_app:atlas_app@db:5432/atlas
+    MIGRATION_DATABASE_URL: postgresql+psycopg://atlas_owner:atlas_owner@db:5432/atlas
+    PIPELINE_DATABASE_URL: postgresql://atlas_pipeline:atlas_pipeline@db:5432/atlas
+    API_URL: http://127.0.0.1:${ATLAS_API_PORT:-8000}
+    FRONTEND_URL: http://127.0.0.1:${ATLAS_FRONTEND_PORT:-3100}
+    OPENAI_REDIRECT_URI: http://127.0.0.1:${ATLAS_API_PORT:-8000}/auth/callback
+
 services:
   db:
     image: pgvector/pgvector:pg18
@@ -8,7 +30,7 @@ services:
       POSTGRES_PASSWORD: atlas
       POSTGRES_DB: atlas
     ports:
-      - "5432:5432"
+      - "${ATLAS_DB_PORT:-5432}:5432"
     volumes:
       - db-data:/var/lib/postgresql
       - ./initdb:/docker-entrypoint-initdb.d:ro
@@ -17,5 +39,101 @@ services:
       interval: 2s
       retries: 30
 
+  # Alembic as the schema owner; runs once and exits.
+  migrate:
+    <<: *backend
+    profiles: [app]
+    command: ["alembic", "upgrade", "head"]
+    depends_on:
+      db:
+        condition: service_healthy
+    restart: "no"
+
+  api:
+    <<: *backend
+    profiles: [app]
+    depends_on:
+      migrate:
+        condition: service_completed_successfully
+    ports:
+      # The OAuth redirect must be exactly http://127.0.0.1:8000/auth/callback.
+      - "127.0.0.1:${ATLAS_API_PORT:-8000}:8000"
+    volumes:
+      - fastembed-cache:/data/fastembed
+    healthcheck:
+      test:
+        - CMD
+        - python
+        - -c
+        - "import urllib.request; urllib.request.urlopen('http://127.0.0.1:8000/health', timeout=3)"
+      interval: 5s
+      timeout: 5s
+      start_period: 120s
+      retries: 30
+    restart: unless-stopped
+
+  frontend:
+    build:
+      context: ../../apps/frontend
+      args:
+        # Inlined into the browser bundle at build time.
+        NEXT_PUBLIC_API_URL: http://127.0.0.1:${ATLAS_API_PORT:-8000}
+        NEXT_PUBLIC_PRIVACY_EMAIL: ${NEXT_PUBLIC_PRIVACY_EMAIL:-}
+    image: amber-frontend:local
+    profiles: [app]
+    depends_on:
+      api:
+        condition: service_healthy
+    ports:
+      - "127.0.0.1:${ATLAS_FRONTEND_PORT:-3100}:3100"
+    healthcheck:
+      test: ["CMD", "node", "-e", "fetch('http://127.0.0.1:3100/').then(r => process.exit(r.ok ? 0 : 1), () => process.exit(1))"]
+      interval: 5s
+      timeout: 5s
+      start_period: 30s
+      retries: 20
+    restart: unless-stopped
+
+  # Ingestion pipeline, run on demand: `docker compose run --rm pipeline all` (or one stage).
+  # The LLM steps use the ChatGPT login stored on the host by `make pipeline-login`.
+  pipeline:
+    build:
+      context: ../../apps/pipeline
+      additional_contexts:
+        backend: service:api
+    image: amber-pipeline:local
+    profiles: [pipeline]
+    depends_on:
+      db:
+        condition: service_healthy
+    env_file:
+      - path: ../../apps/pipeline/.env
+        required: false
+    environment:
+      PIPELINE_DATABASE_URL: postgresql://atlas_pipeline:atlas_pipeline@db:5432/atlas
+      OPENAI_AUTH_ISSUER: ${OPENAI_AUTH_ISSUER:-https://auth.openai.com}
+      OPENAI_API_BASE_URL: ${OPENAI_API_BASE_URL:-https://api.openai.com/v1}
+      OPENAI_MODEL_MAIN: ${OPENAI_MODEL_MAIN:-}
+      OPENAI_MODEL_SMALL: ${OPENAI_MODEL_SMALL:-}
+    volumes:
+      - ../../apps/pipeline/data:/app/pipeline/data
+      - fastembed-cache:/data/fastembed
+      - ${AMBER_CONFIG_DIR:-${HOME}/.config/amber}:/home/app/.config/amber
+
+  # Precompute explanations for the demo paths (backend CLI), on demand:
+  # `docker compose run --rm explain`. Uses the same host ChatGPT login; without one the
+  # texts are built from the edge data.
+  explain:
+    <<: *backend
+    profiles: [pipeline]
+    command: ["python", "-m", "backend.cli", "precompute-explanations"]
+    depends_on:
+      db:
+        condition: service_healthy
+    volumes:
+      - fastembed-cache:/data/fastembed
+      - ${AMBER_CONFIG_DIR:-${HOME}/.config/amber}:/home/app/.config/amber
+
 volumes:
   db-data:
+  fastembed-cache:
