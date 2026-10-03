@@ -138,5 +138,7 @@ function redirectToWelcome(): void {
   const path = window.location.pathname;
   if (path === "/welcome") return;
   const next = path && path !== "/" && !path.startsWith("//") ? `?next=${encodeURIComponent(path)}` : "";
+  // Outside React (no router here); a full navigation also drops stale state.
+  // eslint-disable-next-line @next/next/no-location-assign-relative-destination
   window.location.assign(`/welcome${next}`);
 }
