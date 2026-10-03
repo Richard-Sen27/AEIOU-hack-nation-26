@@ -73,8 +73,8 @@ export function SignInDialog({
               No tracking or advertising cookies.
             </li>
             <li>
-              Health information (a profile, chats, documents) only if you add it, and uploads or
-              contributions only with a separate consent.
+              Health information (a profile, chats, documents) only if you add it and give your
+              consent; contributing to the shared atlas needs a separate one.
             </li>
           </ul>
           <p>
