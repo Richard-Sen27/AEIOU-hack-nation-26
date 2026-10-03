@@ -1,22 +1,29 @@
 import type { Metadata } from "next";
+import Link from "next/link";
 
-import { PagePlaceholder } from "@/components/shell/page-placeholder";
+import { FindingsReview } from "@/components/documents/findings-review";
+import { PageContainer, PageHeader } from "@/components/shell/page-placeholder";
 
 export const metadata: Metadata = { title: "Review findings" };
 
 export default async function DocumentPage(props: PageProps<"/documents/[id]">) {
-  await props.params;
+  const { id } = await props.params;
   return (
-    <PagePlaceholder
-      eyebrow="Documents · Review"
-      title="Review what was found"
-      description="Confirm or reject each finding. Only confirmed findings go into your profile."
-      planned={[
-        "Findings with page and highlighted snippet (GET /documents/{id}/findings)",
-        "Confirm or reject each one",
-        "Variants of uncertain significance flagged with the standard notice",
-        "Delete the document and its findings",
-      ]}
-    />
+    <PageContainer className="max-w-5xl">
+      <nav aria-label="Breadcrumb" className="mb-4 text-sm text-muted-foreground">
+        <Link href="/documents" className="hover:text-foreground hover:underline underline-offset-2">
+          Documents
+        </Link>{" "}
+        / Review
+      </nav>
+      <PageHeader
+        eyebrow="Findings review"
+        title="Review what was found"
+        description="Confirm or reject each finding. Only confirmed findings go into your profile."
+      />
+      <div className="mt-8">
+        <FindingsReview documentId={id} />
+      </div>
+    </PageContainer>
   );
 }
