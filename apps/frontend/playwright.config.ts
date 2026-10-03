@@ -15,6 +15,8 @@ const BASE_URL = `http://127.0.0.1:${PORT}`;
 
 export default defineConfig({
   testDir: "./e2e",
+  // The live suite (real API) has its own config: playwright.live.config.ts.
+  testIgnore: ["live/**"],
   outputDir: "./test-results",
   fullyParallel: true,
   forbidOnly: !!process.env.CI,
