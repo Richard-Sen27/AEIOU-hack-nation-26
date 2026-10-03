@@ -179,7 +179,7 @@ export function NoRouteReport({
           )}
 
           {family !== "all" && (
-            <Button variant="outline" size="sm" render={<Link href={`/path?from=${encodeURIComponent(from.id)}&to=${encodeURIComponent(to.id)}`} />}>
+            <Button variant="outline" size="sm" nativeButton={false} render={<Link href={`/path?from=${encodeURIComponent(from.id)}&to=${encodeURIComponent(to.id)}`} />}>
               Try every kind of connection
             </Button>
           )}
