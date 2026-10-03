@@ -417,3 +417,89 @@ async def test_reply_kind_absent_on_old_stored_replies():
 
     old = {**draft(), "chips": []}
     assert AgentReply.model_validate(old).kind is None
+
+
+def find_path(from_id: str, to_id: str, **extra) -> dict:
+    args = {"from_id": from_id, "to_id": to_id, **extra}
+    return {"tool_calls": [{"name": "find_path", "arguments": args}]}
+
+
+async def test_vus_path_only_on_request_and_carries_notice(doctor, user_llm, llm_calls):
+    vus = DEMO["vus_variant_id"]
+    store = get_graph()
+
+    def routed_nodes() -> set[str]:
+        """Nodes on the paths find_path returned to the model in the last turn."""
+        out = next(
+            json.loads(i["output"])
+            for i in llm_calls()[-1]["input"]
+            if isinstance(i, dict) and i.get("type") == "function_call_output"
+        )
+        edges = [store.edges[s["edge_id"]] for p in out["paths"] for s in p["steps"]]
+        return {n for e in edges for n in (e.source_id, e.target_id)}
+
+    user_llm.enqueue(find_path("HGNC:11444", STXBP1), {"json": draft(summary="Routes found.")})
+    default = final(await turn(doctor, "How is STXBP1 linked to its encephalopathy?"))
+    assert vus not in routed_nodes()
+    assert VUS_NOTICE not in default["summary"]
+
+    user_llm.enqueue(
+        find_path("HGNC:11444", STXBP1, include_vus=True), {"json": draft(summary="Routes found.")}
+    )
+    included = final(await turn(doctor, "Include uncertain variants too, please."))
+    assert vus in routed_nodes()
+    assert VUS_NOTICE in included["summary"]
+
+
+def extraction(**fields) -> dict:
+    base = {
+        "diseases": [],
+        "genes": [],
+        "variants": [],
+        "symptoms": [],
+        "age_years": None,
+        "age_range": None,
+        "about_child": False,
+        "onset": None,
+        "country": None,
+    }
+    return {**base, **fields}
+
+
+EXTRACT = {"tool_calls": [{"name": "extract_entities", "arguments": {"text": None}}]}
+
+
+async def test_profile_hints_from_extraction(doctor, user_llm):
+    user_llm.enqueue(
+        EXTRACT,
+        {"json": extraction(age_years=34, onset="Infantile onset", country="de")},
+        {"json": draft()},
+    )
+    reply = final(await turn(doctor, "I am 34, it started in infancy, I live in Germany."))
+    assert reply["profile_hints"] == {
+        "age_years": 34,
+        "age_range": None,
+        "onset": "Infantile onset",
+        "country": "DE",
+        "about_child_suspected": False,
+    }
+
+
+@pytest.mark.parametrize(
+    "fields",
+    [{"age_years": 4}, {"about_child": True}, {"age_range": "6-12"}],
+)
+async def test_profile_hints_flag_a_child(doctor, user_llm, fields):
+    user_llm.enqueue(EXTRACT, {"json": extraction(**fields)}, {"json": draft()})
+    reply = final(await turn(doctor, "My son has seizures."))
+    assert reply["profile_hints"]["about_child_suspected"] is True
+
+
+async def test_profile_hints_drop_invalid_values(doctor, user_llm):
+    user_llm.enqueue(
+        EXTRACT,
+        {"json": extraction(country="Germany", onset="since 2019-01-01 @ home")},
+        {"json": draft()},
+    )
+    reply = final(await turn(doctor, "Something without hints."))
+    assert reply["profile_hints"] is None

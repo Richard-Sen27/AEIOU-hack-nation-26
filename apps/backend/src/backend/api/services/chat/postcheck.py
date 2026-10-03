@@ -3,6 +3,7 @@
 Citations, origin and confidence, contradictions, viability, VUS, uncertainty, no supported
 route, medical boundary and the patient-lens reading gate."""
 
+import re
 from dataclasses import dataclass, field
 
 from pydantic import BaseModel, Field
@@ -30,9 +31,11 @@ from backend.schemas.chat import (
     Contradiction,
     FollowUp,
     GraphFocus,
+    ProfileHints,
 )
 from backend.schemas.enums import (
     CONFIDENCE_THRESHOLD,
+    AgeRange,
     CardType,
     ChipType,
     EdgeStatus,
@@ -45,6 +48,11 @@ from backend.schemas.gap import GapSearchRequest
 from backend.schemas.graph import Edge
 
 MAX_SUMMARY_SENTENCES = 3
+CHILD_AGE_LIMIT = 16  # accounts are 16+; younger means a parent describes a child
+# Ranges that may include an under-16 (13-17 straddles the limit: flag it, the user decides).
+CHILD_AGE_RANGES = {AgeRange.under_1, AgeRange.age_1_5, AgeRange.age_6_12, AgeRange.age_13_17}
+_ONSET_HINT = re.compile(r"^(?:HP:\d{7}|[A-Za-z][A-Za-z ,'-]{0,59})$")
+_COUNTRY_HINT = re.compile(r"^[A-Z]{2}$")
 MAX_SIMPLIFY_ATTEMPTS = 2
 
 TEXT = {
@@ -404,8 +412,39 @@ async def check_reply(
         gap_search=gap_search,
         ai_notice=pick(AI_NOTICES, lang),
         kind="declined" if decline else "answer",
+        profile_hints=profile_hints(state),
     )
     return reply, report
+
+
+def profile_hints(state: TurnState) -> ProfileHints | None:
+    """Age, onset and country from this turn's extraction, unconfirmed like chips (only values
+    the PatientProfile would accept), plus whether the message seems to be about a child."""
+    ex = state.extraction
+    if ex is None:
+        return None
+    age = ex.age_years if ex.age_years is not None and 0 <= ex.age_years <= 120 else None
+    onset = (ex.onset or "").strip() or None
+    if onset is not None and not _ONSET_HINT.match(onset):
+        onset = None
+    country = (ex.country or "").strip().upper() or None
+    if country is not None and not _COUNTRY_HINT.match(country):
+        country = None
+    child = (
+        ex.about_child
+        or (age is not None and age < CHILD_AGE_LIMIT)
+        or (age is None and ex.age_range in CHILD_AGE_RANGES)
+    )
+    hints = ProfileHints(
+        age_years=age,
+        age_range=ex.age_range if age is None else None,
+        onset=onset,
+        country=country,
+        about_child_suspected=child,
+    )
+    if hints == ProfileHints():
+        return None
+    return hints
 
 
 async def _search_context(state: TurnState) -> list[str]:
@@ -433,6 +472,8 @@ def _symptoms_only(state: TurnState) -> bool:
 
 
 def _touches_vus(state: TurnState, claims: list[Claim], focus, cards: list[Card]) -> bool:
+    if state.vus_in_paths:  # the user asked to route through uncertain variants
+        return True
     ids: set[str] = set()
     for c in claims:
         for eid in c.edge_ids:

@@ -19,6 +19,7 @@ from backend.llm import LLMClient, Tool
 from backend.schemas.chat import Chip, FollowUp
 from backend.schemas.common import Lens
 from backend.schemas.enums import (
+    AgeRange,
     ChipType,
     NodeType,
     PathFamily,
@@ -98,6 +99,14 @@ class Extraction(BaseModel):
     variants: list[Mention] = Field(description="Variants in HGVS notation where possible.")
     symptoms: list[Mention]
     age_years: int | None = Field(description="Age in years, if stated.")
+    age_range: AgeRange | None = Field(
+        None, description="Age range when no exact age is stated ('my toddler' = 1-5)."
+    )
+    about_child: bool = Field(
+        False,
+        description="True when the text describes the user's child or another minor they care "
+        "for ('my son', 'our daughter', 'my baby').",
+    )
     onset: str | None = Field(description="Disease onset, if stated (e.g. 'neonatal').")
     country: str | None = Field(description="ISO 3166-1 alpha-2 country, if stated.")
 
@@ -137,6 +146,11 @@ class PathIn(BaseModel):
     from_id: str
     to_id: str
     family: PathFamily | None = Field(None, description="dna, symptoms, research or all (default).")
+    include_vus: bool | None = Field(
+        None,
+        description="Route through variants of uncertain significance (VUS). Leave null/false; "
+        "set true only when the user explicitly asks to include uncertain variants.",
+    )
 
 
 class FollowupIn(BaseModel):
@@ -162,6 +176,7 @@ class TurnState:
     extraction: Extraction | None = None
     paths: list[PathResponse] = field(default_factory=list)
     follow_up: FollowUp | None = None
+    vus_in_paths: bool = False  # a find_path with include_vus returned a route through a VUS
     tool_errors: Counter = field(default_factory=Counter)
 
     def see_edge(self, edge: Edge) -> None:
@@ -244,13 +259,27 @@ def _path_view(state: TurnState, path: Path) -> dict[str, Any]:
     }
 
 
+def _paths_touch_vus(resp: PathResponse) -> bool:
+    paths = list(resp.paths)
+    if resp.coverage is not None and resp.coverage.closest_partial_path is not None:
+        paths.append(resp.coverage.closest_partial_path)
+    return any(
+        graph_service.is_vus(node)
+        for p in paths
+        for step in p.steps
+        for node in (step.from_node, step.to_node)
+    )
+
+
 # ---- tools --------------------------------------------------------------------------------
 
 EXTRACT_INSTRUCTIONS = (
     "Extract medical mentions from the user's text for a rare-disease atlas. The text is "
     "redacted: placeholders like <PERSON> replace personal data; never try to recover them. "
-    "Return diseases, genes (symbols), variants (HGVS where given), symptoms, age in years, "
-    "onset and country (ISO alpha-2). Keep each mention as written in `text` and give the "
+    "Return diseases, genes (symbols), variants (HGVS where given), symptoms, age in years "
+    "(or an age range when only that is clear), onset and country (ISO alpha-2), and set "
+    "about_child=true when the text is about the user's child or another minor they care for "
+    "('my son', 'our daughter'). Keep each mention as written in `text` and give the "
     "English medical term in `english` (HPO-style for symptoms). Set negated=true for things "
     "the user says are absent ('no problems with eating' = feeding difficulties, negated). "
     "Only extract what the text states; never guess."
@@ -412,11 +441,17 @@ def build_tools(state: TurnState, llm: LLMClient) -> list[Tool]:
     async def find_path(params: PathIn) -> dict:
         try:
             resp = path_service.find_paths(
-                params.from_id, params.to_id, family=params.family or PathFamily.all, k=3
+                params.from_id,
+                params.to_id,
+                family=params.family or PathFamily.all,
+                k=3,
+                include_vus=bool(params.include_vus),
             )
         except ApiError as exc:
             return {"error": exc.message, "code": exc.code.value}
         state.paths.append(resp)
+        if params.include_vus and _paths_touch_vus(resp):
+            state.vus_in_paths = True
         out: dict[str, Any] = {
             "status": resp.status.value,
             "threshold": resp.threshold,
@@ -476,7 +511,9 @@ def build_tools(state: TurnState, llm: LLMClient) -> list[Tool]:
         Tool(
             "find_path",
             "Top paths between two nodes by trust (edge cost -log confidence), or "
-            "no_supported_route with a coverage report naming the missing evidence.",
+            "no_supported_route with a coverage report naming the missing evidence. Variants of "
+            "uncertain significance (VUS) are excluded from routes; set include_vus=true only "
+            "when the user explicitly asks to include uncertain variants.",
             PathIn,
             find_path,
         ),
