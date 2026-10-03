@@ -1,0 +1,178 @@
+"use client";
+
+import { Menu, Search } from "lucide-react";
+import Image from "next/image";
+import Link from "next/link";
+import { usePathname } from "next/navigation";
+import { useState } from "react";
+
+import { ContinueWithChatGPT } from "@/components/gates/continue-with-chatgpt";
+import { useSession } from "@/components/providers/session-provider";
+import { useSearch } from "@/components/search/search-provider";
+import { Button } from "@/components/ui/button";
+import { Kbd } from "@/components/ui/kbd";
+import { Separator } from "@/components/ui/separator";
+import { Sheet, SheetContent, SheetDescription, SheetHeader, SheetTitle, SheetTrigger } from "@/components/ui/sheet";
+import { cn } from "@/lib/utils";
+
+import { LensSwitcher } from "./lens-switcher";
+import { ThemeToggle } from "./theme-toggle";
+import { UserMenu } from "./user-menu";
+
+export const PRIMARY_NAV = [
+  { href: "/atlas", label: "Atlas" },
+  { href: "/clusters", label: "Clusters" },
+  { href: "/chat", label: "Ask Dr. Wu" },
+  { href: "/documents", label: "Documents" },
+] as const;
+
+function isActive(pathname: string, href: string) {
+  return pathname === href || pathname.startsWith(`${href}/`);
+}
+
+export function Wordmark({ className }: { className?: string }) {
+  return (
+    <Link href="/" className={cn("group flex items-center gap-2.5 rounded-md outline-none focus-visible:ring-2 focus-visible:ring-ring", className)}>
+      <Image
+        src="/amber-logo-128.png"
+        alt=""
+        width={28}
+        height={28}
+        unoptimized
+        priority
+        className="size-7 drop-shadow-sm transition-transform group-hover:-rotate-6"
+      />
+      <span className="flex items-baseline gap-1.5 leading-none">
+        <span className="text-[15px] font-semibold tracking-tight">Amber</span>
+        <span className="hidden font-mono text-[10.5px] uppercase tracking-[0.14em] text-muted-foreground lg:inline">
+          Rare Disease Atlas
+        </span>
+      </span>
+      <span className="sr-only"> — Rare Disease Atlas, home</span>
+    </Link>
+  );
+}
+
+export function SiteHeader() {
+  const pathname = usePathname() ?? "/";
+  const { user, status } = useSession();
+  const { openSearch } = useSearch();
+  const [mobileOpen, setMobileOpen] = useState(false);
+
+  return (
+    <header className="sticky top-0 z-40 border-b bg-background/85 backdrop-blur supports-[backdrop-filter]:bg-background/70">
+      <div className="mx-auto flex h-14 w-full max-w-[1440px] items-center gap-3 px-4 sm:px-6">
+        <Wordmark className="mr-2 shrink-0" />
+
+        <nav aria-label="Primary" className="hidden md:block">
+          <ul className="flex items-center gap-0.5">
+            {PRIMARY_NAV.map((item) => {
+              const active = isActive(pathname, item.href);
+              return (
+                <li key={item.href}>
+                  <Link
+                    href={item.href}
+                    aria-current={active ? "page" : undefined}
+                    className={cn(
+                      "relative rounded-md px-3 py-1.5 text-sm text-muted-foreground transition-colors outline-none hover:text-foreground focus-visible:ring-2 focus-visible:ring-ring",
+                      active && "text-foreground after:absolute after:inset-x-3 after:-bottom-[13px] after:h-0.5 after:rounded-full after:bg-primary",
+                    )}
+                  >
+                    {item.label}
+                  </Link>
+                </li>
+              );
+            })}
+          </ul>
+        </nav>
+
+        <div className="ml-auto flex items-center gap-1">
+          <button
+            type="button"
+            onClick={() => openSearch()}
+            className="hidden h-8 w-56 items-center gap-2 rounded-lg border bg-card/60 px-2.5 text-sm text-muted-foreground shadow-xs transition-colors outline-none hover:bg-card hover:text-foreground focus-visible:ring-2 focus-visible:ring-ring sm:flex lg:w-64"
+            aria-label="Search the atlas"
+            aria-keyshortcuts="Meta+K Control+K"
+            data-testid="search-trigger"
+          >
+            <Search className="size-4" aria-hidden />
+            <span className="flex-1 text-left">Search the atlas…</span>
+            <Kbd className="text-[10px]">⌘K</Kbd>
+          </button>
+          <Button
+            variant="ghost"
+            size="icon"
+            className="sm:hidden"
+            aria-label="Search the atlas"
+            onClick={() => openSearch()}
+          >
+            <Search aria-hidden />
+          </Button>
+
+          <div className="hidden items-center gap-1 md:flex">
+            <LensSwitcher />
+            <ThemeToggle />
+          </div>
+
+          <div className="hidden min-w-9 items-center justify-end pl-1 md:flex">
+            {user ? (
+              <UserMenu />
+            ) : status === "loading" ? (
+              <span className="h-9 w-[178px]" aria-hidden />
+            ) : (
+              <ContinueWithChatGPT size="compact" />
+            )}
+          </div>
+
+          <Sheet open={mobileOpen} onOpenChange={setMobileOpen}>
+            <SheetTrigger render={<Button variant="ghost" size="icon" className="md:hidden" aria-label="Open menu" />}>
+              <Menu aria-hidden />
+            </SheetTrigger>
+            <SheetContent side="right" className="w-[86vw] max-w-sm gap-0 p-0">
+              <SheetHeader className="border-b px-5 py-4">
+                <SheetTitle>Menu</SheetTitle>
+                <SheetDescription className="sr-only">Navigation and settings</SheetDescription>
+              </SheetHeader>
+              <nav aria-label="Primary" className="px-3 py-3">
+                <ul className="space-y-0.5">
+                  {PRIMARY_NAV.map((item) => (
+                    <li key={item.href}>
+                      <Link
+                        href={item.href}
+                        onClick={() => setMobileOpen(false)}
+                        aria-current={isActive(pathname, item.href) ? "page" : undefined}
+                        className="flex rounded-md px-3 py-2.5 text-base text-muted-foreground hover:bg-muted hover:text-foreground aria-[current=page]:bg-accent aria-[current=page]:text-accent-foreground"
+                      >
+                        {item.label}
+                      </Link>
+                    </li>
+                  ))}
+                </ul>
+              </nav>
+              <Separator />
+              <div className="flex items-center justify-between px-5 py-3">
+                <span className="text-sm text-muted-foreground">Lens</span>
+                <LensSwitcher />
+              </div>
+              <div className="flex items-center justify-between px-5 py-3">
+                <span className="text-sm text-muted-foreground">Theme</span>
+                <ThemeToggle />
+              </div>
+              <Separator />
+              <div className="px-5 py-4">
+                {user ? (
+                  <div className="flex items-center justify-between">
+                    <span className="truncate text-sm">{user.name || user.email}</span>
+                    <UserMenu />
+                  </div>
+                ) : (
+                  <ContinueWithChatGPT className="w-full" onClick={() => setMobileOpen(false)} />
+                )}
+              </div>
+            </SheetContent>
+          </Sheet>
+        </div>
+      </div>
+    </header>
+  );
+}

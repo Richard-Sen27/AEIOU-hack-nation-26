@@ -92,7 +92,7 @@
   --sidebar-accent-foreground: oklch(0.8053 0.1071 154.1404);
   --sidebar-border: oklch(0.3594 0.0178 161.5528);
   --sidebar-ring: oklch(0.8118 0.1488 68.9938);
-  --font-sans: ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, 'Noto Sans', sans-serif, 'Apple Color Emoji', 'Segoe UI Emoji', 'Segoe UI Symbol', 'Noto Color Emoji';
+  --font-sans: var(--font-archivo), Archivo, ui-sans-serif, system-ui, sans-serif;
   --font-serif: var(--font-archivo), Archivo, ui-sans-serif, sans-serif, system-ui;
   --font-mono: var(--font-jetbrains-mono), JetBrains Mono, ui-monospace, monospace;
   --radius: 0.8rem;
@@ -110,6 +110,53 @@
   --shadow-lg: 0 1px 3px 0px hsl(0 0% 0% / 0.10), 0 4px 6px -1px hsl(0 0% 0% / 0.10);
   --shadow-xl: 0 1px 3px 0px hsl(0 0% 0% / 0.10), 0 8px 10px -1px hsl(0 0% 0% / 0.10);
   --shadow-2xl: 0 1px 3px 0px hsl(0 0% 0% / 0.25);
+}
+
+/* ------------------------------------------------------------------
+ * Graph tokens (added by the frontend foundation). Built only from the
+ * chart palette above, so light and dark follow automatically. Colour is
+ * never the only signal: icons, line style and text always accompany it.
+ * ------------------------------------------------------------------ */
+:root {
+  /* edge families */
+  --edge-dna: var(--chart-2);
+  --edge-symptoms: var(--chart-5);
+  --edge-research: var(--chart-3);
+  --edge-community: var(--chart-4);
+
+  /* node types: biology */
+  --node-disease: var(--chart-1);
+  --node-gene: var(--chart-2);
+  --node-variant: color-mix(in oklch, var(--chart-2) 60%, var(--foreground));
+  --node-mechanism: color-mix(in oklch, var(--chart-2) 55%, var(--chart-3));
+  --node-pathway: color-mix(in oklch, var(--chart-2) 45%, var(--chart-1));
+  --node-phenotype: var(--chart-5);
+  /* research */
+  --node-paper: var(--chart-3);
+  --node-claim: color-mix(in oklch, var(--chart-3) 65%, var(--foreground));
+  --node-researcher: color-mix(in oklch, var(--chart-3) 60%, var(--chart-4));
+  --node-grant: color-mix(in oklch, var(--chart-3) 50%, var(--chart-1));
+  /* clinical */
+  --node-doctor: var(--chart-4);
+  --node-institution: color-mix(in oklch, var(--chart-4) 60%, var(--foreground));
+  --node-network: color-mix(in oklch, var(--chart-4) 55%, var(--chart-3));
+  --node-trial: color-mix(in oklch, var(--chart-4) 50%, var(--chart-5));
+  /* community */
+  --node-patient-org: color-mix(in oklch, var(--chart-5) 55%, var(--chart-4));
+  --node-registry: color-mix(in oklch, var(--chart-5) 60%, var(--foreground));
+  /* cluster hulls */
+  --node-cluster: var(--muted-foreground);
+
+  /* trust layer */
+  --confidence-high: var(--chart-2);
+  --confidence-medium: var(--chart-1);
+  --confidence-low: var(--destructive);
+  --status-flag: var(--chart-5);
+  --graph-highlight: var(--primary);
+  --graph-dim: color-mix(in oklch, var(--muted-foreground) 35%, transparent);
+  --graph-label: var(--foreground);
+  --graph-bg: var(--background);
+  --grid-line: color-mix(in oklch, var(--foreground) 6%, transparent);
 }
 
 @theme inline {
@@ -146,6 +193,33 @@
   --color-sidebar-border: var(--sidebar-border);
   --color-sidebar-ring: var(--sidebar-ring);
 
+  --color-edge-dna: var(--edge-dna);
+  --color-edge-symptoms: var(--edge-symptoms);
+  --color-edge-research: var(--edge-research);
+  --color-edge-community: var(--edge-community);
+  --color-node-disease: var(--node-disease);
+  --color-node-gene: var(--node-gene);
+  --color-node-variant: var(--node-variant);
+  --color-node-mechanism: var(--node-mechanism);
+  --color-node-pathway: var(--node-pathway);
+  --color-node-phenotype: var(--node-phenotype);
+  --color-node-paper: var(--node-paper);
+  --color-node-claim: var(--node-claim);
+  --color-node-researcher: var(--node-researcher);
+  --color-node-grant: var(--node-grant);
+  --color-node-doctor: var(--node-doctor);
+  --color-node-institution: var(--node-institution);
+  --color-node-network: var(--node-network);
+  --color-node-trial: var(--node-trial);
+  --color-node-patient-org: var(--node-patient-org);
+  --color-node-registry: var(--node-registry);
+  --color-node-cluster: var(--node-cluster);
+  --color-confidence-high: var(--confidence-high);
+  --color-confidence-medium: var(--confidence-medium);
+  --color-confidence-low: var(--confidence-low);
+  --color-status-flag: var(--status-flag);
+  --color-graph-highlight: var(--graph-highlight);
+
   --font-sans: var(--font-sans);
   --font-mono: var(--font-mono);
   --font-serif: var(--font-serif);
@@ -175,5 +249,32 @@
   }
   html {
     @apply font-sans;
+  }
+  ::selection {
+    background: color-mix(in oklch, var(--primary) 35%, transparent);
+  }
+}
+
+@layer utilities {
+  /* Faint coordinate grid, the atlas motif. */
+  .bg-atlas-grid {
+    background-image:
+      linear-gradient(to right, var(--grid-line) 1px, transparent 1px),
+      linear-gradient(to bottom, var(--grid-line) 1px, transparent 1px);
+    background-size: 32px 32px;
+  }
+  .tabular {
+    font-variant-numeric: tabular-nums;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+    scroll-behavior: auto !important;
   }
 }
