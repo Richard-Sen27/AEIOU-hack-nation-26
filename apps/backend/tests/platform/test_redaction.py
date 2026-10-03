@@ -170,3 +170,52 @@ def test_test_dates_survive_but_birth_dates_do_not():
     result = redact(text)
     assert "2024-03-01" in result.text and "12.03.2024" in result.text
     assert "01.02.2020" not in result.text
+
+
+@pytest.mark.parametrize(
+    "text,address",
+    [
+        ("Mrs. Rossi lives at 14 Via Roma. KCNQ2 encephalopathy.", "14 Via Roma"),
+        ("Indirizzo: Via Roma 14, Milano.", "Via Roma 14"),
+        ("Residenza: Corso Vittorio Emanuele II 45", "Corso Vittorio Emanuele II 45"),
+        ("Piazza della Signoria 3, Firenze", "Piazza della Signoria 3"),
+        ("Viale dei Mille 12/B", "Viale dei Mille 12/B"),
+        ("Adresse : 12 rue de la Paix, Paris", "12 rue de la Paix"),
+        ("5 Avenue des Champs-Élysées", "5 Avenue des Champs-Élysées"),
+        ("Boulevard Saint-Michel 10", "Boulevard Saint-Michel 10"),
+        ("3 chemin des Vignes, Lyon", "3 chemin des Vignes"),
+        ("Calle Mayor 5, Madrid", "Calle Mayor 5"),
+        ("Avenida da Liberdade 110", "Avenida da Liberdade 110"),
+        ("Plaza de España 2", "Plaza de España 2"),
+        ("Paseo de Gracia 43", "Paseo de Gracia 43"),
+        ("Rua Augusta 100, Lisboa", "Rua Augusta 100"),
+        ("Kalverstraat 12, Amsterdam", "Kalverstraat 12"),
+        ("Wilhelminalaan 3", "Wilhelminalaan 3"),
+        ("Mariahilfer Gasse 7", "Mariahilfer Gasse 7"),
+        ("Platz der Republik 1", "Platz der Republik 1"),
+        ("Hauptstraße 12a, Graz", "Hauptstraße 12a"),
+    ],
+)
+def test_european_street_forms(text, address):
+    result = redact(text)
+    assert address not in result.text
+    assert "<ADDRESS>" in result.text
+    for word in address.split():
+        if len(word) > 3 and not word[0].isdigit():
+            assert word not in result.text, (word, result.text)
+
+
+@pytest.mark.parametrize(
+    "text",
+    [
+        "Inhibition via the pathway is shown.",
+        "STXBP1 acts via Notch signaling in 2 cohorts.",
+        "West syndrome and Dravet syndrome; SCN1A via exon 26.",
+        "Seen at age 2 via telemedicine.",
+        "Gruel route 3 times daily.",
+        "CDKL5 c.215T>C reported via Place-holder notes.",
+        "Ohtahara syndrome evolves via West syndrome in 3 of 10 cases.",
+    ],
+)
+def test_street_recognizers_do_not_eat_medical_prose(text):
+    assert redact(text).text == text

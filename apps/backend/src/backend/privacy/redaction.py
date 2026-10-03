@@ -136,8 +136,64 @@ _POSTAL_CITY = (
 )
 _US_CITY_ZIP = r"(?P<v>[A-Z][a-zA-Z]+(?:\s[A-Z][a-zA-Z]+)?,\s[A-Z]{2}\s\d{5}(?:-\d{4})?)"
 _PO_BOX = r"(?P<v>(?i:p\.?\s?o\.?\s?box|postfach)\s\d+)"
+# Continental European street forms, number before or after the street word ("14 Via Roma",
+# "Via Roma 14", "12 rue de la Paix", "Calle Mayor 5", "Kalverstraat 12"). Every form needs a
+# house number next to a capitalised street name, so prose like "via the pathway", "acts via
+# Notch" or "West syndrome" never matches; the lower-case street word is only accepted for the
+# French/Iberian words that are conventionally written that way, and only after a number.
+_EU_STREET_WORDS = (
+    r"(?:Via|Viale|Vicolo|Piazza|Piazzale|Corso|Largo|Strada|Rue|Avenue|Av\.|Boulevard|Bd\.?|"
+    r"Chemin|Allée|Impasse|Place|Quai|Route|Calle|Avenida|Avda\.|Plaza|Paseo|Carrer|Camino|"
+    r"Carretera|Ronda|Travesía|Rua|Praça|Travessa|Estrada|Straat|Laan|Weg|Gasse|Platz|Allee|"
+    r"Ulica|Ul\.)"
+)
+_EU_LOWER_WORDS = (
+    r"(?:rue|avenue|boulevard|chemin|allée|impasse|place|quai|calle|avenida|plaza|paseo|carrer|"
+    r"camino|rua|praça|travessa|estrada)"
+)
+_EU_CONNECTOR = (
+    r"(?:de|del|della|delle|dei|degli|di|da|du|des|la|le|les|dos|das|do|van|von|der|den|het|"
+    r"y|e|al|alla|d'|l')"
+)
+_EU_NAME = (
+    r"(?:" + _EU_CONNECTOR + r"[ \t]+|d'|l')*[A-ZÀ-ÖØ-Þ][\w'’.\-]*"
+    r"(?:[ \t](?:" + _EU_CONNECTOR + r"[ \t]+|d'|l')*[A-ZÀ-ÖØ-Þ][\w'’.\-]*){0,3}"
+)
+_HOUSE_NO = (
+    r"\d{1,4}(?:[ \t]?(?:bis|ter|[a-zA-Z]))?(?![\w])"
+    r"(?:[ \t]?[/-][ \t]?(?:\d{1,4}[a-zA-Z]?|[A-Z](?![\w])))*"
+)
+_STREET_EU_NUMBER_FIRST = (
+    r"(?<![\w.])(?P<v>\d{1,4}(?:[ \t]?(?:bis|ter|[a-zA-Z]))?,?[ \t]+(?:"
+    + _EU_STREET_WORDS
+    + r"|"
+    + _EU_LOWER_WORDS
+    + r")[ \t]+"
+    + _EU_NAME
+    + r")"
+)
+_STREET_EU_NAME_FIRST = (
+    r"(?<![\w])(?P<v>" + _EU_STREET_WORDS + r"[ \t]+" + _EU_NAME + r",?[ \t]+" + _HOUSE_NO + r")"
+)
+_STREET_NL = (
+    r"(?<![\w])(?P<v>[A-Z][a-zà-ÿ\-]+(?:straat|laan|weg|gracht|plein|kade|singel|dijk|steeg|"
+    r"markt)[ \t]+" + _HOUSE_NO + r")"
+)
+# Knowingly not covered: a bare first name in unlabelled prose ("my son Noah"), when the
+# English NER model misses it (and in German text, where single-word NER names are ignored),
+# and street names written without a house number.
 _ADDRESS_RES = [
-    re.compile(p) for p in (_STREET_EN, _STREET_DE, _POSTAL_CITY, _US_CITY_ZIP, _PO_BOX)
+    re.compile(p)
+    for p in (
+        _STREET_EN,
+        _STREET_DE,
+        _STREET_EU_NUMBER_FIRST,
+        _STREET_EU_NAME_FIRST,
+        _STREET_NL,
+        _POSTAL_CITY,
+        _US_CITY_ZIP,
+        _PO_BOX,
+    )
 ]
 _PHONE_LABELED = re.compile(
     r"(?i:tel(?:efon)?\.?|phone|mobile|mobil|handy|fax|cell)\s*[:.]?\s*"
@@ -648,6 +704,11 @@ _NOT_NAMES = {
     "sincerely",
     "date",
     "name",
+    "indirizzo",
+    "adresse",
+    "dirección",
+    "endereço",
+    "adres",
 }
 
 
