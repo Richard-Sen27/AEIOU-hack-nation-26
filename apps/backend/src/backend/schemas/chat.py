@@ -7,7 +7,15 @@ from uuid import UUID
 from pydantic import Field
 
 from backend.schemas.common import ApiModel
-from backend.schemas.enums import ActionType, CardType, ChatRole, ChipType, ConfidenceLevel, Origin
+from backend.schemas.enums import (
+    ActionType,
+    AgeRange,
+    CardType,
+    ChatRole,
+    ChipType,
+    ConfidenceLevel,
+    Origin,
+)
 from backend.schemas.gap import GapSearchRequest
 
 
@@ -59,6 +67,24 @@ class FollowUp(ApiModel):
     skippable: bool = Field(description="Always true.")
 
 
+class ProfileHints(ApiModel):
+    """Age, onset and country from this turn's message: unconfirmed, like chips. The user
+    confirms them before they reach the PatientProfile (same types as its fields)."""
+
+    age_years: int | None = Field(None, ge=0, le=120, description="Age in years, if stated.")
+    age_range: AgeRange | None = Field(None, description="Age range, if stated instead.")
+    onset: str | None = Field(None, description="Disease onset: HPO onset term ID or label.")
+    country: str | None = Field(
+        None, pattern=r"^[A-Z]{2}$", description="ISO 3166-1 alpha-2 country, if stated."
+    )
+    about_child_suspected: bool = Field(
+        False,
+        description="The message seems to describe a child (age under 16 or a family relation "
+        "such as 'my son'): ask whether it is about the user or a child they care for, and get "
+        "the parental-responsibility confirmation, before saving chips or hints.",
+    )
+
+
 ReplyKind = Literal["answer", "emergency", "declined"]
 
 
@@ -89,6 +115,11 @@ class AgentReply(ApiModel):
         "services, no graph answer) or declined (part of the question crossed the medical "
         "boundary and was declined; graph context may still follow). Null only on replies "
         "stored before this field existed.",
+    )
+    profile_hints: ProfileHints | None = Field(
+        None,
+        description="Unconfirmed age, onset and country extracted from this turn, and whether "
+        "the message seems to be about a child. Null when nothing was found.",
     )
 
 
