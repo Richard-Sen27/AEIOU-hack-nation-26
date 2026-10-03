@@ -172,6 +172,7 @@ export const reply = {
   },
   ai_notice: null,
   gap_search: null,
+  kind: "answer",
 };
 
 export function fullTurnEvents(r: Record<string, unknown> = reply) {
@@ -181,6 +182,8 @@ export function fullTurnEvents(r: Record<string, unknown> = reply) {
     { type: "status", tool: "extract_entities", message: "Reading what you described" },
     { type: "status", tool: "resolve_to_ids", message: "Matching it to the atlas" },
     { type: "status", tool: "find_path", message: "Finding the most trustworthy connections" },
+    // Like the API: the one-line uncertainty statement comes before any summary text.
+    ...(r.uncertainty ? [{ type: "uncertainty", text: r.uncertainty }] : []),
     { type: "summary_delta", text: summary.slice(0, mid) },
     { type: "summary_delta", text: summary.slice(mid) },
     { type: "chips", chips: r.chips },

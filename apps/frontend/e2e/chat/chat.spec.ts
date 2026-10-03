@@ -109,6 +109,28 @@ test.describe("chat", () => {
     await expect(t.getByTestId("claim-confidence")).toContainText("Low");
   });
 
+  test("uncertainty event renders above the summary before the reply is final", async ({ page }) => {
+    await signedIn(page, {
+      "POST /chat": sseBody([
+        { type: "status", tool: "find_path", message: "Finding the most trustworthy connections" },
+        { type: "uncertainty", text: "All connections found here are below the confidence threshold." },
+        { type: "summary_delta", text: "These conditions may be related." },
+      ]),
+    });
+    await page.goto("/chat");
+    await ask(page, "Is STXBP1 related to SYNGAP1?");
+    const t = turn(page);
+    // No final arrived: the line comes from the uncertainty event itself.
+    await expect(t.getByTestId("turn-error")).toBeVisible();
+    await expect(t.getByTestId("uncertainty")).toContainText("below the confidence threshold");
+    const before = await t.evaluate((el) => {
+      const u = el.querySelector('[data-testid="uncertainty"]')!;
+      const s = el.querySelector('[data-testid="summary"]')!;
+      return !!(u.compareDocumentPosition(s) & Node.DOCUMENT_POSITION_FOLLOWING);
+    });
+    expect(before).toBe(true);
+  });
+
   test("claim evidence expands, with the contradiction next to its claim", async ({ page }) => {
     await signedIn(page, { "POST /chat": turnBody() });
     await page.goto("/chat");
@@ -232,7 +254,7 @@ test.describe("chat", () => {
   test("emergency reply looks different and has no graph content", async ({ page }) => {
     await signedIn(page, {
       "POST /chat": turnBody(
-        emptyReply("This sounds like an emergency. Please call emergency services (112 or 911) now."),
+        emptyReply("This sounds like an emergency. Please call emergency services (112 or 911) now.", { kind: "emergency" }),
       ),
     });
     await page.goto("/chat");
@@ -244,12 +266,45 @@ test.describe("chat", () => {
     await expect(t.getByTestId("chips")).toHaveCount(0);
   });
 
+  test("emergency panel follows the reply flag, not the wording", async ({ page }) => {
+    let next: Record<string, unknown> = emptyReply("Please get help for her right away.", { kind: "emergency" });
+    await signedIn(page, { "POST /chat": () => turnBody(next) });
+    await page.goto("/chat");
+    await ask(page, "She is not breathing");
+    await expect(turn(page).getByTestId("emergency")).toBeVisible();
+
+    // An ordinary answer that merely mentions 112 is not an emergency reply.
+    next = emptyReply("The registry hotline is 112 in some countries.", { kind: "answer" });
+    await ask(page, "What is the registry's number?");
+    await expect(turn(page)).toHaveAttribute("data-phase", "done");
+    await expect(turn(page).getByTestId("summary")).toContainText("hotline");
+    await expect(turn(page).getByTestId("emergency")).toHaveCount(0);
+  });
+
+  test("stored emergency reply without a flag still shows the emergency panel", async ({ page }) => {
+    const old = emptyReply("This sounds like an emergency. Please call emergency services (112 or 911) now.");
+    await signedIn(page, {
+      "GET /chat/sessions": [sessions[0]],
+      "GET /chat/sessions/*": {
+        session: sessions[0],
+        messages: [
+          { id: "m1", session_id: SESSION_ID, role: "user", content: "She is not breathing", created_at: "2026-10-03T10:00:00Z" },
+          { id: "m2", session_id: SESSION_ID, role: "assistant", content: old.summary, reply: old, created_at: "2026-10-03T10:00:05Z" },
+        ],
+      },
+    });
+    await page.goto("/chat");
+    await page.getByTestId("session-list").first().getByRole("button", { name: /^STXBP1 and related communities/ }).click();
+    await expect(turn(page).getByTestId("emergency")).toBeVisible();
+  });
+
   test("declined request still shows the graph context", async ({ page }) => {
     const r = {
       ...reply,
       summary: "I can't recommend a treatment; please discuss medication with her neurologist. Here is what the atlas connects to STXBP1 encephalopathy.",
       follow_up: null,
       actions: [],
+      kind: "declined",
     };
     await signedIn(page, { "POST /chat": turnBody(r) });
     await page.goto("/chat");
@@ -462,7 +517,7 @@ test.describe("chat", () => {
   });
 
   test("emergency screenshot", async ({ page }) => {
-    await signedIn(page, { "POST /chat": turnBody(emptyReply("This sounds like an emergency. Please call emergency services (112 or 911) now.")) });
+    await signedIn(page, { "POST /chat": turnBody(emptyReply("This sounds like an emergency. Please call emergency services (112 or 911) now.", { kind: "emergency" })) });
     await page.goto("/chat");
     await ask(page, "She is not breathing");
     await expect(turn(page).getByTestId("emergency")).toBeVisible();

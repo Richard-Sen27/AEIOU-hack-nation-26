@@ -150,6 +150,10 @@ export function useChat({ expertMode }: { expertMode: boolean }) {
         case "status":
           updateTurn(turnId, (t) => ({ ...t, statuses: [...t.statuses, { tool: e.tool, message: e.message }] }));
           return;
+        case "uncertainty":
+          // Sent before the summary so the uncertainty line leads the reply.
+          updateTurn(turnId, (t) => ({ ...t, reply: { ...t.reply, uncertainty: e.text } }));
+          return;
         case "summary_delta":
           updateTurn(turnId, (t) => ({ ...t, reply: { ...t.reply, summary: t.reply.summary + e.text } }));
           return;

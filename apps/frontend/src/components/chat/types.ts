@@ -80,13 +80,16 @@ export function toTurnChips(chips: Chip[], previous: TurnChip[] = []): TurnChip[
 }
 
 /**
- * The contract has no explicit emergency flag. An emergency reply (agent
- * spec: "call emergency services, no graph answer") is a finished reply
- * with no graph content whose summary points to emergency services.
+ * Emergency replies (agent spec: "call emergency services, no graph answer")
+ * carry `kind: "emergency"`. Replies stored before `kind` existed have no
+ * flag; for those only, fall back to the old heuristic: a finished reply with
+ * no graph content whose summary points to emergency services.
  */
 export function isEmergencyReply(turn: AssistantTurn): boolean {
-  if (turn.phase === "streaming" && !turn.final) return false;
   const r = turn.reply;
+  if (r.kind === "emergency") return true;
+  if (r.kind != null) return false;
+  if (turn.phase === "streaming" && !turn.final) return false;
   const noGraph =
     r.chips.length === 0 &&
     r.claims.length === 0 &&
