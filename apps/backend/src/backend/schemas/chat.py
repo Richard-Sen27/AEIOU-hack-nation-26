@@ -7,6 +7,7 @@ from pydantic import Field
 
 from backend.schemas.common import ApiModel
 from backend.schemas.enums import ActionType, CardType, ChatRole, ChipType, ConfidenceLevel, Origin
+from backend.schemas.gap import GapSearchRequest
 
 
 class Chip(ApiModel):
@@ -70,6 +71,14 @@ class AgentReply(ApiModel):
     graph_focus: GraphFocus | None
     actions: list[Action]
     follow_up: FollowUp | None
+    gap_search: GapSearchRequest | None = Field(
+        None,
+        description="Set when no supported route exists: body for POST /gap-search to look for "
+        "the missing evidence.",
+    )
+    ai_notice: str | None = Field(
+        None, description="Always set by the server: the reply comes from an AI system."
+    )
 
 
 class ChatRequest(ApiModel):
