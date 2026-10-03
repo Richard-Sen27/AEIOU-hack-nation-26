@@ -117,7 +117,9 @@ async def test_revoke_upload_deletes_documents_findings_and_profile_items(make_u
     app = await connect_as("atlas_app")
     async with app.transaction():
         await app.execute("SELECT set_config('app.user_id', $1, true)", str(user.id))
-        doc = await app.fetchval("INSERT INTO documents (user_id) VALUES ($1) RETURNING id", user.id)
+        doc = await app.fetchval(
+            "INSERT INTO documents (user_id) VALUES ($1) RETURNING id", user.id
+        )
         finding = await app.fetchval(
             "INSERT INTO findings (document_id, user_id, type, value, normalized_id)"
             " VALUES ($1, $2, 'gene', 'STXBP1', 'HGNC:11444') RETURNING id",
@@ -131,8 +133,12 @@ async def test_revoke_upload_deletes_documents_findings_and_profile_items(make_u
         )
         profile = {
             "genes": [
-                {"id": "HGNC:11444", "label": "STXBP1", "source": "document",
-                 "finding_id": str(finding)},
+                {
+                    "id": "HGNC:11444",
+                    "label": "STXBP1",
+                    "source": "document",
+                    "finding_id": str(finding),
+                },
                 {"id": "HGNC:10590", "label": "SCN1A", "source": "manual"},
             ],
             "phenotypes": [{"id": "HP:0001250", "label": "Seizure", "source": "chat"}],
@@ -165,9 +171,10 @@ async def test_revoke_contribute_removes_contributions_from_shared_graph(make_us
     assert (await user.client.delete("/consents/contribute")).status_code == 204
     shared = {row["id"] for row in await superuser.fetch("SELECT id FROM shared_contributions()")}
     assert cid not in shared
-    assert await superuser.fetchval(
-        "SELECT count(*) FROM contributions WHERE user_id = $1", user.id
-    ) == 0
+    assert (
+        await superuser.fetchval("SELECT count(*) FROM contributions WHERE user_id = $1", user.id)
+        == 0
+    )
     assert_error(await user.client.post("/contributions", json=ASSET), 403, "consent_required")
 
 
