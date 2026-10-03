@@ -96,7 +96,13 @@ export function ConsentContent({ type, onGranted, onCancel }: ConsentContentProp
 
   return (
     <div className="flex min-h-0 flex-col gap-4" data-testid={`consent-content-${type}`}>
-      <div className="-mx-1 max-h-[46vh] space-y-4 overflow-y-auto px-1 text-sm leading-relaxed text-muted-foreground sm:max-h-[50vh]">
+      <div
+        data-consent-notice
+        tabIndex={-1}
+        role="region"
+        aria-label="What you agree to"
+        className="-mx-1 max-h-[46vh] space-y-4 overflow-y-auto px-1 text-sm leading-relaxed text-muted-foreground outline-none focus-visible:ring-2 focus-visible:ring-ring sm:max-h-[50vh]"
+      >
         <p className="text-foreground">{notice.summary}</p>
         <Section title="What we process">
           <Bullets items={notice.processed} />

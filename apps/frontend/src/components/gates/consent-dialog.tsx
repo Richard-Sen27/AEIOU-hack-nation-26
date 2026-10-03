@@ -24,7 +24,12 @@ export function ConsentDialog({
 }) {
   return (
     <Dialog open={type !== null} onOpenChange={(open) => !open && onCancel()}>
-      <DialogContent className="sm:max-w-lg" data-testid="consent-dialog">
+      <DialogContent
+        className="sm:max-w-lg"
+        data-testid="consent-dialog"
+        // Start at the top of the notice, not at its first link further down.
+        initialFocus={() => document.querySelector<HTMLElement>("[data-consent-notice]")}
+      >
         {type && (
           <>
             <DialogHeader className="gap-3">
