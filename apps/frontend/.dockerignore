@@ -1,0 +1,11 @@
+# Dependencies are installed in the image; build output, test artefacts and env files stay out.
+node_modules
+.next
+.next-*
+out
+test-results*
+playwright-report
+e2e
+*.tsbuildinfo
+.env*
+.DS_Store
