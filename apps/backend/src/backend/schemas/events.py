@@ -145,6 +145,7 @@ class GapFinalEvent(ApiModel):
     type: Literal["final"] = "final"
     candidate_count: int
     stop_reason: GapStopReason
+    job_id: UUID | None = Field(None, description="Job row that keeps the result for the user.")
 
 
 class GapErrorEvent(StreamError):

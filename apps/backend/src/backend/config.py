@@ -1,6 +1,7 @@
 from functools import lru_cache
 from pathlib import Path
 
+from pydantic import AliasChoices, Field
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
 ENV_FILE = Path(__file__).resolve().parents[2] / ".env"
@@ -24,6 +25,13 @@ class Settings(BaseSettings):
     cors_extra_origin_regex: str | None = None
     api_url: str = "http://127.0.0.1:8000"
     demo_mode: bool = False
+
+    # Gap-search agent: optional public data source keys (empty = off / unauthenticated).
+    brightdata_api_key: str | None = Field(
+        None, validation_alias=AliasChoices("BRIGHTDATA_API_KEY", "BRIGHT_DATA_API_KEY")
+    )
+    brightdata_serp_zone: str | None = None
+    ncbi_api_key: str | None = None
 
 
 @lru_cache

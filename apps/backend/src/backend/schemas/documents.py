@@ -49,3 +49,6 @@ class Job(ApiModel):
     document_id: UUID | None = None
     error: str | None = Field(None, description="Error code only, never content.")
     created_at: datetime
+    result: dict[str, Any] | None = Field(
+        None, description="Job result: stage and counts; gap search keeps its candidates here."
+    )

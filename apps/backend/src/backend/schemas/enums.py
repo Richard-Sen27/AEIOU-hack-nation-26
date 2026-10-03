@@ -227,6 +227,7 @@ class FindingType(StrEnum):
 
 class JobKind(StrEnum):
     document_extraction = "document_extraction"
+    gap_search = "gap_search"
 
 
 class JobStatus(StrEnum):
