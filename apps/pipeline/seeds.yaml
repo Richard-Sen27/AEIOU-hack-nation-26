@@ -37,6 +37,10 @@ expansion:
   # Diseases linked to a seed gene are always in scope (hop 0).
   max_hops: 2
   via: [shared_gene, shared_pathway, hpo_similarity]
+  # Non-seed diseases must be rare (MONDO "rare" subset or an Orphanet entry) and must not be
+  # broad parent terms ("epilepsy", "intellectual disability") with many MONDO descendants.
+  require_rare: true
+  max_descendants: 30
   # Gene-disease links that count for expansion (sources merged in Stage 4 anyway).
   gene_disease_sources: [mondo, clingen, orphanet, hpo]
   # Grouping diseases ("intellectual disability", ...) have many genes; they may be in scope

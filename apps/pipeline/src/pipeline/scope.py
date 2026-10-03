@@ -61,12 +61,15 @@ def expand(
     cfg: dict[str, Any],
     pathway_genes: dict[str, set[str]] | None = None,
     hpo_scores=None,
+    eligible=None,
 ) -> dict[str, dict[str, Any]]:
     """Breadth-first expansion over the disease graph (shared gene, shared pathway, HPO).
 
     Returns {mondo_id: {"hop": n, "via": reason, "score": s}}. ``hpo_scores(frontier, pool)``
-    returns a (len(frontier), len(pool)) similarity matrix.
+    returns a (len(frontier), len(pool)) similarity matrix. ``eligible(mondo_id)`` filters every
+    non-seed disease (rarity and breadth rules).
     """
+    eligible = eligible or (lambda _mid: True)
     disease_genes: dict[str, set[str]] = defaultdict(set)
     gene_diseases: dict[str, set[str]] = defaultdict(set)
     for mid, hid in gd.select("mondo_id", "hgnc_id").iter_rows():
@@ -82,7 +85,8 @@ def expand(
         scope[mid] = {"hop": 0, "via": "seed", "score": 1.0}
     for g in seed_genes:
         for mid in gene_diseases.get(g, ()):
-            scope.setdefault(mid, {"hop": 0, "via": f"seed gene {g}", "score": 1.0})
+            if eligible(mid):
+                scope.setdefault(mid, {"hop": 0, "via": f"seed gene {g}", "score": 1.0})
     frontier = set(scope)
 
     gene_pathways: dict[str, set[str]] = defaultdict(set)
@@ -96,7 +100,7 @@ def expand(
         cand: dict[str, tuple[float, str]] = {}
 
         def offer(mid: str, score: float, reason: str) -> None:
-            if mid in scope:
+            if mid in scope or not eligible(mid):
                 return
             if mid not in cand or cand[mid][0] < score:
                 cand[mid] = (score, reason)
@@ -116,7 +120,7 @@ def expand(
                                 if len(disease_genes.get(d2, ())) <= max_expand:
                                     offer(d2, 0.5, f"shared pathway {pid} with {d}")
         if "hpo_similarity" in via and hpo_scores is not None:
-            pool = [d for d in hpo_sim.disease_terms() if d not in scope]
+            pool = [d for d in hpo_sim.disease_terms() if d not in scope and eligible(d)]
             front = sorted(frontier)
             if pool and front:
                 sims = hpo_scores(front, pool)
@@ -150,6 +154,44 @@ def expand(
             frontier.add(mid)
         log.info("hop %d: %d candidates, %d added", hop, len(cand), len(ranked))
     return scope
+
+
+def eligibility(cfg: dict[str, Any], seeds: set[str]):
+    """Rule-based filter for non-seed diseases: rare (MONDO rare subset or an Orphanet entry)
+    and not a broad parent term (too many MONDO descendants)."""
+    terms = bio.mondo_terms().filter(~pl.col("deprecated"))
+    children: dict[str, list[str]] = defaultdict(list)
+    rare: set[str] = set()
+    for mid, parents, is_rare, matches in terms.select(
+        "id", "parents", "rare", "exact_matches"
+    ).iter_rows():
+        for p in parents:
+            children[p].append(mid)
+        if is_rare or any(m.startswith("ORPHA:") for m in matches):
+            rare.add(mid)
+    max_desc = cfg.get("max_descendants", 30)
+    require_rare = cfg.get("require_rare", True)
+    cache: dict[str, int] = {}
+
+    def n_desc(mid: str) -> int:
+        if mid not in cache:
+            seen, stack = set(), list(children.get(mid, ()))
+            while stack and len(seen) <= max_desc:
+                c = stack.pop()
+                if c not in seen:
+                    seen.add(c)
+                    stack.extend(children.get(c, ()))
+            cache[mid] = len(seen)
+        return cache[mid]
+
+    def ok(mid: str) -> bool:
+        if mid in seeds:
+            return True
+        if require_rare and mid not in rare:
+            return False
+        return n_desc(mid) <= max_desc
+
+    return ok
 
 
 def select_genes(
@@ -226,6 +268,7 @@ def run() -> dict[str, Any]:
         cfg,
         pathway_genes=pathway_genes,
         hpo_scores=hpo_sim.cosine_matrix,
+        eligible=eligibility(cfg, set(seed_diseases)),
     )
     gene_ids = select_genes(set(scope_map), set(seed_genes), gd, cfg)
     phenotypes = select_phenotypes(set(scope_map), cfg.get("phenotypes_per_disease", 25))
