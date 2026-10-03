@@ -50,7 +50,11 @@ def leftovers(scope: Scope) -> list[dict]:
     found: dict[str, dict] = {}
     genes = scope.gene_ids
     for r in bio.orphanet_genes().iter_rows(named=True):
-        if r["hgnc_id"] in genes and r["orpha"] not in x2m and r["assoc_type"] in bio.CAUSAL_ORPHA_TYPES:
+        if (
+            r["hgnc_id"] in genes
+            and r["orpha"] not in x2m
+            and r["assoc_type"] in bio.CAUSAL_ORPHA_TYPES
+        ):
             found.setdefault(r["orpha"], {"id": r["orpha"], "name": r["name"], "genes": set()})
             found[r["orpha"]]["genes"].add(r["hgnc_id"])
     names = dict(bio.hpoa().select("disease_id", "disease_name").unique("disease_id").iter_rows())
@@ -59,7 +63,8 @@ def leftovers(scope: Scope) -> list[dict]:
         hid = e2h.get(r["entrez_id"])
         if hid in genes and r["disease_id"] not in x2m and r["disease_id"] in names:
             d = found.setdefault(
-                r["disease_id"], {"id": r["disease_id"], "name": names[r["disease_id"]], "genes": set()}
+                r["disease_id"],
+                {"id": r["disease_id"], "name": names[r["disease_id"]], "genes": set()},
             )
             d["genes"].add(hid)
     return list(found.values())
@@ -122,7 +127,11 @@ async def run(scope: Scope) -> None:
         }
         chosen = None
         if cands and cands[0]["trigram"] >= 0.95:
-            chosen, decision["method"], decision["confidence"] = cands[0]["mondo_id"], "exact_label", 1.0
+            chosen, decision["method"], decision["confidence"] = (
+                cands[0]["mondo_id"],
+                "exact_label",
+                1.0,
+            )
         elif llm is None:
             decision["method"] = "skipped_no_llm"
         else:
@@ -138,7 +147,9 @@ async def run(scope: Scope) -> None:
                         {"disease": item["name"], "source_id": item["id"], "candidates": cands}
                     ),
                 )
-                decision.update(method="llm", choice=out.choice, confidence=out.confidence, reason=out.reason)
+                decision.update(
+                    method="llm", choice=out.choice, confidence=out.confidence, reason=out.reason
+                )
                 valid = {c["mondo_id"] for c in cands}
                 if out.choice in valid and out.confidence >= ACCEPT_CONFIDENCE:
                     chosen = out.choice
@@ -157,7 +168,10 @@ async def run(scope: Scope) -> None:
                         source_type="orphanet" if item["id"].startswith("ORPHA") else "hpo",
                         source_ref=item["id"],
                         url=None,
-                        quote=f"{item['name']} ({item['id']}) linked to {chosen} ({decision['method']})",
+                        quote=(
+                            f"{item['name']} ({item['id']}) linked to {chosen} "
+                            f"({decision['method']})"
+                        ),
                         features={
                             "linked_by": decision["method"],
                             "link_confidence": decision.get("confidence"),
@@ -173,4 +187,3 @@ async def run(scope: Scope) -> None:
         counts[d["method"]] += 1
     log.info("linking: %d leftovers %s, %d assertions", len(items), dict(counts), len(rows))
     write_tables("linking", [], [], rows)
-

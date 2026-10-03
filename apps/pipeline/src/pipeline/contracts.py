@@ -142,7 +142,11 @@ def record_raw(
 ) -> dict[str, Any]:
     """Record (or replace) the metadata entry for one raw file in data/raw/<source>/_meta.json."""
     path = Path(path)
-    rel = path.relative_to(RAW / source).as_posix() if path.is_relative_to(RAW / source) else str(path)
+    rel = (
+        path.relative_to(RAW / source).as_posix()
+        if path.is_relative_to(RAW / source)
+        else str(path)
+    )
     record = {
         "file": rel,
         "url": url,
@@ -172,7 +176,9 @@ def _frame(rows: pl.DataFrame | Iterable[Mapping[str, Any]], schema: dict[str, p
         df = df.select([pl.col(c).cast(t) for c, t in schema.items()])
     else:
         rows = [{c: _cell(r.get(c)) for c in schema} for r in rows]
-        df = pl.DataFrame(rows, schema=schema, orient="row") if rows else pl.DataFrame(schema=schema)
+        df = (
+            pl.DataFrame(rows, schema=schema, orient="row") if rows else pl.DataFrame(schema=schema)
+        )
     return df
 
 

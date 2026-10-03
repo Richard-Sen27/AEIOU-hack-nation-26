@@ -10,7 +10,9 @@ BASE = "https://reactome.org/download/current/"
 async def fetch(scope: Scope | None) -> None:
     await download("reactome", BASE + "NCBI2Reactome.txt", "NCBI2Reactome.txt")
     await download("reactome", BASE + "ReactomePathways.txt", "ReactomePathways.txt")
-    await download("reactome", BASE + "ReactomePathwaysRelation.txt", "ReactomePathwaysRelation.txt")
+    await download(
+        "reactome", BASE + "ReactomePathwaysRelation.txt", "ReactomePathwaysRelation.txt"
+    )
 
 
 def normalize(scope: Scope) -> None:

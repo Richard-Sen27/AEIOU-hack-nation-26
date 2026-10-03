@@ -11,7 +11,9 @@ FILES = {
     "en_product6.xml": "gene associations",
     "en_product9_prev.xml": "epidemiology (prevalence)",
 }
-LICENSE = "CC BY 4.0, Orphanet: an online rare disease and orphan drug data base. INSERM. www.orpha.net"
+LICENSE = (
+    "CC BY 4.0, Orphanet: an online rare disease and orphan drug data base. INSERM. www.orpha.net"
+)
 
 
 async def fetch(scope: Scope | None) -> None:

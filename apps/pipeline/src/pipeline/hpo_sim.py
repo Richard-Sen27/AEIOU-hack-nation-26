@@ -35,9 +35,10 @@ def _prepare() -> None:
             for line in fin:
                 fout.write(pattern.sub(r"\1", line))
     for name in ("phenotype.hpoa", "genes_to_phenotype.txt"):
-        if not (PYHPO_DIR / name).exists() or (PYHPO_DIR / name).stat().st_mtime < (
-            RAW / "hpo" / name
-        ).stat().st_mtime:
+        if (
+            not (PYHPO_DIR / name).exists()
+            or (PYHPO_DIR / name).stat().st_mtime < (RAW / "hpo" / name).stat().st_mtime
+        ):
             shutil.copy(RAW / "hpo" / name, PYHPO_DIR / name)
 
 
@@ -91,11 +92,13 @@ def bma(terms_a, terms_b, method: str = "lin") -> float:
     """pyhpo best-match-average similarity between two term sets."""
     if not terms_a or not terms_b:
         return 0.0
-    return float(hposet(terms_a).similarity(hposet(terms_b), kind=IC_KIND, method=method, combine="BMA"))
+    return float(
+        hposet(terms_a).similarity(hposet(terms_b), kind=IC_KIND, method=method, combine="BMA")
+    )
 
 
 def cosine_matrix(rows: list[str], cols: list[str]) -> np.ndarray:
-    """Cheap IC-weighted cosine on ancestor-expanded term sets (used to pre-filter at scope time)."""
+    """Cheap IC-weighted cosine on ancestor-expanded term sets (pre-filter at scope time)."""
     dt = disease_terms()
     vocab: dict[str, int] = {}
     min_ic = 0.5  # ignore near-root terms

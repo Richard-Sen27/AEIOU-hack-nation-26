@@ -52,7 +52,9 @@ async def fetch(scope: Scope | None) -> None:
     if dest.exists() and rec and rec.get("pmids") == pmids:
         return
     async with get_client("curated") as client:
-        r = await client.get(ESUMMARY, params={"db": "pubmed", "id": ",".join(pmids), "retmode": "json"})
+        r = await client.get(
+            ESUMMARY, params={"db": "pubmed", "id": ",".join(pmids), "retmode": "json"}
+        )
         r.raise_for_status()
     dest.parent.mkdir(parents=True, exist_ok=True)
     dest.write_text(json.dumps(r.json(), indent=1))
@@ -116,7 +118,11 @@ def normalize(scope: Scope) -> None:
         if not src or not tgt or (f.get("disease") and not disease):
             skipped.append((f["source"], f["relation"], f["target"], f.get("disease")))
             continue
-        features = {"disease": disease, "curated_file": f["_file"]} if disease else {"curated_file": f["_file"]}
+        features = (
+            {"disease": disease, "curated_file": f["_file"]}
+            if disease
+            else {"curated_file": f["_file"]}
+        )
         rows.append(
             assertion(
                 src,

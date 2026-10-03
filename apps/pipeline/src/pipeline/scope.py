@@ -99,7 +99,7 @@ def expand(
             break
         cand: dict[str, tuple[float, str]] = {}
 
-        def offer(mid: str, score: float, reason: str) -> None:
+        def offer(mid: str, score: float, reason: str, cand=cand) -> None:
             if mid in scope or not eligible(mid):
                 return
             if mid not in cand or cand[mid][0] < score:
@@ -143,7 +143,9 @@ def expand(
                 for d, b in zip(check, best, strict=True):
                     if b < min_coh:
                         del cand[d]
-            for d in [d for d in cand if d not in annotated and not cand[d][1].startswith("shared gene")]:
+            for d in [
+                d for d in cand if d not in annotated and not cand[d][1].startswith("shared gene")
+            ]:
                 del cand[d]
         cap = caps[min(hop - 1, len(caps) - 1)]
         room = max_diseases - len(scope)
@@ -224,8 +226,14 @@ def select_phenotypes(diseases: set[str], per_disease: int) -> list[str]:
         pl.col("hpo_id").map_elements(hpo_sim.ic, return_dtype=pl.Float64).alias("ic"),
     ).filter(pl.col("ic") > 0)
     # Frequent and specific terms first.
-    dp = dp.with_columns((pl.col("ic") * pl.col("frequency").fill_null(0.5).clip(0.1, 1.0)).alias("rank"))
-    top = dp.sort(["mondo_id", "rank"], descending=[False, True]).group_by("mondo_id").head(per_disease)
+    dp = dp.with_columns(
+        (pl.col("ic") * pl.col("frequency").fill_null(0.5).clip(0.1, 1.0)).alias("rank")
+    )
+    top = (
+        dp.sort(["mondo_id", "rank"], descending=[False, True])
+        .group_by("mondo_id")
+        .head(per_disease)
+    )
     return sorted(set(top["hpo_id"].to_list()))
 
 

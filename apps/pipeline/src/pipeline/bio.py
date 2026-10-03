@@ -558,7 +558,10 @@ GO_EVIDENCE_EXCLUDE = {"IEA", "ND", "NAS"}
 @_cached("go", [("go", "goa_human.gaf.gz"), ("go", "go-basic.obo")])
 def go_annotations() -> pl.DataFrame:
     """Gene -> GO biological process, experimental/curated evidence only (no IEA/ND/NAS)."""
-    names = {k: v["name"] for k, v in _obo_terms(RAW / "go" / "go-basic.obo", "biological_process").items()}
+    names = {
+        k: v["name"]
+        for k, v in _obo_terms(RAW / "go" / "go-basic.obo", "biological_process").items()
+    }
     up = uniprot_to_hgnc()
     rows = []
     with gzip.open(RAW / "go" / "goa_human.gaf.gz", "rt") as f:
@@ -570,7 +573,15 @@ def go_annotations() -> pl.DataFrame:
                 continue
             hid = up.get(p[1]) or resolve_gene(p[2])
             if hid:
-                rows.append({"hgnc_id": hid, "go_id": p[4], "name": names[p[4]], "evidence": p[6], "ref": p[5]})
+                rows.append(
+                    {
+                        "hgnc_id": hid,
+                        "go_id": p[4],
+                        "name": names[p[4]],
+                        "evidence": p[6],
+                        "ref": p[5],
+                    }
+                )
     return pl.DataFrame(rows).unique(["hgnc_id", "go_id"], keep="first")
 
 
@@ -621,7 +632,9 @@ def gene_disease() -> pl.DataFrame:
                 "url": r["url"],
                 "polarity": "supports" if cls in CLINGEN_SUPPORTING else "contradicts",
                 "mechanism": None,
-                "detail": f"ClinGen gene-disease validity: {cls} ({r['moi']}, {r['gcep']}, {r['date']})",
+                "detail": (
+                    f"ClinGen gene-disease validity: {cls} ({r['moi']}, {r['gcep']}, {r['date']})"
+                ),
             }
         )
     unmapped = 0
@@ -667,7 +680,9 @@ def gene_disease() -> pl.DataFrame:
             }
         )
     log.info("gene_disease: %d links (%d unmapped to MONDO/HGNC)", len(rows), unmapped)
-    return pl.DataFrame(rows, infer_schema_length=None).unique(["mondo_id", "hgnc_id", "source", "ref"])
+    return pl.DataFrame(rows, infer_schema_length=None).unique(
+        ["mondo_id", "hgnc_id", "source", "ref"]
+    )
 
 
 @cache
@@ -690,7 +705,13 @@ def disease_phenotypes() -> pl.DataFrame:
         pl.col("orpha").replace_strict(x2m, default=None).alias("mondo_id"),
         pl.col("frequency_raw").replace_strict(ORPHA_FREQ, default=None).alias("frequency"),
     ).drop_nulls("mondo_id")
-    o = o.select("mondo_id", "hpo_id", "frequency", pl.col("orpha").alias("ref"), pl.lit("orphanet").alias("source"))
+    o = o.select(
+        "mondo_id",
+        "hpo_id",
+        "frequency",
+        pl.col("orpha").alias("ref"),
+        pl.lit("orphanet").alias("source"),
+    )
     df = pl.concat([a, o], how="vertical_relaxed")
     return df.filter(pl.col("frequency").is_null() | (pl.col("frequency") > 0))
 
@@ -707,7 +728,11 @@ def normalize_mondo(scope: Scope) -> None:
     terms = mondo_terms().filter(pl.col("id").is_in(list(scope.disease_ids)))
     nodes, syns = [], []
     for t in terms.iter_rows(named=True):
-        xrefs = [x for x in t["xrefs"] if x.split(":")[0] in ("OMIM", "Orphanet", "MEDGEN", "GARD", "DOID", "NORD")]
+        xrefs = [
+            x
+            for x in t["xrefs"]
+            if x.split(":")[0] in ("OMIM", "Orphanet", "MEDGEN", "GARD", "DOID", "NORD")
+        ]
         nodes.append(
             {
                 "id": t["id"],
@@ -917,9 +942,8 @@ PATHWAY_MAX_GENES = 300  # pathways larger than this (genome-wide) stay out of t
 
 def _pathway_rows(df: pl.DataFrame, id_col: str, scope: Scope) -> pl.DataFrame:
     sizes = df.group_by(id_col).len("n_genes")
-    return (
-        df.join(sizes, on=id_col)
-        .filter(pl.col("hgnc_id").is_in(list(scope.gene_ids)) & (pl.col("n_genes") <= PATHWAY_MAX_GENES))
+    return df.join(sizes, on=id_col).filter(
+        pl.col("hgnc_id").is_in(list(scope.gene_ids)) & (pl.col("n_genes") <= PATHWAY_MAX_GENES)
     )
 
 
@@ -968,7 +992,11 @@ def normalize_go(scope: Scope) -> None:
         & pl.col("n_genes").is_between(GO_MIN_GENES, GO_MAX_GENES)
     )
     # Most specific (smallest) processes first, a handful per gene keeps the graph explorable.
-    df = df.sort(["hgnc_id", "n_genes"]).group_by("hgnc_id", maintain_order=True).head(GO_MAX_PER_GENE)
+    df = (
+        df.sort(["hgnc_id", "n_genes"])
+        .group_by("hgnc_id", maintain_order=True)
+        .head(GO_MAX_PER_GENE)
+    )
     retrieved = _retrieved("go", "goa_human.gaf.gz")
     nodes, syns, rows = {}, [], []
     for r in df.iter_rows(named=True):
@@ -1124,8 +1152,12 @@ def clinvar_variants() -> pl.DataFrame:
                     "review_status": r["ReviewStatus"],
                     "stars": review_stars(r["ReviewStatus"]),
                     "consequence": consequence(r["Name"], r["Type"]),
-                    "phenotype_ids": sorted({i.strip() for i in ids if i.strip() and i.strip() != "na"}),
-                    "phenotypes": [p for p in r["PhenotypeList"].split("|") if p and p != "not provided"],
+                    "phenotype_ids": sorted(
+                        {i.strip() for i in ids if i.strip() and i.strip() != "na"}
+                    ),
+                    "phenotypes": [
+                        p for p in r["PhenotypeList"].split("|") if p and p != "not provided"
+                    ],
                     "origin": r["OriginSimple"],
                     "last_evaluated": r["LastEvaluated"],
                     "rs": r["RS# (dbSNP)"],
@@ -1161,9 +1193,15 @@ VUS_PER_OTHER_GENE = 1
 
 def select_variants(df: pl.DataFrame, per_gene: int = VARIANTS_PER_GENE, vus: int = VUS_PER_GENE):
     """Cap variants per gene: best review status first, always keep a few VUS for the UI."""
-    df = df.filter(pl.col("classification").is_in(["pathogenic", "likely_pathogenic", "uncertain_significance"]))
+    df = df.filter(
+        pl.col("classification").is_in(
+            ["pathogenic", "likely_pathogenic", "uncertain_significance"]
+        )
+    )
     df = df.with_columns(
-        pl.col("classification").replace_strict({"pathogenic": 0, "likely_pathogenic": 1, "uncertain_significance": 2}).alias("_cls"),
+        pl.col("classification")
+        .replace_strict({"pathogenic": 0, "likely_pathogenic": 1, "uncertain_significance": 2})
+        .alias("_cls"),
         pl.col("phenotype_ids").list.len().alias("_nph"),
     )
     order = ["hgnc_id", "stars", "submitters", "_cls"]
@@ -1283,7 +1321,10 @@ def normalize_clinvar(scope: Scope) -> None:
                 source_type="clinvar",
                 source_ref=f"{len(vids)} P/LP variants",
                 url=f"https://www.ncbi.nlm.nih.gov/clinvar/?term={vids[0]}",
-                quote=f"{len(vids)} pathogenic or likely pathogenic ClinVar variants annotated to this condition",
+                quote=(
+                    f"{len(vids)} pathogenic or likely pathogenic ClinVar variants "
+                    "annotated to this condition"
+                ),
                 retrieved_at=retrieved,
                 features={"n_pathogenic_variants": len(vids), "example_variation_ids": vids[:5]},
             )
