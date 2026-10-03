@@ -2,12 +2,13 @@
  * Live document journey: a synthetic genetic report (fake personal data) is
  * dropped on the landing page after the welcome step, consent is asked just in
  * time, the job runs on the real API with scripted model answers, and
- * the findings are reviewed (snippets, VUS notice, confirm, reject).
+ * the findings are reviewed (snippets, VUS notice, confirm, reject, correct).
  * Start the processes as described in live-helpers.ts, then `PORT=3106 pnpm test:e2e:live`.
  */
 import { expect, test } from "@playwright/test";
 
 import {
+  API,
   GENETIC_REPORT,
   GENETIC_REPORT_SCRIPT,
   deleteAccount,
@@ -67,8 +68,10 @@ test.describe("documents", () => {
       const cards = page.getByTestId("finding");
       await expect(cards.first()).toBeVisible();
       await shot(page, "documents-review", { fullPage: true });
-      const stxbp1 = cards.filter({ hasText: "c.1162C>T" }).first();
-      const scn2a = cards.filter({ hasText: "c.2558G>A" }).first();
+      // Variant cards list their HGVS; gene cards share the same snippet line.
+      const variants = cards.filter({ hasText: "HGVS" });
+      const stxbp1 = variants.filter({ hasText: "c.1162C>T" });
+      const scn2a = variants.filter({ hasText: "c.2558G>A" });
       await expect(stxbp1.getByTestId("finding-snippet")).toContainText("c.1162C>T");
       await expect(scn2a.getByTestId("vus-notice")).toContainText("Discuss it with a genetic counselor");
       // Redaction: the fake name never reaches the review screen.
@@ -80,9 +83,19 @@ test.describe("documents", () => {
       await expect(scn2a).toHaveAttribute("data-state", "rejected");
       await expect(page.getByTestId("review-progress")).toContainText(/2 of \d+ reviewed/);
 
-      // The confirmed finding is in the profile.
+      // A wrongly extracted gene is corrected through the entity search.
+      const geneCard = cards.filter({ hasNotText: "HGVS" }).filter({ hasText: "SCN2A" });
+      await geneCard.getByRole("button", { name: /^Correct / }).click();
+      await geneCard.getByTestId("chip-correct").getByRole("textbox").fill("SCN1A");
+      await geneCard.getByTestId("chip-correct").getByRole("button", { name: /^SCN1A\b/ }).first().click();
+      await expect(geneCard.getByTestId("finding-corrected")).toContainText("SCN1A");
+
+      // The confirmed and the corrected findings are in the profile.
+      const profile = await (await page.request.get(`${API}/profile`)).json();
+      expect(profile.variants.map((v: { hgvs: string }) => v.hgvs)).toEqual(["c.1162C>T"]);
       await page.goto("/profile");
-      await expect(page.getByTestId("profile-editor")).toContainText("STXBP1");
+      await expect(page.getByTestId("profile-variant").getByRole("textbox").first()).toHaveValue("c.1162C>T");
+      await expect(page.getByTestId("profile-gene").filter({ hasText: "SCN1A" })).toHaveCount(1);
 
       expect(urls.some((u) => /STXBP1|Testperson|1162/i.test(decodeURIComponent(u)))).toBe(false);
       expect(await storageDump(page)).not.toMatch(/STXBP1|Testperson/);
