@@ -5,6 +5,8 @@ import { useRouter } from "next/navigation";
 import { useEffect, useId, useImperativeHandle, useRef, useState } from "react";
 import { toast } from "sonner";
 
+import { needsOnboarding } from "@/components/account/onboarding";
+import { ACCEPT } from "@/components/documents/errors";
 import { useGate } from "@/components/providers/gate-provider";
 import { useSession } from "@/components/providers/session-provider";
 import { useSearch } from "@/components/search/search-provider";
@@ -18,7 +20,8 @@ import { cn } from "@/lib/utils";
 export const HERO_PROMPT =
   "Tell us about the diagnosis, a gene, or the symptoms, in your own words. Or drop a report here.";
 
-export const UPLOAD_ACCEPT = ".pdf,.png,.jpg,.jpeg,.heic,.docx,application/pdf,image/png,image/jpeg,image/heic";
+/** Same list as the documents page, so every drop zone accepts what the API accepts. */
+export const UPLOAD_ACCEPT = ACCEPT;
 
 const EXAMPLES = ["STXBP1", "Dravet syndrome", "Infantile spasms"];
 
@@ -104,7 +107,19 @@ export function HeroInput({ ref }: { ref?: React.Ref<HeroInputHandle> }) {
   async function handleFiles(list: FileList | null) {
     const files = list ? Array.from(list) : [];
     if (files.length === 0) return;
-    const ok = await requireConsent("health_data", "Reading a report needs an account and your consent.");
+    if (needsOnboarding(user)) {
+      // A first sign-in passes the welcome step before anything else; the
+      // documents page asks for consent once it is back (files kept in memory).
+      setPendingUploads(files);
+      router.push("/documents");
+      return;
+    }
+    const ok = await requireConsent(
+      "health_data",
+      user
+        ? "Reading a report needs your consent."
+        : "Reading a report needs an account and your consent. The report has not been uploaded or kept, so after signing in please add it again.",
+    );
     if (!ok) {
       if (user) toast("Nothing was uploaded", { description: "You can add a report any time from Documents." });
       return;

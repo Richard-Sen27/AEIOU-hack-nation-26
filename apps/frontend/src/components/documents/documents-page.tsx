@@ -6,6 +6,7 @@ import { useCallback, useEffect, useRef, useState } from "react";
 import { routeGlobalError } from "@/components/account/api-errors";
 import { SessionLoading, SignInPrompt } from "@/components/account/sign-in-prompt";
 import { useGate } from "@/components/providers/gate-provider";
+import { needsOnboarding } from "@/components/account/onboarding";
 import { useSession } from "@/components/providers/session-provider";
 import { apiFetch } from "@/lib/api/fetch";
 import type { Document } from "@/lib/api/generated/types.gen";
@@ -29,7 +30,6 @@ export function DocumentsPage() {
   const { requireConsent } = useGate();
   const [documents, setDocuments] = useState<Document[] | null>(null);
   const [listError, setListError] = useState<string | null>(null);
-  const pending = useRef<File[] | null>(null);
   const uploadsRef = useRef<HTMLElement>(null);
 
   const loadDocuments = useCallback(async () => {
@@ -63,17 +63,14 @@ export function DocumentsPage() {
     if (count > 0) uploadsRef.current?.scrollIntoView({ behavior: "smooth", block: "start" });
   }, [count]);
 
-  // Files handed over from the landing page or chat (in memory only).
+  // Files handed over from the landing page or chat (in memory only). Taken
+  // only once the account may upload: a first sign-in passes the welcome step
+  // first, and the files must survive that detour.
   useEffect(() => {
-    if (pending.current === null) pending.current = takePendingUploads();
-  }, []);
-
-  useEffect(() => {
-    if (status === "loading" || !pending.current?.length) return;
-    const files = pending.current;
-    pending.current = [];
-    void handleFiles(files);
-  }, [status, handleFiles]);
+    if (status === "loading" || !user || needsOnboarding(user)) return;
+    const files = takePendingUploads();
+    if (files.length) void handleFiles(files);
+  }, [status, user, handleFiles]);
 
   useEffect(() => {
     // eslint-disable-next-line react-hooks/set-state-in-effect -- fetch on sign-in, state set after await
