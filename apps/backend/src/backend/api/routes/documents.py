@@ -28,7 +28,8 @@ async def upload_document(
     db: DB,
     background: BackgroundTasks,
     file: Annotated[
-        UploadFile, File(description="PDF, PNG, JPEG, HEIC or DOCX; max 20 MB, 30 pages.")
+        UploadFile,
+        File(description="PDF, PNG, JPEG, HEIC, DOCX or plain text; max 20 MB, 30 pages."),
     ],
     user: UploadConsentUser,
 ) -> JobAccepted:
@@ -100,6 +101,7 @@ async def reject_finding(finding_id: UUID, db: DB, user: User) -> PatientProfile
     },
     operation_id="streamJob",
 )
-async def stream_job(job_id: UUID, user: User) -> EventStream:
+async def stream_job(job_id: UUID, db: DB, user: User) -> EventStream:
     """Job progress."""
+    await documents.get_job(db, user, job_id)
     return sse_response(documents.job_events(job_id, user))
