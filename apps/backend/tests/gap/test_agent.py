@@ -227,6 +227,8 @@ async def test_quote_must_come_from_a_fetched_page(llm):
         gap_search.CandidateDraft(**_candidate(quote=QUOTE.upper())),  # same, case-insensitive
         gap_search.CandidateDraft(**_candidate(source_url="https://example.org/never-fetched")),
         gap_search.CandidateDraft(**_candidate(relation="authored")),  # wrong family
+        # in the source, but does not name STXBP1
+        gap_search.CandidateDraft(**_candidate(quote="Dravet syndrome share early-onset seizures")),
     ]
     out = gap_search.verify(drafts, terms, ctx)
     assert len(out) == 1 and out[0].quote == QUOTE

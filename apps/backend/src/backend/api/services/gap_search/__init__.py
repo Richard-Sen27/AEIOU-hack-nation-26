@@ -175,10 +175,19 @@ def _norm(value: str) -> str:
     return re.sub(r"\s+", " ", value).strip().casefold()
 
 
+def _mentions(quote: str, node: PublicNode) -> bool:
+    text = _norm(quote)
+    for term in (node.label, node.id, *node.synonyms):
+        t = _norm(term)
+        if len(t) >= 3 and re.search(rf"(?<![a-z0-9]){re.escape(t)}(?![a-z0-9])", text):
+            return True
+    return False
+
+
 def verify(
     drafts: list[CandidateDraft], terms: PublicTerms, ctx: ToolContext
 ) -> list[CandidateEdge]:
-    """Keep candidates whose quote occurs in the fetched source text; drop everything else."""
+    """Keep candidates whose quote occurs in the fetched source text and names both nodes."""
     ends = {terms.source.id, terms.target.id}
     allowed = set(allowed_relations(terms.family))
     out: list[CandidateEdge] = []
@@ -191,6 +200,8 @@ def verify(
             continue
         source = ctx.sources.get(d.source_url.strip())
         if source is None or _norm(quote) not in _norm(source.text):
+            continue
+        if not (_mentions(quote, terms.source) and _mentions(quote, terms.target)):
             continue
         key = (d.relation, source.url, _norm(quote))
         if key in seen:
@@ -228,22 +239,28 @@ class _Outcome:
     runner: str
 
 
+def _json(output: dict) -> str:
+    return json.dumps(output, ensure_ascii=False)
+
+
 def _bind(ctx: ToolContext):
-    async def pubmed_search(query: str) -> dict:
+    """Agents SDK tool functions (JSON string results; the SDK would str() a dict)."""
+
+    async def pubmed_search(query: str) -> str:
         """Search PubMed abstracts. Returns pmid, url, title and abstract per article."""
-        return await gap_tools.pubmed_search(ctx, query)
+        return _json(await gap_tools.pubmed_search(ctx, query))
 
-    async def clinicaltrials_search(query: str) -> dict:
+    async def clinicaltrials_search(query: str) -> str:
         """Search ClinicalTrials.gov studies. Returns nct_id, url, title, summary, conditions."""
-        return await gap_tools.clinicaltrials_search(ctx, query)
+        return _json(await gap_tools.clinicaltrials_search(ctx, query))
 
-    async def fetch_page(url: str) -> dict:
+    async def fetch_page(url: str) -> str:
         """Fetch a public web page (http/https) and return its text."""
-        return await gap_tools.fetch_page(ctx, url)
+        return _json(await gap_tools.fetch_page(ctx, url))
 
-    async def web_search(query: str) -> dict:
+    async def web_search(query: str) -> str:
         """Search the web. Returns title, url and snippet; use fetch_page to read a result."""
-        return await gap_tools.web_search(ctx, query)
+        return _json(await gap_tools.web_search(ctx, query))
 
     fns = [pubmed_search, clinicaltrials_search, fetch_page]
     if ctx.web_search_enabled:
