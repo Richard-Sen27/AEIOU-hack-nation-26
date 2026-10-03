@@ -208,6 +208,7 @@ def _run(coro):
 
 def main(argv: list[str] | None = None) -> int:
     logging.basicConfig(level=logging.WARNING, format="%(levelname)s %(name)s %(message)s")
+    logging.getLogger("presidio-analyzer").setLevel(logging.ERROR)
     parser = argparse.ArgumentParser(prog="python -m backend.cli")
     sub = parser.add_subparsers(dest="command", required=True)
 
