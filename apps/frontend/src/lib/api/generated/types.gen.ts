@@ -137,6 +137,10 @@ export type AgentReply = {
      * Always set by the server on new replies: answer, emergency (call emergency services, no graph answer) or declined (part of the question crossed the medical boundary and was declined; graph context may still follow). Null only on replies stored before this field existed.
      */
     kind?: 'answer' | 'emergency' | 'declined' | null;
+    /**
+     * Unconfirmed age, onset and country extracted from this turn, and whether the message seems to be about a child. Null when nothing was found.
+     */
+    profile_hints?: ProfileHints | null;
 };
 
 /**
@@ -2475,6 +2479,43 @@ export type ProfileGene = {
      * Gene symbol.
      */
     label: string;
+};
+
+/**
+ * ProfileHints
+ *
+ * Age, onset and country from this turn's message: unconfirmed, like chips. The user
+ * confirms them before they reach the PatientProfile (same types as its fields).
+ */
+export type ProfileHints = {
+    /**
+     * Age Years
+     *
+     * Age in years, if stated.
+     */
+    age_years?: number | null;
+    /**
+     * Age range, if stated instead.
+     */
+    age_range?: AgeRange | null;
+    /**
+     * Onset
+     *
+     * Disease onset: HPO onset term ID or label.
+     */
+    onset?: string | null;
+    /**
+     * Country
+     *
+     * ISO 3166-1 alpha-2 country, if stated.
+     */
+    country?: string | null;
+    /**
+     * About Child Suspected
+     *
+     * The message seems to describe a child (age under 16 or a family relation such as 'my son'): ask whether it is about the user or a child they care for, and get the parental-responsibility confirmation, before saving chips or hints.
+     */
+    about_child_suspected?: boolean;
 };
 
 /**

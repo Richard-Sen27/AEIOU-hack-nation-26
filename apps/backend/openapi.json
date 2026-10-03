@@ -2733,6 +2733,17 @@
             ],
             "title": "Kind",
             "description": "Always set by the server on new replies: answer, emergency (call emergency services, no graph answer) or declined (part of the question crossed the medical boundary and was declined; graph context may still follow). Null only on replies stored before this field existed."
+          },
+          "profile_hints": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/ProfileHints"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "Unconfirmed age, onset and country extracted from this turn, and whether the message seems to be about a child. Null when nothing was found."
           }
         },
         "type": "object",
@@ -6447,6 +6458,69 @@
           "label"
         ],
         "title": "ProfileGene"
+      },
+      "ProfileHints": {
+        "properties": {
+          "age_years": {
+            "anyOf": [
+              {
+                "type": "integer",
+                "maximum": 120.0,
+                "minimum": 0.0
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Age Years",
+            "description": "Age in years, if stated."
+          },
+          "age_range": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/AgeRange"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "Age range, if stated instead."
+          },
+          "onset": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Onset",
+            "description": "Disease onset: HPO onset term ID or label."
+          },
+          "country": {
+            "anyOf": [
+              {
+                "type": "string",
+                "pattern": "^[A-Z]{2}$"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Country",
+            "description": "ISO 3166-1 alpha-2 country, if stated."
+          },
+          "about_child_suspected": {
+            "type": "boolean",
+            "title": "About Child Suspected",
+            "description": "The message seems to describe a child (age under 16 or a family relation such as 'my son'): ask whether it is about the user or a child they care for, and get the parental-responsibility confirmation, before saving chips or hints.",
+            "default": false
+          }
+        },
+        "type": "object",
+        "title": "ProfileHints",
+        "description": "Age, onset and country from this turn's message: unconfirmed, like chips. The user\nconfirms them before they reach the PatientProfile (same types as its fields)."
       },
       "ProfilePhenotype": {
         "properties": {
