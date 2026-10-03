@@ -213,3 +213,51 @@ test.describe("/path: gap search", () => {
     await expect(page.getByTestId("gap-candidate").getByRole("alert")).toContainText("payload.quote");
   });
 });
+
+test("a partial route that reaches the destination marks its weak link in place", async ({ page }) => {
+  const { noRouteResponse, E: Edges, N: Nodes } = await import("./fixtures");
+  const weakResponse = {
+    ...noRouteResponse,
+    coverage: {
+      ...noRouteResponse.coverage,
+      missing_link: {
+        from_id: Nodes.syngap1.id,
+        to_id: Nodes.stxbp1.id,
+        description: "The weakest link is an inferred shared pathway with low confidence (0.30).",
+      },
+    },
+  };
+  await mockPathApi(page, { "GET /path": { json: weakResponse } });
+  await page.goto(NO_ROUTE_URL);
+  const label = page.locator(`[data-testid="flow-edge-label"][data-edge-id="${Edges.lowPathway.id}"]`);
+  await expect(label).toHaveAttribute("data-weak", "true");
+  await expect(label).toContainText("Below threshold");
+  await expect(page.getByTestId("flow-missing-link")).toHaveCount(0);
+  await expect(page.getByTestId("weak-link-note")).toContainText("below the confidence threshold");
+  await expect(page.getByTestId("missing-link")).toContainText("inferred shared pathway");
+});
+
+test("zero candidates is a normal outcome; a missing ChatGPT connection asks to sign in again", async ({ page }) => {
+  await mockPathApi(
+    page,
+    {
+      "POST /gap-search": sseBody([
+        { type: "progress", step: 0, tool: null, message: "Starting", elapsed_s: 0 },
+        { type: "progress", step: 1, tool: "pubmed_search", message: "Searching PubMed", elapsed_s: 3 },
+        { type: "final", candidate_count: 0, stop_reason: "max_steps", job_id: "j1" },
+      ]),
+    },
+    { signedIn: true },
+  );
+  await page.goto(NO_ROUTE_URL);
+  await page.getByTestId("gap-start").click();
+  await expect(page.getByTestId("gap-ending")).toContainText("step budget");
+  await expect(page.getByTestId("gap-ending")).toContainText("Nothing found in the sources searched");
+  await expect(page.getByTestId("gap-ending")).not.toHaveAttribute("role", "alert");
+
+  await page.unrouteAll();
+  await mockPathApi(page, { "POST /gap-search": errorEnvelope(401, "sign_in_required") }, { signedIn: true });
+  await page.getByTestId("gap-start").click();
+  await expect(page.getByTestId("gap-ending")).toContainText("ChatGPT connection");
+  await expect(page.getByTestId("gap-ending").getByRole("button", { name: "Sign in" })).toBeVisible();
+});
