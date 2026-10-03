@@ -8,6 +8,7 @@ from dataclasses import dataclass, field
 from pydantic import BaseModel, Field
 
 from backend.api.services import graph as graph_service
+from backend.api.services import search as search_service
 from backend.api.services.chat import safety
 from backend.api.services.chat.tools import TurnState
 from backend.api.services.explanation.common import (
@@ -325,7 +326,7 @@ async def check_reply(
 
     if declined and not (claims or cards or (focus and (focus.node_ids or focus.highlight_path))):
         chip_nodes = [c.id for c in state.chips.values() if c.id]
-        fallback = chip_nodes or sorted(state.node_ids)[:5]
+        fallback = chip_nodes or await _search_context(state)
         if fallback:
             focus = GraphFocus(node_ids=fallback, highlight_path=[])
             cards.append(Card(type=CardType.open_in_atlas, node_ids=fallback[:1], edge_ids=[]))
@@ -404,6 +405,18 @@ async def check_reply(
         ai_notice=pick(AI_NOTICES, lang),
     )
     return reply, report
+
+
+async def _search_context(state: TurnState) -> list[str]:
+    """Graph context for a decline when the tools found none: search the redacted message."""
+    try:
+        async with user_transaction(None) as db:
+            resp = await search_service.search(db, state.message, limit=3)
+    except Exception:  # noqa: BLE001 - the decline still stands without context
+        return []
+    ids = [r.id for r in resp.results]
+    state.node_ids.update(ids)
+    return ids
 
 
 def _label(node_id: str) -> str:

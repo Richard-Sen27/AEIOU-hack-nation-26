@@ -58,8 +58,10 @@ __all__ = [
     "delete_session",
     "get_session",
     "list_sessions",
+    "prepare_message",
     "run_turn",
     "start_turn",
+    "traced_turn",
 ]
 
 log = logging.getLogger(__name__)
@@ -232,23 +234,32 @@ async def start_turn(
         if request.session_id is not None:
             await _get_session_row(db, user.id, request.session_id)
             history = _history(await _messages(db, user.id, request.session_id))
+    prepared = await prepare_message(request.message, profile, history)
+    prepared.session_id = request.session_id
+    if not prepared.emergency:
+        prepared.llm = await auth_service.llm_for_user(user.id)
+    return _stream(prepared, user, lens)
+
+
+async def prepare_message(
+    raw: str, profile: PatientProfile, history: list[dict[str, str]] | None = None
+) -> _Prepared:
+    """Redact the message and the profile (before any model call) and detect emergencies."""
     terms = _profile_terms(profile)
-    message = (await asyncio.to_thread(redact, request.message, allow_terms=terms)).text
-    emergency = safety.is_emergency(message) or safety.is_emergency(request.message)
+    message = (await asyncio.to_thread(redact, raw, allow_terms=terms)).text
+    emergency = safety.is_emergency(message) or safety.is_emergency(raw)
     profile_text = profile_json(profile)
     if profile_text != "{}":
         profile_text = (await asyncio.to_thread(redact, profile_text, allow_terms=terms)).text
-    llm = None if emergency else await auth_service.llm_for_user(user.id)
-    prepared = _Prepared(
+    return _Prepared(
         message=message,
         profile=profile,
         profile_text=profile_text,
-        history=history,
-        session_id=request.session_id,
+        history=history or [],
+        session_id=None,
         emergency=emergency,
-        llm=llm,
+        llm=None,
     )
-    return _stream(prepared, user, lens)
 
 
 def run_turn(request: ChatRequest, user: CurrentUser, lens: Lens) -> AsyncIterator[ChatEvent]:
@@ -304,19 +315,20 @@ async def _save_reply(user_id: UUID, session_id: UUID, reply: AgentReply) -> UUI
     return message_id
 
 
-async def _traced_turn(
+async def traced_turn(
     prepared: _Prepared,
-    user: CurrentUser,
+    user_id: UUID | str,
     lens: Lens,
-    session_id: UUID,
-    queue: asyncio.Queue,
+    session_id: UUID | str | None,
+    on_status=None,
 ) -> TurnResult:
+    """Emergency reply or agent turn inside one `chat.turn` trace (redacted text only)."""
     tracer = tracing.get_tracer()
     meta = {"role": lens.role.value, "expert_mode": lens.expert_mode, "language": lens.language}
     with tracer.trace(
         "chat.turn",
-        user_id=str(user.id),
-        session_id=str(session_id),
+        user_id=str(user_id),
+        session_id=str(session_id) if session_id else None,
         input=prepared.message,
         metadata=meta,
     ) as span:
@@ -331,7 +343,7 @@ async def _traced_turn(
                 profile=prepared.profile,
                 profile_text=prepared.profile_text,
                 history=prepared.history,
-                on_status=lambda tool, msg: queue.put_nowait((tool, msg)),
+                on_status=on_status,
                 tracer=tracer,
             )
         span.update(
@@ -358,7 +370,11 @@ async def _stream(prepared: _Prepared, user: CurrentUser, lens: Lens) -> AsyncIt
     session_id = await _save_user_message(user.id, prepared.session_id, prepared.message)
 
     queue: asyncio.Queue = asyncio.Queue()
-    task = asyncio.create_task(_traced_turn(prepared, user, lens, session_id, queue))
+    task = asyncio.create_task(
+        traced_turn(
+            prepared, user.id, lens, session_id, lambda tool, msg: queue.put_nowait((tool, msg))
+        )
+    )
     try:
         while True:
             getter = asyncio.create_task(queue.get())
