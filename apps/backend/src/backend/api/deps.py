@@ -84,7 +84,7 @@ async def get_optional_user(
 async def require_signed_in(
     user: Annotated[CurrentUser | None, Depends(get_optional_user)],
 ) -> CurrentUser:
-    """Signed in, 16+ confirmation not needed: only for onboarding and account/data-rights routes."""
+    """Signed in, 16+ confirmation not needed: only onboarding and account/data-rights routes."""
     if user is None:
         raise ApiError(401, ErrorCode.sign_in_required)
     return user
