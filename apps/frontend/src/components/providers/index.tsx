@@ -6,6 +6,7 @@ import { Toaster } from "@/components/ui/sonner";
 import { TooltipProvider } from "@/components/ui/tooltip";
 
 import { SearchProvider } from "@/components/search/search-provider";
+import { OnboardingRedirect } from "@/components/account/onboarding";
 
 import { GateProvider } from "./gate-provider";
 import { LensProvider } from "./lens-provider";
@@ -21,6 +22,7 @@ export function Providers({ children }: { children: React.ReactNode }) {
             <GateProvider>
               <SearchProvider>
                 {children}
+                <OnboardingRedirect />
                 <Toaster position="bottom-right" closeButton />
               </SearchProvider>
             </GateProvider>
