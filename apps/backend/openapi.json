@@ -303,7 +303,7 @@
           "account"
         ],
         "summary": "Put Profile",
-        "description": "Replace the PatientProfile. Send `updated_at` from the last GET; 409 if it changed.",
+        "description": "Replace the PatientProfile (needs the health_data consent). Send `updated_at` from the\nlast GET; 409 if it changed.",
         "operationId": "putProfile",
         "requestBody": {
           "content": {
@@ -409,7 +409,7 @@
           "account"
         ],
         "summary": "Grant Consent",
-        "description": "Grant a consent (upload or contribute, each separately).",
+        "description": "Grant a consent (health_data or contribute, each separately).",
         "operationId": "grantConsent",
         "requestBody": {
           "content": {
@@ -1264,7 +1264,7 @@
           "chat"
         ],
         "summary": "Post Chat",
-        "description": "Send a message to Dr. Wu (an AI system); streams the checked structured reply.",
+        "description": "Send a message to Dr. Wu (an AI system); streams the checked structured reply.\n\nNeeds the health_data consent: the message may carry the user's health data.",
         "operationId": "chat",
         "requestBody": {
           "content": {
@@ -1949,6 +1949,16 @@
               }
             }
           },
+          "403": {
+            "description": "consent_required (no active consent of the needed type) or forbidden.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
           "404": {
             "description": "not_found",
             "content": {
@@ -2015,6 +2025,16 @@
           },
           "401": {
             "description": "sign_in_required: guest, or the session expired.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "consent_required (no active consent of the needed type) or forbidden.",
             "content": {
               "application/json": {
                 "schema": {

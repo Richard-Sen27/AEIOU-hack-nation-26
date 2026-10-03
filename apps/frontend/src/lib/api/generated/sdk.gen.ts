@@ -96,7 +96,8 @@ export const getProfile = <ThrowOnError extends boolean = false>(options?: Optio
 /**
  * Put Profile
  *
- * Replace the PatientProfile. Send `updated_at` from the last GET; 409 if it changed.
+ * Replace the PatientProfile (needs the health_data consent). Send `updated_at` from the
+ * last GET; 409 if it changed.
  */
 export const putProfile = <ThrowOnError extends boolean = false>(options: Options<PutProfileData, ThrowOnError>): RequestResult<PutProfileResponses, PutProfileErrors, ThrowOnError> => (options.client ?? client).put<PutProfileResponses, PutProfileErrors, ThrowOnError>({
     url: '/profile',
@@ -117,7 +118,7 @@ export const listConsents = <ThrowOnError extends boolean = false>(options?: Opt
 /**
  * Grant Consent
  *
- * Grant a consent (upload or contribute, each separately).
+ * Grant a consent (health_data or contribute, each separately).
  */
 export const grantConsent = <ThrowOnError extends boolean = false>(options: Options<GrantConsentData, ThrowOnError>): RequestResult<GrantConsentResponses, GrantConsentErrors, ThrowOnError> => (options.client ?? client).post<GrantConsentResponses, GrantConsentErrors, ThrowOnError>({
     url: '/consents',
@@ -209,6 +210,8 @@ export const explainPath = <ThrowOnError extends boolean = false>(options: Optio
  * Post Chat
  *
  * Send a message to Dr. Wu (an AI system); streams the checked structured reply.
+ *
+ * Needs the health_data consent: the message may carry the user's health data.
  */
 export const chat = <ThrowOnError extends boolean = false>(options: Options<ChatData, ThrowOnError, ChatResponse>): Promise<ServerSentEventsResult<ChatResponses>> => (options.client ?? client).sse.post<ChatResponses, ChatErrors, ThrowOnError>({
     url: '/chat',

@@ -4086,6 +4086,10 @@ export type ConfirmFindingErrors = {
      */
     401: ErrorResponse;
     /**
+     * consent_required (no active consent of the needed type) or forbidden.
+     */
+    403: ErrorResponse;
+    /**
      * not_found
      */
     404: ErrorResponse;
@@ -4127,6 +4131,10 @@ export type RejectFindingErrors = {
      * sign_in_required: guest, or the session expired.
      */
     401: ErrorResponse;
+    /**
+     * consent_required (no active consent of the needed type) or forbidden.
+     */
+    403: ErrorResponse;
     /**
      * not_found
      */
