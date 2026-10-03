@@ -1,10 +1,11 @@
 "use client";
 
 import { ChevronDown, Search, X } from "lucide-react";
-import { useEffect, useRef, useState } from "react";
+import { useContext, useEffect, useRef, useState } from "react";
 import {
   Button as AriaButton,
   ComboBox,
+  ComboBoxStateContext,
   Group,
   Input,
   Label,
@@ -24,6 +25,20 @@ import { cn } from "@/lib/utils";
 import type { Endpoint } from "./types";
 
 type Status = "idle" | "loading" | "done" | "sentence" | "offline";
+
+/**
+ * Opens the list when typed results arrive while the input has focus. React
+ * Aria only opens on keystrokes it sees, so a paste (one input event) could
+ * otherwise leave the results hidden.
+ */
+function OpenOnResults({ status, input }: { status: Status; input: React.RefObject<HTMLInputElement | null> }) {
+  const state = useContext(ComboBoxStateContext);
+  useEffect(() => {
+    if (!state || state.isOpen || status === "idle") return;
+    if (typeof document !== "undefined" && document.activeElement === input.current) state.open(null, "input");
+  }, [state, status, input]);
+  return null;
+}
 
 /**
  * Typeahead against `GET /search`: typed results with the matched synonym
@@ -50,6 +65,12 @@ export function EntityPicker({
   const [hits, setHits] = useState<SearchHit[]>([]);
   const [status, setStatus] = useState<Status>("idle");
   const typed = useRef(false);
+  const inputRef = useRef<HTMLInputElement>(null);
+
+  // Focus after hydration (a plain autoFocus attribute skips React Aria's focus tracking).
+  useEffect(() => {
+    if (autoFocus) inputRef.current?.focus();
+  }, [autoFocus]);
 
   // Follow the external value (prefill, swap) unless the user is typing.
   useEffect(() => {
@@ -122,6 +143,7 @@ export function EntityPicker({
       }}
       data-testid={testId}
     >
+      <OpenOnResults status={status} input={inputRef} />
       <Label className="font-mono text-[10.5px] uppercase tracking-[0.14em] text-muted-foreground">{label}</Label>
       <Group
         className={cn(
@@ -142,7 +164,7 @@ export function EntityPicker({
           className="h-full min-w-0 flex-1 bg-transparent text-[15px] outline-none placeholder:text-muted-foreground sm:text-sm"
           placeholder={placeholder}
           maxLength={SEARCH_MAX_CHARS * 2}
-          autoFocus={autoFocus}
+          ref={inputRef}
         />
         {status === "loading" && <Spinner className="size-4 text-muted-foreground" />}
         {value && (

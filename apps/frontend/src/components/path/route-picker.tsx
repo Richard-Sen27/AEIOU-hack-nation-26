@@ -60,7 +60,6 @@ export function RoutePicker({
           value={to}
           onChange={onTo}
           placeholder="Where should the route lead?"
-          autoFocus={!!from && !to}
           testId="pick-to"
         />
       </div>
