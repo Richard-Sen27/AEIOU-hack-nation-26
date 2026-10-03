@@ -46,6 +46,13 @@ function formatAttr(v: unknown): string {
   if (typeof v === "boolean") return v ? "Yes" : "No";
   if (Array.isArray(v)) return v.map(formatAttr).join(", ");
   if (typeof v === "string") return v.replace(/_/g, " ");
+  if (v && typeof v === "object") {
+    // Structured records (e.g. Orphanet prevalence rows) read as "key value" pairs.
+    return Object.entries(v)
+      .filter(([, x]) => x !== null && x !== undefined && x !== "")
+      .map(([k, x]) => `${k.replace(/_/g, " ")} ${formatAttr(x)}`)
+      .join(", ");
+  }
   return String(v);
 }
 
