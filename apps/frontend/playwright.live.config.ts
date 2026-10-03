@@ -24,6 +24,7 @@ export default defineConfig({
   use: {
     baseURL: `http://127.0.0.1:${PORT}`,
     trace: "retain-on-failure",
+    actionTimeout: 20_000,
     // Real GPU in headless mode: the Atlas draws ~17k edges with WebGL, which
     // software rendering (SwiftShader) makes too slow to judge pan and zoom.
     launchOptions: { args: ["--enable-gpu", "--ignore-gpu-blocklist", "--use-angle=metal"] },
