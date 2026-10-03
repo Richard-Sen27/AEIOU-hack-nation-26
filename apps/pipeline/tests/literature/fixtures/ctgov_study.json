@@ -1,0 +1,239 @@
+{
+ "studies": [
+  {
+   "protocolSection": {
+    "identificationModule": {
+     "nctId": "NCT06625112",
+     "orgStudyIdInfo": {
+      "id": "ESCO-STXBP1-2024-001"
+     },
+     "organization": {
+      "fullName": "European STXBP1 Consortium",
+      "class": "NETWORK"
+     },
+     "briefTitle": "A Multicentric European Study to Promote Clinical Trial Readiness for STXBP1-related Disorders",
+     "officialTitle": "A Multicentric European Study to Promote Clinical Trial Readiness for STXBP1-related Disorders",
+     "acronym": "ESCO"
+    },
+    "statusModule": {
+     "statusVerifiedDate": "2026-02",
+     "overallStatus": "RECRUITING",
+     "expandedAccessInfo": {
+      "hasExpandedAccess": false
+     },
+     "startDateStruct": {
+      "date": "2025-11-04",
+      "type": "ACTUAL"
+     },
+     "primaryCompletionDateStruct": {
+      "date": "2029-10-31",
+      "type": "ESTIMATED"
+     },
+     "completionDateStruct": {
+      "date": "2034-10-31",
+      "type": "ESTIMATED"
+     },
+     "studyFirstSubmitDate": "2024-09-04",
+     "studyFirstSubmitQcDate": "2024-09-30",
+     "studyFirstPostDateStruct": {
+      "date": "2024-10-03",
+      "type": "ACTUAL"
+     },
+     "lastUpdateSubmitDate": "2026-02-04",
+     "lastUpdatePostDateStruct": {
+      "date": "2026-02-06",
+      "type": "ACTUAL"
+     }
+    },
+    "sponsorCollaboratorsModule": {
+     "responsibleParty": {
+      "type": "PRINCIPAL_INVESTIGATOR",
+      "investigatorFullName": "Kelsey Ax",
+      "investigatorTitle": "Study Manager",
+      "investigatorAffiliation": "European STXBP1 Consortium"
+     },
+     "leadSponsor": {
+      "name": "European STXBP1 Consortium",
+      "class": "NETWORK"
+     },
+     "collaborators": [
+      {
+       "name": "Filadelfia Epilepsy Hospital",
+       "class": "OTHER"
+      },
+      {
+       "name": "University Hospital Heidelberg",
+       "class": "OTHER"
+      },
+      {
+       "name": "University Hospital, Antwerp",
+       "class": "OTHER"
+      },
+      {
+       "name": "Istituto Giannina Gaslini, Genoa, Italy",
+       "class": "UNKNOWN"
+      },
+      {
+       "name": "Hospital Sant Joan de Deu",
+       "class": "OTHER"
+      },
+      {
+       "name": "Amsterdam UMC, location VUmc",
+       "class": "OTHER"
+      },
+      {
+       "name": "Sheba Medical Center",
+       "class": "OTHER_GOV"
+      },
+      {
+       "name": "Aix Marseille Universit\u00e9",
+       "class": "OTHER"
+      },
+      {
+       "name": "Hospital Ruber Internacional",
+       "class": "OTHER"
+      }
+     ]
+    },
+    "oversightModule": {
+     "oversightHasDmc": false,
+     "isFdaRegulatedDrug": false,
+     "isFdaRegulatedDevice": false
+    },
+    "descriptionModule": {
+     "briefSummary": "STXBP1-related disorders (STXBP1-RD) are rare genetic neurodevelopmental disorders, caused by pathogenic variants in the gene STXBP1. The core clinical features of the disorder are developmental delay often leading to (severe) intellectual disability and seizures in most patients, although the phenotypic spectrum is variable. Behavioral problems and movement disorders are frequent comorbidities. STXBP1-RD are severe disorders with significant impact on the quality of life of the patients and their caregivers. At the moment, there is no cure for STXBP1-RD and treatment is largely limited to symptom control. Recent advances in the field of precision medicine and gene therapy have led to the identification of potential novel disease modifying therapies for STXBP1-RD that hold promise to reach clinical trials in the coming years. However, accurate and successful evaluation of such novel precision therapies in STXBP1-RD patients is challenging, given the rarity of the condition and the variable clinical spectrum. Furthermore, relevant clinical endpoints, taking into account the patients' and caregivers' perspective have not been identified to date.\n\nIn this European collaborative study, the investigators will prospectively follow patients with STXBP1-RD during different phases of life (infantile period, childhood and adolescence/adulthood). The study aims to better understand the natural history and the phenotypic spectrum of the disease including the identification of disease modifiers. It further aims to identify relevant clinical endpoints (what to treat?) and robust outcome measures and biomarkers (how to measure?) for future clinical trials. The study is performed in close collaboration with different STXBP1 patient-caregiver communities across Europe.",
+     "detailedDescription": "STXBP1-related disorders (STXBP1-RD) are a severe condition that heavily impact the life of affected individuals and their families. Core clinical features of STXBP1-RDs are seizures, developmental delay often leading to (severe) intellectual disability, movement disorders and behavioral problems \\[1\\]. The phenotypic spectrum and severity of the disease are variable. At the moment, there is no cure, nor disease modifying therapy for STXBP1-RD, and available treatments are largely symptomatic and mainly directed at seizure control. Furthermore, there is no defined standard of care for patients with STXBP1-RD, and unmet needs, as defined by patients and their caregivers, have not been systematically investigated. Potential disease-modifying therapies for STXBP1-RD hold the promise to be translated in the clinics in the coming years, but there are gaps to fill in order to prepare for successful, efficient, and rational evaluation of targeted therapies in STXBP1-RD. To accelerate the path towards a cure for STXB1P-RD, clinicians and researchers founded a European STXBP1 Consortium (ESCO). ESCO is committed to perform a large scale, pan-European natural history study in collaboration with STXBP1 Patient advocacy organizations (PAOs). This natural history study aims to provide an accurate description of STXBP1-RD trajectories, identify potential biomarkers, and incorporate the perspective of the patients and caregivers' community. The results of this comprehensive assessments will allow the evaluation of relevant endpoints and outcome measures, that will inform the design of future interventional studies with targeted therapies and provide an historical control group for such studies.\n\nPrimary objectives:\n\n* Establishment of a European Registry of STXBP1-related disorders\n* Characterization of the phenotypic spectrum of disease and to identify disease modifiers.\n* Description of the longitudinal natural history of patients with STXBP1-RD for the purpose of historical control in interventional studies with disease-modifying therapies.\n* Identification of relevant endpoints and outcome measures for clinical trials in STXBP1-RD.\n\nSecondary objectives:\n\n* Identification of disease biomarkers in STXBP1-RD for the purpose of complementing diagnosis, establishing prognosis, treatment decision support, and measuring treatment effects.\n* Assessment of the disease burden on the quality of life and unmet needs, and establish the standard of care of STXBP1-RD.\n\nA REDCap based Registry will include both retrospective and prospective data concerning demographics, genetics, and clinical features of individuals with STXBP1-RD. It will also form the basis of the prospective NHS.\n\nThe study is also composed of two phases: 1. Pilot Natural history study (pNHS), followed by 2. Extension Natural history (eNHS) study.\n\nThe investigators plan to enroll 50 individuals for the Pilot study and 70 additional individuals for the NHS study, including a total of 120 patients with STXBP1-RD of different ages.\n\nThe pNHS study is especially aimed at:\n\n1. assessing the sensitivity of the outcome measures in differentiating patients with different degrees of impairment in the respective disease domains, at different ages;\n2. assessing the sensitivity of the outcome measures to measure the change over time;\n3. assessing the burden of study participation for patients and their caregivers.\n\nThe pNHS study will have a duration of 12 months. Participants who completed the pNHS study will be enrolled in the following eNHS.\n\nThe eNHS study will have a 4-year duration."
+    },
+    "conditionsModule": {
+     "conditions": [
+      "STXBP1 Encephalopathy With Epilepsy"
+     ],
+     "keywords": [
+      "European",
+      "STXBP1",
+      "European STXBP1 Consortium",
+      "ESCO",
+      "STXBP1-RD",
+      "Syntaxin Binding Protein",
+      "epileptic encephalopathy",
+      "epilepsy",
+      "natural history study",
+      "registry"
+     ]
+    },
+    "designModule": {
+     "studyType": "OBSERVATIONAL",
+     "patientRegistry": true,
+     "targetDuration": "5 Years",
+     "designInfo": {
+      "observationalModel": "CASE_ONLY",
+      "timePerspective": "OTHER"
+     },
+     "bioSpec": {
+      "retention": "SAMPLES_WITH_DNA",
+      "description": "The participant / legal representative can choose and consent to donate optional samples.\n\n* Plasma/serum\n* Urine\n* DNA\n* Peripheral Blood Mononuclear Cell (PBMC)\n* Cerebrospinal fluid (CSF)"
+     },
+     "enrollmentInfo": {
+      "count": 120,
+      "type": "ESTIMATED"
+     }
+    },
+    "armsInterventionsModule": {
+     "armGroups": [
+      {
+       "label": "Natural history study participants"
+      }
+     ]
+    },
+    "outcomesModule": {
+     "primaryOutcomes": [
+      {
+       "measure": "Changes in clinical assessment percentiles over time.",
+       "description": "The primary analysis will include all participants who meet the inclusion and exclusion criteria and complete the first visit. For each participant, the percentage of correct responses on clinical assessments will be recorded. Variations in percentile scores over the study period will be examined using a linear mixed-effects model, allowing for the repeated observations collected from each participant.",
+       "timeFrame": "12 months"
+      }
+     ]
+    },
+    "eligibilityModule": {
+     "eligibilityCriteria": "Inclusion Criteria:\n\n* participant has a (likely) pathogenic, disease-causing STXBP1 variant, according to the American College of Medical Genetics and Genomics (ACMG) criteria; or participant has a larger structural variant including the STXBP1 gene where STXBP1 is thought to be (one of) the culprit gene(s) causing the phenotype \u2022written informed consent from study participant and/or legal guardian.\n\nExclusion Criteria:\n\n* Exclusion criteria for the study are: none if the inclusion criteria are met.",
+     "healthyVolunteers": false,
+     "sex": "ALL",
+     "stdAges": [
+      "CHILD",
+      "ADULT",
+      "OLDER_ADULT"
+     ],
+     "studyPopulation": "Patients with STXBP1 living in one of the 8 ESCO member countries( Belgium, Italy, Israel, Denmark, France, Spain, Netherlands, Germany) and has a (likely) pathogenic, disease-causing STXBP1 variant, according to t.",
+     "samplingMethod": "NON_PROBABILITY_SAMPLE"
+    },
+    "contactsLocationsModule": {
+     "centralContacts": [
+      {
+       "name": "Kelsey Ax",
+       "role": "CONTACT",
+       "phone": "+1 555 0100",
+       "email": "contact@example.org"
+      },
+      {
+       "name": "Hannah Stamberger",
+       "role": "CONTACT",
+       "email": "contact@example.org"
+      }
+     ],
+     "overallOfficials": [
+      {
+       "name": "Matthijs Verhage",
+       "affiliation": "Amsterdam UMC",
+       "role": "STUDY_CHAIR"
+      },
+      {
+       "name": "Hannah Stamberger",
+       "affiliation": "University Hospital, Antwerp",
+       "role": "PRINCIPAL_INVESTIGATOR"
+      },
+      {
+       "name": "Ganna Balagura",
+       "affiliation": "Universit\u00e0 degli Studi di Genova",
+       "role": "PRINCIPAL_INVESTIGATOR"
+      },
+      {
+       "name": "Andrea Soto-Padilla",
+       "affiliation": "Amsterdam UMC",
+       "role": "STUDY_DIRECTOR"
+      }
+     ],
+     "locations": [
+      {
+       "facility": "Universitair Ziekenhuis Antwerpen",
+       "status": "RECRUITING",
+       "city": "Antwerp",
+       "country": "Belgium",
+       "contacts": [
+        {
+         "name": "Hannah Stamberger",
+         "role": "CONTACT"
+        }
+       ],
+       "geoPoint": {
+        "lat": 51.22047,
+        "lon": 4.40026
+       }
+      }
+     ]
+    },
+    "referencesModule": {
+     "seeAlsoLinks": [
+      {
+       "label": "ESCO website",
+       "url": "https://stxbp1eu.org/"
+      }
+     ]
+    },
+    "ipdSharingStatementModule": {
+     "ipdSharing": "UNDECIDED"
+    }
+   },
+   "hasResults": false
+  }
+ ]
+}
