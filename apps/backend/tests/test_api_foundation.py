@@ -79,8 +79,7 @@ async def test_require_consent(make_user):
 
     with_consent = await make_user(consents=["contribute"])
     r = await with_consent.client.post("/contributions", json=body)
-    assert r.status_code == 501
-    assert r.json()["error"]["code"] == "not_implemented"
+    assert r.status_code == 201
 
 
 async def test_guest_upload_needs_sign_in(client):
@@ -111,12 +110,6 @@ async def test_update_settings(make_user):
 
     r = await user.client.patch("/me/settings", json={"role": "guest"})
     assert r.status_code == 422
-
-
-async def test_stub_returns_501(client):
-    r = await client.get("/clusters")
-    assert r.status_code == 501
-    assert r.json()["error"]["code"] == "not_implemented"
 
 
 async def test_openapi_has_event_models(client):

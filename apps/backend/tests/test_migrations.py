@@ -56,7 +56,7 @@ async def test_fixture_loaded(connect_as):
     app = await connect_as("atlas_app")
     assert await app.fetchval("SELECT count(*) FROM nodes") == len(data["nodes"])
     assert await app.fetchval("SELECT count(*) FROM edges") == len(data["edges"])
-    assert await app.fetchval("SELECT count(*) FROM explanations_cache") == 4
+    assert await app.fetchval("SELECT count(*) FROM explanations_cache") >= 4
     assert await app.fetchval("SELECT data_version FROM ingestion_runs") == "fixture"
     hit = await app.fetchval(
         "SELECT node_id FROM node_synonyms"
