@@ -110,7 +110,8 @@ export function useUploads({ onDone }: { onDone?: (done: UploadDone) => void } =
               if (evt.code === "sign_in_required" || evt.code === "llm_reauth_required") {
                 reportApiError(new ApiError("reauth_required", "Please sign in with ChatGPT again.", 401));
               }
-              fail(key, evt.code, evt.message);
+              // The file was received and is already deleted; sign-in errors here concern the AI step.
+              fail(key, evt.code === "sign_in_required" ? "llm_reauth_required" : evt.code, evt.message);
             }
           },
         });
