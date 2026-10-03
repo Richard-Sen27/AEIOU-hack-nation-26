@@ -3,9 +3,6 @@ name = "backend"
 version = "0.1.0"
 description = "Rare Disease Atlas API"
 readme = "README.md"
-authors = [
-    { name = "Richard Senger", email = "richard.senger27@icloud.com" }
-]
 requires-python = ">=3.13"
 dependencies = [
     "alembic>=1.20.0",
