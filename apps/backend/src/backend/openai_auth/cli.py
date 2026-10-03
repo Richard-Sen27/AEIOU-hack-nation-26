@@ -124,7 +124,7 @@ class FileTokenProvider:
                     creds.tokens = None
                     save_credentials(creds, self.path)
                     raise LLMError("reauth_required", "sign-in expired; log in again") from None
-                raise LLMError("upstream", f"token refresh failed ({exc.code})") from None
+                raise LLMError("upstream", f"token refresh failed ({exc})") from None
             save_credentials(creds, self.path)
             return creds.tokens.access_token
 

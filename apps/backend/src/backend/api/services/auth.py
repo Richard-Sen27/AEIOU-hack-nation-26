@@ -377,7 +377,7 @@ class DbTokenProvider:
                     tokens = await _oidc().refresh(tokens)
                 except OAuthError as exc:
                     if not (exc.reauth_required or exc.code == "invalid_client"):
-                        raise LLMError("upstream", f"token refresh failed ({exc.code})") from None
+                        raise LLMError("upstream", f"token refresh failed ({exc})") from None
                     dead = True
                     await db.execute(
                         text("DELETE FROM openai_tokens WHERE user_id = :uid"),
