@@ -1,13 +1,21 @@
 """PatientProfile: strict validation, every field editable, lost-update safe, mergeable."""
 
+import json
 import uuid
 
+import pytest
 from account_helpers import assert_error
+from sqlalchemy import text
 
-from backend.api.services.account import merge_profile_items, remove_profile_items
+from backend.api.errors import ApiError
+from backend.api.services.account import (
+    merge_profile_items,
+    remove_profile_items,
+    validate_profile,
+)
 from backend.db.session import user_transaction
 from backend.schemas.enums import ProfileSource
-from backend.schemas.profile import ProfileGene, ProfilePhenotype
+from backend.schemas.profile import PatientProfile, ProfileGene, ProfilePhenotype
 
 PROFILE = {
     "diseases": [{"id": "MONDO:0013276", "label": "STXBP1 encephalopathy", "source": "chat"}],
@@ -178,3 +186,42 @@ async def test_cross_user_isolation(make_user):
     assert (await b.client.get("/profile")).json()["diseases"] == []
     await b.client.put("/profile", json={"updated_at": None, "age_years": 40})
     assert (await a.client.get("/profile")).json()["age_years"] == 2
+
+
+async def test_child_profile_needs_parental_responsibility(make_user):
+    user = await make_user()
+    for body in (
+        {**PROFILE, "about_child": True},
+        {**PROFILE, "about_child": True, "parental_responsibility_confirmed": False},
+    ):
+        r = await user.client.put("/profile", json=body)
+        assert_error(r, 422, "validation_error")
+        assert "parental_responsibility_confirmed" in r.json()["error"]["message"]
+        assert "STXBP1" not in r.text
+    ok = {**PROFILE, "about_child": True, "parental_responsibility_confirmed": True}
+    saved = (await user.client.put("/profile", json=ok)).json()
+    assert saved["about_child"] is True and saved["parental_responsibility_confirmed"] is True
+    # Not about a child (the default): no confirmation needed, and none is kept.
+    plain = {**PROFILE, "updated_at": saved["updated_at"]}
+    assert (await user.client.put("/profile", json=plain)).json()["about_child"] is False
+
+
+async def test_merge_rejects_child_profile_without_parental_responsibility(make_user):
+    user = await make_user()
+    async with user_transaction(user.id) as db:
+        await db.execute(
+            text(
+                "INSERT INTO patient_profiles (user_id, profile) VALUES (:uid, CAST(:p AS jsonb))"
+            ),
+            {"uid": user.id, "p": json.dumps({"about_child": True})},
+        )
+    with pytest.raises(ApiError) as exc:
+        async with user_transaction(user.id) as db:
+            await merge_profile_items(
+                db, user.id, [ProfileGene(id="HGNC:10590", label="SCN1A", source="document")]
+            )
+    assert exc.value.status_code == 422
+    assert "parental_responsibility_confirmed" in exc.value.message
+    unsafe = PatientProfile.model_construct(**{**PatientProfile().__dict__, "about_child": True})
+    with pytest.raises(ApiError):
+        validate_profile(unsafe)

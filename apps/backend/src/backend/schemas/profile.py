@@ -7,7 +7,7 @@ unknown fields are rejected.
 from datetime import date, datetime
 from uuid import UUID
 
-from pydantic import ConfigDict, Field, model_validator
+from pydantic import ConfigDict, Field, ValidationInfo, field_validator
 
 from backend.schemas.common import ApiModel
 from backend.schemas.enums import AgeRange, ProfileSource, VariantClassification, Zygosity
@@ -64,12 +64,15 @@ class PatientProfile(ApiModel):
     )
     about_child: bool = Field(False, description="The profile describes a child.")
     parental_responsibility_confirmed: bool = Field(
-        False, description="Required true when about_child is true."
+        False, description="Required true when about_child is true.", validate_default=True
     )
     updated_at: datetime | None = Field(None, description="Server-set last update time.")
 
-    @model_validator(mode="after")
-    def _child_needs_parental_responsibility(self) -> "PatientProfile":
-        if self.about_child and not self.parental_responsibility_confirmed:
+    @field_validator("parental_responsibility_confirmed", mode="after")
+    @classmethod
+    def _child_needs_parental_responsibility(cls, value: bool, info: ValidationInfo) -> bool:
+        # A field validator (not a model validator) so the 422 names this field. It runs even
+        # when the field is omitted, because about_child=true alone must be rejected too.
+        if info.data.get("about_child") and not value:
             raise ValueError("parental responsibility must be confirmed for a child's profile")
-        return self
+        return value

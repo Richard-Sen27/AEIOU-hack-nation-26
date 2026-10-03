@@ -291,6 +291,12 @@ def _invalid(field: str) -> ApiError:
     return ApiError(422, ErrorCode.validation_error, f"Invalid request fields: {field}")
 
 
+def _invalid_from(exc: ValidationError, fallback: str) -> ApiError:
+    """422 naming the failing fields only (pydantic's inputs would echo user content)."""
+    fields = sorted({".".join(str(p) for p in err.get("loc", ())) for err in exc.errors()})
+    return _invalid(", ".join(f for f in fields if f) or fallback)
+
+
 def _check_id(value: str | None, kind: str, field: str) -> None:
     if value is not None and not _ID_PATTERNS[kind].match(value):
         raise _invalid(field)
@@ -338,6 +344,9 @@ def validate_profile(profile: PatientProfile) -> None:
         _check_label(p.label, f"phenotypes.{i}.label")
         _check_onset(p.onset, f"phenotypes.{i}.onset")
     _check_onset(profile.onset, "onset")
+    if profile.about_child and not profile.parental_responsibility_confirmed:
+        # compliance.md, Children: data about a child needs parental responsibility.
+        raise _invalid("parental_responsibility_confirmed")
 
 
 def _item_key(item: ProfileItemModel) -> tuple[str, str]:
@@ -368,7 +377,10 @@ def _profile_json(profile: PatientProfile) -> str:
 
 
 def _load_profile(data: dict[str, Any] | None, updated_at: datetime | None) -> PatientProfile:
-    profile = PatientProfile.model_validate({**(data or {}), "updated_at": None})
+    try:
+        profile = PatientProfile.model_validate({**(data or {}), "updated_at": None})
+    except ValidationError as exc:
+        raise _invalid_from(exc, "profile") from None
     profile.updated_at = updated_at
     return profile
 
@@ -467,8 +479,8 @@ async def merge_profile_items(
     _stamp_and_dedupe(profile)
     try:
         profile = PatientProfile.model_validate(profile.model_dump())
-    except ValidationError:
-        raise _invalid("items") from None
+    except ValidationError as exc:
+        raise _invalid_from(exc, "items") from None
     validate_profile(profile)
     return await _write_profile(db, user_id, profile)
 
