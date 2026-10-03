@@ -478,6 +478,7 @@ async def get_job(db: AsyncSession, user: CurrentUser, job_id: UUID) -> Job:
         document_id=rec.document_id,
         error=rec.error,
         created_at=rec.created_at,
+        result=rec.result,
     )
 
 
