@@ -12,7 +12,6 @@ _CITATION_GROUP_RE = re.compile(r"\s*\[\s*e_[0-9a-f]{12}(?:\s*[,;]\s*e_[0-9a-f]{
 _SENTENCE_RE = re.compile(r"(?<=[.!?])\s+(?=[\"'(\[A-ZÄÖÜ0-9])")
 
 
-
 def _grade_targets() -> dict[Role, float]:
     """Flesch-Kincaid targets per lens, from the graph service's role hints (one source of
     truth: guest 6, patient 8, doctor 12, researcher 14)."""
