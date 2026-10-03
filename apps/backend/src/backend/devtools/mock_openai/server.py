@@ -1,3 +1,4 @@
+import os
 import socket
 import threading
 import time
@@ -36,9 +37,13 @@ class MockOpenAIServer:
             self.app,
             host="127.0.0.1",
             port=self.port,
-            log_level="warning",
+            log_level=os.environ.get("MOCK_OPENAI_LOG_LEVEL", "warning"),
             lifespan="off",
             timeout_keep_alive=60,
+            # uvloop/httptools in a background thread occasionally dropped requests (the
+            # server loop sat idle while the client waited); the pure-Python stack does not.
+            loop="asyncio",
+            http="h11",
         )
         self._server = uvicorn.Server(config)
         self._thread: threading.Thread | None = None
@@ -67,11 +72,12 @@ class MockOpenAIServer:
             time.sleep(0.02)
         return self
 
-    def stop(self) -> None:
+    def stop(self, *, wait: bool = True) -> None:
+        """Ask the server to exit; with wait=False the daemon thread finishes on its own."""
         self._server.should_exit = True
-        if self._thread:
+        if wait and self._thread:
             self._thread.join(timeout=5)
-        self._sock.close()
+            self._sock.close()
 
     # convenience passthroughs
     def reset(self) -> None:
