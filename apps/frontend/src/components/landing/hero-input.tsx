@@ -38,7 +38,7 @@ function bestHit(hits: SearchHit[], q: string): SearchHit | undefined {
 /**
  * The landing input (system spec, "Chat-based input"). Names search the atlas
  * and open the node; sentences go to Dr. Wu (signed in) or offer sign-in
- * (guests, nothing is sent). Dropped files go through the upload consent gate
+ * (guests, nothing is sent). Dropped files go through the health-data consent gate
  * to the documents flow. Typed text never enters a URL or browser storage.
  */
 export function HeroInput({ ref }: { ref?: React.Ref<HeroInputHandle> }) {
@@ -104,7 +104,7 @@ export function HeroInput({ ref }: { ref?: React.Ref<HeroInputHandle> }) {
   async function handleFiles(list: FileList | null) {
     const files = list ? Array.from(list) : [];
     if (files.length === 0) return;
-    const ok = await requireConsent("upload", "Reading a report needs an account and your consent.");
+    const ok = await requireConsent("health_data", "Reading a report needs an account and your consent.");
     if (!ok) {
       if (user) toast("Nothing was uploaded", { description: "You can add a report any time from Documents." });
       return;

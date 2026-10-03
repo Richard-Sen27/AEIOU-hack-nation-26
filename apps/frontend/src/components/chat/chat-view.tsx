@@ -61,7 +61,7 @@ export function ChatView() {
   async function handleFiles(list: FileList | null) {
     const files = list ? Array.from(list) : [];
     if (!files.length) return;
-    const ok = await requireConsent("upload", "Reading a report needs your consent.");
+    const ok = await requireConsent("health_data", "Reading a report needs your consent.");
     if (!ok) {
       toast("Nothing was uploaded", { description: "You can add a report any time from Documents." });
       return;

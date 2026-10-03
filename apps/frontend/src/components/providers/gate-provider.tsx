@@ -84,7 +84,7 @@ export function GateProvider({ children }: { children: React.ReactNode }) {
           case "consent_required": {
             const t = error.details.consent_type;
             const contribute = t === "contribute" || /contribut/i.test(error.message);
-            setConsentType(contribute ? "contribute" : "upload");
+            setConsentType(contribute ? "contribute" : "health_data");
             return;
           }
           case "upstream_error":

@@ -7,7 +7,7 @@ import type { ConsentType } from "@/lib/api/types";
  * wording below changes in substance.
  */
 export const CONSENT_VERSION: Record<ConsentType, string> = {
-  upload: "upload-2026-10-04",
+  health_data: "health-data-2026-10-04",
   contribute: "contribute-2026-10-04",
 };
 
@@ -31,30 +31,31 @@ export type ConsentNotice = {
 };
 
 export const CONSENT_NOTICES: Record<ConsentType, ConsentNotice> = {
-  upload: {
+  health_data: {
     summary:
-      "To read a report for you, Amber has to process the health and genetic information in it. We need your explicit consent for that.",
+      "To help you, Amber has to process health and genetic information: what you tell Dr. Wu, your profile and the documents you upload. We ask for your explicit consent once, for all three.",
     processed: [
-      "The document you upload (a genetic report, clinical letter, research paper or registry document).",
-      "Health and genetic information found in it: diagnoses, genes, variants, symptoms, test dates. These are sensitive personal information.",
-      "The findings you confirm, which are added to your private profile.",
+      "What you type to Dr. Wu, the AI assistant, and its replies.",
+      "Your private profile: the diseases, genes, variants, symptoms, age range, onset and country you confirm.",
+      "Documents you upload (a genetic report, clinical letter, research paper or registry document) and the findings extracted from them.",
+      "All of this is health and genetic information: sensitive personal information.",
     ],
     purpose:
-      "Only to extract findings for you to review and, once you confirm them, to find connections in the atlas for you. Never for advertising, profiling or training AI models.",
+      "Only to find connections in the atlas for you: similar conditions, patient communities, research and next steps. Never for advertising, profiling or training AI models.",
     safeguards: [
-      "Names, birth dates, addresses and patient IDs are removed on our server before any AI model sees the text.",
-      "The original file is deleted right after the text is extracted. We never keep it.",
-      "Only the redacted text goes to OpenAI, running on your own ChatGPT plan.",
+      "Names, birth dates, addresses and patient IDs are removed on our server before any AI model sees your text or documents.",
+      "Original files are deleted right after the text is extracted. We never keep them.",
+      "Only redacted text goes to OpenAI, running on your own ChatGPT plan.",
       "Nothing is sold or shared. Nothing goes into the shared atlas unless you separately agree to contribute.",
     ],
     retention: [
-      "Original file: deleted immediately after extraction.",
-      "Findings, and profile items that came from documents: kept until you delete them, withdraw this consent or delete your account.",
+      "Original files: deleted immediately after extraction.",
+      "Chats, profile, documents' findings: kept until you delete them, withdraw this consent or delete your account.",
     ],
     withdrawal:
-      "You can withdraw at any time in your profile with one click. Withdrawing deletes your uploaded documents, their findings and processing jobs, and the items in your profile that came from documents.",
+      "You can withdraw at any time in your profile with one click. Withdrawing deletes your profile, your chats with Dr. Wu, your documents with their findings and processing jobs. Your account, settings and contributions stay.",
     agreement:
-      "I explicitly consent to Amber processing the health and genetic information in documents I upload, as described above.",
+      "I explicitly consent to Amber processing the health and genetic information I share in chats, my profile and uploaded documents, as described above.",
     grantLabel: "I agree, continue",
   },
   contribute: {
@@ -85,15 +86,15 @@ export const CONSENT_NOTICES: Record<ConsentType, ConsentNotice> = {
 
 /** What withdrawing deletes, for the profile's consent section. */
 export const WITHDRAWAL_EFFECT: Record<ConsentType, string> = {
-  upload:
-    "Withdrawing deletes your uploaded documents, their findings and processing jobs, and the items in your profile that came from documents.",
+  health_data:
+    "Withdrawing deletes your profile, your chats with Dr. Wu, and your documents with their findings and processing jobs. Your account, settings and contributions stay.",
   contribute: "Withdrawing removes all your contributions from the shared atlas.",
 };
 
 export const CONSENT_LABELS: Record<ConsentType, { title: string; description: string }> = {
-  upload: {
-    title: "Document upload",
-    description: "Lets Amber read reports you upload and extract findings for you to review.",
+  health_data: {
+    title: "Use of your health information",
+    description: "Lets Amber process what you tell Dr. Wu, your profile and the documents you upload, to find connections for you.",
   },
   contribute: {
     title: "Contribute to the shared atlas",

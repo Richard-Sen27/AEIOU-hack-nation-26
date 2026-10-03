@@ -59,7 +59,7 @@ export default function PrivacyPage() {
               },
               {
                 title: "Health data only with your consent",
-                body: "Uploads and contributions each need their own explicit consent, which you can withdraw in one click.",
+                body: "One explicit consent covers your health information (chats, profile, documents); contributing to the shared atlas needs a separate one. Each is withdrawn in one click.",
               },
               {
                 title: "Personal details removed before AI",
@@ -141,11 +141,10 @@ export default function PrivacyPage() {
               rows={[
                 ["Your account and the features you ask for", "Account data, settings", "Contract (GDPR Art. 6(1)(b))"],
                 [
-                  "Reading your documents and finding connections for you",
-                  "Health and genetic data you upload",
-                  "Your explicit consent for uploads (Art. 9(2)(a))",
+                  "Your chats with Dr. Wu, your private profile and reading your documents, to find connections for you",
+                  "Health and genetic data you type, confirm or upload",
+                  "Your explicit consent to the use of your health information, asked once before the first use (Art. 9(2)(a))",
                 ],
-                ["Your private profile and chats", "Health data you enter or confirm", "Your explicit consent (Art. 9(2)(a)), given when you add it"],
                 [
                   "Publishing your contributions in the shared atlas",
                   "What you submit, without your name",
@@ -225,9 +224,9 @@ export default function PrivacyPage() {
               head={["Data", "How long"]}
               rows={[
                 ["Uploaded files", "Deleted as soon as the text is extracted (held in memory only)"],
-                ["Findings, document details and extraction jobs", "Until you delete the document, withdraw upload consent, or delete your account"],
-                ["Profile", "Until you edit it or delete your account; items that came from documents until you withdraw upload consent"],
-                ["Chats", "Until you delete the chat or your account"],
+                ["Findings, document details and extraction jobs", "Until you delete the document, withdraw consent to the use of your health information, or delete your account"],
+                ["Profile", "Until you edit it, withdraw consent to the use of your health information, or delete your account"],
+                ["Chats", "Until you delete the chat, withdraw consent to the use of your health information, or delete your account"],
                 ["Contributions", "Until you remove them, withdraw contribute consent, or delete your account"],
                 ["Consent records", "Until you delete your account (kept after withdrawal as proof of what you agreed to)"],
                 ["Account and settings", "Until you delete your account"],

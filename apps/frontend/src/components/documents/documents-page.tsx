@@ -52,7 +52,7 @@ export function DocumentsPage() {
 
   const handleFiles = useCallback(
     async (files: File[]) => {
-      if (await requireConsent("upload", "Uploading a report needs an account.")) add(files);
+      if (await requireConsent("health_data", "Uploading a report needs an account.")) add(files);
     },
     [add, requireConsent],
   );

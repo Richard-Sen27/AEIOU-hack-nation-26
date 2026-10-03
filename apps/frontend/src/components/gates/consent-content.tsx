@@ -27,7 +27,7 @@ export type ConsentContentProps = {
 };
 
 export const CONSENT_TITLES: Record<ConsentType, string> = {
-  upload: "Before you upload a document",
+  health_data: "Use of your health information",
   contribute: "Before you contribute to the shared atlas",
 };
 
@@ -125,7 +125,7 @@ export function ConsentContent({ type, onGranted, onCancel }: ConsentContentProp
       <div className="space-y-3 rounded-lg border bg-muted/50 p-3">
         <fieldset className="space-y-2">
           <legend className="mb-2 text-sm font-medium">
-            {type === "upload" ? "Whose documents will you upload?" : "Whose information will you contribute?"}
+            {type === "health_data" ? "Whose health information is this?" : "Whose information will you contribute?"}
           </legend>
           <RadioGroup
             value={subject}
@@ -136,8 +136,8 @@ export function ConsentContent({ type, onGranted, onCancel }: ConsentContentProp
             className="gap-2"
           >
             <label className="flex items-center gap-2.5 text-sm">
-              <RadioGroupItem value="self" aria-label={type === "upload" ? "My own" : "My own, or not about a person"} />
-              {type === "upload" ? "My own" : "My own, or not about a person (e.g. a registry)"}
+              <RadioGroupItem value="self" aria-label={type === "health_data" ? "My own" : "My own, or not about a person"} />
+              {type === "health_data" ? "My own" : "My own, or not about a person (e.g. a registry)"}
             </label>
             <label className="flex items-center gap-2.5 text-sm">
               <RadioGroupItem value="child" aria-label="A child I care for" />
