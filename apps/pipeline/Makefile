@@ -3,7 +3,7 @@ RUN := uv run atlas-pipeline
 SOURCE ?=
 SRC := $(if $(SOURCE),--source $(SOURCE),)
 
-.PHONY: scope fetch normalize extract build analytics validate load snapshot explain all login test lint
+.PHONY: scope fetch normalize extract build analytics validate load snapshot explain all login logout whoami test lint
 
 scope:
 	$(RUN) scope
@@ -40,6 +40,12 @@ all:
 
 login:
 	$(RUN) login
+
+logout:
+	$(RUN) logout
+
+whoami:
+	$(RUN) whoami
 
 test:
 	uv run pytest -q

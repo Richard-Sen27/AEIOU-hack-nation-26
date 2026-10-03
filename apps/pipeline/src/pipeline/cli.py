@@ -198,6 +198,27 @@ def login() -> None:
     _run(llm.login)
 
 
+@app.command()
+def logout() -> None:
+    """Forget the stored ChatGPT sign-in (pipeline.llm.logout)."""
+    _llm_call("logout")
+
+
+@app.command()
+def whoami() -> None:
+    """Show who is signed in for the pipeline's LLM steps (pipeline.llm.whoami)."""
+    _llm_call("whoami")
+
+
+def _llm_call(name: str) -> None:
+    try:
+        llm = importlib.import_module("pipeline.llm")
+    except ModuleNotFoundError:
+        log.error("pipeline.llm is not available")
+        raise typer.Exit(1) from None
+    _run(getattr(llm, name))
+
+
 @app.command(name="all")
 def run_all(skip_explain: Annotated[bool, typer.Option("--skip-explain")] = False) -> None:
     """fetch bulk -> scope -> fetch scoped -> normalize -> extract -> build -> analytics ->
