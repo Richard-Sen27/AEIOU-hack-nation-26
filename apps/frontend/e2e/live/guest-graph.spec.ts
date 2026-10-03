@@ -169,6 +169,19 @@ test.describe("guest graph journey", () => {
     expect(problems()).toEqual([]);
   });
 
+  test("researcher entries can be claimed or removed", async ({ page }) => {
+    const problems = trackProblems(page);
+    await page.goto(`/node/${encodeURIComponent("ORCID:0000-0001-8898-8313")}`);
+    await page.getByTestId("claim-entry-link").click();
+    await expect(page).toHaveURL(/\/about-data\?entry=ORCID%3A0000-0001-8898-8313#claim$/);
+    await expect(page.getByTestId("claim-entry")).toContainText("ORCID:0000-0001-8898-8313");
+    // Either a prefilled mailto, or a clear explanation when no address is configured.
+    const mailto = page.getByTestId("claim-mailto");
+    if (await mailto.count()) await expect(mailto).toHaveAttribute("href", /ORCID%3A0000-0001-8898-8313/);
+    else await expect(page.getByTestId("claim-no-email")).toBeVisible();
+    expect(problems()).toEqual([]);
+  });
+
   test("nothing health-related ends up in URLs or storage", async ({ page }) => {
     const urls = trackUrls(page);
     await page.goto("/");

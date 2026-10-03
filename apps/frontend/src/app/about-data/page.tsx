@@ -30,8 +30,18 @@ function Src({ href, children }: { href: string; children: React.ReactNode }) {
   );
 }
 
-export default function AboutDataPage() {
-  const claimSubject = encodeURIComponent("Atlas entry: claim, correct or remove");
+/** Public graph ids only (e.g. `RES:…`, `INST:…`, `ORCID:…`); anything else is ignored. */
+const ENTRY_ID = /^[A-Za-z][A-Za-z0-9_]{0,15}:[A-Za-z0-9_.-]{1,64}$/;
+
+export default async function AboutDataPage(props: PageProps<"/about-data">) {
+  const { entry: rawEntry } = await props.searchParams;
+  const entry = typeof rawEntry === "string" && ENTRY_ID.test(rawEntry) ? rawEntry : null;
+  const subjectText = `Atlas entry: claim, correct or remove${entry ? ` (${entry})` : ""}`;
+  const bodyText = entry
+    ? `Entry: ${entry}\nI would like to: claim / correct / remove (please choose)\n`
+    : "";
+  const claimSubject = encodeURIComponent(subjectText);
+  const claimHref = `mailto:${PRIVACY_EMAIL}?subject=${claimSubject}${bodyText ? `&body=${encodeURIComponent(bodyText)}` : ""}`;
   return (
     <PageContainer className="max-w-6xl">
       <PageHeader
@@ -148,6 +158,11 @@ export default function AboutDataPage() {
           </NoticeSection>
 
           <NoticeSection id="claim" title="Claim, correct or remove your entry">
+            {entry && (
+              <p className="rounded-lg border bg-muted/40 px-3 py-2" data-testid="claim-entry">
+                Your request is about the entry <code className="font-mono text-foreground">{entry}</code>.
+              </p>
+            )}
             <p>
               <strong>There is no in-app form for this yet.</strong> Please write to the privacy contact instead:
             </p>
@@ -158,20 +173,31 @@ export default function AboutDataPage() {
                   <>
                     {" "}
                     (
-                    <a href={`mailto:${PRIVACY_EMAIL}?subject=${claimSubject}`} className={link}>
+                    <a href={claimHref} className={link} data-testid="claim-mailto">
                       start the e-mail
                     </a>
                     )
                   </>
                 )}{" "}
-                with the subject &ldquo;Atlas entry: claim, correct or remove&rdquo;.
+                with the subject &ldquo;{subjectText}&rdquo;.
               </li>
-              <li>Include the link to your entry in the atlas and say whether you want to claim, correct or remove it.</li>
+              <li>
+                {entry
+                  ? "Say whether you want to claim, correct or remove it; the entry id above tells us which one."
+                  : "Include the link to your entry in the atlas and say whether you want to claim, correct or remove it."}
+              </li>
               <li>
                 Write from an e-mail address listed in a public source about you (for example your institution&apos;s page),
                 so we can confirm it is you without asking for identity documents.
               </li>
             </ol>
+            {!PRIVACY_EMAIL && (
+              <p data-testid="claim-no-email">
+                This deployment has not published its privacy address yet, so the request cannot be sent from here.
+                Keep the subject above{entry ? " with the entry id" : ""}, and send it once the address appears on this
+                page or in the privacy notice. Nothing about your entry changes until then.
+              </p>
+            )}
             <p>
               We reply within one month. If you object, we remove your entry and keep it out of future data versions unless
               there are compelling legitimate grounds, which we would explain to you.

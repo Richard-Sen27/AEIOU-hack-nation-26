@@ -156,11 +156,15 @@ export function NodePanel({
             ))}
           </dl>
         )}
-        {ACTIONABLE.has(node.type) && ["researcher", "doctor"].includes(node.type) && (
-          <p className="text-[11px] text-muted-foreground">
-            Public professional information only.{" "}
-            <Link href="/about-data" className="underline underline-offset-2">
-              About this data, or claim or remove a profile
+        {["researcher", "doctor", "institution"].includes(node.type) && (
+          <p className="flex flex-wrap items-center gap-x-2 gap-y-1 text-[11px] text-muted-foreground">
+            <span>Public professional information only.</span>
+            <Link
+              href={`/about-data?entry=${encodeURIComponent(node.id)}#claim`}
+              className="font-medium text-foreground underline underline-offset-2"
+              data-testid="claim-entry-link"
+            >
+              Claim or remove this entry
             </Link>
           </p>
         )}
