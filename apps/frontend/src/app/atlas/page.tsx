@@ -1,21 +1,24 @@
 import type { Metadata } from "next";
+import { Suspense } from "react";
 
-import { PagePlaceholder } from "@/components/shell/page-placeholder";
+import { AtlasView } from "@/components/atlas/atlas-view";
 
-export const metadata: Metadata = { title: "Atlas" };
+export const metadata: Metadata = {
+  title: "Atlas",
+  description: "The whole map of rare diseases, grouped by shared mechanism and symptoms rather than by name.",
+};
 
+/** `/atlas?focus=<node id>` selects and centres a node; `?tour=1` starts the guided tour. */
 export default function AtlasPage() {
   return (
-    <PagePlaceholder
-      eyebrow="Atlas"
-      title="The whole map of rare diseases"
-      description="Zoomed out: every disease in the atlas, grouped by shared mechanism and symptoms rather than by name."
-      planned={[
-        "Sigma.js view of all diseases with precomputed ForceAtlas2 positions",
-        "Clusters labelled by their shared mechanism, with counterexamples",
-        "Filter by connection type: shared biology, symptoms, research, community",
-        "Click a node for a summary; open it for the full neighbourhood",
-      ]}
-    />
+    <Suspense
+      fallback={
+        <div className="flex h-[calc(100dvh-3.5rem)] flex-col">
+          <h1 className="border-b px-6 py-3 text-base font-semibold">Atlas</h1>
+        </div>
+      }
+    >
+      <AtlasView />
+    </Suspense>
   );
 }
