@@ -42,10 +42,12 @@ export function ConsentsSection({ onChanged }: { onChanged?: () => void }) {
     }
   }, []);
 
+  // Reload when the active consents change anywhere (e.g. granted from the contribute form).
+  const activeKey = (user?.consents ?? []).join(",");
   useEffect(() => {
-    // eslint-disable-next-line react-hooks/set-state-in-effect -- initial fetch, state set after await
+    // eslint-disable-next-line react-hooks/set-state-in-effect -- fetch, state set after await
     void load();
-  }, [load]);
+  }, [load, activeKey]);
 
   async function withdraw(type: ConsentType) {
     setBusy(type);
