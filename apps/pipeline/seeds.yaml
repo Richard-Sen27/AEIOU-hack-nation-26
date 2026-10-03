@@ -1,0 +1,75 @@
+# Stage 0: scope of the atlas. Scaling up means editing this file only.
+#
+# Demo cluster: developmental and epileptic encephalopathies (DEE) and channelopathies.
+# Genes are resolved to HGNC ids (symbol, alias or previous symbol); diseases to MONDO ids by
+# exact label or exact synonym (or give the MONDO id directly). Unresolved seeds fail the run.
+
+cluster: developmental and epileptic encephalopathies / channelopathies
+
+genes:
+  - STXBP1
+  - SCN1A
+  - SCN2A
+  - SCN8A
+  - KCNQ2
+  - CDKL5
+  - SYNGAP1
+  - PCDH19
+  - KCNT1
+  - SLC2A1
+
+diseases:
+  - STXBP1-related encephalopathy
+  - Dravet syndrome
+  - developmental and epileptic encephalopathy, 11      # SCN2A, early-onset (gain of function)
+  - seizures, benign familial infantile, 3             # SCN2A, self-limited (gain of function)
+  - complex neurodevelopmental disorder                # SCN2A haploinsufficiency (ClinGen)
+  - migraine, familial hemiplegic, 3                   # SCN1A gain of function
+  - developmental and epileptic encephalopathy, 13      # SCN8A
+  - developmental and epileptic encephalopathy, 7       # KCNQ2
+  - seizures, benign familial neonatal, 1              # KCNQ2
+  - CDKL5 disorder
+  - developmental and epileptic encephalopathy, 9       # PCDH19
+  - developmental and epileptic encephalopathy, 14      # KCNT1
+  - encephalopathy due to GLUT1 deficiency             # SLC2A1
+
+expansion:
+  # Diseases linked to a seed gene are always in scope (hop 0).
+  max_hops: 2
+  via: [shared_gene, shared_pathway, hpo_similarity]
+  # Gene-disease links that count for expansion (sources merged in Stage 4 anyway).
+  gene_disease_sources: [mondo, clingen, orphanet, hpo]
+  # Grouping diseases ("intellectual disability", ...) have many genes; they may be in scope
+  # but neither expand nor pull genes in.
+  expand_max_genes_per_disease: 8
+  gene_from_disease_max_genes: 8
+  # Shared pathway: only specific Reactome pathways (few member genes) count.
+  pathway_max_genes: 40
+  # HPO similarity: IC-weighted cosine on ancestor-expanded annotations.
+  hpo_threshold: 0.55
+  hpo_top_k_per_disease: 5
+  # Every non-seed disease must have at least this HPO similarity to a hop-0 disease.
+  min_coherence: 0.3
+  # Caps keep the graph explorable.
+  max_new_per_hop: [120, 60]
+  max_diseases: 220
+  max_genes: 150
+  phenotypes_per_disease: 25
+
+validation:
+  # Facts that must exist as supported edges (confidence >= 0.6) after the build.
+  golden:
+    - {source: Dravet syndrome, relation: caused_by_variant_in, target: SCN1A}
+    - {source: STXBP1-related encephalopathy, relation: caused_by_variant_in, target: STXBP1}
+    - {source: "developmental and epileptic encephalopathy, 11", relation: caused_by_variant_in, target: SCN2A}
+    - {source: CDKL5 disorder, relation: caused_by_variant_in, target: CDKL5}
+    - {source: encephalopathy due to GLUT1 deficiency, relation: caused_by_variant_in, target: SLC2A1}
+    - {source: STXBP1, relation: acts_via, target: MECH:loss_of_function}
+  # Same gene, opposite mechanism: these must never share a mechanism cluster.
+  counterexamples:
+    - gene: SCN2A
+      gain_of_function: ["developmental and epileptic encephalopathy, 11", "seizures, benign familial infantile, 3"]
+      loss_of_function: [complex neurodevelopmental disorder]
+    - gene: SCN1A
+      gain_of_function: ["migraine, familial hemiplegic, 3"]
+      loss_of_function: [Dravet syndrome]
