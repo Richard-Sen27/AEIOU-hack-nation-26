@@ -2,7 +2,7 @@
 
 import { Bot, FileUp, History } from "lucide-react";
 import { useRouter } from "next/navigation";
-import { useEffect, useRef, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import { toast } from "sonner";
 
 import { useGate } from "@/components/providers/gate-provider";
@@ -43,12 +43,25 @@ export function ChatView() {
   // Free text handed over from the landing page (in memory only).
   const tookPending = useRef(false);
   const { send } = chat;
+  // The first message is the first use of health information: ask for the
+  // health-data consent just in time. Declining sends nothing and keeps the text.
+  const gatedSend = useCallback(
+    async (text: string) => {
+      if (await requireConsent("health_data", "Dr. Wu needs your consent to use the health information you share.")) {
+        send(text);
+        return;
+      }
+      composer.current?.fill(text);
+      toast("Nothing was sent", { description: "Your message is still in the box." });
+    },
+    [requireConsent, send],
+  );
   useEffect(() => {
     if (tookPending.current) return;
     tookPending.current = true;
     const text = takePendingChatMessage();
-    if (text) send(text);
-  }, [send]);
+    if (text) void gatedSend(text);
+  }, [gatedSend]);
 
   // Keep the newest content in view while the user is near the bottom.
   const lastTurn = chat.turns[chat.turns.length - 1];
@@ -179,12 +192,17 @@ export function ChatView() {
                       isLatest={i === chat.turns.length - 1}
                       language={language}
                       onRetry={() => chat.retry(t.id)}
-                      onSend={chat.send}
+                      onSend={(text) => void gatedSend(text)}
                       onSkipFollowUp={() => chat.dismissFollowUp(t.id)}
                       onConfirmChip={(ci) => void chat.confirmChip(t.id, ci)}
                       onRemoveChip={(ci) => void chat.removeChip(t.id, ci)}
                       onUndoChip={(ci) => chat.undoRemove(t.id, ci)}
                       onCorrectChip={(ci, hit) => void chat.correctChip(t.id, ci, hit)}
+                      onConfirmHint={(k) => void chat.confirmHint(t.id, k)}
+                      onDismissHint={(k) => chat.dismissHint(t.id, k)}
+                      showChildOffer={chat.profileAboutChild === false}
+                      onConfirmChild={() => chat.markAboutChild(t.id)}
+                      onDismissChild={() => chat.dismissChildOffer(t.id)}
                     />
                   </li>
                 ),
@@ -199,7 +217,7 @@ export function ChatView() {
             streaming={chat.streaming}
             expertMode={expertMode}
             onExpertMode={setExpertMode}
-            onSend={chat.send}
+            onSend={(text) => void gatedSend(text)}
             onStop={chat.stop}
             onFiles={(f) => void handleFiles(f)}
           />

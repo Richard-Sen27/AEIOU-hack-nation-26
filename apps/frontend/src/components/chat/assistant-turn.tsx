@@ -27,9 +27,10 @@ import { cn } from "@/lib/utils";
 import { Actions } from "./actions";
 import { Cards } from "./cards";
 import { Chips } from "./chips";
+import { ChildOffer, ProfileHints } from "./profile-hints";
 import { Claims } from "./claims";
 import { FollowUpQuestion } from "./follow-up";
-import { isEmergencyReply, type AssistantTurn as Turn, type TurnError } from "./types";
+import { isEmergencyReply, type AssistantTurn as Turn, type HintKey, type TurnError } from "./types";
 
 function StatusLines({ turn }: { turn: Turn }) {
   const [open, setOpen] = useState(false);
@@ -188,6 +189,11 @@ export function AssistantTurnView({
   onRemoveChip,
   onUndoChip,
   onCorrectChip,
+  onConfirmHint,
+  onDismissHint,
+  showChildOffer,
+  onConfirmChild,
+  onDismissChild,
 }: {
   turn: Turn;
   isLatest: boolean;
@@ -199,6 +205,12 @@ export function AssistantTurnView({
   onRemoveChip: (i: number) => void;
   onUndoChip: (i: number) => void;
   onCorrectChip: (i: number, hit: SearchHit) => void;
+  onConfirmHint: (key: HintKey) => void;
+  onDismissHint: (key: HintKey) => void;
+  /** The stored profile says "own data"; offer to change it if this reply suspects a child. */
+  showChildOffer: boolean;
+  onConfirmChild: () => Promise<void>;
+  onDismissChild: () => void;
 }) {
   const r = turn.reply;
   const streaming = turn.phase === "streaming";
@@ -251,6 +263,14 @@ export function AssistantTurnView({
             )}
 
             <Chips chips={r.chips} onConfirm={onConfirmChip} onRemove={onRemoveChip} onUndo={onUndoChip} onCorrect={onCorrectChip} />
+            {turn.final && (
+              <>
+                <ProfileHints hints={r.profile_hints} state={turn.hintState} onConfirm={onConfirmHint} onDismiss={onDismissHint} />
+                {showChildOffer && r.profile_hints?.about_child_suspected && !turn.childOfferDone && (
+                  <ChildOffer onConfirm={onConfirmChild} onDismiss={onDismissChild} />
+                )}
+              </>
+            )}
             <Claims reply={r} />
             <Cards cards={r.cards} />
             <Actions actions={r.actions} edgeIds={focus?.highlight_path ?? []} language={language} />

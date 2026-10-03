@@ -52,7 +52,15 @@ export type AssistantTurn = {
   /** In-memory copy of the question, for "Try again". Never persisted. */
   request?: string;
   followUpDone?: boolean;
+  /** What the user decided about each `profile_hints` item of this reply. */
+  hintState?: Partial<Record<HintKey, HintDecision>>;
+  /** The "is this about a child?" offer was answered or dismissed. */
+  childOfferDone?: boolean;
 };
+
+/** Profile hints from a reply (age, onset, country), confirmed or dismissed one by one. */
+export type HintKey = "age" | "onset" | "country";
+export type HintDecision = "saving" | "confirmed" | "dismissed";
 
 export type Turn = UserTurn | AssistantTurn;
 

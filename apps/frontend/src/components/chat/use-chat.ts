@@ -15,6 +15,7 @@ import {
   type AssistantTurn,
   type ChatEvent,
   type ChatSession,
+  type HintKey,
   type PatientProfile,
   type Schemas,
   type Turn,
@@ -70,6 +71,35 @@ export function applyChipToProfile(
       break;
   }
   return next;
+}
+
+/** Write one profile hint (age, onset or country) into a PatientProfile. */
+export function applyHintToProfile(profile: PatientProfile, hints: Schemas.ProfileHints, key: HintKey): PatientProfile {
+  switch (key) {
+    case "age":
+      return hints.age_years != null
+        ? { ...profile, age_years: hints.age_years, age_range: null }
+        : { ...profile, age_range: hints.age_range ?? null, age_years: null };
+    case "onset":
+      return { ...profile, onset: hints.onset ?? null };
+    case "country":
+      return { ...profile, country: hints.country ?? null };
+  }
+}
+
+/** A profile with nothing in it yet has no "whose data is this" decision either. */
+function isEmptyProfile(p: PatientProfile) {
+  return (
+    !p.diseases?.length &&
+    !p.genes?.length &&
+    !p.variants?.length &&
+    !p.phenotypes?.length &&
+    p.age_years == null &&
+    !p.age_range &&
+    !p.onset &&
+    !p.country &&
+    !p.about_child
+  );
 }
 
 function turnsFromHistory(messages: Schemas.ChatMessage[]): Turn[] {
@@ -244,7 +274,8 @@ export function useChat({ expertMode }: { expertMode: boolean }) {
         updateTurn(turnId, (t) => ({ ...t, phase: "error", error: err }));
         if (err.code === "sign_in_required" || err.code === "reauth_required") {
           openSignIn("Sign in again to continue the conversation with Dr. Wu.");
-        } else if (err.code === "age_confirmation_required" && e instanceof ApiError) {
+        } else if ((err.code === "age_confirmation_required" || err.code === "consent_required") && e instanceof ApiError) {
+          // Opens the welcome step or the consent dialog; "Try again" resends the kept text.
           reportApiError(e);
         }
         announce(`Dr. Wu could not answer. ${err.message}`, "assertive");
@@ -353,32 +384,60 @@ export function useChat({ expertMode }: { expertMode: boolean }) {
   );
 
   /**
-   * Save `chip` into (add) or out of (remove) the profile. `PUT /profile` is
-   * optimistically locked on `updated_at`: read fresh, merge, write, and on a
-   * 409 conflict read again and retry once.
+   * Whose data the health-data consent was given for (own, or a child with
+   * parental responsibility confirmed). compliance.md, Children: the first
+   * save into an empty profile carries that answer, so it is asked only once.
    */
-  const persistChip = useCallback(
-    async (chip: TurnChip, add: boolean) => {
+  const consentSubject = useCallback(async (): Promise<Pick<PatientProfile, "about_child" | "parental_responsibility_confirmed">> => {
+    try {
+      const list = await apiFetch<Schemas.Consent[]>("/consents", { quiet: true, cache: "no-store" });
+      const c = (list ?? []).find((x) => x.consent_type === "health_data" && x.active);
+      if (c?.about_child && c.parental_responsibility_confirmed) {
+        return { about_child: true, parental_responsibility_confirmed: true };
+      }
+    } catch {
+      /* fall back to "own data" */
+    }
+    return { about_child: false, parental_responsibility_confirmed: false };
+  }, []);
+
+  /**
+   * Read the profile, apply `change`, write it. `PUT /profile` is
+   * optimistically locked on `updated_at`: on a 409 conflict read again and
+   * retry once.
+   */
+  const saveProfile = useCallback(
+    async (change: (p: PatientProfile) => PatientProfile) => {
       for (let attempt = 0; ; attempt++) {
         const current = await loadProfile();
-        const next = applyChipToProfile(current, chip, add);
+        let next = change(current);
+        if (isEmptyProfile(current) && !next.about_child) next = { ...next, ...(await consentSubject()) };
         try {
           const saved = await apiFetch<PatientProfile>("/profile", { method: "PUT", json: next, quiet: true });
           profileRef.current = saved && typeof saved === "object" ? saved : next;
-          return;
+          return profileRef.current;
         } catch (e) {
           if (attempt === 0 && e instanceof ApiError && (e.code === "conflict" || e.status === 409)) continue;
           throw e;
         }
       }
     },
-    [loadProfile],
+    [loadProfile, consentSubject],
+  );
+
+  /** Save `chip` into (add) or out of (remove) the profile. */
+  const persistChip = useCallback(
+    async (chip: TurnChip, add: boolean) => {
+      await saveProfile((p) => applyChipToProfile(p, chip, add));
+    },
+    [saveProfile],
   );
 
   const chipFailed = useCallback(
     (e: unknown) => {
       const err = errorFrom(e);
       if (err.code === "sign_in_required" || err.code === "reauth_required") openSignIn();
+      if (err.code === "consent_required" && e instanceof ApiError) reportApiError(e);
       toast("Your profile was not updated", {
         description:
           err.code === "not_implemented"
@@ -466,7 +525,75 @@ export function useChat({ expertMode }: { expertMode: boolean }) {
     [turns, persistChip, setChip, chipFailed],
   );
 
+  const setHint = useCallback(
+    (turnId: string, key: HintKey, decision: "saving" | "confirmed" | "dismissed" | undefined) =>
+      updateTurn(turnId, (t) => ({ ...t, hintState: { ...t.hintState, [key]: decision } })),
+    [updateTurn],
+  );
+
+  /** Confirm one profile hint (age, onset, country) into the profile. */
+  const confirmHint = useCallback(
+    async (turnId: string, key: HintKey) => {
+      const t = turns.find((x) => x.id === turnId);
+      const hints = t && t.kind === "assistant" ? t.reply.profile_hints : null;
+      if (!hints) return;
+      setHint(turnId, key, "saving");
+      try {
+        await saveProfile((p) => applyHintToProfile(p, hints, key));
+        setHint(turnId, key, "confirmed");
+        announce("Added to your profile.");
+      } catch (e) {
+        setHint(turnId, key, undefined);
+        chipFailed(e);
+      }
+    },
+    [turns, saveProfile, setHint, chipFailed],
+  );
+
+  const dismissHint = useCallback(
+    (turnId: string, key: HintKey) => setHint(turnId, key, "dismissed"),
+    [setHint],
+  );
+
+  /** Whether the stored profile already says it describes a child (null: unknown yet). */
+  const [profileAboutChild, setProfileAboutChild] = useState<boolean | null>(null);
+  const suspectsChild = turns.some(
+    (t) => t.kind === "assistant" && t.final && t.reply.profile_hints?.about_child_suspected && !t.childOfferDone,
+  );
+  useEffect(() => {
+    if (!suspectsChild || profileAboutChild !== null) return;
+    // An empty profile takes its answer from the consent (asked there already).
+    loadProfile()
+      .then(async (p) => setProfileAboutChild(isEmptyProfile(p) ? !!(await consentSubject()).about_child : !!p.about_child))
+      .catch(() => setProfileAboutChild(null));
+  }, [suspectsChild, profileAboutChild, loadProfile, consentSubject]);
+
+  /** The user says the profile is about a child they hold parental responsibility for. */
+  const markAboutChild = useCallback(
+    async (turnId: string) => {
+      try {
+        await saveProfile((p) => ({ ...p, about_child: true, parental_responsibility_confirmed: true }));
+        setProfileAboutChild(true);
+        updateTurn(turnId, (t) => ({ ...t, childOfferDone: true }));
+        announce("Your profile now says it is about a child you care for.");
+      } catch (e) {
+        chipFailed(e);
+      }
+    },
+    [saveProfile, updateTurn, chipFailed],
+  );
+
+  const dismissChildOffer = useCallback(
+    (turnId: string) => updateTurn(turnId, (t) => ({ ...t, childOfferDone: true })),
+    [updateTurn],
+  );
+
   return {
+    profileAboutChild,
+    confirmHint,
+    dismissHint,
+    markAboutChild,
+    dismissChildOffer,
     turns,
     sessionId,
     sessions,

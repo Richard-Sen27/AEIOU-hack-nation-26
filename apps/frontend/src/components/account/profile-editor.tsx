@@ -5,6 +5,7 @@ import { useCallback, useEffect, useId, useMemo, useState } from "react";
 import { toast } from "sonner";
 
 import { NodeChip, VusNotice } from "@/components/graph-ui";
+import { useGate } from "@/components/providers/gate-provider";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Checkbox } from "@/components/ui/checkbox";
@@ -108,6 +109,7 @@ function EmptyLine({ children }: { children: React.ReactNode }) {
 const now = () => new Date().toISOString();
 
 export function ProfileEditor() {
+  const { requireConsent } = useGate();
   const [load, setLoad] = useState<LoadState>({ kind: "loading" });
   const [saved, setSaved] = useState<PatientProfile>(EMPTY);
   const [draft, setDraft] = useState<PatientProfile>(EMPTY);
@@ -152,6 +154,9 @@ export function ProfileEditor() {
       announce("Please confirm parental responsibility before saving.", "assertive");
       return;
     }
+    // The first save is the first use of health information: ask just in time.
+    // Declining keeps the draft as it is.
+    if (!(await requireConsent("health_data", "Saving your profile needs your consent to use health information."))) return;
     setSaving(true);
     // Optimistic locking: send back the updated_at we last read.
     const body: PatientProfile = { ...draft, updated_at: saved.updated_at ?? null };
