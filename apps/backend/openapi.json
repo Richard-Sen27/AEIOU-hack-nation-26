@@ -2718,15 +2718,21 @@
             "description": "Always set by the server: the reply comes from an AI system."
           },
           "kind": {
-            "type": "string",
-            "enum": [
-              "answer",
-              "emergency",
-              "declined"
+            "anyOf": [
+              {
+                "type": "string",
+                "enum": [
+                  "answer",
+                  "emergency",
+                  "declined"
+                ]
+              },
+              {
+                "type": "null"
+              }
             ],
             "title": "Kind",
-            "description": "Set by the server: answer (default), emergency (call emergency services, no graph answer) or declined (part of the question crossed the medical boundary and was declined; graph context may still follow).",
-            "default": "answer"
+            "description": "Always set by the server on new replies: answer, emergency (call emergency services, no graph answer) or declined (part of the question crossed the medical boundary and was declined; graph context may still follow). Null only on replies stored before this field existed."
           }
         },
         "type": "object",

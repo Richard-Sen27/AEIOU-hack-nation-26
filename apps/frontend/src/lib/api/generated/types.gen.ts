@@ -134,9 +134,9 @@ export type AgentReply = {
     /**
      * Kind
      *
-     * Set by the server: answer (default), emergency (call emergency services, no graph answer) or declined (part of the question crossed the medical boundary and was declined; graph context may still follow).
+     * Always set by the server on new replies: answer, emergency (call emergency services, no graph answer) or declined (part of the question crossed the medical boundary and was declined; graph context may still follow). Null only on replies stored before this field existed.
      */
-    kind?: 'answer' | 'emergency' | 'declined';
+    kind?: 'answer' | 'emergency' | 'declined' | null;
 };
 
 /**
