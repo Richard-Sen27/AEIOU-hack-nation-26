@@ -21,7 +21,7 @@ from backend.api.services.explanation.common import reading_grade
 from backend.llm import LLMClient
 from backend.observability import tracing
 from backend.schemas.common import Lens
-from backend.schemas.enums import Origin, Role
+from backend.schemas.enums import Origin, Relation, Role
 from backend.schemas.profile import PatientProfile
 
 GOLDEN_PATH = Path(__file__).with_name("golden.yaml")
@@ -74,6 +74,7 @@ class CheckResult:
     total: int = 0
     failures: list[str] = field(default_factory=list)
     gating: bool = True
+    unresolved: list[str] = field(default_factory=list)  # expected labels missing in the graph
 
     @property
     def ok(self) -> bool:
@@ -81,6 +82,11 @@ class CheckResult:
 
     def line(self) -> str:
         mark = "PASS" if self.ok else ("FAIL" if self.gating else "info")
+        if self.unresolved:
+            return (
+                f"{mark:4} {self.name:12} {self.passed}/{self.total}"
+                f" ({len(self.unresolved)} expected node(s) not in the graph)"
+            )
         return f"{mark:4} {self.name:12} {self.passed}/{self.total}"
 
 
@@ -88,6 +94,17 @@ def resolve_label(label: str) -> list[str]:
     store = graph_service.get_graph()
     hits = store.name_index.get(graph_service.normalize_name(label), [])
     return list(dict.fromkeys(node_id for node_id, _ in hits))
+
+
+def has_inferred(node_ids: list[str], relation: Relation) -> bool:
+    """True if one of the nodes carries an inferred edge of this relation."""
+    store = graph_service.get_graph()
+    for nid in node_ids:
+        for eid in store.incident.get(nid, ()):
+            edge = store.edges[eid]
+            if edge.relation == relation and edge.origin == Origin.inferred:
+                return True
+    return False
 
 
 def reply_node_ids(result: TurnResult) -> set[str]:
@@ -146,9 +163,12 @@ async def run_eval(
             for item in spec["questions"][:limit]:
                 expected = {lbl: resolve_label(lbl) for lbl in item["expect"]}
                 result = await harness.ask(item["question"], _lens(item))
-                if any(not ids for ids in expected.values()):
-                    continue  # label not in this graph: skip, do not count
                 golden.total += 1
+                absent = [lbl for lbl, ids in expected.items() if not ids]
+                if absent:
+                    # A missing node counts as a failure and is listed on its own line.
+                    golden.unresolved += [f"{item['persona']}: {lbl}" for lbl in absent]
+                    continue
                 found = reply_node_ids(result)
                 missing = [lbl for lbl, ids in expected.items() if not set(ids) & found]
                 if missing:
@@ -157,6 +177,16 @@ async def run_eval(
                     golden.passed += 1
             if golden.total and golden.passed / golden.total >= GOLDEN_MIN_PASS:
                 golden.failures = []
+            for item in spec.get("inference_questions", [])[:limit]:
+                # Seeds for the inference check: relations inferred in every graph build.
+                relation = Relation(item["relation"])
+                for lbl in item["expect"]:
+                    ids = resolve_label(lbl)
+                    if not ids:
+                        golden.unresolved.append(f"inference: {lbl}")
+                    elif not has_inferred(ids, relation):
+                        golden.unresolved.append(f"inference: no inferred {relation} at {lbl}")
+                await harness.ask(item["question"], _lens(item))
             if "golden" in selected:
                 checks.append(golden)
         if "refusal" in selected:
@@ -216,6 +246,10 @@ async def run_eval(
                         c.passed += 1
                     else:
                         c.failures.append("inferred edge shown as observed")
+            if not c.total:
+                c.failures.append("no claim cited an inferred edge: the check would pass vacuously")
+                # The unscripted mock never cites real edges on purpose: informational there.
+                c.gating = not mock
             checks.append(c)
         if "readability" in selected:
             c = CheckResult("readability")
@@ -239,6 +273,8 @@ async def run_eval(
         print("  " + check.line(), file=out)
         for failure in check.failures[:5]:
             print(f"       - {failure}", file=out)
+        for label in check.unresolved:
+            print(f"       - not in graph: {label}", file=out)
     return checks
 
 
