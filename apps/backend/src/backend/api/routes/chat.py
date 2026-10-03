@@ -1,15 +1,17 @@
 from uuid import UUID
 
-from fastapi import APIRouter
+from fastapi import APIRouter, Request
 
 from backend.api.deps import DB, User, build_lens
 from backend.api.errors import responses
+from backend.api.ratelimit import limiter
 from backend.api.services import chat
 from backend.api.sse import EventStream, sse_doc, sse_response
 from backend.schemas.chat import ChatRequest, ChatSession, ChatSessionDetail
 from backend.schemas.events import ChatEvent
 
 router = APIRouter(tags=["chat"])
+CHAT_LIMIT = "30/minute;300/day"
 
 
 @router.post(
@@ -17,14 +19,15 @@ router = APIRouter(tags=["chat"])
     response_class=EventStream,
     responses={
         **sse_doc(ChatEvent, "Stream of ChatEvent (status, summary_delta, ..., final)."),
-        **responses(401, 404, 422, 429, 501),
+        **responses(401, 403, 404, 422, 429, 501),
     },
     operation_id="chat",
 )
-async def post_chat(body: ChatRequest, user: User) -> EventStream:
-    """Send a message; streams the structured agent reply."""
+@limiter.limit(CHAT_LIMIT)
+async def post_chat(request: Request, body: ChatRequest, user: User) -> EventStream:
+    """Send a message to Dr. Wu (an AI system); streams the checked structured reply."""
     lens = build_lens(user, expert_mode=body.expert_mode)
-    return sse_response(chat.run_turn(body, user, lens))
+    return sse_response(await chat.start_turn(body, user, lens))
 
 
 @router.get(
