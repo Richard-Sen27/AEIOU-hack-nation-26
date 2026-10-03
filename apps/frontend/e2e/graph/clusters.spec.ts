@@ -19,6 +19,7 @@ test.describe("clusters", () => {
     await expect(page).toHaveURL(/\/node\/CLUSTER%3A1$/);
     await expect(page.getByRole("heading", { level: 1, name: "Sodium channel gain-of-function epilepsies" })).toBeVisible();
     // Its neighbourhood is its members.
+    await expect(page.getByTestId("cluster-members")).toContainText("SCN8A developmental");
     await page.getByRole("radio", { name: "List" }).click();
     await expect(page.getByTestId("node-list")).toContainText("SCN8A developmental");
     expect(errors()).toEqual([]);

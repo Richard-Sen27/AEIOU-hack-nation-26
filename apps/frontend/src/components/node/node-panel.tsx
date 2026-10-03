@@ -197,11 +197,35 @@ export function NodePanel({
         )}
       </section>
 
+      {node.type === "cluster" && (
+        <section aria-labelledby="node-members-title" className="border-b px-4 py-4" data-testid="cluster-members">
+          <h2 id="node-members-title" className="mb-1 text-sm font-semibold">
+            Members · {[...nodes.values()].filter((n) => n.id !== node.id).length}
+          </h2>
+          <p className="mb-2.5 text-xs text-muted-foreground">
+            Grouped by analysis of shared genes, pathways and symptoms. Membership is a hypothesis.
+          </p>
+          <ul className="flex flex-wrap gap-1.5">
+            {[...nodes.values()]
+              .filter((n) => n.id !== node.id)
+              .map((n) => (
+                <li key={n.id}>
+                  <NodeChip id={n.id} type={n.type} label={n.label} size="sm" />
+                </li>
+              ))}
+          </ul>
+        </section>
+      )}
+
       <section aria-labelledby="node-connections-title" className="px-4 py-4">
         <h2 id="node-connections-title" className="mb-3 text-sm font-semibold">
           Connections
         </h2>
-        {groups.length === 0 && <p className="text-sm text-muted-foreground">No direct connections recorded yet.</p>}
+        {groups.length === 0 && (
+          <p className="text-sm text-muted-foreground">
+            {node.type === "cluster" ? "A group has members rather than sourced connections of its own." : "No direct connections recorded yet."}
+          </p>
+        )}
         <div className="space-y-4">
           {groups.map((g) => {
             const fam = EDGE_FAMILY_META[g.family];

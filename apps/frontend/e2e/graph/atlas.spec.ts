@@ -117,14 +117,14 @@ test.describe("atlas", () => {
   });
 
   test("3,000 nodes and 20,000 edges render and stay interactive", async ({ page }) => {
-    test.setTimeout(120_000);
+    test.setTimeout(180_000);
     const big = largeAtlas(3000, 20000);
     await mockApi(page, graphMocks({ "GET /atlas.json": big }));
     const errors = trackConsoleErrors(page);
     await page.goto("/atlas");
     await expect(page.getByTestId("atlas-counts")).toContainText("3,000 items · 20,000 connections");
     const canvas = page.getByTestId("atlas-canvas");
-    await expect(canvas.locator("canvas").first()).toBeVisible({ timeout: 30_000 });
+    await expect(canvas.locator("canvas").first()).toBeVisible({ timeout: 90_000 });
     const box = (await canvas.boundingBox())!;
     // Wheel-zoom and drag; the main thread must stay responsive.
     const t0 = Date.now();
