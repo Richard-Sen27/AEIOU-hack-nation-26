@@ -33,7 +33,7 @@ from backend.schemas.account import (
 from backend.schemas.chat import AgentReply, ChatMessage, ChatSession
 from backend.schemas.contributions import EdgeFlag
 from backend.schemas.documents import Document, Finding, Job
-from backend.schemas.enums import ConsentType, ErrorCode, ProfileSource, Role
+from backend.schemas.enums import ConsentType, ErrorCode, JobKind, ProfileSource, Role
 from backend.schemas.profile import (
     PatientProfile,
     ProfileDisease,
@@ -247,7 +247,8 @@ async def grant_consent(db: AsyncSession, user: CurrentUser, body: ConsentGrant)
 async def revoke_consent(db: AsyncSession, user: CurrentUser, consent_type: ConsentType) -> None:
     """Revoke and delete the data held under that consent (Art. 7(3)); 404 if none is active.
 
-    upload: documents, findings, extraction jobs and the profile items that came from documents.
+    health_data: the patient profile, chat sessions and messages, documents, findings and
+    document jobs. The account, settings and the contribute consent with its contributions stay.
     contribute: every contribution, which removes it from the shared graph.
     """
     existing = await _active_consent(db, user.id, consent_type)
@@ -258,10 +259,14 @@ async def revoke_consent(db: AsyncSession, user: CurrentUser, consent_type: Cons
     )
     params = {"uid": user.id}
     if consent_type == ConsentType.health_data:
-        await db.execute(text("DELETE FROM jobs WHERE user_id = :uid"), params)
-        await db.execute(text("DELETE FROM documents WHERE user_id = :uid"), params)
-        await db.execute(text("DELETE FROM findings WHERE user_id = :uid"), params)
-        await remove_profile_items(db, user.id, source=ProfileSource.document)
+        # Gap-search jobs use public graph terms only and are not held under this consent.
+        await db.execute(
+            text("DELETE FROM jobs WHERE user_id = :uid AND kind = :kind"),
+            {**params, "kind": JobKind.document_extraction.value},
+        )
+        for table in ("findings", "documents", "chat_messages", "chat_sessions"):
+            await db.execute(text(f"DELETE FROM {table} WHERE user_id = :uid"), params)
+        await db.execute(text("DELETE FROM patient_profiles WHERE user_id = :uid"), params)
     else:
         await db.execute(text("DELETE FROM contributions WHERE user_id = :uid"), params)
         await refresh_shared_graph(db, contributions=True)
@@ -470,8 +475,11 @@ async def merge_profile_items(
 
     Call inside a transaction scoped to user_id. An item with the same key (ID, or ClinVar
     ID / HGVS for variants) replaces the stored one; `confirmed_at` defaults to now. Raises
-    ApiError 422 if an item fails validation.
+    ApiError 403 consent_required without an active health_data consent, 422 if an item fails
+    validation.
     """
+    if await _active_consent(db, user_id, ConsentType.health_data) is None:
+        raise ApiError(403, ErrorCode.consent_required)
     profile = await _locked_profile(db, user_id)
     for item in items:
         name, _ = _item_key(item)

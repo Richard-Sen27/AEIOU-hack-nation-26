@@ -88,7 +88,7 @@ async def test_guest_upload_needs_sign_in(client):
 
 
 async def test_validation_error_does_not_echo_input(make_user):
-    user = await make_user()
+    user = await make_user(consents=["health_data"])
     secret = "my daughter has seizures"
     r = await user.client.put("/profile", json={"diseases": secret})
     assert r.status_code == 422

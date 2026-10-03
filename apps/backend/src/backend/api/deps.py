@@ -23,6 +23,8 @@ __all__ = [
     "require_signed_in",
     "SignedInUser",
     "require_consent",
+    "HealthDataConsentUser",
+    "ContributeConsentUser",
     "get_lens",
     "build_lens",
     "gpc_signal",

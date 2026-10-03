@@ -1,6 +1,6 @@
 from fastapi import APIRouter, Request, Response
 
-from backend.api.deps import DB, SignedInUser, User
+from backend.api.deps import DB, HealthDataConsentUser, SignedInUser, User
 from backend.api.errors import responses
 from backend.api.ratelimit import limiter
 from backend.api.security import clear_session
@@ -66,8 +66,9 @@ async def get_profile(db: DB, user: SignedInUser) -> PatientProfile:
     responses=responses(401, 403, 409, 422),
     operation_id="putProfile",
 )
-async def put_profile(body: PatientProfile, db: DB, user: User) -> PatientProfile:
-    """Replace the PatientProfile. Send `updated_at` from the last GET; 409 if it changed."""
+async def put_profile(body: PatientProfile, db: DB, user: HealthDataConsentUser) -> PatientProfile:
+    """Replace the PatientProfile (needs the health_data consent). Send `updated_at` from the
+    last GET; 409 if it changed."""
     return await account.put_profile(db, user, body)
 
 
@@ -90,7 +91,7 @@ async def list_consents(db: DB, user: SignedInUser) -> list[Consent]:
     operation_id="grantConsent",
 )
 async def grant_consent(body: ConsentGrant, db: DB, user: User) -> Consent:
-    """Grant a consent (upload or contribute, each separately)."""
+    """Grant a consent (health_data or contribute, each separately)."""
     return await account.grant_consent(db, user, body)
 
 

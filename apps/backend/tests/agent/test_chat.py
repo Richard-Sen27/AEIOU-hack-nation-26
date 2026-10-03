@@ -76,7 +76,7 @@ def final(events: list[dict]) -> dict:
 
 @pytest.fixture
 async def doctor(make_user, user_llm):
-    return await make_user(role="doctor")
+    return await make_user(role="doctor", consents=["health_data"])
 
 
 async def test_guest_gets_401(client):
@@ -85,14 +85,14 @@ async def test_guest_gets_401(client):
 
 
 async def test_unconfirmed_age_gets_403(make_user, user_llm):
-    user = await make_user(role="patient", age_confirmed=False)
+    user = await make_user(role="patient", age_confirmed=False, consents=["health_data"])
     resp = await user.client.post("/chat", json={"message": "hello"})
     assert resp.status_code == 403
     assert resp.json()["error"]["code"] == "age_confirmation_required"
 
 
 async def test_no_plan_tokens_gets_401(make_user, mock_openai_env):
-    user = await make_user(role="patient")
+    user = await make_user(role="patient", consents=["health_data"])
     resp = await user.client.post("/chat", json={"message": "STXBP1 encephalopathy"})
     assert resp.status_code == 401 and resp.json()["error"]["code"] == "sign_in_required"
 
@@ -106,7 +106,9 @@ async def test_no_plan_tokens_gets_401(make_user, mock_openai_env):
     ],
 )
 async def test_emergency_short_circuit(make_user, mock_openai_env, llm_calls, message, needle):
-    user = await make_user(role="patient")  # no tokens: proves no LLM client is even needed
+    user = await make_user(
+        role="patient", consents=["health_data"]
+    )  # no tokens: proves no LLM client is even needed
     events = await turn(user, message)
     reply = final(events)
     assert needle in reply["summary"]
@@ -362,7 +364,7 @@ async def test_vus_notice(doctor, user_llm):
 
 
 async def test_patient_summary_reading_gate(make_user, user_llm, llm_calls):
-    user = await make_user(role="patient")
+    user = await make_user(role="patient", consents=["health_data"])
     hard = (
         "Heterogeneous electrophysiological characterization demonstrates pathophysiologically "
         "distinct neurodevelopmental manifestations across voltage-gated channelopathies."
@@ -374,8 +376,8 @@ async def test_patient_summary_reading_gate(make_user, user_llm, llm_calls):
 
 
 async def test_sessions_persist_and_are_isolated(make_user, user_llm, llm_calls):
-    alice = await make_user(role="doctor")
-    bob = await make_user(role="doctor")
+    alice = await make_user(role="doctor", consents=["health_data"])
+    bob = await make_user(role="doctor", consents=["health_data"])
     user_llm.enqueue({"json": draft(summary="First answer.")})
     events = await turn(alice, "STXBP1 encephalopathy")
     sid = events[-1]["session_id"]
@@ -506,7 +508,7 @@ async def test_profile_hints_drop_invalid_values(doctor, user_llm):
 
 
 async def test_patient_summary_reading_gate_german(make_user, user_llm, llm_calls):
-    user = await make_user(role="patient")
+    user = await make_user(role="patient", consents=["health_data"])
     hard = (
         "Die heterogene elektrophysiologische Charakterisierung demonstriert pathophysiologisch "
         "unterschiedliche neuroentwicklungsbezogene Manifestationen bei Kanalopathien."

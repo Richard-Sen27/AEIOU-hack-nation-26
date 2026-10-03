@@ -3,7 +3,14 @@
 import json
 import uuid
 
+import pytest
 from account_helpers import ASSET, assert_error
+
+from backend.api.errors import ApiError
+from backend.api.services.account import merge_profile_items
+from backend.db.session import user_transaction
+from backend.schemas.enums import ErrorCode
+from backend.schemas.profile import ProfileGene
 
 
 async def test_guest_needs_sign_in(client):
@@ -105,7 +112,7 @@ async def test_child_needs_parental_responsibility(make_user):
 
 
 async def test_child_profile_requires_child_consent(make_user):
-    user = await make_user()
+    user = await make_user(consents=["health_data"])
     profile = {"about_child": True, "parental_responsibility_confirmed": True, "updated_at": None}
     assert (await user.client.put("/profile", json=profile)).status_code == 200
     r = await user.client.post(
@@ -129,10 +136,9 @@ async def test_validation(make_user):
     assert_error(await user.client.delete("/consents/marketing"), 422, "validation_error")
 
 
-async def test_revoke_health_data_deletes_documents_findings_and_profile_items(
-    make_user, connect_as
-):
-    user = await make_user(consents=["health_data"])
+async def test_revoke_health_data_deletes_the_data_held_under_it(make_user, connect_as):
+    user = await make_user(consents=["health_data", "contribute"])
+    assert (await user.client.post("/contributions", json=ASSET)).status_code == 201
     app = await connect_as("atlas_app")
     async with app.transaction():
         await app.execute("SELECT set_config('app.user_id', $1, true)", str(user.id))
@@ -149,6 +155,16 @@ async def test_revoke_health_data_deletes_documents_findings_and_profile_items(
             "INSERT INTO jobs (user_id, kind, document_id) VALUES ($1, 'document_extraction', $2)",
             user.id,
             doc,
+        )
+        await app.execute("INSERT INTO jobs (user_id, kind) VALUES ($1, 'gap_search')", user.id)
+        session = await app.fetchval(
+            "INSERT INTO chat_sessions (user_id) VALUES ($1) RETURNING id", user.id
+        )
+        await app.execute(
+            "INSERT INTO chat_messages (session_id, user_id, role, content)"
+            " VALUES ($1, $2, 'user', 'redacted')",
+            session,
+            user.id,
         )
         profile = {
             "genes": [
@@ -171,13 +187,57 @@ async def test_revoke_health_data_deletes_documents_findings_and_profile_items(
     assert (await user.client.delete("/consents/health_data")).status_code == 204
 
     su = await connect_as("atlas")
-    for table in ("documents", "findings", "jobs"):
+    for table in ("documents", "findings", "chat_sessions", "chat_messages", "patient_profiles"):
         n = await su.fetchval(f"SELECT count(*) FROM {table} WHERE user_id = $1", user.id)
         assert n == 0, table
-    kept = (await user.client.get("/profile")).json()
-    assert [g["id"] for g in kept["genes"]] == ["HGNC:10590"]
-    assert [p["id"] for p in kept["phenotypes"]] == ["HP:0001250"]
-    assert (await user.client.get("/auth/session")).json()["user"]["consents"] == []
+    kinds = await su.fetch("SELECT kind FROM jobs WHERE user_id = $1", user.id)
+    assert [k["kind"] for k in kinds] == ["gap_search"]
+    profile = (await user.client.get("/profile")).json()
+    assert profile["genes"] == [] and profile["phenotypes"] == []
+    # The account, its settings and the separate contribute consent stay.
+    session_user = (await user.client.get("/auth/session")).json()["user"]
+    assert session_user["consents"] == ["contribute"]
+    assert len((await user.client.get("/contributions")).json()) == 1
+    # Processing stops: features that use health data need the consent again.
+    assert_error(
+        await user.client.put("/profile", json={"updated_at": None}), 403, "consent_required"
+    )
+
+
+async def test_health_data_consent_gates_processing_not_reading(make_user):
+    user = await make_user()
+    assert_error(
+        await user.client.post("/chat", json={"message": "hello"}), 403, "consent_required"
+    )
+    assert_error(
+        await user.client.put("/profile", json={"updated_at": None}), 403, "consent_required"
+    )
+    finding = "00000000-0000-0000-0000-000000000000"
+    for action in ("confirm", "reject"):
+        r = await user.client.post(f"/findings/{finding}/{action}")
+        assert_error(r, 403, "consent_required")
+    # Reading, exporting and settings stay available without it.
+    assert (await user.client.get("/profile")).status_code == 200
+    assert (await user.client.get("/me/export")).status_code == 200
+    assert (await user.client.get("/consents")).status_code == 200
+    # Order of checks: age confirmation before consent.
+    young = await make_user(age_confirmed=False)
+    assert_error(
+        await young.client.post("/chat", json={"message": "hello"}),
+        403,
+        "age_confirmation_required",
+    )
+
+
+async def test_merge_helper_needs_health_data_consent(make_user):
+    user = await make_user()
+    with pytest.raises(ApiError) as exc:
+        async with user_transaction(user.id) as db:
+            await merge_profile_items(
+                db, user.id, [ProfileGene(id="HGNC:10590", label="SCN1A", source="document")]
+            )
+    assert exc.value.status_code == 403
+    assert exc.value.code == ErrorCode.consent_required
 
 
 async def test_revoke_contribute_removes_contributions_from_shared_graph(make_user, superuser):

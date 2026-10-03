@@ -73,10 +73,10 @@ async def delete_document(document_id: UUID, db: DB, user: User) -> None:
 @router.post(
     "/findings/{finding_id}/confirm",
     response_model=PatientProfile,
-    responses=responses(401, 404, 501),
+    responses=responses(401, 403, 404, 501),
     operation_id="confirmFinding",
 )
-async def confirm_finding(finding_id: UUID, db: DB, user: User) -> PatientProfile:
+async def confirm_finding(finding_id: UUID, db: DB, user: HealthDataConsentUser) -> PatientProfile:
     """Confirm a finding; returns the updated profile."""
     return await documents.confirm_finding(db, user, finding_id)
 
@@ -84,10 +84,10 @@ async def confirm_finding(finding_id: UUID, db: DB, user: User) -> PatientProfil
 @router.post(
     "/findings/{finding_id}/reject",
     response_model=PatientProfile,
-    responses=responses(401, 404, 501),
+    responses=responses(401, 403, 404, 501),
     operation_id="rejectFinding",
 )
-async def reject_finding(finding_id: UUID, db: DB, user: User) -> PatientProfile:
+async def reject_finding(finding_id: UUID, db: DB, user: HealthDataConsentUser) -> PatientProfile:
     """Reject a finding; returns the updated profile."""
     return await documents.reject_finding(db, user, finding_id)
 

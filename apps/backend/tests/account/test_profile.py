@@ -45,7 +45,7 @@ async def test_guest_needs_sign_in(client):
 
 
 async def test_empty_then_put_then_get(make_user):
-    user = await make_user()
+    user = await make_user(consents=["health_data"])
     empty = (await user.client.get("/profile")).json()
     assert empty["diseases"] == [] and empty["updated_at"] is None
 
@@ -66,7 +66,7 @@ async def test_empty_then_put_then_get(make_user):
 
 
 async def test_lost_update_is_rejected(make_user):
-    user = await make_user()
+    user = await make_user(consents=["health_data"])
     first = (await user.client.put("/profile", json=PROFILE)).json()
     second = await user.client.put("/profile", json={**first, "age_years": 4})
     assert second.status_code == 200
@@ -77,7 +77,7 @@ async def test_lost_update_is_rejected(make_user):
 
 
 async def test_validation(make_user):
-    user = await make_user()
+    user = await make_user(consents=["health_data"])
     cases = [
         {**PROFILE, "name": "Jane Doe"},  # unknown field
         {**PROFILE, "birth_date": "2023-01-01"},
@@ -109,7 +109,7 @@ async def test_validation(make_user):
 
 async def test_variant_strings_are_storable(make_user):
     """The digit-run rule keeps phone numbers out of labels; HGVS and ClinVar strings are exempt."""
-    user = await make_user()
+    user = await make_user(consents=["health_data"])
     hgvs_values = [
         "NM_003165.6:c.1216C>T",
         "c.12345G>A",
@@ -131,13 +131,13 @@ async def test_variant_strings_are_storable(make_user):
 
 
 async def test_age_confirmation_required_for_put(make_user):
-    user = await make_user(age_confirmed=False)
+    user = await make_user(age_confirmed=False, consents=["health_data"])
     assert (await user.client.get("/profile")).status_code == 200
     assert_error(await user.client.put("/profile", json=PROFILE), 403, "age_confirmation_required")
 
 
 async def test_merge_and_remove_helpers(make_user):
-    user = await make_user()
+    user = await make_user(consents=["health_data"])
     finding = uuid.uuid4()
     async with user_transaction(user.id) as db:
         merged = await merge_profile_items(
@@ -170,7 +170,7 @@ async def test_merge_and_remove_helpers(make_user):
 
 
 async def test_merge_invalidates_stale_put(make_user):
-    user = await make_user()
+    user = await make_user(consents=["health_data"])
     read = (await user.client.put("/profile", json=PROFILE)).json()
     async with user_transaction(user.id) as db:
         await merge_profile_items(
@@ -180,8 +180,8 @@ async def test_merge_invalidates_stale_put(make_user):
 
 
 async def test_cross_user_isolation(make_user):
-    a = await make_user()
-    b = await make_user()
+    a = await make_user(consents=["health_data"])
+    b = await make_user(consents=["health_data"])
     await a.client.put("/profile", json=PROFILE)
     assert (await b.client.get("/profile")).json()["diseases"] == []
     await b.client.put("/profile", json={"updated_at": None, "age_years": 40})
@@ -189,7 +189,7 @@ async def test_cross_user_isolation(make_user):
 
 
 async def test_child_profile_needs_parental_responsibility(make_user):
-    user = await make_user()
+    user = await make_user(consents=["health_data"])
     for body in (
         {**PROFILE, "about_child": True},
         {**PROFILE, "about_child": True, "parental_responsibility_confirmed": False},
@@ -207,7 +207,7 @@ async def test_child_profile_needs_parental_responsibility(make_user):
 
 
 async def test_merge_rejects_child_profile_without_parental_responsibility(make_user):
-    user = await make_user()
+    user = await make_user(consents=["health_data"])
     async with user_transaction(user.id) as db:
         await db.execute(
             text(

@@ -2,7 +2,7 @@ from uuid import UUID
 
 from fastapi import APIRouter, Request
 
-from backend.api.deps import DB, User, build_lens
+from backend.api.deps import DB, HealthDataConsentUser, User, build_lens
 from backend.api.errors import responses
 from backend.api.ratelimit import limiter
 from backend.api.services import chat
@@ -24,8 +24,12 @@ CHAT_LIMIT = "30/minute;300/day"
     operation_id="chat",
 )
 @limiter.limit(CHAT_LIMIT)
-async def post_chat(request: Request, body: ChatRequest, user: User) -> EventStream:
-    """Send a message to Dr. Wu (an AI system); streams the checked structured reply."""
+async def post_chat(
+    request: Request, body: ChatRequest, user: HealthDataConsentUser
+) -> EventStream:
+    """Send a message to Dr. Wu (an AI system); streams the checked structured reply.
+
+    Needs the health_data consent: the message may carry the user's health data."""
     lens = build_lens(user, expert_mode=body.expert_mode)
     return sse_response(await chat.start_turn(body, user, lens))
 
