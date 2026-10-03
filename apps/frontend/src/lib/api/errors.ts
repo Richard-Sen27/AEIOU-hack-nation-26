@@ -14,6 +14,7 @@ export type ApiErrorCode =
   | "sign_in_required"
   | "reauth_required"
   | "consent_required"
+  | "age_confirmation_required"
   | "not_implemented"
   | "not_found"
   | "rate_limited"
@@ -120,5 +121,22 @@ export function setApiErrorHandler(next: ApiErrorHandler): () => void {
  */
 export function reportApiError(error: ApiError): void {
   if (error.isAbort) return;
+  if (error.code === "age_confirmation_required") {
+    redirectToWelcome();
+    return;
+  }
   handler?.(error);
+}
+
+/**
+ * `age_confirmation_required` (403): the account has not confirmed 16+ yet.
+ * Send the user to /welcome and back to the current path afterwards (path
+ * only: query strings and hashes could carry user content).
+ */
+function redirectToWelcome(): void {
+  if (typeof window === "undefined") return;
+  const path = window.location.pathname;
+  if (path === "/welcome") return;
+  const next = path && path !== "/" && !path.startsWith("//") ? `?next=${encodeURIComponent(path)}` : "";
+  window.location.assign(`/welcome${next}`);
 }
