@@ -172,7 +172,7 @@ export function HeroInput({ ref }: { ref?: React.Ref<HeroInputHandle> }) {
         )}
       >
         <label htmlFor={`${hintId}-input`} className="sr-only">
-          {HERO_PROMPT}
+          Describe the diagnosis, a gene or the symptoms in your own words, or search the atlas by name
         </label>
         <textarea
           id={`${hintId}-input`}
