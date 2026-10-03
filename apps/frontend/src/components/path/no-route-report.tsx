@@ -69,10 +69,11 @@ export function NoRouteReport({
         ? [ml.to_id, ml.from_id]
         : [lastId, ml.to_id];
     const farNode = labels.get(far) ?? { id: far, label: far, type: "disease" };
-    missing = { fromId: near, to: farNode, description: ml.description };
+    missing = { fromId: near, from: labels.get(near), to: farNode, description: ml.description };
   } else if (!ml && !reachesTarget) {
     missing = {
       fromId: lastId,
+      from: labels.get(lastId),
       to,
       description: "No source connects the end of this partial route to the destination.",
     };

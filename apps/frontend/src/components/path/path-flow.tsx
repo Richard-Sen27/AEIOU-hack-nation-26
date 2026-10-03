@@ -246,6 +246,8 @@ const edgeTypes = { trust: TrustEdge, missing: MissingEdge };
 
 export type MissingLinkView = {
   fromId: string;
+  /** The node the gap starts from, when no partial step names it. */
+  from?: { id: string; label: string; type: string };
   to: { id: string; label: string; type: string };
   description: string;
 };
@@ -300,7 +302,7 @@ export function PathFlow({
     }
     let missingFromIndex = -1;
     if (missing) {
-      if (list.length === 0) list.push({ id: missing.fromId, label: missing.fromId, type: "disease" });
+      if (list.length === 0) list.push(missing.from ?? { id: missing.fromId, label: missing.fromId, type: "disease" });
       missingFromIndex = list.findIndex((n) => n.id === missing.fromId);
       if (missingFromIndex < 0) missingFromIndex = list.length - 1;
       list.push(missing.to);
