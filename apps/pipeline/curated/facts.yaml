@@ -1,0 +1,179 @@
+# Small set of curated, cited facts ingested as ordinary assertions (source "curated").
+# Every PMID was checked against PubMed; the `curated` connector re-verifies each title against
+# the live E-utilities record at fetch time and the build fails if one does not match.
+# The quote is the paper's title (an exact span of the cited record).
+#
+# Endpoints: {gene: SYMBOL}, {disease: MONDO label or id}, or {mechanism: loss_of_function |
+# gain_of_function | dominant_negative}. For acts_via, `disease` names the condition in which
+# the gene acts through that mechanism (used by Stage 5 for per gene-disease mechanisms).
+
+facts:
+  - source: {disease: Dravet syndrome}
+    relation: caused_by_variant_in
+    target: {gene: SCN1A}
+    tier: peer_reviewed
+    claim_type: experimental
+    pmid: 11359211
+    title: De novo mutations in the sodium-channel gene SCN1A cause severe myoclonic epilepsy of infancy.
+
+  - source: {gene: SCN1A}
+    relation: acts_via
+    target: {mechanism: loss_of_function}
+    disease: Dravet syndrome
+    tier: peer_reviewed
+    claim_type: experimental
+    pmid: 16921370
+    title: Reduced sodium current in GABAergic interneurons in a mouse model of severe myoclonic epilepsy in infancy.
+
+  - source: {gene: SCN1A}
+    relation: acts_via
+    target: {mechanism: gain_of_function}
+    disease: "migraine, familial hemiplegic, 3"
+    tier: peer_reviewed
+    claim_type: experimental
+    pmid: 30038559
+    title: Gain of Function for the SCN1A/hNa(v)1.1-L1670W Mutation Responsible for Familial Hemiplegic Migraine.
+
+  - source: {gene: SCN1A}
+    relation: acts_via
+    target: {mechanism: gain_of_function}
+    disease: "migraine, familial hemiplegic, 3"
+    tier: peer_reviewed
+    claim_type: experimental
+    pmid: 29986598
+    title: "Gain of function of sporadic/familial hemiplegic migraine-causing SCN1A mutations: Use of an optimized cDNA."
+
+  - source: {gene: SCN2A}
+    relation: acts_via
+    target: {mechanism: gain_of_function}
+    disease: "developmental and epileptic encephalopathy, 11"
+    tier: peer_reviewed
+    claim_type: experimental
+    pmid: 28256214
+    title: Opposing Effects on Na(V)1.2 Function Underlie Differences Between SCN2A Variants Observed in Individuals With Autism Spectrum Disorder or Infantile Seizures.
+
+  - source: {gene: SCN2A}
+    relation: acts_via
+    target: {mechanism: gain_of_function}
+    disease: "seizures, benign familial infantile, 3"
+    tier: review
+    claim_type: review
+    pmid: 29691040
+    title: Progress in Understanding and Treating SCN2A-Mediated Disorders.
+
+  - source: {gene: SCN2A}
+    relation: acts_via
+    target: {mechanism: loss_of_function}
+    disease: complex neurodevelopmental disorder
+    tier: peer_reviewed
+    claim_type: experimental
+    pmid: 28256214
+    title: Opposing Effects on Na(V)1.2 Function Underlie Differences Between SCN2A Variants Observed in Individuals With Autism Spectrum Disorder or Infantile Seizures.
+
+  - source: {gene: SCN2A}
+    relation: acts_via
+    target: {mechanism: loss_of_function}
+    disease: complex neurodevelopmental disorder
+    tier: review
+    claim_type: review
+    pmid: 29691040
+    title: Progress in Understanding and Treating SCN2A-Mediated Disorders.
+
+  - source: {disease: "seizures, benign familial infantile, 3"}
+    relation: caused_by_variant_in
+    target: {gene: SCN2A}
+    tier: peer_reviewed
+    claim_type: experimental
+    pmid: 12243921
+    title: Sodium-channel defects in benign familial neonatal-infantile seizures.
+
+  - source: {disease: "developmental and epileptic encephalopathy, 11"}
+    relation: caused_by_variant_in
+    target: {gene: SCN2A}
+    tier: peer_reviewed
+    claim_type: experimental
+    pmid: 28379373
+    title: Genetic and phenotypic heterogeneity suggest therapeutic implications in SCN2A-related disorders.
+
+  - source: {disease: STXBP1-related encephalopathy}
+    relation: caused_by_variant_in
+    target: {gene: STXBP1}
+    tier: peer_reviewed
+    claim_type: experimental
+    pmid: 18469812
+    title: De novo mutations in the gene encoding STXBP1 (MUNC18-1) cause early infantile epileptic encephalopathy.
+
+  - source: {disease: "seizures, benign familial neonatal, 1"}
+    relation: caused_by_variant_in
+    target: {gene: KCNQ2}
+    tier: peer_reviewed
+    claim_type: experimental
+    pmid: 9425895
+    title: A novel potassium channel gene, KCNQ2, is mutated in an inherited epilepsy of newborns.
+
+  - source: {disease: "developmental and epileptic encephalopathy, 7"}
+    relation: caused_by_variant_in
+    target: {gene: KCNQ2}
+    tier: peer_reviewed
+    claim_type: experimental
+    pmid: 22275249
+    title: "KCNQ2 encephalopathy: emerging phenotype of a neonatal epileptic encephalopathy."
+
+  - source: {gene: KCNQ2}
+    relation: acts_via
+    target: {mechanism: dominant_negative}
+    disease: "developmental and epileptic encephalopathy, 7"
+    tier: peer_reviewed
+    claim_type: experimental
+    pmid: 24318194
+    title: Dominant-negative effects of KCNQ2 mutations are associated with epileptic encephalopathy.
+
+  - source: {gene: KCNT1}
+    relation: acts_via
+    target: {mechanism: gain_of_function}
+    disease: malignant migrating partial seizures of infancy
+    tier: peer_reviewed
+    claim_type: experimental
+    pmid: 23086397
+    title: De novo gain-of-function KCNT1 channel mutations cause malignant migrating partial seizures of infancy.
+
+  - source: {disease: CDKL5 disorder}
+    relation: caused_by_variant_in
+    target: {gene: CDKL5}
+    tier: peer_reviewed
+    claim_type: experimental
+    pmid: 15492925
+    title: Mutations of CDKL5 cause a severe neurodevelopmental disorder with infantile spasms and mental retardation.
+
+  - source: {disease: encephalopathy due to GLUT1 deficiency}
+    relation: caused_by_variant_in
+    target: {gene: SLC2A1}
+    tier: peer_reviewed
+    claim_type: experimental
+    pmid: 9462754
+    title: GLUT-1 deficiency syndrome caused by haploinsufficiency of the blood-brain barrier hexose carrier.
+
+  - source: {gene: SLC2A1}
+    relation: acts_via
+    target: {mechanism: loss_of_function}
+    disease: encephalopathy due to GLUT1 deficiency
+    tier: peer_reviewed
+    claim_type: experimental
+    pmid: 9462754
+    title: GLUT-1 deficiency syndrome caused by haploinsufficiency of the blood-brain barrier hexose carrier.
+
+  - source: {disease: "intellectual disability, autosomal dominant 5"}
+    relation: caused_by_variant_in
+    target: {gene: SYNGAP1}
+    tier: peer_reviewed
+    claim_type: experimental
+    pmid: 19196676
+    title: Mutations in SYNGAP1 in autosomal nonsyndromic mental retardation.
+
+  - source: {disease: "developmental and epileptic encephalopathy, 9"}
+    relation: caused_by_variant_in
+    target: {gene: PCDH19}
+    tier: peer_reviewed
+    claim_type: experimental
+    pmid: 18469813
+    title: X-linked protocadherin 19 mutations cause female-limited epilepsy and cognitive impairment.
