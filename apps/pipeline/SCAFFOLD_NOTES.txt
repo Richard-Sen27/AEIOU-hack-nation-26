@@ -1,0 +1,58 @@
+Pipeline scaffold notes (for the literature & community agent)
+===============================================================
+
+The scaffold follows the brief exactly. Additions / precisions:
+
+1. Sources
+   - sources/<name>.py exposes SOURCE = Source(name, phase, fetch, normalize)
+     from pipeline.contracts. fetch is `async def fetch(scope: Scope | None) -> None`,
+     normalize is `def normalize(scope: Scope) -> None` (a coroutine function also works for
+     normalize; the CLI awaits it).
+   - A module that fails to import is logged and skipped, it does not break other sources.
+   - `atlas-pipeline fetch --source pubmed`, `atlas-pipeline normalize --source pubmed`,
+     `make fetch SOURCE=pubmed`.
+
+2. Scope (pipeline.contracts.load_scope() -> Scope)
+   - Scope.genes: [{"hgnc_id", "symbol", "aliases", "seed", "name"}]
+   - Scope.diseases: [{"mondo_id", "label", "synonyms", "seed"}]
+   - Scope.phenotypes: [{"hpo_id", "label"}]
+   - helpers: scope.gene_ids, gene_symbols, disease_ids, phenotype_ids, data_version.
+
+3. Tables (pipeline.contracts)
+   - write_tables(source, nodes=..., synonyms=..., assertions=..., stage="normalized")
+     Stage 3 output: stage="extracted" -> data/extracted/<name>/.
+     Rows can be dicts (dict/list values in attrs/features are JSON-encoded for you) or
+     polars DataFrames with the contract columns.
+   - assertion(source_id, target_id, relation, tier=..., source_type=..., ...) builds a row.
+   - read_table("nodes" | "synonyms" | "assertions", stages=(...), sources=None)
+   - retrieved_at is an ISO 8601 UTC string (contracts.now_iso()).
+   - tier values: curated_db | peer_reviewed | review | preprint | llm_inferred | patient_reported
+   - polarity: supports | contradicts. Edges are merged on (source_id, relation, target_id);
+     the direction convention is the spec's "From -> to" column (e.g. authored:
+     researcher -> paper, about: paper -> disease/gene, studies: trial -> disease).
+   - Nodes referenced by your assertions must exist in some nodes table (yours or a biology
+     source); Stage 4 drops assertions whose endpoints are unknown and logs the count.
+     Disease ids must be in-scope MONDO ids (scope.disease_ids), gene ids HGNC.
+   - Quote verification report: please write data/extracted/<name>/quote_report.json as
+     {"checked": int, "passed": int, "rejected": int, "reasons": {reason: count}}.
+     Stage 6 reads every data/extracted/*/quote_report.json and reports it.
+
+4. HTTP (pipeline.http)
+   - get_client(source) -> httpx.AsyncClient with hishel sqlite cache at
+     data/cache/http/<source>.db (200 responses, GET and POST, key = URL + body, TTL 30d),
+     per-source aiolimiter rate (config.rates: pubmed 3/s or 10/s with NCBI_API_KEY,
+     reporter 1/s, clinicaltrials 5/s, patient_orgs 2/s), tenacity retries on 408/425/429/5xx
+     and transport errors. Use `async with get_client("pubmed") as c:`.
+   - download(source, url, filename) -> Path streams to data/raw/<source>/ and records
+     _meta.json; reuses the file if already recorded (force=True to refetch).
+   - record_raw(source, url, path, source_version) for files you write yourself.
+   - Added dependency: `hishel[async]` (anysqlite) via `uv add`, needed by the sqlite storage.
+
+5. CLI hooks into your modules
+   - `atlas-pipeline extract` imports pipeline.extract and calls `run()` (sync or async,
+     no arguments; load the scope yourself). Missing module -> skipped with a warning.
+   - `atlas-pipeline login` calls `pipeline.llm.login()` (sync or async).
+   - Stage 2 linking calls `pipeline.llm.get_llm()` and expects a backend.llm.LLMClient or None.
+
+6. Paths: pipeline.paths (DATA, RAW, NORMALIZED, EXTRACTED, GRAPH, SNAPSHOT, CACHE, SCOPE_FILE,
+   LOGS, CURATED).
