@@ -1,0 +1,4948 @@
+{
+ "data_version": "fixture",
+ "description": "Hand-written test graph for the epileptic encephalopathy / channelopathy demo cluster. Evidence rows are fixtures (source_type 'fixture'), not real sources; nodes with attrs.placeholder_id use placeholder identifiers.",
+ "demo": {
+  "path_edge_ids": [
+   "e_3b8845b635b8",
+   "e_0af807385728",
+   "e_558f7d2a940d"
+  ],
+  "path_id": "p_ec8907fa38b0b33d",
+  "counterexample_edge_id": "e_2c4dbc663a2a",
+  "contradicted_edge_id": "e_9a6ff6e0e247",
+  "pending_review_edge_id": "e_e9b6a37fd8f0",
+  "low_confidence_edge_id": "e_275854103db5",
+  "no_supported_route": {
+   "from": "MONDO:9900010",
+   "to": "MONDO:0100135"
+  },
+  "vus_variant_id": "CLINVAR:FX0004"
+ },
+ "clusters": [
+  {
+   "id": "CLUSTER:1",
+   "label": "Sodium channel gain-of-function epilepsies",
+   "mechanism_summary": "Variants that make sodium channels (SCN1A, SCN2A, SCN8A) more active, leading to early-onset seizures.",
+   "attrs": {
+    "genes": [
+     "HGNC:10588",
+     "HGNC:10597",
+     "HGNC:10585"
+    ],
+    "fixture": true
+   },
+   "member_count": 4
+  },
+  {
+   "id": "CLUSTER:2",
+   "label": "Sodium channel loss-of-function epilepsies",
+   "mechanism_summary": "Variants that reduce sodium channel function (SCN1A, SCN2A), with fever-sensitive seizures or later-onset neurodevelopmental features.",
+   "attrs": {
+    "genes": [
+     "HGNC:10585",
+     "HGNC:10588"
+    ],
+    "fixture": true
+   },
+   "member_count": 3
+  },
+  {
+   "id": "CLUSTER:3",
+   "label": "Synaptic and potassium channel encephalopathies",
+   "mechanism_summary": "Reduced synaptic vesicle release (STXBP1) or potassium channel dysfunction (KCNQ2) in early-onset encephalopathies.",
+   "attrs": {
+    "genes": [
+     "HGNC:11444",
+     "HGNC:6296"
+    ],
+    "fixture": true
+   },
+   "member_count": 3
+  }
+ ],
+ "nodes": [
+  {
+   "id": "MONDO:0100135",
+   "type": "disease",
+   "label": "Dravet syndrome",
+   "description": "Severe childhood epilepsy, most often from SCN1A loss-of-function variants.",
+   "url": "http://purl.obolibrary.org/obo/MONDO_0100135",
+   "attrs": {
+    "fixture": true
+   },
+   "cluster_id": "CLUSTER:2",
+   "synonyms": [
+    {
+     "synonym": "Severe myoclonic epilepsy of infancy",
+     "source": "fixture"
+    },
+    {
+     "synonym": "SMEI",
+     "source": "fixture"
+    },
+    {
+     "synonym": "SCN1A Dravet",
+     "source": "fixture"
+    }
+   ],
+   "x": -120.01,
+   "y": 158.54,
+   "centrality": 0.9412
+  },
+  {
+   "id": "MONDO:9900001",
+   "type": "disease",
+   "label": "Genetic epilepsy with febrile seizures plus (SCN1A)",
+   "description": null,
+   "url": null,
+   "attrs": {
+    "fixture": true,
+    "placeholder_id": true
+   },
+   "cluster_id": "CLUSTER:2",
+   "synonyms": [
+    {
+     "synonym": "GEFS+",
+     "source": "fixture"
+    },
+    {
+     "synonym": "GEFS plus",
+     "source": "fixture"
+    }
+   ],
+   "x": -461.99,
+   "y": 645.78,
+   "centrality": 0.3529
+  },
+  {
+   "id": "MONDO:9900002",
+   "type": "disease",
+   "label": "Familial hemiplegic migraine type 3",
+   "description": null,
+   "url": null,
+   "attrs": {
+    "fixture": true,
+    "placeholder_id": true
+   },
+   "cluster_id": "CLUSTER:1",
+   "synonyms": [
+    {
+     "synonym": "FHM3",
+     "source": "fixture"
+    },
+    {
+     "synonym": "hemiplegic migraine SCN1A",
+     "source": "fixture"
+    }
+   ],
+   "x": -435.3,
+   "y": 470.41,
+   "centrality": 0.2353
+  },
+  {
+   "id": "MONDO:9900003",
+   "type": "disease",
+   "label": "SCN2A developmental and epileptic encephalopathy (early onset)",
+   "description": "Neonatal or early-infantile seizures with SCN2A gain-of-function variants.",
+   "url": null,
+   "attrs": {
+    "fixture": true,
+    "placeholder_id": true
+   },
+   "cluster_id": "CLUSTER:1",
+   "synonyms": [
+    {
+     "synonym": "SCN2A-DEE",
+     "source": "fixture"
+    },
+    {
+     "synonym": "early-infantile SCN2A encephalopathy",
+     "source": "fixture"
+    }
+   ],
+   "x": 781.12,
+   "y": -26.13,
+   "centrality": 1.0
+  },
+  {
+   "id": "MONDO:9900004",
+   "type": "disease",
+   "label": "Self-limited familial neonatal-infantile epilepsy (SCN2A)",
+   "description": null,
+   "url": null,
+   "attrs": {
+    "fixture": true,
+    "placeholder_id": true
+   },
+   "cluster_id": "CLUSTER:1",
+   "synonyms": [
+    {
+     "synonym": "BFNIS",
+     "source": "fixture"
+    },
+    {
+     "synonym": "benign familial neonatal-infantile seizures",
+     "source": "fixture"
+    }
+   ],
+   "x": 669.89,
+   "y": 601.04,
+   "centrality": 0.2353
+  },
+  {
+   "id": "MONDO:9900005",
+   "type": "disease",
+   "label": "SCN2A-related neurodevelopmental disorder (later onset)",
+   "description": "Autism or intellectual disability, sometimes later-onset seizures, with SCN2A loss-of-function variants.",
+   "url": null,
+   "attrs": {
+    "fixture": true,
+    "placeholder_id": true
+   },
+   "cluster_id": "CLUSTER:2",
+   "synonyms": [
+    {
+     "synonym": "SCN2A autism",
+     "source": "fixture"
+    },
+    {
+     "synonym": "SCN2A loss-of-function disorder",
+     "source": "fixture"
+    }
+   ],
+   "x": 858.64,
+   "y": -192.7,
+   "centrality": 0.6471
+  },
+  {
+   "id": "MONDO:9900006",
+   "type": "disease",
+   "label": "SCN8A developmental and epileptic encephalopathy",
+   "description": null,
+   "url": null,
+   "attrs": {
+    "fixture": true,
+    "placeholder_id": true
+   },
+   "cluster_id": "CLUSTER:1",
+   "synonyms": [
+    {
+     "synonym": "DEE13",
+     "source": "fixture"
+    },
+    {
+     "synonym": "SCN8A encephalopathy",
+     "source": "fixture"
+    }
+   ],
+   "x": 263.67,
+   "y": -10.93,
+   "centrality": 0.5882
+  },
+  {
+   "id": "MONDO:9900007",
+   "type": "disease",
+   "label": "STXBP1 encephalopathy",
+   "description": "Early-onset epilepsy and developmental delay caused by STXBP1 variants.",
+   "url": null,
+   "attrs": {
+    "fixture": true,
+    "placeholder_id": true
+   },
+   "cluster_id": "CLUSTER:3",
+   "synonyms": [
+    {
+     "synonym": "STXBP1-related disorder",
+     "source": "fixture"
+    },
+    {
+     "synonym": "Ohtahara syndrome",
+     "source": "fixture"
+    },
+    {
+     "synonym": "DEE4",
+     "source": "fixture"
+    },
+    {
+     "synonym": "STXBP1 DEE",
+     "source": "fixture"
+    }
+   ],
+   "x": 1334.1,
+   "y": -440.28,
+   "centrality": 0.9412
+  },
+  {
+   "id": "MONDO:9900008",
+   "type": "disease",
+   "label": "KCNQ2 developmental and epileptic encephalopathy",
+   "description": null,
+   "url": null,
+   "attrs": {
+    "fixture": true,
+    "placeholder_id": true
+   },
+   "cluster_id": "CLUSTER:3",
+   "synonyms": [
+    {
+     "synonym": "KCNQ2-DEE",
+     "source": "fixture"
+    },
+    {
+     "synonym": "DEE7",
+     "source": "fixture"
+    }
+   ],
+   "x": 1108.32,
+   "y": 911.18,
+   "centrality": 0.5882
+  },
+  {
+   "id": "MONDO:9900009",
+   "type": "disease",
+   "label": "Self-limited familial neonatal epilepsy (KCNQ2)",
+   "description": null,
+   "url": null,
+   "attrs": {
+    "fixture": true,
+    "placeholder_id": true
+   },
+   "cluster_id": "CLUSTER:3",
+   "synonyms": [
+    {
+     "synonym": "BFNE",
+     "source": "fixture"
+    },
+    {
+     "synonym": "benign familial neonatal seizures",
+     "source": "fixture"
+    }
+   ],
+   "x": 1191.17,
+   "y": 1385.82,
+   "centrality": 0.1765
+  },
+  {
+   "id": "MONDO:9900010",
+   "type": "disease",
+   "label": "SYNGAP1-related intellectual disability",
+   "description": "Fixture node with no supported route to the sodium channel diseases.",
+   "url": null,
+   "attrs": {
+    "fixture": true,
+    "placeholder_id": true
+   },
+   "cluster_id": null,
+   "synonyms": [
+    {
+     "synonym": "SYNGAP1 encephalopathy",
+     "source": "fixture"
+    },
+    {
+     "synonym": "MRD5",
+     "source": "fixture"
+    }
+   ],
+   "x": 1973.86,
+   "y": -1713.13,
+   "centrality": 0.1176
+  },
+  {
+   "id": "HGNC:10585",
+   "type": "gene",
+   "label": "SCN1A",
+   "description": "Sodium voltage-gated channel alpha subunit 1",
+   "url": "https://www.genenames.org/data/gene-symbol-report/#!/hgnc_id/HGNC:10585",
+   "attrs": {
+    "fixture": true,
+    "symbol": "SCN1A"
+   },
+   "cluster_id": null,
+   "synonyms": [
+    {
+     "synonym": "Nav1.1",
+     "source": "fixture"
+    }
+   ],
+   "x": 267.76,
+   "y": 915.31,
+   "centrality": 0.4118
+  },
+  {
+   "id": "HGNC:10588",
+   "type": "gene",
+   "label": "SCN2A",
+   "description": "Sodium voltage-gated channel alpha subunit 2",
+   "url": "https://www.genenames.org/data/gene-symbol-report/#!/hgnc_id/HGNC:10588",
+   "attrs": {
+    "fixture": true,
+    "symbol": "SCN2A"
+   },
+   "cluster_id": null,
+   "synonyms": [
+    {
+     "synonym": "Nav1.2",
+     "source": "fixture"
+    }
+   ],
+   "x": 1164.36,
+   "y": 576.07,
+   "centrality": 0.5294
+  },
+  {
+   "id": "HGNC:10597",
+   "type": "gene",
+   "label": "SCN8A",
+   "description": "Sodium voltage-gated channel alpha subunit 8",
+   "url": "https://www.genenames.org/data/gene-symbol-report/#!/hgnc_id/HGNC:10597",
+   "attrs": {
+    "fixture": true,
+    "symbol": "SCN8A"
+   },
+   "cluster_id": null,
+   "synonyms": [
+    {
+     "synonym": "Nav1.6",
+     "source": "fixture"
+    }
+   ],
+   "x": 352.22,
+   "y": 1077.33,
+   "centrality": 0.1765
+  },
+  {
+   "id": "HGNC:11444",
+   "type": "gene",
+   "label": "STXBP1",
+   "description": "Syntaxin binding protein 1",
+   "url": "https://www.genenames.org/data/gene-symbol-report/#!/hgnc_id/HGNC:11444",
+   "attrs": {
+    "fixture": true,
+    "symbol": "STXBP1"
+   },
+   "cluster_id": null,
+   "synonyms": [
+    {
+     "synonym": "MUNC18-1",
+     "source": "fixture"
+    }
+   ],
+   "x": 2358.24,
+   "y": 5.58,
+   "centrality": 0.2941
+  },
+  {
+   "id": "HGNC:6296",
+   "type": "gene",
+   "label": "KCNQ2",
+   "description": "Potassium voltage-gated channel subfamily Q member 2",
+   "url": "https://www.genenames.org/data/gene-symbol-report/#!/hgnc_id/HGNC:6296",
+   "attrs": {
+    "fixture": true,
+    "symbol": "KCNQ2"
+   },
+   "cluster_id": null,
+   "synonyms": [
+    {
+     "synonym": "Kv7.2",
+     "source": "fixture"
+    }
+   ],
+   "x": 1593.16,
+   "y": 2008.17,
+   "centrality": 0.4118
+  },
+  {
+   "id": "HGNC:99000001",
+   "type": "gene",
+   "label": "SYNGAP1",
+   "description": "Synaptic Ras GTPase activating protein 1",
+   "url": null,
+   "attrs": {
+    "fixture": true,
+    "symbol": "SYNGAP1",
+    "placeholder_id": true
+   },
+   "cluster_id": null,
+   "synonyms": [],
+   "x": 2400.62,
+   "y": -2603.95,
+   "centrality": 0.0588
+  },
+  {
+   "id": "CLINVAR:FX0001",
+   "type": "variant",
+   "label": "SCN1A truncating variant (fixture)",
+   "description": null,
+   "url": null,
+   "attrs": {
+    "fixture": true,
+    "classification": "pathogenic",
+    "consequence": "truncating",
+    "gene": "HGNC:10585",
+    "placeholder_id": true
+   },
+   "cluster_id": null,
+   "synonyms": [],
+   "x": -288.06,
+   "y": 1021.82,
+   "centrality": 0.1176
+  },
+  {
+   "id": "CLINVAR:FX0002",
+   "type": "variant",
+   "label": "SCN2A missense variant, gain of function (fixture)",
+   "description": null,
+   "url": null,
+   "attrs": {
+    "fixture": true,
+    "classification": "pathogenic",
+    "consequence": "missense",
+    "gene": "HGNC:10588",
+    "placeholder_id": true
+   },
+   "cluster_id": null,
+   "synonyms": [],
+   "x": 1629.56,
+   "y": 468.9,
+   "centrality": 0.1176
+  },
+  {
+   "id": "CLINVAR:FX0003",
+   "type": "variant",
+   "label": "SCN2A truncating variant, loss of function (fixture)",
+   "description": null,
+   "url": null,
+   "attrs": {
+    "fixture": true,
+    "classification": "likely_pathogenic",
+    "consequence": "truncating",
+    "gene": "HGNC:10588",
+    "placeholder_id": true
+   },
+   "cluster_id": null,
+   "synonyms": [],
+   "x": 1685.8,
+   "y": 100.14,
+   "centrality": 0.1176
+  },
+  {
+   "id": "CLINVAR:FX0004",
+   "type": "variant",
+   "label": "STXBP1 missense variant of uncertain significance (fixture)",
+   "description": null,
+   "url": null,
+   "attrs": {
+    "fixture": true,
+    "classification": "uncertain_significance",
+    "consequence": "missense",
+    "gene": "HGNC:11444",
+    "placeholder_id": true
+   },
+   "cluster_id": null,
+   "synonyms": [],
+   "x": 2270.72,
+   "y": -449.52,
+   "centrality": 0.1176
+  },
+  {
+   "id": "CLINVAR:FX0005",
+   "type": "variant",
+   "label": "KCNQ2 missense variant (fixture)",
+   "description": null,
+   "url": null,
+   "attrs": {
+    "fixture": true,
+    "classification": "likely_pathogenic",
+    "consequence": "missense",
+    "gene": "HGNC:6296",
+    "placeholder_id": true
+   },
+   "cluster_id": null,
+   "synonyms": [],
+   "x": 1768.41,
+   "y": 1691.46,
+   "centrality": 0.1176
+  },
+  {
+   "id": "MECH:loss_of_function",
+   "type": "mechanism",
+   "label": "Loss of function",
+   "description": null,
+   "url": null,
+   "attrs": {
+    "fixture": true
+   },
+   "cluster_id": null,
+   "synonyms": [
+    {
+     "synonym": "haploinsufficiency",
+     "source": "fixture"
+    },
+    {
+     "synonym": "LoF",
+     "source": "fixture"
+    }
+   ],
+   "x": 1566.26,
+   "y": 1010.07,
+   "centrality": 0.2353
+  },
+  {
+   "id": "MECH:gain_of_function",
+   "type": "mechanism",
+   "label": "Gain of function",
+   "description": null,
+   "url": null,
+   "attrs": {
+    "fixture": true
+   },
+   "cluster_id": null,
+   "synonyms": [
+    {
+     "synonym": "GoF",
+     "source": "fixture"
+    }
+   ],
+   "x": 631.36,
+   "y": 1369.93,
+   "centrality": 0.1765
+  },
+  {
+   "id": "MECH:dominant_negative",
+   "type": "mechanism",
+   "label": "Dominant negative",
+   "description": null,
+   "url": null,
+   "attrs": {
+    "fixture": true
+   },
+   "cluster_id": null,
+   "synonyms": [
+    {
+     "synonym": "dominant-negative",
+     "source": "fixture"
+    }
+   ],
+   "x": 1930.94,
+   "y": 2892.84,
+   "centrality": 0.0588
+  },
+  {
+   "id": "GO:0005248",
+   "type": "pathway",
+   "label": "Voltage-gated sodium channel activity",
+   "description": null,
+   "url": "http://purl.obolibrary.org/obo/GO_0005248",
+   "attrs": {
+    "fixture": true
+   },
+   "cluster_id": null,
+   "synonyms": [],
+   "x": 791.27,
+   "y": 1277.6,
+   "centrality": 0.1765
+  },
+  {
+   "id": "GO:0005249",
+   "type": "pathway",
+   "label": "Voltage-gated potassium channel activity",
+   "description": null,
+   "url": "http://purl.obolibrary.org/obo/GO_0005249",
+   "attrs": {
+    "fixture": true
+   },
+   "cluster_id": null,
+   "synonyms": [],
+   "x": 2235.53,
+   "y": 2701.49,
+   "centrality": 0.0588
+  },
+  {
+   "id": "GO:0016079",
+   "type": "pathway",
+   "label": "Synaptic vesicle exocytosis",
+   "description": null,
+   "url": "http://purl.obolibrary.org/obo/GO_0016079",
+   "attrs": {
+    "fixture": true
+   },
+   "cluster_id": null,
+   "synonyms": [],
+   "x": 3070.53,
+   "y": -529.44,
+   "centrality": 0.1176
+  },
+  {
+   "id": "HP:0001250",
+   "type": "phenotype",
+   "label": "Seizure",
+   "description": null,
+   "url": "https://hpo.jax.org/browse/term/HP:0001250",
+   "attrs": {
+    "fixture": true
+   },
+   "cluster_id": null,
+   "synonyms": [
+    {
+     "synonym": "seizures",
+     "source": "fixture"
+    },
+    {
+     "synonym": "epileptic seizure",
+     "source": "fixture"
+    },
+    {
+     "synonym": "fits",
+     "source": "fixture"
+    }
+   ],
+   "x": 562.3,
+   "y": 380.67,
+   "centrality": 0.6471
+  },
+  {
+   "id": "HP:0001263",
+   "type": "phenotype",
+   "label": "Global developmental delay",
+   "description": null,
+   "url": "https://hpo.jax.org/browse/term/HP:0001263",
+   "attrs": {
+    "fixture": true
+   },
+   "cluster_id": null,
+   "synonyms": [
+    {
+     "synonym": "developmental delay",
+     "source": "fixture"
+    },
+    {
+     "synonym": "delayed milestones",
+     "source": "fixture"
+    }
+   ],
+   "x": 704.5,
+   "y": 149.75,
+   "centrality": 0.3529
+  },
+  {
+   "id": "HP:0001252",
+   "type": "phenotype",
+   "label": "Hypotonia",
+   "description": null,
+   "url": "https://hpo.jax.org/browse/term/HP:0001252",
+   "attrs": {
+    "fixture": true
+   },
+   "cluster_id": null,
+   "synonyms": [
+    {
+     "synonym": "low muscle tone",
+     "source": "fixture"
+    },
+    {
+     "synonym": "floppy baby",
+     "source": "fixture"
+    }
+   ],
+   "x": 1047.61,
+   "y": 168.24,
+   "centrality": 0.2353
+  },
+  {
+   "id": "HP:0011968",
+   "type": "phenotype",
+   "label": "Feeding difficulties",
+   "description": null,
+   "url": "https://hpo.jax.org/browse/term/HP:0011968",
+   "attrs": {
+    "fixture": true
+   },
+   "cluster_id": null,
+   "synonyms": [
+    {
+     "synonym": "feeding problems",
+     "source": "fixture"
+    },
+    {
+     "synonym": "problems with eating",
+     "source": "fixture"
+    }
+   ],
+   "x": 1168.11,
+   "y": -719.86,
+   "centrality": 0.1176
+  },
+  {
+   "id": "HP:0001249",
+   "type": "phenotype",
+   "label": "Intellectual disability",
+   "description": null,
+   "url": "https://hpo.jax.org/browse/term/HP:0001249",
+   "attrs": {
+    "fixture": true
+   },
+   "cluster_id": null,
+   "synonyms": [
+    {
+     "synonym": "learning disability",
+     "source": "fixture"
+    }
+   ],
+   "x": 507.83,
+   "y": -328.84,
+   "centrality": 0.2353
+  },
+  {
+   "id": "HP:0001251",
+   "type": "phenotype",
+   "label": "Ataxia",
+   "description": null,
+   "url": "https://hpo.jax.org/browse/term/HP:0001251",
+   "attrs": {
+    "fixture": true
+   },
+   "cluster_id": null,
+   "synonyms": [
+    {
+     "synonym": "unsteady walking",
+     "source": "fixture"
+    }
+   ],
+   "x": 428.16,
+   "y": -549.97,
+   "centrality": 0.1176
+  },
+  {
+   "id": "HP:0000729",
+   "type": "phenotype",
+   "label": "Autistic behavior",
+   "description": null,
+   "url": "https://hpo.jax.org/browse/term/HP:0000729",
+   "attrs": {
+    "fixture": true
+   },
+   "cluster_id": null,
+   "synonyms": [
+    {
+     "synonym": "autism",
+     "source": "fixture"
+    }
+   ],
+   "x": 1035.17,
+   "y": -1174.88,
+   "centrality": 0.0588
+  },
+  {
+   "id": "HP:0002373",
+   "type": "phenotype",
+   "label": "Febrile seizure",
+   "description": null,
+   "url": "https://hpo.jax.org/browse/term/HP:0002373",
+   "attrs": {
+    "fixture": true
+   },
+   "cluster_id": null,
+   "synonyms": [
+    {
+     "synonym": "fever seizures",
+     "source": "fixture"
+    },
+    {
+     "synonym": "febrile convulsions",
+     "source": "fixture"
+    }
+   ],
+   "x": -896.47,
+   "y": 191.89,
+   "centrality": 0.1176
+  },
+  {
+   "id": "HP:0012469",
+   "type": "phenotype",
+   "label": "Infantile spasms",
+   "description": null,
+   "url": "https://hpo.jax.org/browse/term/HP:0012469",
+   "attrs": {
+    "fixture": true
+   },
+   "cluster_id": null,
+   "synonyms": [
+    {
+     "synonym": "West syndrome spasms",
+     "source": "fixture"
+    }
+   ],
+   "x": 1437.4,
+   "y": 227.72,
+   "centrality": 0.1765
+  },
+  {
+   "id": "HP:0002133",
+   "type": "phenotype",
+   "label": "Status epilepticus",
+   "description": null,
+   "url": "https://hpo.jax.org/browse/term/HP:0002133",
+   "attrs": {
+    "fixture": true
+   },
+   "cluster_id": null,
+   "synonyms": [
+    {
+     "synonym": "prolonged seizure",
+     "source": "fixture"
+    }
+   ],
+   "x": -503.25,
+   "y": -222.41,
+   "centrality": 0.1176
+  },
+  {
+   "id": "HP:0002076",
+   "type": "phenotype",
+   "label": "Migraine",
+   "description": null,
+   "url": "https://hpo.jax.org/browse/term/HP:0002076",
+   "attrs": {
+    "fixture": true
+   },
+   "cluster_id": null,
+   "synonyms": [],
+   "x": -1485.93,
+   "y": 389.09,
+   "centrality": 0.0588
+  },
+  {
+   "id": "PMID:FX0001",
+   "type": "paper",
+   "label": "Fixture paper: SCN2A gain and loss of function in epilepsy",
+   "description": null,
+   "url": null,
+   "attrs": {
+    "fixture": true,
+    "year": 2024,
+    "placeholder_id": true
+   },
+   "cluster_id": null,
+   "synonyms": [],
+   "x": 1313.66,
+   "y": -867.8,
+   "centrality": 0.2941
+  },
+  {
+   "id": "PMID:FX0002",
+   "type": "paper",
+   "label": "Fixture paper: STXBP1 and synaptic vesicle release",
+   "description": null,
+   "url": null,
+   "attrs": {
+    "fixture": true,
+    "year": 2023,
+    "placeholder_id": true
+   },
+   "cluster_id": null,
+   "synonyms": [],
+   "x": 2494.65,
+   "y": -775.97,
+   "centrality": 0.2353
+  },
+  {
+   "id": "PMID:FX0003",
+   "type": "paper",
+   "label": "Fixture paper: SCN1A variants in Dravet syndrome",
+   "description": null,
+   "url": null,
+   "attrs": {
+    "fixture": true,
+    "year": 2022,
+    "placeholder_id": true
+   },
+   "cluster_id": null,
+   "synonyms": [],
+   "x": -219.04,
+   "y": -1068.41,
+   "centrality": 0.1765
+  },
+  {
+   "id": "PMID:FX0004",
+   "type": "paper",
+   "label": "Fixture paper: KCNQ2 variant classes and severity",
+   "description": null,
+   "url": null,
+   "attrs": {
+    "fixture": true,
+    "year": 2025,
+    "placeholder_id": true
+   },
+   "cluster_id": null,
+   "synonyms": [],
+   "x": 268.94,
+   "y": 2098.33,
+   "centrality": 0.1765
+  },
+  {
+   "id": "CLAIM:fx0001",
+   "type": "claim",
+   "label": "SCN2A gain- and loss-of-function variants lead to different clinical courses (fixture)",
+   "description": null,
+   "url": null,
+   "attrs": {
+    "fixture": true,
+    "claim_type": "experimental"
+   },
+   "cluster_id": null,
+   "synonyms": [],
+   "x": 1285.71,
+   "y": -100.13,
+   "centrality": 0.1765
+  },
+  {
+   "id": "CLAIM:fx0002",
+   "type": "claim",
+   "label": "STXBP1 haploinsufficiency reduces synaptic vesicle release (fixture)",
+   "description": null,
+   "url": null,
+   "attrs": {
+    "fixture": true,
+    "claim_type": "experimental"
+   },
+   "cluster_id": null,
+   "synonyms": [],
+   "x": 3081.11,
+   "y": -296.12,
+   "centrality": 0.1176
+  },
+  {
+   "id": "CLAIM:fx0003",
+   "type": "claim",
+   "label": "Dominant-negative KCNQ2 variants are linked to more severe disease (fixture)",
+   "description": null,
+   "url": null,
+   "attrs": {
+    "fixture": true,
+    "claim_type": "review"
+   },
+   "cluster_id": null,
+   "synonyms": [],
+   "x": 979.41,
+   "y": 2602.5,
+   "centrality": 0.1176
+  },
+  {
+   "id": "RES:fx-alpha",
+   "type": "researcher",
+   "label": "Researcher Alpha (fixture)",
+   "description": null,
+   "url": null,
+   "attrs": {
+    "fixture": true
+   },
+   "cluster_id": null,
+   "synonyms": [],
+   "x": 779.78,
+   "y": -1552.0,
+   "centrality": 0.2353
+  },
+  {
+   "id": "RES:fx-beta",
+   "type": "researcher",
+   "label": "Researcher Beta (fixture)",
+   "description": null,
+   "url": null,
+   "attrs": {
+    "fixture": true
+   },
+   "cluster_id": null,
+   "synonyms": [],
+   "x": 2101.17,
+   "y": -1429.3,
+   "centrality": 0.1765
+  },
+  {
+   "id": "RES:fx-gamma",
+   "type": "researcher",
+   "label": "Researcher Gamma (fixture)",
+   "description": null,
+   "url": null,
+   "attrs": {
+    "fixture": true
+   },
+   "cluster_id": null,
+   "synonyms": [],
+   "x": -908.22,
+   "y": -1127.75,
+   "centrality": 0.1765
+  },
+  {
+   "id": "RES:fx-delta",
+   "type": "researcher",
+   "label": "Researcher Delta (fixture)",
+   "description": null,
+   "url": null,
+   "attrs": {
+    "fixture": true
+   },
+   "cluster_id": null,
+   "synonyms": [],
+   "x": -1008.25,
+   "y": 2329.26,
+   "centrality": 0.1176
+  },
+  {
+   "id": "DOC:fx-one",
+   "type": "doctor",
+   "label": "Clinician One (fixture)",
+   "description": null,
+   "url": null,
+   "attrs": {
+    "fixture": true,
+    "specialty": "child neurology"
+   },
+   "cluster_id": null,
+   "synonyms": [],
+   "x": -1939.5,
+   "y": 1514.9,
+   "centrality": 0.1176
+  },
+  {
+   "id": "DOC:fx-two",
+   "type": "doctor",
+   "label": "Clinician Two (fixture)",
+   "description": null,
+   "url": null,
+   "attrs": {
+    "fixture": true,
+    "specialty": "clinical genetics"
+   },
+   "cluster_id": null,
+   "synonyms": [],
+   "x": -1359.02,
+   "y": -801.5,
+   "centrality": 0.1176
+  },
+  {
+   "id": "INST:fx-childrens",
+   "type": "institution",
+   "label": "Fixture Children's Hospital",
+   "description": null,
+   "url": null,
+   "attrs": {
+    "fixture": true,
+    "center_of_expertise": true
+   },
+   "cluster_id": null,
+   "synonyms": [],
+   "x": -2073.76,
+   "y": 1904.23,
+   "centrality": 0.2353
+  },
+  {
+   "id": "INST:fx-neuro",
+   "type": "institution",
+   "label": "Fixture University Neuroscience Institute",
+   "description": null,
+   "url": null,
+   "attrs": {
+    "fixture": true
+   },
+   "cluster_id": null,
+   "synonyms": [],
+   "x": 1627.46,
+   "y": -2091.65,
+   "centrality": 0.1765
+  },
+  {
+   "id": "INST:fx-epilepsy",
+   "type": "institution",
+   "label": "Fixture Epilepsy Center",
+   "description": null,
+   "url": null,
+   "attrs": {
+    "fixture": true,
+    "center_of_expertise": true
+   },
+   "cluster_id": null,
+   "synonyms": [],
+   "x": -1793.81,
+   "y": -415.93,
+   "centrality": 0.1765
+  },
+  {
+   "id": "NET:fixture-rare-epilepsy",
+   "type": "network",
+   "label": "Rare Epilepsy Reference Network (fixture)",
+   "description": null,
+   "url": null,
+   "attrs": {
+    "fixture": true
+   },
+   "cluster_id": null,
+   "synonyms": [],
+   "x": -2029.14,
+   "y": 735.99,
+   "centrality": 0.1765
+  },
+  {
+   "id": "GRANT:FX-R01-0001",
+   "type": "grant",
+   "label": "Fixture grant: sodium channel mechanisms in DEE",
+   "description": null,
+   "url": null,
+   "attrs": {
+    "fixture": true,
+    "funder": "fixture",
+    "placeholder_id": true
+   },
+   "cluster_id": null,
+   "synonyms": [],
+   "x": 564.92,
+   "y": -845.11,
+   "centrality": 0.1765
+  },
+  {
+   "id": "GRANT:FX-R21-0002",
+   "type": "grant",
+   "label": "Fixture grant: STXBP1 natural history",
+   "description": null,
+   "url": null,
+   "attrs": {
+    "fixture": true,
+    "funder": "fixture",
+    "placeholder_id": true
+   },
+   "cluster_id": null,
+   "synonyms": [],
+   "x": 214.15,
+   "y": -1198.96,
+   "centrality": 0.1176
+  },
+  {
+   "id": "NCT99000001",
+   "type": "trial",
+   "label": "Fixture interventional study in SCN1A-related epilepsy",
+   "description": null,
+   "url": null,
+   "attrs": {
+    "fixture": true,
+    "phase": "2",
+    "status": "recruiting",
+    "placeholder_id": true
+   },
+   "cluster_id": null,
+   "synonyms": [],
+   "x": -1121.58,
+   "y": 957.1,
+   "centrality": 0.1765
+  },
+  {
+   "id": "NCT99000002",
+   "type": "trial",
+   "label": "Fixture observational study in sodium channel encephalopathies",
+   "description": null,
+   "url": null,
+   "attrs": {
+    "fixture": true,
+    "phase": null,
+    "status": "active_not_recruiting",
+    "placeholder_id": true
+   },
+   "cluster_id": null,
+   "synonyms": [],
+   "x": -326.19,
+   "y": -495.66,
+   "centrality": 0.1765
+  },
+  {
+   "id": "ORG:fx-dravet-families",
+   "type": "patient_org",
+   "label": "Dravet Families Network (fixture)",
+   "description": null,
+   "url": null,
+   "attrs": {
+    "fixture": true,
+    "country": "AT"
+   },
+   "cluster_id": null,
+   "synonyms": [
+    {
+     "synonym": "Dravet families",
+     "source": "fixture"
+    }
+   ],
+   "x": -1150.7,
+   "y": 559.97,
+   "centrality": 0.2353
+  },
+  {
+   "id": "ORG:fx-scn2a-community",
+   "type": "patient_org",
+   "label": "SCN2A Community Alliance (fixture)",
+   "description": null,
+   "url": null,
+   "attrs": {
+    "fixture": true,
+    "country": "US"
+   },
+   "cluster_id": null,
+   "synonyms": [],
+   "x": 169.01,
+   "y": 408.52,
+   "centrality": 0.2353
+  },
+  {
+   "id": "ORG:fx-stxbp1-parents",
+   "type": "patient_org",
+   "label": "STXBP1 Parents Group (fixture)",
+   "description": null,
+   "url": null,
+   "attrs": {
+    "fixture": true,
+    "country": "DE"
+   },
+   "cluster_id": null,
+   "synonyms": [],
+   "x": 1852.19,
+   "y": -1498.54,
+   "centrality": 0.1176
+  },
+  {
+   "id": "REG:fx-sodium-channel-registry",
+   "type": "registry",
+   "label": "Sodium Channel Epilepsy Registry (fixture)",
+   "description": null,
+   "url": null,
+   "attrs": {
+    "fixture": true,
+    "kind": "registry"
+   },
+   "cluster_id": null,
+   "synonyms": [],
+   "x": -715.41,
+   "y": 915.95,
+   "centrality": 0.1176
+  },
+  {
+   "id": "REG:fx-stxbp1-natural-history",
+   "type": "registry",
+   "label": "STXBP1 Natural History Study (fixture)",
+   "description": null,
+   "url": null,
+   "attrs": {
+    "fixture": true,
+    "kind": "natural_history_study"
+   },
+   "cluster_id": null,
+   "synonyms": [],
+   "x": 2160.8,
+   "y": -2279.42,
+   "centrality": 0.1176
+  },
+  {
+   "id": "REG:fx-neonatal-seizure-registry",
+   "type": "registry",
+   "label": "Neonatal Seizure Registry (fixture)",
+   "description": null,
+   "url": null,
+   "attrs": {
+    "fixture": true,
+    "kind": "registry"
+   },
+   "cluster_id": null,
+   "synonyms": [],
+   "x": -2787.7,
+   "y": 2420.25,
+   "centrality": 0.0588
+  },
+  {
+   "id": "CLUSTER:1",
+   "type": "cluster",
+   "label": "Sodium channel gain-of-function epilepsies",
+   "description": "Variants that make sodium channels (SCN1A, SCN2A, SCN8A) more active, leading to early-onset seizures.",
+   "url": null,
+   "attrs": {
+    "fixture": true
+   },
+   "cluster_id": null,
+   "synonyms": [],
+   "x": -1000.0,
+   "y": 700.0,
+   "centrality": 0.0
+  },
+  {
+   "id": "CLUSTER:2",
+   "type": "cluster",
+   "label": "Sodium channel loss-of-function epilepsies",
+   "description": "Variants that reduce sodium channel function (SCN1A, SCN2A), with fever-sensitive seizures or later-onset neurodevelopmental features.",
+   "url": null,
+   "attrs": {
+    "fixture": true
+   },
+   "cluster_id": null,
+   "synonyms": [],
+   "x": 1000.0,
+   "y": 700.0,
+   "centrality": 0.0
+  },
+  {
+   "id": "CLUSTER:3",
+   "type": "cluster",
+   "label": "Synaptic and potassium channel encephalopathies",
+   "description": "Reduced synaptic vesicle release (STXBP1) or potassium channel dysfunction (KCNQ2) in early-onset encephalopathies.",
+   "url": null,
+   "attrs": {
+    "fixture": true
+   },
+   "cluster_id": null,
+   "synonyms": [],
+   "x": 0.0,
+   "y": -1000.0,
+   "centrality": 0.0
+  }
+ ],
+ "edges": [
+  {
+   "id": "e_da7bfb96736c",
+   "source_id": "MONDO:0100135",
+   "target_id": "HGNC:10585",
+   "relation": "caused_by_variant_in",
+   "family": "dna",
+   "confidence": 0.97,
+   "origin": "observed",
+   "status": "active",
+   "features": null,
+   "evidence": [
+    {
+     "tier": "curated_db",
+     "source_type": "fixture",
+     "source_id": "fixture:1.1",
+     "url": null,
+     "quote": "Fixture evidence (supports) for caused_by_variant_in; not a real source.",
+     "retrieved_at": "2026-10-03T00:00:00Z",
+     "polarity": "supports",
+     "claim_type": null
+    },
+    {
+     "tier": "peer_reviewed",
+     "source_type": "fixture",
+     "source_id": "fixture:1.2",
+     "url": null,
+     "quote": "Fixture evidence (supports) for caused_by_variant_in; not a real source.",
+     "retrieved_at": "2026-10-03T00:00:00Z",
+     "polarity": "supports",
+     "claim_type": "experimental"
+    }
+   ]
+  },
+  {
+   "id": "e_bf8f3b4c5df2",
+   "source_id": "MONDO:9900001",
+   "target_id": "HGNC:10585",
+   "relation": "caused_by_variant_in",
+   "family": "dna",
+   "confidence": 0.97,
+   "origin": "observed",
+   "status": "active",
+   "features": null,
+   "evidence": [
+    {
+     "tier": "curated_db",
+     "source_type": "fixture",
+     "source_id": "fixture:2.1",
+     "url": null,
+     "quote": "Fixture evidence (supports) for caused_by_variant_in; not a real source.",
+     "retrieved_at": "2026-10-03T00:00:00Z",
+     "polarity": "supports",
+     "claim_type": null
+    },
+    {
+     "tier": "peer_reviewed",
+     "source_type": "fixture",
+     "source_id": "fixture:2.2",
+     "url": null,
+     "quote": "Fixture evidence (supports) for caused_by_variant_in; not a real source.",
+     "retrieved_at": "2026-10-03T00:00:00Z",
+     "polarity": "supports",
+     "claim_type": "experimental"
+    }
+   ]
+  },
+  {
+   "id": "e_a19e4ec558c7",
+   "source_id": "MONDO:9900002",
+   "target_id": "HGNC:10585",
+   "relation": "caused_by_variant_in",
+   "family": "dna",
+   "confidence": 0.97,
+   "origin": "observed",
+   "status": "active",
+   "features": null,
+   "evidence": [
+    {
+     "tier": "curated_db",
+     "source_type": "fixture",
+     "source_id": "fixture:3.1",
+     "url": null,
+     "quote": "Fixture evidence (supports) for caused_by_variant_in; not a real source.",
+     "retrieved_at": "2026-10-03T00:00:00Z",
+     "polarity": "supports",
+     "claim_type": null
+    },
+    {
+     "tier": "peer_reviewed",
+     "source_type": "fixture",
+     "source_id": "fixture:3.2",
+     "url": null,
+     "quote": "Fixture evidence (supports) for caused_by_variant_in; not a real source.",
+     "retrieved_at": "2026-10-03T00:00:00Z",
+     "polarity": "supports",
+     "claim_type": "experimental"
+    }
+   ]
+  },
+  {
+   "id": "e_e0a41be0eda0",
+   "source_id": "MONDO:9900003",
+   "target_id": "HGNC:10588",
+   "relation": "caused_by_variant_in",
+   "family": "dna",
+   "confidence": 0.97,
+   "origin": "observed",
+   "status": "active",
+   "features": null,
+   "evidence": [
+    {
+     "tier": "curated_db",
+     "source_type": "fixture",
+     "source_id": "fixture:4.1",
+     "url": null,
+     "quote": "Fixture evidence (supports) for caused_by_variant_in; not a real source.",
+     "retrieved_at": "2026-10-03T00:00:00Z",
+     "polarity": "supports",
+     "claim_type": null
+    },
+    {
+     "tier": "peer_reviewed",
+     "source_type": "fixture",
+     "source_id": "fixture:4.2",
+     "url": null,
+     "quote": "Fixture evidence (supports) for caused_by_variant_in; not a real source.",
+     "retrieved_at": "2026-10-03T00:00:00Z",
+     "polarity": "supports",
+     "claim_type": "experimental"
+    }
+   ]
+  },
+  {
+   "id": "e_e459b521f577",
+   "source_id": "MONDO:9900004",
+   "target_id": "HGNC:10588",
+   "relation": "caused_by_variant_in",
+   "family": "dna",
+   "confidence": 0.97,
+   "origin": "observed",
+   "status": "active",
+   "features": null,
+   "evidence": [
+    {
+     "tier": "curated_db",
+     "source_type": "fixture",
+     "source_id": "fixture:5.1",
+     "url": null,
+     "quote": "Fixture evidence (supports) for caused_by_variant_in; not a real source.",
+     "retrieved_at": "2026-10-03T00:00:00Z",
+     "polarity": "supports",
+     "claim_type": null
+    },
+    {
+     "tier": "peer_reviewed",
+     "source_type": "fixture",
+     "source_id": "fixture:5.2",
+     "url": null,
+     "quote": "Fixture evidence (supports) for caused_by_variant_in; not a real source.",
+     "retrieved_at": "2026-10-03T00:00:00Z",
+     "polarity": "supports",
+     "claim_type": "experimental"
+    }
+   ]
+  },
+  {
+   "id": "e_c807720bef64",
+   "source_id": "MONDO:9900005",
+   "target_id": "HGNC:10588",
+   "relation": "caused_by_variant_in",
+   "family": "dna",
+   "confidence": 0.97,
+   "origin": "observed",
+   "status": "active",
+   "features": null,
+   "evidence": [
+    {
+     "tier": "curated_db",
+     "source_type": "fixture",
+     "source_id": "fixture:6.1",
+     "url": null,
+     "quote": "Fixture evidence (supports) for caused_by_variant_in; not a real source.",
+     "retrieved_at": "2026-10-03T00:00:00Z",
+     "polarity": "supports",
+     "claim_type": null
+    },
+    {
+     "tier": "peer_reviewed",
+     "source_type": "fixture",
+     "source_id": "fixture:6.2",
+     "url": null,
+     "quote": "Fixture evidence (supports) for caused_by_variant_in; not a real source.",
+     "retrieved_at": "2026-10-03T00:00:00Z",
+     "polarity": "supports",
+     "claim_type": "experimental"
+    }
+   ]
+  },
+  {
+   "id": "e_0fc812da97ff",
+   "source_id": "MONDO:9900006",
+   "target_id": "HGNC:10597",
+   "relation": "caused_by_variant_in",
+   "family": "dna",
+   "confidence": 0.97,
+   "origin": "observed",
+   "status": "active",
+   "features": null,
+   "evidence": [
+    {
+     "tier": "curated_db",
+     "source_type": "fixture",
+     "source_id": "fixture:7.1",
+     "url": null,
+     "quote": "Fixture evidence (supports) for caused_by_variant_in; not a real source.",
+     "retrieved_at": "2026-10-03T00:00:00Z",
+     "polarity": "supports",
+     "claim_type": null
+    },
+    {
+     "tier": "peer_reviewed",
+     "source_type": "fixture",
+     "source_id": "fixture:7.2",
+     "url": null,
+     "quote": "Fixture evidence (supports) for caused_by_variant_in; not a real source.",
+     "retrieved_at": "2026-10-03T00:00:00Z",
+     "polarity": "supports",
+     "claim_type": "experimental"
+    }
+   ]
+  },
+  {
+   "id": "e_e5f778ac8a21",
+   "source_id": "MONDO:9900007",
+   "target_id": "HGNC:11444",
+   "relation": "caused_by_variant_in",
+   "family": "dna",
+   "confidence": 0.97,
+   "origin": "observed",
+   "status": "active",
+   "features": null,
+   "evidence": [
+    {
+     "tier": "curated_db",
+     "source_type": "fixture",
+     "source_id": "fixture:8.1",
+     "url": null,
+     "quote": "Fixture evidence (supports) for caused_by_variant_in; not a real source.",
+     "retrieved_at": "2026-10-03T00:00:00Z",
+     "polarity": "supports",
+     "claim_type": null
+    },
+    {
+     "tier": "peer_reviewed",
+     "source_type": "fixture",
+     "source_id": "fixture:8.2",
+     "url": null,
+     "quote": "Fixture evidence (supports) for caused_by_variant_in; not a real source.",
+     "retrieved_at": "2026-10-03T00:00:00Z",
+     "polarity": "supports",
+     "claim_type": "experimental"
+    }
+   ]
+  },
+  {
+   "id": "e_0e48dc13eb9a",
+   "source_id": "MONDO:9900008",
+   "target_id": "HGNC:6296",
+   "relation": "caused_by_variant_in",
+   "family": "dna",
+   "confidence": 0.97,
+   "origin": "observed",
+   "status": "active",
+   "features": null,
+   "evidence": [
+    {
+     "tier": "curated_db",
+     "source_type": "fixture",
+     "source_id": "fixture:9.1",
+     "url": null,
+     "quote": "Fixture evidence (supports) for caused_by_variant_in; not a real source.",
+     "retrieved_at": "2026-10-03T00:00:00Z",
+     "polarity": "supports",
+     "claim_type": null
+    },
+    {
+     "tier": "peer_reviewed",
+     "source_type": "fixture",
+     "source_id": "fixture:9.2",
+     "url": null,
+     "quote": "Fixture evidence (supports) for caused_by_variant_in; not a real source.",
+     "retrieved_at": "2026-10-03T00:00:00Z",
+     "polarity": "supports",
+     "claim_type": "experimental"
+    }
+   ]
+  },
+  {
+   "id": "e_9098bf1bc72e",
+   "source_id": "MONDO:9900009",
+   "target_id": "HGNC:6296",
+   "relation": "caused_by_variant_in",
+   "family": "dna",
+   "confidence": 0.97,
+   "origin": "observed",
+   "status": "active",
+   "features": null,
+   "evidence": [
+    {
+     "tier": "curated_db",
+     "source_type": "fixture",
+     "source_id": "fixture:10.1",
+     "url": null,
+     "quote": "Fixture evidence (supports) for caused_by_variant_in; not a real source.",
+     "retrieved_at": "2026-10-03T00:00:00Z",
+     "polarity": "supports",
+     "claim_type": null
+    },
+    {
+     "tier": "peer_reviewed",
+     "source_type": "fixture",
+     "source_id": "fixture:10.2",
+     "url": null,
+     "quote": "Fixture evidence (supports) for caused_by_variant_in; not a real source.",
+     "retrieved_at": "2026-10-03T00:00:00Z",
+     "polarity": "supports",
+     "claim_type": "experimental"
+    }
+   ]
+  },
+  {
+   "id": "e_086cea2fe5d6",
+   "source_id": "MONDO:9900010",
+   "target_id": "HGNC:99000001",
+   "relation": "caused_by_variant_in",
+   "family": "dna",
+   "confidence": 0.9,
+   "origin": "observed",
+   "status": "active",
+   "features": null,
+   "evidence": [
+    {
+     "tier": "curated_db",
+     "source_type": "fixture",
+     "source_id": "fixture:11.1",
+     "url": null,
+     "quote": "Fixture evidence (supports) for caused_by_variant_in; not a real source.",
+     "retrieved_at": "2026-10-03T00:00:00Z",
+     "polarity": "supports",
+     "claim_type": null
+    }
+   ]
+  },
+  {
+   "id": "e_e51faf8111c6",
+   "source_id": "HGNC:10585",
+   "target_id": "MECH:loss_of_function",
+   "relation": "acts_via",
+   "family": "dna",
+   "confidence": 0.9,
+   "origin": "observed",
+   "status": "active",
+   "features": null,
+   "evidence": [
+    {
+     "tier": "curated_db",
+     "source_type": "fixture",
+     "source_id": "fixture:12.1",
+     "url": null,
+     "quote": "Fixture evidence (supports) for acts_via; not a real source.",
+     "retrieved_at": "2026-10-03T00:00:00Z",
+     "polarity": "supports",
+     "claim_type": null
+    }
+   ]
+  },
+  {
+   "id": "e_9fb130e0c09f",
+   "source_id": "HGNC:10585",
+   "target_id": "MECH:gain_of_function",
+   "relation": "acts_via",
+   "family": "dna",
+   "confidence": 0.7,
+   "origin": "observed",
+   "status": "active",
+   "features": null,
+   "evidence": [
+    {
+     "tier": "peer_reviewed",
+     "source_type": "fixture",
+     "source_id": "fixture:13.1",
+     "url": null,
+     "quote": "Fixture evidence (supports) for acts_via; not a real source.",
+     "retrieved_at": "2026-10-03T00:00:00Z",
+     "polarity": "supports",
+     "claim_type": "experimental"
+    }
+   ]
+  },
+  {
+   "id": "e_eccdcf853c78",
+   "source_id": "HGNC:10588",
+   "target_id": "MECH:gain_of_function",
+   "relation": "acts_via",
+   "family": "dna",
+   "confidence": 0.9,
+   "origin": "observed",
+   "status": "active",
+   "features": null,
+   "evidence": [
+    {
+     "tier": "curated_db",
+     "source_type": "fixture",
+     "source_id": "fixture:14.1",
+     "url": null,
+     "quote": "Fixture evidence (supports) for acts_via; not a real source.",
+     "retrieved_at": "2026-10-03T00:00:00Z",
+     "polarity": "supports",
+     "claim_type": null
+    }
+   ]
+  },
+  {
+   "id": "e_458a73b1731a",
+   "source_id": "HGNC:10588",
+   "target_id": "MECH:loss_of_function",
+   "relation": "acts_via",
+   "family": "dna",
+   "confidence": 0.9,
+   "origin": "observed",
+   "status": "active",
+   "features": null,
+   "evidence": [
+    {
+     "tier": "curated_db",
+     "source_type": "fixture",
+     "source_id": "fixture:15.1",
+     "url": null,
+     "quote": "Fixture evidence (supports) for acts_via; not a real source.",
+     "retrieved_at": "2026-10-03T00:00:00Z",
+     "polarity": "supports",
+     "claim_type": null
+    }
+   ]
+  },
+  {
+   "id": "e_52e49c0b1031",
+   "source_id": "HGNC:10597",
+   "target_id": "MECH:gain_of_function",
+   "relation": "acts_via",
+   "family": "dna",
+   "confidence": 0.9,
+   "origin": "observed",
+   "status": "active",
+   "features": null,
+   "evidence": [
+    {
+     "tier": "curated_db",
+     "source_type": "fixture",
+     "source_id": "fixture:16.1",
+     "url": null,
+     "quote": "Fixture evidence (supports) for acts_via; not a real source.",
+     "retrieved_at": "2026-10-03T00:00:00Z",
+     "polarity": "supports",
+     "claim_type": null
+    }
+   ]
+  },
+  {
+   "id": "e_1b4ecc171bbf",
+   "source_id": "HGNC:11444",
+   "target_id": "MECH:loss_of_function",
+   "relation": "acts_via",
+   "family": "dna",
+   "confidence": 0.9,
+   "origin": "observed",
+   "status": "active",
+   "features": null,
+   "evidence": [
+    {
+     "tier": "curated_db",
+     "source_type": "fixture",
+     "source_id": "fixture:17.1",
+     "url": null,
+     "quote": "Fixture evidence (supports) for acts_via; not a real source.",
+     "retrieved_at": "2026-10-03T00:00:00Z",
+     "polarity": "supports",
+     "claim_type": null
+    }
+   ]
+  },
+  {
+   "id": "e_19b15224f476",
+   "source_id": "HGNC:6296",
+   "target_id": "MECH:dominant_negative",
+   "relation": "acts_via",
+   "family": "dna",
+   "confidence": 0.85,
+   "origin": "observed",
+   "status": "active",
+   "features": null,
+   "evidence": [
+    {
+     "tier": "peer_reviewed",
+     "source_type": "fixture",
+     "source_id": "fixture:18.1",
+     "url": null,
+     "quote": "Fixture evidence (supports) for acts_via; not a real source.",
+     "retrieved_at": "2026-10-03T00:00:00Z",
+     "polarity": "supports",
+     "claim_type": "experimental"
+    },
+    {
+     "tier": "review",
+     "source_type": "fixture",
+     "source_id": "fixture:18.2",
+     "url": null,
+     "quote": "Fixture evidence (supports) for acts_via; not a real source.",
+     "retrieved_at": "2026-10-03T00:00:00Z",
+     "polarity": "supports",
+     "claim_type": "review"
+    }
+   ]
+  },
+  {
+   "id": "e_5b9c7b05b82d",
+   "source_id": "HGNC:6296",
+   "target_id": "MECH:loss_of_function",
+   "relation": "acts_via",
+   "family": "dna",
+   "confidence": 0.9,
+   "origin": "observed",
+   "status": "active",
+   "features": null,
+   "evidence": [
+    {
+     "tier": "curated_db",
+     "source_type": "fixture",
+     "source_id": "fixture:19.1",
+     "url": null,
+     "quote": "Fixture evidence (supports) for acts_via; not a real source.",
+     "retrieved_at": "2026-10-03T00:00:00Z",
+     "polarity": "supports",
+     "claim_type": null
+    }
+   ]
+  },
+  {
+   "id": "e_97e3a46ad845",
+   "source_id": "HGNC:10585",
+   "target_id": "GO:0005248",
+   "relation": "participates_in",
+   "family": "dna",
+   "confidence": 0.9,
+   "origin": "observed",
+   "status": "active",
+   "features": null,
+   "evidence": [
+    {
+     "tier": "curated_db",
+     "source_type": "fixture",
+     "source_id": "fixture:20.1",
+     "url": null,
+     "quote": "Fixture evidence (supports) for participates_in; not a real source.",
+     "retrieved_at": "2026-10-03T00:00:00Z",
+     "polarity": "supports",
+     "claim_type": null
+    }
+   ]
+  },
+  {
+   "id": "e_98e84fe23c01",
+   "source_id": "HGNC:10588",
+   "target_id": "GO:0005248",
+   "relation": "participates_in",
+   "family": "dna",
+   "confidence": 0.9,
+   "origin": "observed",
+   "status": "active",
+   "features": null,
+   "evidence": [
+    {
+     "tier": "curated_db",
+     "source_type": "fixture",
+     "source_id": "fixture:21.1",
+     "url": null,
+     "quote": "Fixture evidence (supports) for participates_in; not a real source.",
+     "retrieved_at": "2026-10-03T00:00:00Z",
+     "polarity": "supports",
+     "claim_type": null
+    }
+   ]
+  },
+  {
+   "id": "e_8be6cc6a3ada",
+   "source_id": "HGNC:10597",
+   "target_id": "GO:0005248",
+   "relation": "participates_in",
+   "family": "dna",
+   "confidence": 0.9,
+   "origin": "observed",
+   "status": "active",
+   "features": null,
+   "evidence": [
+    {
+     "tier": "curated_db",
+     "source_type": "fixture",
+     "source_id": "fixture:22.1",
+     "url": null,
+     "quote": "Fixture evidence (supports) for participates_in; not a real source.",
+     "retrieved_at": "2026-10-03T00:00:00Z",
+     "polarity": "supports",
+     "claim_type": null
+    }
+   ]
+  },
+  {
+   "id": "e_7f96e138998c",
+   "source_id": "HGNC:6296",
+   "target_id": "GO:0005249",
+   "relation": "participates_in",
+   "family": "dna",
+   "confidence": 0.9,
+   "origin": "observed",
+   "status": "active",
+   "features": null,
+   "evidence": [
+    {
+     "tier": "curated_db",
+     "source_type": "fixture",
+     "source_id": "fixture:23.1",
+     "url": null,
+     "quote": "Fixture evidence (supports) for participates_in; not a real source.",
+     "retrieved_at": "2026-10-03T00:00:00Z",
+     "polarity": "supports",
+     "claim_type": null
+    }
+   ]
+  },
+  {
+   "id": "e_565381ece0a2",
+   "source_id": "HGNC:11444",
+   "target_id": "GO:0016079",
+   "relation": "participates_in",
+   "family": "dna",
+   "confidence": 0.9,
+   "origin": "observed",
+   "status": "active",
+   "features": null,
+   "evidence": [
+    {
+     "tier": "curated_db",
+     "source_type": "fixture",
+     "source_id": "fixture:24.1",
+     "url": null,
+     "quote": "Fixture evidence (supports) for participates_in; not a real source.",
+     "retrieved_at": "2026-10-03T00:00:00Z",
+     "polarity": "supports",
+     "claim_type": null
+    }
+   ]
+  },
+  {
+   "id": "e_ca4e3bbc1ef2",
+   "source_id": "MONDO:0100135",
+   "target_id": "HP:0001250",
+   "relation": "has_phenotype",
+   "family": "symptoms",
+   "confidence": 0.9,
+   "origin": "observed",
+   "status": "active",
+   "features": {
+    "frequency": "frequent"
+   },
+   "evidence": [
+    {
+     "tier": "curated_db",
+     "source_type": "fixture",
+     "source_id": "fixture:25.1",
+     "url": null,
+     "quote": "Fixture evidence (supports) for has_phenotype; not a real source.",
+     "retrieved_at": "2026-10-03T00:00:00Z",
+     "polarity": "supports",
+     "claim_type": null
+    }
+   ]
+  },
+  {
+   "id": "e_cd290c1b228d",
+   "source_id": "MONDO:0100135",
+   "target_id": "HP:0002373",
+   "relation": "has_phenotype",
+   "family": "symptoms",
+   "confidence": 0.9,
+   "origin": "observed",
+   "status": "active",
+   "features": {
+    "frequency": "frequent"
+   },
+   "evidence": [
+    {
+     "tier": "curated_db",
+     "source_type": "fixture",
+     "source_id": "fixture:26.1",
+     "url": null,
+     "quote": "Fixture evidence (supports) for has_phenotype; not a real source.",
+     "retrieved_at": "2026-10-03T00:00:00Z",
+     "polarity": "supports",
+     "claim_type": null
+    }
+   ]
+  },
+  {
+   "id": "e_732cad569e41",
+   "source_id": "MONDO:0100135",
+   "target_id": "HP:0002133",
+   "relation": "has_phenotype",
+   "family": "symptoms",
+   "confidence": 0.9,
+   "origin": "observed",
+   "status": "active",
+   "features": {
+    "frequency": "frequent"
+   },
+   "evidence": [
+    {
+     "tier": "curated_db",
+     "source_type": "fixture",
+     "source_id": "fixture:27.1",
+     "url": null,
+     "quote": "Fixture evidence (supports) for has_phenotype; not a real source.",
+     "retrieved_at": "2026-10-03T00:00:00Z",
+     "polarity": "supports",
+     "claim_type": null
+    }
+   ]
+  },
+  {
+   "id": "e_198c8e82e285",
+   "source_id": "MONDO:0100135",
+   "target_id": "HP:0001249",
+   "relation": "has_phenotype",
+   "family": "symptoms",
+   "confidence": 0.7,
+   "origin": "observed",
+   "status": "active",
+   "features": {
+    "frequency": "occasional"
+   },
+   "evidence": [
+    {
+     "tier": "peer_reviewed",
+     "source_type": "fixture",
+     "source_id": "fixture:28.1",
+     "url": null,
+     "quote": "Fixture evidence (supports) for has_phenotype; not a real source.",
+     "retrieved_at": "2026-10-03T00:00:00Z",
+     "polarity": "supports",
+     "claim_type": "experimental"
+    }
+   ]
+  },
+  {
+   "id": "e_82a680d84294",
+   "source_id": "MONDO:0100135",
+   "target_id": "HP:0001251",
+   "relation": "has_phenotype",
+   "family": "symptoms",
+   "confidence": 0.7,
+   "origin": "observed",
+   "status": "active",
+   "features": {
+    "frequency": "occasional"
+   },
+   "evidence": [
+    {
+     "tier": "peer_reviewed",
+     "source_type": "fixture",
+     "source_id": "fixture:29.1",
+     "url": null,
+     "quote": "Fixture evidence (supports) for has_phenotype; not a real source.",
+     "retrieved_at": "2026-10-03T00:00:00Z",
+     "polarity": "supports",
+     "claim_type": "experimental"
+    }
+   ]
+  },
+  {
+   "id": "e_9caa3786a7b8",
+   "source_id": "MONDO:0100135",
+   "target_id": "HP:0001263",
+   "relation": "has_phenotype",
+   "family": "symptoms",
+   "confidence": 0.7,
+   "origin": "observed",
+   "status": "active",
+   "features": {
+    "frequency": "occasional"
+   },
+   "evidence": [
+    {
+     "tier": "peer_reviewed",
+     "source_type": "fixture",
+     "source_id": "fixture:30.1",
+     "url": null,
+     "quote": "Fixture evidence (supports) for has_phenotype; not a real source.",
+     "retrieved_at": "2026-10-03T00:00:00Z",
+     "polarity": "supports",
+     "claim_type": "experimental"
+    }
+   ]
+  },
+  {
+   "id": "e_4cdaafb0f374",
+   "source_id": "MONDO:9900001",
+   "target_id": "HP:0001250",
+   "relation": "has_phenotype",
+   "family": "symptoms",
+   "confidence": 0.9,
+   "origin": "observed",
+   "status": "active",
+   "features": {
+    "frequency": "frequent"
+   },
+   "evidence": [
+    {
+     "tier": "curated_db",
+     "source_type": "fixture",
+     "source_id": "fixture:31.1",
+     "url": null,
+     "quote": "Fixture evidence (supports) for has_phenotype; not a real source.",
+     "retrieved_at": "2026-10-03T00:00:00Z",
+     "polarity": "supports",
+     "claim_type": null
+    }
+   ]
+  },
+  {
+   "id": "e_d5564d3b0fb2",
+   "source_id": "MONDO:9900001",
+   "target_id": "HP:0002373",
+   "relation": "has_phenotype",
+   "family": "symptoms",
+   "confidence": 0.9,
+   "origin": "observed",
+   "status": "active",
+   "features": {
+    "frequency": "frequent"
+   },
+   "evidence": [
+    {
+     "tier": "curated_db",
+     "source_type": "fixture",
+     "source_id": "fixture:32.1",
+     "url": null,
+     "quote": "Fixture evidence (supports) for has_phenotype; not a real source.",
+     "retrieved_at": "2026-10-03T00:00:00Z",
+     "polarity": "supports",
+     "claim_type": null
+    }
+   ]
+  },
+  {
+   "id": "e_ce62a3e3ed43",
+   "source_id": "MONDO:9900002",
+   "target_id": "HP:0002076",
+   "relation": "has_phenotype",
+   "family": "symptoms",
+   "confidence": 0.9,
+   "origin": "observed",
+   "status": "active",
+   "features": {
+    "frequency": "frequent"
+   },
+   "evidence": [
+    {
+     "tier": "curated_db",
+     "source_type": "fixture",
+     "source_id": "fixture:33.1",
+     "url": null,
+     "quote": "Fixture evidence (supports) for has_phenotype; not a real source.",
+     "retrieved_at": "2026-10-03T00:00:00Z",
+     "polarity": "supports",
+     "claim_type": null
+    }
+   ]
+  },
+  {
+   "id": "e_1bb13fc577b0",
+   "source_id": "MONDO:9900002",
+   "target_id": "HP:0001250",
+   "relation": "has_phenotype",
+   "family": "symptoms",
+   "confidence": 0.9,
+   "origin": "observed",
+   "status": "active",
+   "features": {
+    "frequency": "frequent"
+   },
+   "evidence": [
+    {
+     "tier": "curated_db",
+     "source_type": "fixture",
+     "source_id": "fixture:34.1",
+     "url": null,
+     "quote": "Fixture evidence (supports) for has_phenotype; not a real source.",
+     "retrieved_at": "2026-10-03T00:00:00Z",
+     "polarity": "supports",
+     "claim_type": null
+    }
+   ]
+  },
+  {
+   "id": "e_16c32603aed9",
+   "source_id": "MONDO:9900003",
+   "target_id": "HP:0001250",
+   "relation": "has_phenotype",
+   "family": "symptoms",
+   "confidence": 0.9,
+   "origin": "observed",
+   "status": "active",
+   "features": {
+    "frequency": "frequent"
+   },
+   "evidence": [
+    {
+     "tier": "curated_db",
+     "source_type": "fixture",
+     "source_id": "fixture:35.1",
+     "url": null,
+     "quote": "Fixture evidence (supports) for has_phenotype; not a real source.",
+     "retrieved_at": "2026-10-03T00:00:00Z",
+     "polarity": "supports",
+     "claim_type": null
+    }
+   ]
+  },
+  {
+   "id": "e_59381f1807cc",
+   "source_id": "MONDO:9900003",
+   "target_id": "HP:0012469",
+   "relation": "has_phenotype",
+   "family": "symptoms",
+   "confidence": 0.9,
+   "origin": "observed",
+   "status": "active",
+   "features": {
+    "frequency": "frequent"
+   },
+   "evidence": [
+    {
+     "tier": "curated_db",
+     "source_type": "fixture",
+     "source_id": "fixture:36.1",
+     "url": null,
+     "quote": "Fixture evidence (supports) for has_phenotype; not a real source.",
+     "retrieved_at": "2026-10-03T00:00:00Z",
+     "polarity": "supports",
+     "claim_type": null
+    }
+   ]
+  },
+  {
+   "id": "e_ed9e636240f5",
+   "source_id": "MONDO:9900003",
+   "target_id": "HP:0001263",
+   "relation": "has_phenotype",
+   "family": "symptoms",
+   "confidence": 0.9,
+   "origin": "observed",
+   "status": "active",
+   "features": {
+    "frequency": "frequent"
+   },
+   "evidence": [
+    {
+     "tier": "curated_db",
+     "source_type": "fixture",
+     "source_id": "fixture:37.1",
+     "url": null,
+     "quote": "Fixture evidence (supports) for has_phenotype; not a real source.",
+     "retrieved_at": "2026-10-03T00:00:00Z",
+     "polarity": "supports",
+     "claim_type": null
+    }
+   ]
+  },
+  {
+   "id": "e_9a4bea791e03",
+   "source_id": "MONDO:9900003",
+   "target_id": "HP:0001252",
+   "relation": "has_phenotype",
+   "family": "symptoms",
+   "confidence": 0.7,
+   "origin": "observed",
+   "status": "active",
+   "features": {
+    "frequency": "occasional"
+   },
+   "evidence": [
+    {
+     "tier": "peer_reviewed",
+     "source_type": "fixture",
+     "source_id": "fixture:38.1",
+     "url": null,
+     "quote": "Fixture evidence (supports) for has_phenotype; not a real source.",
+     "retrieved_at": "2026-10-03T00:00:00Z",
+     "polarity": "supports",
+     "claim_type": "experimental"
+    }
+   ]
+  },
+  {
+   "id": "e_9050e88a4c0c",
+   "source_id": "MONDO:9900003",
+   "target_id": "HP:0011968",
+   "relation": "has_phenotype",
+   "family": "symptoms",
+   "confidence": 0.7,
+   "origin": "observed",
+   "status": "active",
+   "features": {
+    "frequency": "occasional"
+   },
+   "evidence": [
+    {
+     "tier": "peer_reviewed",
+     "source_type": "fixture",
+     "source_id": "fixture:39.1",
+     "url": null,
+     "quote": "Fixture evidence (supports) for has_phenotype; not a real source.",
+     "retrieved_at": "2026-10-03T00:00:00Z",
+     "polarity": "supports",
+     "claim_type": "experimental"
+    }
+   ]
+  },
+  {
+   "id": "e_ced02afcc635",
+   "source_id": "MONDO:9900004",
+   "target_id": "HP:0001250",
+   "relation": "has_phenotype",
+   "family": "symptoms",
+   "confidence": 0.9,
+   "origin": "observed",
+   "status": "active",
+   "features": {
+    "frequency": "frequent"
+   },
+   "evidence": [
+    {
+     "tier": "curated_db",
+     "source_type": "fixture",
+     "source_id": "fixture:40.1",
+     "url": null,
+     "quote": "Fixture evidence (supports) for has_phenotype; not a real source.",
+     "retrieved_at": "2026-10-03T00:00:00Z",
+     "polarity": "supports",
+     "claim_type": null
+    }
+   ]
+  },
+  {
+   "id": "e_1b5033232968",
+   "source_id": "MONDO:9900005",
+   "target_id": "HP:0001249",
+   "relation": "has_phenotype",
+   "family": "symptoms",
+   "confidence": 0.9,
+   "origin": "observed",
+   "status": "active",
+   "features": {
+    "frequency": "frequent"
+   },
+   "evidence": [
+    {
+     "tier": "curated_db",
+     "source_type": "fixture",
+     "source_id": "fixture:41.1",
+     "url": null,
+     "quote": "Fixture evidence (supports) for has_phenotype; not a real source.",
+     "retrieved_at": "2026-10-03T00:00:00Z",
+     "polarity": "supports",
+     "claim_type": null
+    }
+   ]
+  },
+  {
+   "id": "e_2041553e16ee",
+   "source_id": "MONDO:9900005",
+   "target_id": "HP:0000729",
+   "relation": "has_phenotype",
+   "family": "symptoms",
+   "confidence": 0.9,
+   "origin": "observed",
+   "status": "active",
+   "features": {
+    "frequency": "frequent"
+   },
+   "evidence": [
+    {
+     "tier": "curated_db",
+     "source_type": "fixture",
+     "source_id": "fixture:42.1",
+     "url": null,
+     "quote": "Fixture evidence (supports) for has_phenotype; not a real source.",
+     "retrieved_at": "2026-10-03T00:00:00Z",
+     "polarity": "supports",
+     "claim_type": null
+    }
+   ]
+  },
+  {
+   "id": "e_10e78a3bcb56",
+   "source_id": "MONDO:9900005",
+   "target_id": "HP:0001263",
+   "relation": "has_phenotype",
+   "family": "symptoms",
+   "confidence": 0.9,
+   "origin": "observed",
+   "status": "active",
+   "features": {
+    "frequency": "frequent"
+   },
+   "evidence": [
+    {
+     "tier": "curated_db",
+     "source_type": "fixture",
+     "source_id": "fixture:43.1",
+     "url": null,
+     "quote": "Fixture evidence (supports) for has_phenotype; not a real source.",
+     "retrieved_at": "2026-10-03T00:00:00Z",
+     "polarity": "supports",
+     "claim_type": null
+    }
+   ]
+  },
+  {
+   "id": "e_d3a450dc59a6",
+   "source_id": "MONDO:9900006",
+   "target_id": "HP:0001250",
+   "relation": "has_phenotype",
+   "family": "symptoms",
+   "confidence": 0.9,
+   "origin": "observed",
+   "status": "active",
+   "features": {
+    "frequency": "frequent"
+   },
+   "evidence": [
+    {
+     "tier": "curated_db",
+     "source_type": "fixture",
+     "source_id": "fixture:44.1",
+     "url": null,
+     "quote": "Fixture evidence (supports) for has_phenotype; not a real source.",
+     "retrieved_at": "2026-10-03T00:00:00Z",
+     "polarity": "supports",
+     "claim_type": null
+    }
+   ]
+  },
+  {
+   "id": "e_73139536b382",
+   "source_id": "MONDO:9900006",
+   "target_id": "HP:0001263",
+   "relation": "has_phenotype",
+   "family": "symptoms",
+   "confidence": 0.9,
+   "origin": "observed",
+   "status": "active",
+   "features": {
+    "frequency": "frequent"
+   },
+   "evidence": [
+    {
+     "tier": "curated_db",
+     "source_type": "fixture",
+     "source_id": "fixture:45.1",
+     "url": null,
+     "quote": "Fixture evidence (supports) for has_phenotype; not a real source.",
+     "retrieved_at": "2026-10-03T00:00:00Z",
+     "polarity": "supports",
+     "claim_type": null
+    }
+   ]
+  },
+  {
+   "id": "e_ae186d9b8a46",
+   "source_id": "MONDO:9900006",
+   "target_id": "HP:0001252",
+   "relation": "has_phenotype",
+   "family": "symptoms",
+   "confidence": 0.9,
+   "origin": "observed",
+   "status": "active",
+   "features": {
+    "frequency": "frequent"
+   },
+   "evidence": [
+    {
+     "tier": "curated_db",
+     "source_type": "fixture",
+     "source_id": "fixture:46.1",
+     "url": null,
+     "quote": "Fixture evidence (supports) for has_phenotype; not a real source.",
+     "retrieved_at": "2026-10-03T00:00:00Z",
+     "polarity": "supports",
+     "claim_type": null
+    }
+   ]
+  },
+  {
+   "id": "e_3a85f516e6f7",
+   "source_id": "MONDO:9900006",
+   "target_id": "HP:0001249",
+   "relation": "has_phenotype",
+   "family": "symptoms",
+   "confidence": 0.7,
+   "origin": "observed",
+   "status": "active",
+   "features": {
+    "frequency": "occasional"
+   },
+   "evidence": [
+    {
+     "tier": "peer_reviewed",
+     "source_type": "fixture",
+     "source_id": "fixture:47.1",
+     "url": null,
+     "quote": "Fixture evidence (supports) for has_phenotype; not a real source.",
+     "retrieved_at": "2026-10-03T00:00:00Z",
+     "polarity": "supports",
+     "claim_type": "experimental"
+    }
+   ]
+  },
+  {
+   "id": "e_95b5e4747d36",
+   "source_id": "MONDO:9900006",
+   "target_id": "HP:0002133",
+   "relation": "has_phenotype",
+   "family": "symptoms",
+   "confidence": 0.7,
+   "origin": "observed",
+   "status": "active",
+   "features": {
+    "frequency": "occasional"
+   },
+   "evidence": [
+    {
+     "tier": "peer_reviewed",
+     "source_type": "fixture",
+     "source_id": "fixture:48.1",
+     "url": null,
+     "quote": "Fixture evidence (supports) for has_phenotype; not a real source.",
+     "retrieved_at": "2026-10-03T00:00:00Z",
+     "polarity": "supports",
+     "claim_type": "experimental"
+    }
+   ]
+  },
+  {
+   "id": "e_bbb03f09d0fa",
+   "source_id": "MONDO:9900007",
+   "target_id": "HP:0001250",
+   "relation": "has_phenotype",
+   "family": "symptoms",
+   "confidence": 0.9,
+   "origin": "observed",
+   "status": "active",
+   "features": {
+    "frequency": "frequent"
+   },
+   "evidence": [
+    {
+     "tier": "curated_db",
+     "source_type": "fixture",
+     "source_id": "fixture:49.1",
+     "url": null,
+     "quote": "Fixture evidence (supports) for has_phenotype; not a real source.",
+     "retrieved_at": "2026-10-03T00:00:00Z",
+     "polarity": "supports",
+     "claim_type": null
+    }
+   ]
+  },
+  {
+   "id": "e_212b5611fc6d",
+   "source_id": "MONDO:9900007",
+   "target_id": "HP:0001263",
+   "relation": "has_phenotype",
+   "family": "symptoms",
+   "confidence": 0.9,
+   "origin": "observed",
+   "status": "active",
+   "features": {
+    "frequency": "frequent"
+   },
+   "evidence": [
+    {
+     "tier": "curated_db",
+     "source_type": "fixture",
+     "source_id": "fixture:50.1",
+     "url": null,
+     "quote": "Fixture evidence (supports) for has_phenotype; not a real source.",
+     "retrieved_at": "2026-10-03T00:00:00Z",
+     "polarity": "supports",
+     "claim_type": null
+    }
+   ]
+  },
+  {
+   "id": "e_2102fff024d0",
+   "source_id": "MONDO:9900007",
+   "target_id": "HP:0001252",
+   "relation": "has_phenotype",
+   "family": "symptoms",
+   "confidence": 0.9,
+   "origin": "observed",
+   "status": "active",
+   "features": {
+    "frequency": "frequent"
+   },
+   "evidence": [
+    {
+     "tier": "curated_db",
+     "source_type": "fixture",
+     "source_id": "fixture:51.1",
+     "url": null,
+     "quote": "Fixture evidence (supports) for has_phenotype; not a real source.",
+     "retrieved_at": "2026-10-03T00:00:00Z",
+     "polarity": "supports",
+     "claim_type": null
+    }
+   ]
+  },
+  {
+   "id": "e_4f203b137e09",
+   "source_id": "MONDO:9900007",
+   "target_id": "HP:0001249",
+   "relation": "has_phenotype",
+   "family": "symptoms",
+   "confidence": 0.7,
+   "origin": "observed",
+   "status": "active",
+   "features": {
+    "frequency": "occasional"
+   },
+   "evidence": [
+    {
+     "tier": "peer_reviewed",
+     "source_type": "fixture",
+     "source_id": "fixture:52.1",
+     "url": null,
+     "quote": "Fixture evidence (supports) for has_phenotype; not a real source.",
+     "retrieved_at": "2026-10-03T00:00:00Z",
+     "polarity": "supports",
+     "claim_type": "experimental"
+    }
+   ]
+  },
+  {
+   "id": "e_fb35a61269a2",
+   "source_id": "MONDO:9900007",
+   "target_id": "HP:0012469",
+   "relation": "has_phenotype",
+   "family": "symptoms",
+   "confidence": 0.7,
+   "origin": "observed",
+   "status": "active",
+   "features": {
+    "frequency": "occasional"
+   },
+   "evidence": [
+    {
+     "tier": "peer_reviewed",
+     "source_type": "fixture",
+     "source_id": "fixture:53.1",
+     "url": null,
+     "quote": "Fixture evidence (supports) for has_phenotype; not a real source.",
+     "retrieved_at": "2026-10-03T00:00:00Z",
+     "polarity": "supports",
+     "claim_type": "experimental"
+    }
+   ]
+  },
+  {
+   "id": "e_73bd184c2a04",
+   "source_id": "MONDO:9900007",
+   "target_id": "HP:0011968",
+   "relation": "has_phenotype",
+   "family": "symptoms",
+   "confidence": 0.7,
+   "origin": "observed",
+   "status": "active",
+   "features": {
+    "frequency": "occasional"
+   },
+   "evidence": [
+    {
+     "tier": "peer_reviewed",
+     "source_type": "fixture",
+     "source_id": "fixture:54.1",
+     "url": null,
+     "quote": "Fixture evidence (supports) for has_phenotype; not a real source.",
+     "retrieved_at": "2026-10-03T00:00:00Z",
+     "polarity": "supports",
+     "claim_type": "experimental"
+    }
+   ]
+  },
+  {
+   "id": "e_ea50083fd0aa",
+   "source_id": "MONDO:9900007",
+   "target_id": "HP:0001251",
+   "relation": "has_phenotype",
+   "family": "symptoms",
+   "confidence": 0.7,
+   "origin": "observed",
+   "status": "active",
+   "features": {
+    "frequency": "occasional"
+   },
+   "evidence": [
+    {
+     "tier": "peer_reviewed",
+     "source_type": "fixture",
+     "source_id": "fixture:55.1",
+     "url": null,
+     "quote": "Fixture evidence (supports) for has_phenotype; not a real source.",
+     "retrieved_at": "2026-10-03T00:00:00Z",
+     "polarity": "supports",
+     "claim_type": "experimental"
+    }
+   ]
+  },
+  {
+   "id": "e_d3289fb48ca6",
+   "source_id": "MONDO:9900008",
+   "target_id": "HP:0001250",
+   "relation": "has_phenotype",
+   "family": "symptoms",
+   "confidence": 0.9,
+   "origin": "observed",
+   "status": "active",
+   "features": {
+    "frequency": "frequent"
+   },
+   "evidence": [
+    {
+     "tier": "curated_db",
+     "source_type": "fixture",
+     "source_id": "fixture:56.1",
+     "url": null,
+     "quote": "Fixture evidence (supports) for has_phenotype; not a real source.",
+     "retrieved_at": "2026-10-03T00:00:00Z",
+     "polarity": "supports",
+     "claim_type": null
+    }
+   ]
+  },
+  {
+   "id": "e_82f20a46f63b",
+   "source_id": "MONDO:9900008",
+   "target_id": "HP:0001263",
+   "relation": "has_phenotype",
+   "family": "symptoms",
+   "confidence": 0.9,
+   "origin": "observed",
+   "status": "active",
+   "features": {
+    "frequency": "frequent"
+   },
+   "evidence": [
+    {
+     "tier": "curated_db",
+     "source_type": "fixture",
+     "source_id": "fixture:57.1",
+     "url": null,
+     "quote": "Fixture evidence (supports) for has_phenotype; not a real source.",
+     "retrieved_at": "2026-10-03T00:00:00Z",
+     "polarity": "supports",
+     "claim_type": null
+    }
+   ]
+  },
+  {
+   "id": "e_fb598a83db64",
+   "source_id": "MONDO:9900008",
+   "target_id": "HP:0001252",
+   "relation": "has_phenotype",
+   "family": "symptoms",
+   "confidence": 0.9,
+   "origin": "observed",
+   "status": "active",
+   "features": {
+    "frequency": "frequent"
+   },
+   "evidence": [
+    {
+     "tier": "curated_db",
+     "source_type": "fixture",
+     "source_id": "fixture:58.1",
+     "url": null,
+     "quote": "Fixture evidence (supports) for has_phenotype; not a real source.",
+     "retrieved_at": "2026-10-03T00:00:00Z",
+     "polarity": "supports",
+     "claim_type": null
+    }
+   ]
+  },
+  {
+   "id": "e_4fad26e79f85",
+   "source_id": "MONDO:9900008",
+   "target_id": "HP:0012469",
+   "relation": "has_phenotype",
+   "family": "symptoms",
+   "confidence": 0.7,
+   "origin": "observed",
+   "status": "active",
+   "features": {
+    "frequency": "occasional"
+   },
+   "evidence": [
+    {
+     "tier": "peer_reviewed",
+     "source_type": "fixture",
+     "source_id": "fixture:59.1",
+     "url": null,
+     "quote": "Fixture evidence (supports) for has_phenotype; not a real source.",
+     "retrieved_at": "2026-10-03T00:00:00Z",
+     "polarity": "supports",
+     "claim_type": "experimental"
+    }
+   ]
+  },
+  {
+   "id": "e_216d58d49905",
+   "source_id": "MONDO:9900009",
+   "target_id": "HP:0001250",
+   "relation": "has_phenotype",
+   "family": "symptoms",
+   "confidence": 0.9,
+   "origin": "observed",
+   "status": "active",
+   "features": {
+    "frequency": "frequent"
+   },
+   "evidence": [
+    {
+     "tier": "curated_db",
+     "source_type": "fixture",
+     "source_id": "fixture:60.1",
+     "url": null,
+     "quote": "Fixture evidence (supports) for has_phenotype; not a real source.",
+     "retrieved_at": "2026-10-03T00:00:00Z",
+     "polarity": "supports",
+     "claim_type": null
+    }
+   ]
+  },
+  {
+   "id": "e_9a6ff6e0e247",
+   "source_id": "MONDO:9900005",
+   "target_id": "HP:0001250",
+   "relation": "has_phenotype",
+   "family": "symptoms",
+   "confidence": 0.87,
+   "origin": "observed",
+   "status": "active",
+   "features": {
+    "frequency": "occasional",
+    "note": "later onset, not universal"
+   },
+   "evidence": [
+    {
+     "tier": "peer_reviewed",
+     "source_type": "fixture",
+     "source_id": "fixture:61.1",
+     "url": null,
+     "quote": "Fixture evidence (supports) for has_phenotype; not a real source.",
+     "retrieved_at": "2026-10-03T00:00:00Z",
+     "polarity": "supports",
+     "claim_type": "experimental"
+    },
+    {
+     "tier": "curated_db",
+     "source_type": "fixture",
+     "source_id": "fixture:61.2",
+     "url": null,
+     "quote": "Fixture evidence (supports) for has_phenotype; not a real source.",
+     "retrieved_at": "2026-10-03T00:00:00Z",
+     "polarity": "supports",
+     "claim_type": null
+    },
+    {
+     "tier": "review",
+     "source_type": "fixture",
+     "source_id": "fixture:61.3",
+     "url": null,
+     "quote": "Fixture evidence (contradicts) for has_phenotype; not a real source.",
+     "retrieved_at": "2026-10-03T00:00:00Z",
+     "polarity": "contradicts",
+     "claim_type": "review"
+    }
+   ]
+  },
+  {
+   "id": "e_67eecf2b6aac",
+   "source_id": "CLINVAR:FX0001",
+   "target_id": "HGNC:10585",
+   "relation": "variant_of",
+   "family": "dna",
+   "confidence": 0.9,
+   "origin": "observed",
+   "status": "active",
+   "features": null,
+   "evidence": [
+    {
+     "tier": "curated_db",
+     "source_type": "fixture",
+     "source_id": "fixture:62.1",
+     "url": null,
+     "quote": "Fixture evidence (supports) for variant_of; not a real source.",
+     "retrieved_at": "2026-10-03T00:00:00Z",
+     "polarity": "supports",
+     "claim_type": null
+    }
+   ]
+  },
+  {
+   "id": "e_5f164b618df5",
+   "source_id": "CLINVAR:FX0001",
+   "target_id": "MONDO:0100135",
+   "relation": "observed_in",
+   "family": "dna",
+   "confidence": 0.9,
+   "origin": "observed",
+   "status": "active",
+   "features": null,
+   "evidence": [
+    {
+     "tier": "curated_db",
+     "source_type": "fixture",
+     "source_id": "fixture:63.1",
+     "url": null,
+     "quote": "Fixture evidence (supports) for observed_in; not a real source.",
+     "retrieved_at": "2026-10-03T00:00:00Z",
+     "polarity": "supports",
+     "claim_type": null
+    }
+   ]
+  },
+  {
+   "id": "e_c459836183c8",
+   "source_id": "CLINVAR:FX0002",
+   "target_id": "HGNC:10588",
+   "relation": "variant_of",
+   "family": "dna",
+   "confidence": 0.9,
+   "origin": "observed",
+   "status": "active",
+   "features": null,
+   "evidence": [
+    {
+     "tier": "curated_db",
+     "source_type": "fixture",
+     "source_id": "fixture:64.1",
+     "url": null,
+     "quote": "Fixture evidence (supports) for variant_of; not a real source.",
+     "retrieved_at": "2026-10-03T00:00:00Z",
+     "polarity": "supports",
+     "claim_type": null
+    }
+   ]
+  },
+  {
+   "id": "e_c3e58f5595cb",
+   "source_id": "CLINVAR:FX0002",
+   "target_id": "MONDO:9900003",
+   "relation": "observed_in",
+   "family": "dna",
+   "confidence": 0.9,
+   "origin": "observed",
+   "status": "active",
+   "features": null,
+   "evidence": [
+    {
+     "tier": "curated_db",
+     "source_type": "fixture",
+     "source_id": "fixture:65.1",
+     "url": null,
+     "quote": "Fixture evidence (supports) for observed_in; not a real source.",
+     "retrieved_at": "2026-10-03T00:00:00Z",
+     "polarity": "supports",
+     "claim_type": null
+    }
+   ]
+  },
+  {
+   "id": "e_24da6ee5497b",
+   "source_id": "CLINVAR:FX0003",
+   "target_id": "HGNC:10588",
+   "relation": "variant_of",
+   "family": "dna",
+   "confidence": 0.9,
+   "origin": "observed",
+   "status": "active",
+   "features": null,
+   "evidence": [
+    {
+     "tier": "curated_db",
+     "source_type": "fixture",
+     "source_id": "fixture:66.1",
+     "url": null,
+     "quote": "Fixture evidence (supports) for variant_of; not a real source.",
+     "retrieved_at": "2026-10-03T00:00:00Z",
+     "polarity": "supports",
+     "claim_type": null
+    }
+   ]
+  },
+  {
+   "id": "e_b6cf84390234",
+   "source_id": "CLINVAR:FX0003",
+   "target_id": "MONDO:9900005",
+   "relation": "observed_in",
+   "family": "dna",
+   "confidence": 0.9,
+   "origin": "observed",
+   "status": "active",
+   "features": null,
+   "evidence": [
+    {
+     "tier": "curated_db",
+     "source_type": "fixture",
+     "source_id": "fixture:67.1",
+     "url": null,
+     "quote": "Fixture evidence (supports) for observed_in; not a real source.",
+     "retrieved_at": "2026-10-03T00:00:00Z",
+     "polarity": "supports",
+     "claim_type": null
+    }
+   ]
+  },
+  {
+   "id": "e_3e5174a67b88",
+   "source_id": "CLINVAR:FX0004",
+   "target_id": "HGNC:11444",
+   "relation": "variant_of",
+   "family": "dna",
+   "confidence": 0.9,
+   "origin": "observed",
+   "status": "active",
+   "features": null,
+   "evidence": [
+    {
+     "tier": "curated_db",
+     "source_type": "fixture",
+     "source_id": "fixture:68.1",
+     "url": null,
+     "quote": "Fixture evidence (supports) for variant_of; not a real source.",
+     "retrieved_at": "2026-10-03T00:00:00Z",
+     "polarity": "supports",
+     "claim_type": null
+    }
+   ]
+  },
+  {
+   "id": "e_da10eda72ba1",
+   "source_id": "CLINVAR:FX0004",
+   "target_id": "MONDO:9900007",
+   "relation": "observed_in",
+   "family": "dna",
+   "confidence": 0.9,
+   "origin": "observed",
+   "status": "active",
+   "features": null,
+   "evidence": [
+    {
+     "tier": "curated_db",
+     "source_type": "fixture",
+     "source_id": "fixture:69.1",
+     "url": null,
+     "quote": "Fixture evidence (supports) for observed_in; not a real source.",
+     "retrieved_at": "2026-10-03T00:00:00Z",
+     "polarity": "supports",
+     "claim_type": null
+    }
+   ]
+  },
+  {
+   "id": "e_af0faeb288f0",
+   "source_id": "CLINVAR:FX0005",
+   "target_id": "HGNC:6296",
+   "relation": "variant_of",
+   "family": "dna",
+   "confidence": 0.9,
+   "origin": "observed",
+   "status": "active",
+   "features": null,
+   "evidence": [
+    {
+     "tier": "curated_db",
+     "source_type": "fixture",
+     "source_id": "fixture:70.1",
+     "url": null,
+     "quote": "Fixture evidence (supports) for variant_of; not a real source.",
+     "retrieved_at": "2026-10-03T00:00:00Z",
+     "polarity": "supports",
+     "claim_type": null
+    }
+   ]
+  },
+  {
+   "id": "e_003925329288",
+   "source_id": "CLINVAR:FX0005",
+   "target_id": "MONDO:9900008",
+   "relation": "observed_in",
+   "family": "dna",
+   "confidence": 0.9,
+   "origin": "observed",
+   "status": "active",
+   "features": null,
+   "evidence": [
+    {
+     "tier": "curated_db",
+     "source_type": "fixture",
+     "source_id": "fixture:71.1",
+     "url": null,
+     "quote": "Fixture evidence (supports) for observed_in; not a real source.",
+     "retrieved_at": "2026-10-03T00:00:00Z",
+     "polarity": "supports",
+     "claim_type": null
+    }
+   ]
+  },
+  {
+   "id": "e_84345280e95d",
+   "source_id": "MONDO:0100135",
+   "target_id": "MONDO:9900001",
+   "relation": "same_gene_same_mechanism",
+   "family": "dna",
+   "confidence": 0.79,
+   "origin": "inferred",
+   "status": "active",
+   "features": {
+    "gene": "HGNC:10585",
+    "mechanism": "MECH:loss_of_function",
+    "truncating_share": 0.62
+   },
+   "evidence": [
+    {
+     "tier": "llm_inferred",
+     "source_type": "fixture",
+     "source_id": "fixture:72.1",
+     "url": null,
+     "quote": "Fixture evidence (supports) for same_gene_same_mechanism; not a real source.",
+     "retrieved_at": "2026-10-03T00:00:00Z",
+     "polarity": "supports",
+     "claim_type": null
+    },
+    {
+     "tier": "peer_reviewed",
+     "source_type": "fixture",
+     "source_id": "fixture:72.2",
+     "url": null,
+     "quote": "Fixture evidence (supports) for same_gene_same_mechanism; not a real source.",
+     "retrieved_at": "2026-10-03T00:00:00Z",
+     "polarity": "supports",
+     "claim_type": "experimental"
+    }
+   ]
+  },
+  {
+   "id": "e_8942efd76191",
+   "source_id": "MONDO:9900003",
+   "target_id": "MONDO:9900004",
+   "relation": "same_gene_same_mechanism",
+   "family": "dna",
+   "confidence": 0.79,
+   "origin": "inferred",
+   "status": "active",
+   "features": {
+    "gene": "HGNC:10588",
+    "mechanism": "MECH:gain_of_function",
+    "missense_share": 0.9
+   },
+   "evidence": [
+    {
+     "tier": "llm_inferred",
+     "source_type": "fixture",
+     "source_id": "fixture:73.1",
+     "url": null,
+     "quote": "Fixture evidence (supports) for same_gene_same_mechanism; not a real source.",
+     "retrieved_at": "2026-10-03T00:00:00Z",
+     "polarity": "supports",
+     "claim_type": null
+    },
+    {
+     "tier": "peer_reviewed",
+     "source_type": "fixture",
+     "source_id": "fixture:73.2",
+     "url": null,
+     "quote": "Fixture evidence (supports) for same_gene_same_mechanism; not a real source.",
+     "retrieved_at": "2026-10-03T00:00:00Z",
+     "polarity": "supports",
+     "claim_type": "experimental"
+    }
+   ]
+  },
+  {
+   "id": "e_2c4dbc663a2a",
+   "source_id": "MONDO:9900003",
+   "target_id": "MONDO:9900005",
+   "relation": "same_gene_different_mechanism",
+   "family": "dna",
+   "confidence": 0.85,
+   "origin": "inferred",
+   "status": "active",
+   "features": {
+    "gene": "HGNC:10588",
+    "mechanisms": [
+     "MECH:gain_of_function",
+     "MECH:loss_of_function"
+    ]
+   },
+   "evidence": [
+    {
+     "tier": "peer_reviewed",
+     "source_type": "fixture",
+     "source_id": "fixture:74.1",
+     "url": null,
+     "quote": "Fixture evidence (supports) for same_gene_different_mechanism; not a real source.",
+     "retrieved_at": "2026-10-03T00:00:00Z",
+     "polarity": "supports",
+     "claim_type": "experimental"
+    },
+    {
+     "tier": "review",
+     "source_type": "fixture",
+     "source_id": "fixture:74.2",
+     "url": null,
+     "quote": "Fixture evidence (supports) for same_gene_different_mechanism; not a real source.",
+     "retrieved_at": "2026-10-03T00:00:00Z",
+     "polarity": "supports",
+     "claim_type": "review"
+    }
+   ]
+  },
+  {
+   "id": "e_53d16698b2ae",
+   "source_id": "MONDO:0100135",
+   "target_id": "MONDO:9900002",
+   "relation": "same_gene_different_mechanism",
+   "family": "dna",
+   "confidence": 0.85,
+   "origin": "inferred",
+   "status": "active",
+   "features": {
+    "gene": "HGNC:10585",
+    "mechanisms": [
+     "MECH:loss_of_function",
+     "MECH:gain_of_function"
+    ]
+   },
+   "evidence": [
+    {
+     "tier": "peer_reviewed",
+     "source_type": "fixture",
+     "source_id": "fixture:75.1",
+     "url": null,
+     "quote": "Fixture evidence (supports) for same_gene_different_mechanism; not a real source.",
+     "retrieved_at": "2026-10-03T00:00:00Z",
+     "polarity": "supports",
+     "claim_type": "experimental"
+    },
+    {
+     "tier": "review",
+     "source_type": "fixture",
+     "source_id": "fixture:75.2",
+     "url": null,
+     "quote": "Fixture evidence (supports) for same_gene_different_mechanism; not a real source.",
+     "retrieved_at": "2026-10-03T00:00:00Z",
+     "polarity": "supports",
+     "claim_type": "review"
+    }
+   ]
+  },
+  {
+   "id": "e_90e34a93428f",
+   "source_id": "MONDO:9900008",
+   "target_id": "MONDO:9900009",
+   "relation": "same_gene_different_mechanism",
+   "family": "dna",
+   "confidence": 0.7,
+   "origin": "inferred",
+   "status": "active",
+   "features": {
+    "gene": "HGNC:6296",
+    "mechanisms": [
+     "MECH:dominant_negative",
+     "MECH:loss_of_function"
+    ]
+   },
+   "evidence": [
+    {
+     "tier": "peer_reviewed",
+     "source_type": "fixture",
+     "source_id": "fixture:76.1",
+     "url": null,
+     "quote": "Fixture evidence (supports) for same_gene_different_mechanism; not a real source.",
+     "retrieved_at": "2026-10-03T00:00:00Z",
+     "polarity": "supports",
+     "claim_type": "experimental"
+    }
+   ]
+  },
+  {
+   "id": "e_9ab6f1779039",
+   "source_id": "MONDO:9900003",
+   "target_id": "MONDO:9900006",
+   "relation": "shared_pathway",
+   "family": "dna",
+   "confidence": 0.9,
+   "origin": "inferred",
+   "status": "active",
+   "features": {
+    "pathways": [
+     "GO:0005248"
+    ],
+    "mechanism": "MECH:gain_of_function"
+   },
+   "evidence": [
+    {
+     "tier": "curated_db",
+     "source_type": "fixture",
+     "source_id": "fixture:77.1",
+     "url": null,
+     "quote": "Fixture evidence (supports) for shared_pathway; not a real source.",
+     "retrieved_at": "2026-10-03T00:00:00Z",
+     "polarity": "supports",
+     "claim_type": null
+    }
+   ]
+  },
+  {
+   "id": "e_23bbe17b5e84",
+   "source_id": "MONDO:0100135",
+   "target_id": "MONDO:9900005",
+   "relation": "shared_pathway",
+   "family": "dna",
+   "confidence": 0.55,
+   "origin": "inferred",
+   "status": "active",
+   "features": {
+    "pathways": [
+     "GO:0005248"
+    ],
+    "note": "contested"
+   },
+   "evidence": [
+    {
+     "tier": "llm_inferred",
+     "source_type": "fixture",
+     "source_id": "fixture:78.1",
+     "url": null,
+     "quote": "Fixture evidence (supports) for shared_pathway; not a real source.",
+     "retrieved_at": "2026-10-03T00:00:00Z",
+     "polarity": "supports",
+     "claim_type": null
+    },
+    {
+     "tier": "review",
+     "source_type": "fixture",
+     "source_id": "fixture:78.2",
+     "url": null,
+     "quote": "Fixture evidence (supports) for shared_pathway; not a real source.",
+     "retrieved_at": "2026-10-03T00:00:00Z",
+     "polarity": "supports",
+     "claim_type": "review"
+    },
+    {
+     "tier": "peer_reviewed",
+     "source_type": "fixture",
+     "source_id": "fixture:78.3",
+     "url": null,
+     "quote": "Fixture evidence (contradicts) for shared_pathway; not a real source.",
+     "retrieved_at": "2026-10-03T00:00:00Z",
+     "polarity": "contradicts",
+     "claim_type": "experimental"
+    }
+   ]
+  },
+  {
+   "id": "e_275854103db5",
+   "source_id": "MONDO:9900007",
+   "target_id": "MONDO:9900010",
+   "relation": "shared_pathway",
+   "family": "dna",
+   "confidence": 0.3,
+   "origin": "inferred",
+   "status": "active",
+   "features": {
+    "pathways": [
+     "GO:0016079"
+    ],
+    "note": "hypothesis, unsupported"
+   },
+   "evidence": [
+    {
+     "tier": "llm_inferred",
+     "source_type": "fixture",
+     "source_id": "fixture:79.1",
+     "url": null,
+     "quote": "Fixture evidence (supports) for shared_pathway; not a real source.",
+     "retrieved_at": "2026-10-03T00:00:00Z",
+     "polarity": "supports",
+     "claim_type": null
+    }
+   ]
+  },
+  {
+   "id": "e_3b8845b635b8",
+   "source_id": "MONDO:9900003",
+   "target_id": "MONDO:9900007",
+   "relation": "similar_symptoms",
+   "family": "symptoms",
+   "confidence": 0.9,
+   "origin": "inferred",
+   "status": "active",
+   "features": {
+    "shared_hpo": [
+     "HP:0001250",
+     "HP:0001263",
+     "HP:0001252",
+     "HP:0012469",
+     "HP:0011968"
+    ],
+    "bma_similarity": 0.74,
+    "label": "similar experience, possibly different cause"
+   },
+   "evidence": [
+    {
+     "tier": "curated_db",
+     "source_type": "fixture",
+     "source_id": "fixture:80.1",
+     "url": null,
+     "quote": "Fixture evidence (supports) for similar_symptoms; not a real source.",
+     "retrieved_at": "2026-10-03T00:00:00Z",
+     "polarity": "supports",
+     "claim_type": null
+    }
+   ]
+  },
+  {
+   "id": "e_327242aeac1d",
+   "source_id": "MONDO:9900007",
+   "target_id": "MONDO:9900008",
+   "relation": "similar_symptoms",
+   "family": "symptoms",
+   "confidence": 0.7,
+   "origin": "inferred",
+   "status": "active",
+   "features": {
+    "shared_hpo": [
+     "HP:0001250",
+     "HP:0001263",
+     "HP:0001252",
+     "HP:0012469"
+    ],
+    "bma_similarity": 0.69
+   },
+   "evidence": [
+    {
+     "tier": "peer_reviewed",
+     "source_type": "fixture",
+     "source_id": "fixture:81.1",
+     "url": null,
+     "quote": "Fixture evidence (supports) for similar_symptoms; not a real source.",
+     "retrieved_at": "2026-10-03T00:00:00Z",
+     "polarity": "supports",
+     "claim_type": "experimental"
+    }
+   ]
+  },
+  {
+   "id": "e_b1a0a4ab33a2",
+   "source_id": "MONDO:0100135",
+   "target_id": "MONDO:9900006",
+   "relation": "similar_symptoms",
+   "family": "symptoms",
+   "confidence": 0.5,
+   "origin": "inferred",
+   "status": "active",
+   "features": {
+    "shared_hpo": [
+     "HP:0001250",
+     "HP:0002133",
+     "HP:0001249"
+    ],
+    "bma_similarity": 0.55
+   },
+   "evidence": [
+    {
+     "tier": "review",
+     "source_type": "fixture",
+     "source_id": "fixture:82.1",
+     "url": null,
+     "quote": "Fixture evidence (supports) for similar_symptoms; not a real source.",
+     "retrieved_at": "2026-10-03T00:00:00Z",
+     "polarity": "supports",
+     "claim_type": "review"
+    }
+   ]
+  },
+  {
+   "id": "e_8a65297ef0be",
+   "source_id": "MONDO:9900005",
+   "target_id": "MONDO:9900007",
+   "relation": "similar_symptoms",
+   "family": "symptoms",
+   "confidence": 0.7,
+   "origin": "inferred",
+   "status": "active",
+   "features": {
+    "shared_hpo": [
+     "HP:0001249",
+     "HP:0001263"
+    ],
+    "bma_similarity": 0.61
+   },
+   "evidence": [
+    {
+     "tier": "peer_reviewed",
+     "source_type": "fixture",
+     "source_id": "fixture:83.1",
+     "url": null,
+     "quote": "Fixture evidence (supports) for similar_symptoms; not a real source.",
+     "retrieved_at": "2026-10-03T00:00:00Z",
+     "polarity": "supports",
+     "claim_type": "experimental"
+    }
+   ]
+  },
+  {
+   "id": "e_e9b6a37fd8f0",
+   "source_id": "MONDO:9900003",
+   "target_id": "MONDO:9900008",
+   "relation": "similar_symptoms",
+   "family": "symptoms",
+   "confidence": 0.2,
+   "origin": "user_contributed",
+   "status": "pending_review",
+   "features": {
+    "shared_hpo": [
+     "HP:0001250",
+     "HP:0012469"
+    ]
+   },
+   "evidence": [
+    {
+     "tier": "patient_reported",
+     "source_type": "fixture",
+     "source_id": "fixture:84.1",
+     "url": null,
+     "quote": "Fixture evidence (supports) for similar_symptoms; not a real source.",
+     "retrieved_at": "2026-10-03T00:00:00Z",
+     "polarity": "supports",
+     "claim_type": null
+    }
+   ]
+  },
+  {
+   "id": "e_09082f5dd5ee",
+   "source_id": "MONDO:0100135",
+   "target_id": "MONDO:9900003",
+   "relation": "shared_researcher",
+   "family": "research",
+   "confidence": 0.9,
+   "origin": "inferred",
+   "status": "active",
+   "features": {
+    "shared_people": [
+     "RES:fx-alpha"
+    ]
+   },
+   "evidence": [
+    {
+     "tier": "curated_db",
+     "source_type": "fixture",
+     "source_id": "fixture:85.1",
+     "url": null,
+     "quote": "Fixture evidence (supports) for shared_researcher; not a real source.",
+     "retrieved_at": "2026-10-03T00:00:00Z",
+     "polarity": "supports",
+     "claim_type": null
+    }
+   ]
+  },
+  {
+   "id": "e_7491e499de92",
+   "source_id": "MONDO:9900003",
+   "target_id": "MONDO:9900007",
+   "relation": "shared_researcher",
+   "family": "research",
+   "confidence": 0.9,
+   "origin": "inferred",
+   "status": "active",
+   "features": {
+    "shared_people": [
+     "RES:fx-beta"
+    ]
+   },
+   "evidence": [
+    {
+     "tier": "curated_db",
+     "source_type": "fixture",
+     "source_id": "fixture:86.1",
+     "url": null,
+     "quote": "Fixture evidence (supports) for shared_researcher; not a real source.",
+     "retrieved_at": "2026-10-03T00:00:00Z",
+     "polarity": "supports",
+     "claim_type": null
+    }
+   ]
+  },
+  {
+   "id": "e_a5cda1836499",
+   "source_id": "PMID:FX0001",
+   "target_id": "CLAIM:fx0001",
+   "relation": "asserts",
+   "family": "research",
+   "confidence": 0.7,
+   "origin": "observed",
+   "status": "active",
+   "features": null,
+   "evidence": [
+    {
+     "tier": "peer_reviewed",
+     "source_type": "fixture",
+     "source_id": "fixture:87.1",
+     "url": null,
+     "quote": "Fixture evidence (supports) for asserts; not a real source.",
+     "retrieved_at": "2026-10-03T00:00:00Z",
+     "polarity": "supports",
+     "claim_type": "experimental"
+    }
+   ]
+  },
+  {
+   "id": "e_ca9285143886",
+   "source_id": "PMID:FX0002",
+   "target_id": "CLAIM:fx0002",
+   "relation": "asserts",
+   "family": "research",
+   "confidence": 0.7,
+   "origin": "observed",
+   "status": "active",
+   "features": null,
+   "evidence": [
+    {
+     "tier": "peer_reviewed",
+     "source_type": "fixture",
+     "source_id": "fixture:88.1",
+     "url": null,
+     "quote": "Fixture evidence (supports) for asserts; not a real source.",
+     "retrieved_at": "2026-10-03T00:00:00Z",
+     "polarity": "supports",
+     "claim_type": "experimental"
+    }
+   ]
+  },
+  {
+   "id": "e_05d1b8ad5fd0",
+   "source_id": "PMID:FX0004",
+   "target_id": "CLAIM:fx0003",
+   "relation": "asserts",
+   "family": "research",
+   "confidence": 0.7,
+   "origin": "observed",
+   "status": "active",
+   "features": null,
+   "evidence": [
+    {
+     "tier": "peer_reviewed",
+     "source_type": "fixture",
+     "source_id": "fixture:89.1",
+     "url": null,
+     "quote": "Fixture evidence (supports) for asserts; not a real source.",
+     "retrieved_at": "2026-10-03T00:00:00Z",
+     "polarity": "supports",
+     "claim_type": "experimental"
+    }
+   ]
+  },
+  {
+   "id": "e_cb4732c592dd",
+   "source_id": "RES:fx-alpha",
+   "target_id": "PMID:FX0001",
+   "relation": "authored",
+   "family": "research",
+   "confidence": 0.9,
+   "origin": "observed",
+   "status": "active",
+   "features": null,
+   "evidence": [
+    {
+     "tier": "curated_db",
+     "source_type": "fixture",
+     "source_id": "fixture:90.1",
+     "url": null,
+     "quote": "Fixture evidence (supports) for authored; not a real source.",
+     "retrieved_at": "2026-10-03T00:00:00Z",
+     "polarity": "supports",
+     "claim_type": null
+    }
+   ]
+  },
+  {
+   "id": "e_2e2f0405725d",
+   "source_id": "RES:fx-alpha",
+   "target_id": "PMID:FX0003",
+   "relation": "authored",
+   "family": "research",
+   "confidence": 0.9,
+   "origin": "observed",
+   "status": "active",
+   "features": null,
+   "evidence": [
+    {
+     "tier": "curated_db",
+     "source_type": "fixture",
+     "source_id": "fixture:91.1",
+     "url": null,
+     "quote": "Fixture evidence (supports) for authored; not a real source.",
+     "retrieved_at": "2026-10-03T00:00:00Z",
+     "polarity": "supports",
+     "claim_type": null
+    }
+   ]
+  },
+  {
+   "id": "e_768e905ddd7a",
+   "source_id": "RES:fx-beta",
+   "target_id": "PMID:FX0001",
+   "relation": "authored",
+   "family": "research",
+   "confidence": 0.9,
+   "origin": "observed",
+   "status": "active",
+   "features": null,
+   "evidence": [
+    {
+     "tier": "curated_db",
+     "source_type": "fixture",
+     "source_id": "fixture:92.1",
+     "url": null,
+     "quote": "Fixture evidence (supports) for authored; not a real source.",
+     "retrieved_at": "2026-10-03T00:00:00Z",
+     "polarity": "supports",
+     "claim_type": null
+    }
+   ]
+  },
+  {
+   "id": "e_a7d06a700216",
+   "source_id": "RES:fx-beta",
+   "target_id": "PMID:FX0002",
+   "relation": "authored",
+   "family": "research",
+   "confidence": 0.9,
+   "origin": "observed",
+   "status": "active",
+   "features": null,
+   "evidence": [
+    {
+     "tier": "curated_db",
+     "source_type": "fixture",
+     "source_id": "fixture:93.1",
+     "url": null,
+     "quote": "Fixture evidence (supports) for authored; not a real source.",
+     "retrieved_at": "2026-10-03T00:00:00Z",
+     "polarity": "supports",
+     "claim_type": null
+    }
+   ]
+  },
+  {
+   "id": "e_cabf2236ded9",
+   "source_id": "RES:fx-gamma",
+   "target_id": "PMID:FX0003",
+   "relation": "authored",
+   "family": "research",
+   "confidence": 0.9,
+   "origin": "observed",
+   "status": "active",
+   "features": null,
+   "evidence": [
+    {
+     "tier": "curated_db",
+     "source_type": "fixture",
+     "source_id": "fixture:94.1",
+     "url": null,
+     "quote": "Fixture evidence (supports) for authored; not a real source.",
+     "retrieved_at": "2026-10-03T00:00:00Z",
+     "polarity": "supports",
+     "claim_type": null
+    }
+   ]
+  },
+  {
+   "id": "e_e2e8d78c5cbc",
+   "source_id": "RES:fx-delta",
+   "target_id": "PMID:FX0004",
+   "relation": "authored",
+   "family": "research",
+   "confidence": 0.9,
+   "origin": "observed",
+   "status": "active",
+   "features": null,
+   "evidence": [
+    {
+     "tier": "curated_db",
+     "source_type": "fixture",
+     "source_id": "fixture:95.1",
+     "url": null,
+     "quote": "Fixture evidence (supports) for authored; not a real source.",
+     "retrieved_at": "2026-10-03T00:00:00Z",
+     "polarity": "supports",
+     "claim_type": null
+    }
+   ]
+  },
+  {
+   "id": "e_566d67a02744",
+   "source_id": "PMID:FX0001",
+   "target_id": "MONDO:9900003",
+   "relation": "about",
+   "family": "research",
+   "confidence": 0.9,
+   "origin": "observed",
+   "status": "active",
+   "features": null,
+   "evidence": [
+    {
+     "tier": "curated_db",
+     "source_type": "fixture",
+     "source_id": "fixture:96.1",
+     "url": null,
+     "quote": "Fixture evidence (supports) for about; not a real source.",
+     "retrieved_at": "2026-10-03T00:00:00Z",
+     "polarity": "supports",
+     "claim_type": null
+    }
+   ]
+  },
+  {
+   "id": "e_881db48d4143",
+   "source_id": "PMID:FX0001",
+   "target_id": "MONDO:9900005",
+   "relation": "about",
+   "family": "research",
+   "confidence": 0.9,
+   "origin": "observed",
+   "status": "active",
+   "features": null,
+   "evidence": [
+    {
+     "tier": "curated_db",
+     "source_type": "fixture",
+     "source_id": "fixture:97.1",
+     "url": null,
+     "quote": "Fixture evidence (supports) for about; not a real source.",
+     "retrieved_at": "2026-10-03T00:00:00Z",
+     "polarity": "supports",
+     "claim_type": null
+    }
+   ]
+  },
+  {
+   "id": "e_49c3bbac8dbb",
+   "source_id": "PMID:FX0002",
+   "target_id": "MONDO:9900007",
+   "relation": "about",
+   "family": "research",
+   "confidence": 0.9,
+   "origin": "observed",
+   "status": "active",
+   "features": null,
+   "evidence": [
+    {
+     "tier": "curated_db",
+     "source_type": "fixture",
+     "source_id": "fixture:98.1",
+     "url": null,
+     "quote": "Fixture evidence (supports) for about; not a real source.",
+     "retrieved_at": "2026-10-03T00:00:00Z",
+     "polarity": "supports",
+     "claim_type": null
+    }
+   ]
+  },
+  {
+   "id": "e_509f0384f42f",
+   "source_id": "PMID:FX0002",
+   "target_id": "GO:0016079",
+   "relation": "about",
+   "family": "research",
+   "confidence": 0.9,
+   "origin": "observed",
+   "status": "active",
+   "features": null,
+   "evidence": [
+    {
+     "tier": "curated_db",
+     "source_type": "fixture",
+     "source_id": "fixture:99.1",
+     "url": null,
+     "quote": "Fixture evidence (supports) for about; not a real source.",
+     "retrieved_at": "2026-10-03T00:00:00Z",
+     "polarity": "supports",
+     "claim_type": null
+    }
+   ]
+  },
+  {
+   "id": "e_621ba90a4a5c",
+   "source_id": "PMID:FX0003",
+   "target_id": "MONDO:0100135",
+   "relation": "about",
+   "family": "research",
+   "confidence": 0.9,
+   "origin": "observed",
+   "status": "active",
+   "features": null,
+   "evidence": [
+    {
+     "tier": "curated_db",
+     "source_type": "fixture",
+     "source_id": "fixture:100.1",
+     "url": null,
+     "quote": "Fixture evidence (supports) for about; not a real source.",
+     "retrieved_at": "2026-10-03T00:00:00Z",
+     "polarity": "supports",
+     "claim_type": null
+    }
+   ]
+  },
+  {
+   "id": "e_5ad7d5cf330c",
+   "source_id": "PMID:FX0004",
+   "target_id": "MONDO:9900008",
+   "relation": "about",
+   "family": "research",
+   "confidence": 0.9,
+   "origin": "observed",
+   "status": "active",
+   "features": null,
+   "evidence": [
+    {
+     "tier": "curated_db",
+     "source_type": "fixture",
+     "source_id": "fixture:101.1",
+     "url": null,
+     "quote": "Fixture evidence (supports) for about; not a real source.",
+     "retrieved_at": "2026-10-03T00:00:00Z",
+     "polarity": "supports",
+     "claim_type": null
+    }
+   ]
+  },
+  {
+   "id": "e_158a04bd7579",
+   "source_id": "CLAIM:fx0001",
+   "target_id": "HGNC:10588",
+   "relation": "about",
+   "family": "research",
+   "confidence": 0.9,
+   "origin": "observed",
+   "status": "active",
+   "features": null,
+   "evidence": [
+    {
+     "tier": "curated_db",
+     "source_type": "fixture",
+     "source_id": "fixture:102.1",
+     "url": null,
+     "quote": "Fixture evidence (supports) for about; not a real source.",
+     "retrieved_at": "2026-10-03T00:00:00Z",
+     "polarity": "supports",
+     "claim_type": null
+    }
+   ]
+  },
+  {
+   "id": "e_3b8e7b649f6f",
+   "source_id": "CLAIM:fx0002",
+   "target_id": "HGNC:11444",
+   "relation": "about",
+   "family": "research",
+   "confidence": 0.9,
+   "origin": "observed",
+   "status": "active",
+   "features": null,
+   "evidence": [
+    {
+     "tier": "curated_db",
+     "source_type": "fixture",
+     "source_id": "fixture:103.1",
+     "url": null,
+     "quote": "Fixture evidence (supports) for about; not a real source.",
+     "retrieved_at": "2026-10-03T00:00:00Z",
+     "polarity": "supports",
+     "claim_type": null
+    }
+   ]
+  },
+  {
+   "id": "e_601ef38a183f",
+   "source_id": "CLAIM:fx0003",
+   "target_id": "HGNC:6296",
+   "relation": "about",
+   "family": "research",
+   "confidence": 0.9,
+   "origin": "observed",
+   "status": "active",
+   "features": null,
+   "evidence": [
+    {
+     "tier": "curated_db",
+     "source_type": "fixture",
+     "source_id": "fixture:104.1",
+     "url": null,
+     "quote": "Fixture evidence (supports) for about; not a real source.",
+     "retrieved_at": "2026-10-03T00:00:00Z",
+     "polarity": "supports",
+     "claim_type": null
+    }
+   ]
+  },
+  {
+   "id": "e_edc402ab6731",
+   "source_id": "CLAIM:fx0001",
+   "target_id": "HP:0001250",
+   "relation": "about",
+   "family": "research",
+   "confidence": 0.9,
+   "origin": "observed",
+   "status": "active",
+   "features": null,
+   "evidence": [
+    {
+     "tier": "curated_db",
+     "source_type": "fixture",
+     "source_id": "fixture:105.1",
+     "url": null,
+     "quote": "Fixture evidence (supports) for about; not a real source.",
+     "retrieved_at": "2026-10-03T00:00:00Z",
+     "polarity": "supports",
+     "claim_type": null
+    }
+   ]
+  },
+  {
+   "id": "e_45b9680758f8",
+   "source_id": "RES:fx-alpha",
+   "target_id": "GRANT:FX-R01-0001",
+   "relation": "pi_of",
+   "family": "research",
+   "confidence": 0.9,
+   "origin": "observed",
+   "status": "active",
+   "features": null,
+   "evidence": [
+    {
+     "tier": "curated_db",
+     "source_type": "fixture",
+     "source_id": "fixture:106.1",
+     "url": null,
+     "quote": "Fixture evidence (supports) for pi_of; not a real source.",
+     "retrieved_at": "2026-10-03T00:00:00Z",
+     "polarity": "supports",
+     "claim_type": null
+    }
+   ]
+  },
+  {
+   "id": "e_c42955a31210",
+   "source_id": "RES:fx-gamma",
+   "target_id": "GRANT:FX-R21-0002",
+   "relation": "pi_of",
+   "family": "research",
+   "confidence": 0.9,
+   "origin": "observed",
+   "status": "active",
+   "features": null,
+   "evidence": [
+    {
+     "tier": "curated_db",
+     "source_type": "fixture",
+     "source_id": "fixture:107.1",
+     "url": null,
+     "quote": "Fixture evidence (supports) for pi_of; not a real source.",
+     "retrieved_at": "2026-10-03T00:00:00Z",
+     "polarity": "supports",
+     "claim_type": null
+    }
+   ]
+  },
+  {
+   "id": "e_42e91747052d",
+   "source_id": "GRANT:FX-R01-0001",
+   "target_id": "MONDO:9900003",
+   "relation": "funds_research_on",
+   "family": "research",
+   "confidence": 0.9,
+   "origin": "observed",
+   "status": "active",
+   "features": null,
+   "evidence": [
+    {
+     "tier": "curated_db",
+     "source_type": "fixture",
+     "source_id": "fixture:108.1",
+     "url": null,
+     "quote": "Fixture evidence (supports) for funds_research_on; not a real source.",
+     "retrieved_at": "2026-10-03T00:00:00Z",
+     "polarity": "supports",
+     "claim_type": null
+    }
+   ]
+  },
+  {
+   "id": "e_bbf77cfc304c",
+   "source_id": "GRANT:FX-R01-0001",
+   "target_id": "MONDO:9900006",
+   "relation": "funds_research_on",
+   "family": "research",
+   "confidence": 0.9,
+   "origin": "observed",
+   "status": "active",
+   "features": null,
+   "evidence": [
+    {
+     "tier": "curated_db",
+     "source_type": "fixture",
+     "source_id": "fixture:109.1",
+     "url": null,
+     "quote": "Fixture evidence (supports) for funds_research_on; not a real source.",
+     "retrieved_at": "2026-10-03T00:00:00Z",
+     "polarity": "supports",
+     "claim_type": null
+    }
+   ]
+  },
+  {
+   "id": "e_06eaf745529a",
+   "source_id": "GRANT:FX-R21-0002",
+   "target_id": "MONDO:9900007",
+   "relation": "funds_research_on",
+   "family": "research",
+   "confidence": 0.9,
+   "origin": "observed",
+   "status": "active",
+   "features": null,
+   "evidence": [
+    {
+     "tier": "curated_db",
+     "source_type": "fixture",
+     "source_id": "fixture:110.1",
+     "url": null,
+     "quote": "Fixture evidence (supports) for funds_research_on; not a real source.",
+     "retrieved_at": "2026-10-03T00:00:00Z",
+     "polarity": "supports",
+     "claim_type": null
+    }
+   ]
+  },
+  {
+   "id": "e_0af807385728",
+   "source_id": "ORG:fx-scn2a-community",
+   "target_id": "MONDO:9900003",
+   "relation": "serves",
+   "family": "community",
+   "confidence": 0.9,
+   "origin": "observed",
+   "status": "active",
+   "features": null,
+   "evidence": [
+    {
+     "tier": "curated_db",
+     "source_type": "fixture",
+     "source_id": "fixture:111.1",
+     "url": null,
+     "quote": "Fixture evidence (supports) for serves; not a real source.",
+     "retrieved_at": "2026-10-03T00:00:00Z",
+     "polarity": "supports",
+     "claim_type": null
+    }
+   ]
+  },
+  {
+   "id": "e_3b2f2fa95bc5",
+   "source_id": "ORG:fx-dravet-families",
+   "target_id": "MONDO:0100135",
+   "relation": "serves",
+   "family": "community",
+   "confidence": 0.9,
+   "origin": "observed",
+   "status": "active",
+   "features": null,
+   "evidence": [
+    {
+     "tier": "curated_db",
+     "source_type": "fixture",
+     "source_id": "fixture:112.1",
+     "url": null,
+     "quote": "Fixture evidence (supports) for serves; not a real source.",
+     "retrieved_at": "2026-10-03T00:00:00Z",
+     "polarity": "supports",
+     "claim_type": null
+    }
+   ]
+  },
+  {
+   "id": "e_d98d0fd127ef",
+   "source_id": "ORG:fx-dravet-families",
+   "target_id": "MONDO:9900001",
+   "relation": "serves",
+   "family": "community",
+   "confidence": 0.9,
+   "origin": "observed",
+   "status": "active",
+   "features": null,
+   "evidence": [
+    {
+     "tier": "curated_db",
+     "source_type": "fixture",
+     "source_id": "fixture:113.1",
+     "url": null,
+     "quote": "Fixture evidence (supports) for serves; not a real source.",
+     "retrieved_at": "2026-10-03T00:00:00Z",
+     "polarity": "supports",
+     "claim_type": null
+    }
+   ]
+  },
+  {
+   "id": "e_1fa21e66c18a",
+   "source_id": "ORG:fx-scn2a-community",
+   "target_id": "MONDO:9900005",
+   "relation": "serves",
+   "family": "community",
+   "confidence": 0.9,
+   "origin": "observed",
+   "status": "active",
+   "features": null,
+   "evidence": [
+    {
+     "tier": "curated_db",
+     "source_type": "fixture",
+     "source_id": "fixture:114.1",
+     "url": null,
+     "quote": "Fixture evidence (supports) for serves; not a real source.",
+     "retrieved_at": "2026-10-03T00:00:00Z",
+     "polarity": "supports",
+     "claim_type": null
+    }
+   ]
+  },
+  {
+   "id": "e_def512846922",
+   "source_id": "ORG:fx-scn2a-community",
+   "target_id": "MONDO:9900004",
+   "relation": "serves",
+   "family": "community",
+   "confidence": 0.9,
+   "origin": "observed",
+   "status": "active",
+   "features": null,
+   "evidence": [
+    {
+     "tier": "curated_db",
+     "source_type": "fixture",
+     "source_id": "fixture:115.1",
+     "url": null,
+     "quote": "Fixture evidence (supports) for serves; not a real source.",
+     "retrieved_at": "2026-10-03T00:00:00Z",
+     "polarity": "supports",
+     "claim_type": null
+    }
+   ]
+  },
+  {
+   "id": "e_46deb3ed8856",
+   "source_id": "ORG:fx-stxbp1-parents",
+   "target_id": "MONDO:9900007",
+   "relation": "serves",
+   "family": "community",
+   "confidence": 0.9,
+   "origin": "observed",
+   "status": "active",
+   "features": null,
+   "evidence": [
+    {
+     "tier": "curated_db",
+     "source_type": "fixture",
+     "source_id": "fixture:116.1",
+     "url": null,
+     "quote": "Fixture evidence (supports) for serves; not a real source.",
+     "retrieved_at": "2026-10-03T00:00:00Z",
+     "polarity": "supports",
+     "claim_type": null
+    }
+   ]
+  },
+  {
+   "id": "e_558f7d2a940d",
+   "source_id": "ORG:fx-scn2a-community",
+   "target_id": "REG:fx-sodium-channel-registry",
+   "relation": "runs",
+   "family": "community",
+   "confidence": 0.9,
+   "origin": "observed",
+   "status": "active",
+   "features": null,
+   "evidence": [
+    {
+     "tier": "curated_db",
+     "source_type": "fixture",
+     "source_id": "fixture:117.1",
+     "url": null,
+     "quote": "Fixture evidence (supports) for runs; not a real source.",
+     "retrieved_at": "2026-10-03T00:00:00Z",
+     "polarity": "supports",
+     "claim_type": null
+    }
+   ]
+  },
+  {
+   "id": "e_5111302306b4",
+   "source_id": "ORG:fx-dravet-families",
+   "target_id": "REG:fx-sodium-channel-registry",
+   "relation": "runs",
+   "family": "community",
+   "confidence": 0.9,
+   "origin": "observed",
+   "status": "active",
+   "features": null,
+   "evidence": [
+    {
+     "tier": "curated_db",
+     "source_type": "fixture",
+     "source_id": "fixture:118.1",
+     "url": null,
+     "quote": "Fixture evidence (supports) for runs; not a real source.",
+     "retrieved_at": "2026-10-03T00:00:00Z",
+     "polarity": "supports",
+     "claim_type": null
+    }
+   ]
+  },
+  {
+   "id": "e_be9eca72fc21",
+   "source_id": "ORG:fx-stxbp1-parents",
+   "target_id": "REG:fx-stxbp1-natural-history",
+   "relation": "runs",
+   "family": "community",
+   "confidence": 0.9,
+   "origin": "observed",
+   "status": "active",
+   "features": null,
+   "evidence": [
+    {
+     "tier": "curated_db",
+     "source_type": "fixture",
+     "source_id": "fixture:119.1",
+     "url": null,
+     "quote": "Fixture evidence (supports) for runs; not a real source.",
+     "retrieved_at": "2026-10-03T00:00:00Z",
+     "polarity": "supports",
+     "claim_type": null
+    }
+   ]
+  },
+  {
+   "id": "e_d2f9da48e30e",
+   "source_id": "INST:fx-neuro",
+   "target_id": "REG:fx-stxbp1-natural-history",
+   "relation": "runs",
+   "family": "community",
+   "confidence": 0.9,
+   "origin": "observed",
+   "status": "active",
+   "features": null,
+   "evidence": [
+    {
+     "tier": "curated_db",
+     "source_type": "fixture",
+     "source_id": "fixture:120.1",
+     "url": null,
+     "quote": "Fixture evidence (supports) for runs; not a real source.",
+     "retrieved_at": "2026-10-03T00:00:00Z",
+     "polarity": "supports",
+     "claim_type": null
+    }
+   ]
+  },
+  {
+   "id": "e_92ad19add139",
+   "source_id": "INST:fx-childrens",
+   "target_id": "REG:fx-neonatal-seizure-registry",
+   "relation": "runs",
+   "family": "community",
+   "confidence": 0.9,
+   "origin": "observed",
+   "status": "active",
+   "features": null,
+   "evidence": [
+    {
+     "tier": "curated_db",
+     "source_type": "fixture",
+     "source_id": "fixture:121.1",
+     "url": null,
+     "quote": "Fixture evidence (supports) for runs; not a real source.",
+     "retrieved_at": "2026-10-03T00:00:00Z",
+     "polarity": "supports",
+     "claim_type": null
+    }
+   ]
+  },
+  {
+   "id": "e_6ef2332ad9c1",
+   "source_id": "NCT99000001",
+   "target_id": "MONDO:0100135",
+   "relation": "studies",
+   "family": "community",
+   "confidence": 0.9,
+   "origin": "observed",
+   "status": "active",
+   "features": null,
+   "evidence": [
+    {
+     "tier": "curated_db",
+     "source_type": "fixture",
+     "source_id": "fixture:122.1",
+     "url": null,
+     "quote": "Fixture evidence (supports) for studies; not a real source.",
+     "retrieved_at": "2026-10-03T00:00:00Z",
+     "polarity": "supports",
+     "claim_type": null
+    }
+   ]
+  },
+  {
+   "id": "e_e78db2256353",
+   "source_id": "NCT99000001",
+   "target_id": "MONDO:9900001",
+   "relation": "studies",
+   "family": "community",
+   "confidence": 0.9,
+   "origin": "observed",
+   "status": "active",
+   "features": null,
+   "evidence": [
+    {
+     "tier": "curated_db",
+     "source_type": "fixture",
+     "source_id": "fixture:123.1",
+     "url": null,
+     "quote": "Fixture evidence (supports) for studies; not a real source.",
+     "retrieved_at": "2026-10-03T00:00:00Z",
+     "polarity": "supports",
+     "claim_type": null
+    }
+   ]
+  },
+  {
+   "id": "e_6639bf6c05cc",
+   "source_id": "NCT99000002",
+   "target_id": "MONDO:9900003",
+   "relation": "studies",
+   "family": "community",
+   "confidence": 0.9,
+   "origin": "observed",
+   "status": "active",
+   "features": null,
+   "evidence": [
+    {
+     "tier": "curated_db",
+     "source_type": "fixture",
+     "source_id": "fixture:124.1",
+     "url": null,
+     "quote": "Fixture evidence (supports) for studies; not a real source.",
+     "retrieved_at": "2026-10-03T00:00:00Z",
+     "polarity": "supports",
+     "claim_type": null
+    }
+   ]
+  },
+  {
+   "id": "e_c79f4594994a",
+   "source_id": "NCT99000002",
+   "target_id": "MONDO:9900006",
+   "relation": "studies",
+   "family": "community",
+   "confidence": 0.9,
+   "origin": "observed",
+   "status": "active",
+   "features": null,
+   "evidence": [
+    {
+     "tier": "curated_db",
+     "source_type": "fixture",
+     "source_id": "fixture:125.1",
+     "url": null,
+     "quote": "Fixture evidence (supports) for studies; not a real source.",
+     "retrieved_at": "2026-10-03T00:00:00Z",
+     "polarity": "supports",
+     "claim_type": null
+    }
+   ]
+  },
+  {
+   "id": "e_b7dfc0c79901",
+   "source_id": "DOC:fx-one",
+   "target_id": "NCT99000001",
+   "relation": "investigator_of",
+   "family": "community",
+   "confidence": 0.9,
+   "origin": "observed",
+   "status": "active",
+   "features": null,
+   "evidence": [
+    {
+     "tier": "curated_db",
+     "source_type": "fixture",
+     "source_id": "fixture:126.1",
+     "url": null,
+     "quote": "Fixture evidence (supports) for investigator_of; not a real source.",
+     "retrieved_at": "2026-10-03T00:00:00Z",
+     "polarity": "supports",
+     "claim_type": null
+    }
+   ]
+  },
+  {
+   "id": "e_743e32b77475",
+   "source_id": "DOC:fx-two",
+   "target_id": "NCT99000002",
+   "relation": "investigator_of",
+   "family": "community",
+   "confidence": 0.9,
+   "origin": "observed",
+   "status": "active",
+   "features": null,
+   "evidence": [
+    {
+     "tier": "curated_db",
+     "source_type": "fixture",
+     "source_id": "fixture:127.1",
+     "url": null,
+     "quote": "Fixture evidence (supports) for investigator_of; not a real source.",
+     "retrieved_at": "2026-10-03T00:00:00Z",
+     "polarity": "supports",
+     "claim_type": null
+    }
+   ]
+  },
+  {
+   "id": "e_ef1348efb011",
+   "source_id": "RES:fx-alpha",
+   "target_id": "INST:fx-neuro",
+   "relation": "affiliated_with",
+   "family": "community",
+   "confidence": 0.9,
+   "origin": "observed",
+   "status": "active",
+   "features": null,
+   "evidence": [
+    {
+     "tier": "curated_db",
+     "source_type": "fixture",
+     "source_id": "fixture:128.1",
+     "url": null,
+     "quote": "Fixture evidence (supports) for affiliated_with; not a real source.",
+     "retrieved_at": "2026-10-03T00:00:00Z",
+     "polarity": "supports",
+     "claim_type": null
+    }
+   ]
+  },
+  {
+   "id": "e_2a1179206b8e",
+   "source_id": "RES:fx-beta",
+   "target_id": "INST:fx-neuro",
+   "relation": "affiliated_with",
+   "family": "community",
+   "confidence": 0.9,
+   "origin": "observed",
+   "status": "active",
+   "features": null,
+   "evidence": [
+    {
+     "tier": "curated_db",
+     "source_type": "fixture",
+     "source_id": "fixture:129.1",
+     "url": null,
+     "quote": "Fixture evidence (supports) for affiliated_with; not a real source.",
+     "retrieved_at": "2026-10-03T00:00:00Z",
+     "polarity": "supports",
+     "claim_type": null
+    }
+   ]
+  },
+  {
+   "id": "e_22f9acd35175",
+   "source_id": "RES:fx-gamma",
+   "target_id": "INST:fx-epilepsy",
+   "relation": "affiliated_with",
+   "family": "community",
+   "confidence": 0.9,
+   "origin": "observed",
+   "status": "active",
+   "features": null,
+   "evidence": [
+    {
+     "tier": "curated_db",
+     "source_type": "fixture",
+     "source_id": "fixture:130.1",
+     "url": null,
+     "quote": "Fixture evidence (supports) for affiliated_with; not a real source.",
+     "retrieved_at": "2026-10-03T00:00:00Z",
+     "polarity": "supports",
+     "claim_type": null
+    }
+   ]
+  },
+  {
+   "id": "e_9b5118417661",
+   "source_id": "RES:fx-delta",
+   "target_id": "INST:fx-childrens",
+   "relation": "affiliated_with",
+   "family": "community",
+   "confidence": 0.9,
+   "origin": "observed",
+   "status": "active",
+   "features": null,
+   "evidence": [
+    {
+     "tier": "curated_db",
+     "source_type": "fixture",
+     "source_id": "fixture:131.1",
+     "url": null,
+     "quote": "Fixture evidence (supports) for affiliated_with; not a real source.",
+     "retrieved_at": "2026-10-03T00:00:00Z",
+     "polarity": "supports",
+     "claim_type": null
+    }
+   ]
+  },
+  {
+   "id": "e_03ce372cf7bf",
+   "source_id": "DOC:fx-one",
+   "target_id": "INST:fx-childrens",
+   "relation": "affiliated_with",
+   "family": "community",
+   "confidence": 0.9,
+   "origin": "observed",
+   "status": "active",
+   "features": null,
+   "evidence": [
+    {
+     "tier": "curated_db",
+     "source_type": "fixture",
+     "source_id": "fixture:132.1",
+     "url": null,
+     "quote": "Fixture evidence (supports) for affiliated_with; not a real source.",
+     "retrieved_at": "2026-10-03T00:00:00Z",
+     "polarity": "supports",
+     "claim_type": null
+    }
+   ]
+  },
+  {
+   "id": "e_68e80ea8009b",
+   "source_id": "DOC:fx-two",
+   "target_id": "INST:fx-epilepsy",
+   "relation": "affiliated_with",
+   "family": "community",
+   "confidence": 0.9,
+   "origin": "observed",
+   "status": "active",
+   "features": null,
+   "evidence": [
+    {
+     "tier": "curated_db",
+     "source_type": "fixture",
+     "source_id": "fixture:133.1",
+     "url": null,
+     "quote": "Fixture evidence (supports) for affiliated_with; not a real source.",
+     "retrieved_at": "2026-10-03T00:00:00Z",
+     "polarity": "supports",
+     "claim_type": null
+    }
+   ]
+  },
+  {
+   "id": "e_ecb23c719a97",
+   "source_id": "INST:fx-childrens",
+   "target_id": "NET:fixture-rare-epilepsy",
+   "relation": "member_of",
+   "family": "community",
+   "confidence": 0.9,
+   "origin": "observed",
+   "status": "active",
+   "features": null,
+   "evidence": [
+    {
+     "tier": "curated_db",
+     "source_type": "fixture",
+     "source_id": "fixture:134.1",
+     "url": null,
+     "quote": "Fixture evidence (supports) for member_of; not a real source.",
+     "retrieved_at": "2026-10-03T00:00:00Z",
+     "polarity": "supports",
+     "claim_type": null
+    }
+   ]
+  },
+  {
+   "id": "e_b9ae53b1d30a",
+   "source_id": "INST:fx-epilepsy",
+   "target_id": "NET:fixture-rare-epilepsy",
+   "relation": "member_of",
+   "family": "community",
+   "confidence": 0.9,
+   "origin": "observed",
+   "status": "active",
+   "features": null,
+   "evidence": [
+    {
+     "tier": "curated_db",
+     "source_type": "fixture",
+     "source_id": "fixture:135.1",
+     "url": null,
+     "quote": "Fixture evidence (supports) for member_of; not a real source.",
+     "retrieved_at": "2026-10-03T00:00:00Z",
+     "polarity": "supports",
+     "claim_type": null
+    }
+   ]
+  },
+  {
+   "id": "e_b039a6b490a8",
+   "source_id": "ORG:fx-dravet-families",
+   "target_id": "NET:fixture-rare-epilepsy",
+   "relation": "member_of",
+   "family": "community",
+   "confidence": 0.9,
+   "origin": "observed",
+   "status": "active",
+   "features": null,
+   "evidence": [
+    {
+     "tier": "curated_db",
+     "source_type": "fixture",
+     "source_id": "fixture:136.1",
+     "url": null,
+     "quote": "Fixture evidence (supports) for member_of; not a real source.",
+     "retrieved_at": "2026-10-03T00:00:00Z",
+     "polarity": "supports",
+     "claim_type": null
+    }
+   ]
+  }
+ ],
+ "explanations": [
+  {
+   "path_id": "p_ec8907fa38b0b33d",
+   "edge_ids": [
+    "e_3b8845b635b8",
+    "e_0af807385728",
+    "e_558f7d2a940d"
+   ],
+   "role": "guest",
+   "language": "en",
+   "text": "Children with STXBP1 encephalopathy and children with early-onset SCN2A encephalopathy have many of the same symptoms [e_3b8845b635b8]. A patient group for SCN2A [e_0af807385728] runs a registry that families can join [e_558f7d2a940d].",
+   "citations": [
+    "e_3b8845b635b8",
+    "e_0af807385728",
+    "e_558f7d2a940d"
+   ]
+  },
+  {
+   "path_id": "p_ec8907fa38b0b33d",
+   "edge_ids": [
+    "e_3b8845b635b8",
+    "e_0af807385728",
+    "e_558f7d2a940d"
+   ],
+   "role": "patient",
+   "language": "en",
+   "text": "Your child's condition, STXBP1 encephalopathy, shares many symptoms with early-onset SCN2A encephalopathy, such as seizures and delayed development [e_3b8845b635b8]. This is a similar experience with a possibly different cause. The SCN2A Community Alliance supports these families [e_0af807385728] and runs a registry you could ask about joining [e_558f7d2a940d].",
+   "citations": [
+    "e_3b8845b635b8",
+    "e_0af807385728",
+    "e_558f7d2a940d"
+   ]
+  },
+  {
+   "path_id": "p_ec8907fa38b0b33d",
+   "edge_ids": [
+    "e_3b8845b635b8",
+    "e_0af807385728",
+    "e_558f7d2a940d"
+   ],
+   "role": "doctor",
+   "language": "en",
+   "text": "STXBP1 encephalopathy and early-onset SCN2A DEE overlap in phenotype (seizures, global developmental delay, hypotonia, infantile spasms, feeding difficulties) [e_3b8845b635b8]; the overlap is phenotypic, not mechanistic. The SCN2A patient organization [e_0af807385728] operates a sodium channel epilepsy registry [e_558f7d2a940d] that could collect comparable natural history data.",
+   "citations": [
+    "e_3b8845b635b8",
+    "e_0af807385728",
+    "e_558f7d2a940d"
+   ]
+  },
+  {
+   "path_id": "p_ec8907fa38b0b33d",
+   "edge_ids": [
+    "e_3b8845b635b8",
+    "e_0af807385728",
+    "e_558f7d2a940d"
+   ],
+   "role": "researcher",
+   "language": "en",
+   "text": "MONDO:9900007 (STXBP1) and MONDO:9900003 (SCN2A GoF DEE) are linked by similar_symptoms (BMA 0.74, 5 shared HPO terms) [e_3b8845b635b8], an inferred edge. ORG:fx-scn2a-community serves MONDO:9900003 [e_0af807385728] and runs REG:fx-sodium-channel-registry [e_558f7d2a940d], a reusable data asset across communities.",
+   "citations": [
+    "e_3b8845b635b8",
+    "e_0af807385728",
+    "e_558f7d2a940d"
+   ]
+  }
+ ]
+}
