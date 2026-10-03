@@ -374,17 +374,18 @@ def disease_query_terms(scope: Scope, disease: dict[str, Any], limit: int = 6) -
 
 
 async def request(client, method: str, url: str, *, pace: float = 0.0, attempts: int = 4, **kw):
-    """One API call through the shared client, spaced by ``pace`` seconds, with an extra retry
-    layer on top of the transport's (it also covers errors raised while handling a 429)."""
+    """One API call through the shared client with an extra retry layer on top of the
+    transport's. Real network responses are followed by a ``pace`` second pause; responses served
+    from the HTTP cache are not."""
     import asyncio
 
     import httpx
 
     for attempt in range(attempts):
-        if pace:
-            await asyncio.sleep(pace)
         try:
             r = await client.request(method, url, **kw)
+            if pace and not r.extensions.get("hishel_from_cache"):
+                await asyncio.sleep(pace)
             if r.status_code in (429, 500, 502, 503, 504) and attempt < attempts - 1:
                 await asyncio.sleep(2**attempt * 2)
                 continue
@@ -395,6 +396,53 @@ async def request(client, method: str, url: str, *, pace: float = 0.0, attempts:
                 raise
             await asyncio.sleep(2**attempt * 2)
     raise AssertionError("unreachable")
+
+
+def fetch_fingerprint(scope: Scope | None, *parts: Any) -> str:
+    """Hash of everything a scoped fetch depends on: the scope's genes and diseases (ids, names,
+    seed flags) plus source-specific settings."""
+    genes = sorted(
+        (g["hgnc_id"], g.get("symbol"), sorted(g.get("aliases") or []), bool(g.get("seed")))
+        for g in (scope.genes if scope else [])
+    )
+    diseases = sorted(
+        (d["mondo_id"], d.get("label"), sorted(d.get("synonyms") or []), bool(d.get("seed")))
+        for d in (scope.diseases if scope else [])
+    )
+    payload = json.dumps([genes, diseases, *parts], sort_keys=True, default=str)
+    return hashlib.sha256(payload.encode()).hexdigest()
+
+
+def refresh_requested(source: str) -> bool:
+    """``PIPELINE_REFRESH=1`` (or a comma-separated list of source names) forces a re-fetch."""
+    import os
+
+    raw = os.environ.get("PIPELINE_REFRESH", "").strip().lower()
+    return raw in {"1", "true", "yes", "all"} or source in {s.strip() for s in raw.split(",")}
+
+
+def fetch_is_current(raw_dir: Path, source: str, fingerprint: str, outputs: list[str]) -> bool:
+    """True if the raw outputs were fetched for this fingerprint. Otherwise the marker is removed,
+    so an interrupted re-fetch is never mistaken for a complete one."""
+    marker = raw_dir / "_fingerprint.json"
+    current = False
+    if not refresh_requested(source) and marker.exists():
+        try:
+            current = json.loads(marker.read_text()).get("fingerprint") == fingerprint
+        except ValueError:
+            current = False
+        current = current and all((raw_dir / o).exists() for o in outputs)
+    if not current:
+        marker.unlink(missing_ok=True)
+    return current
+
+
+def write_fingerprint(raw_dir: Path, fingerprint: str) -> None:
+    from datetime import UTC, datetime
+
+    (raw_dir / "_fingerprint.json").write_text(
+        json.dumps({"fingerprint": fingerprint, "written_at": datetime.now(UTC).isoformat()})
+    )
 
 
 def json_attrs(**kwargs: Any) -> str:

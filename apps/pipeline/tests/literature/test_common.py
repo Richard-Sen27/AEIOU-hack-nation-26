@@ -140,3 +140,49 @@ def test_scrub_contacts():
     text = "Write to a.b@example.org or call +1 (555) 010-0199. Electronic address: x@y.org."
     out = scrub_contacts(text)
     assert "@" not in out and "555" not in out
+
+
+def test_fetch_fingerprint_skip_and_refresh(tmp_path, scope, monkeypatch):
+    from pipeline.extract.common import fetch_fingerprint, fetch_is_current, write_fingerprint
+
+    fp = fetch_fingerprint(scope, {"cap": 40})
+    assert fp == fetch_fingerprint(scope, {"cap": 40})
+    assert fp != fetch_fingerprint(scope, {"cap": 41})
+    assert not fetch_is_current(tmp_path, "pubmed", fp, ["searches.json"])
+    (tmp_path / "searches.json").write_text("[]")
+    write_fingerprint(tmp_path, fp)
+    assert fetch_is_current(tmp_path, "pubmed", fp, ["searches.json"])
+    scope.genes[0]["seed"] = False
+    assert not fetch_is_current(tmp_path, "pubmed", fetch_fingerprint(scope, {"cap": 40}), [])
+    assert not (tmp_path / "_fingerprint.json").exists()  # stale marker removed
+    write_fingerprint(tmp_path, fp)
+    monkeypatch.setenv("PIPELINE_REFRESH", "reporter,pubmed")
+    assert not fetch_is_current(tmp_path, "pubmed", fp, ["searches.json"])
+
+
+async def test_request_paces_only_network_responses(monkeypatch):
+    import asyncio
+
+    import httpx
+
+    from pipeline.extract import common
+
+    sleeps = []
+
+    async def fake_sleep(s):
+        sleeps.append(s)
+
+    monkeypatch.setattr(asyncio, "sleep", fake_sleep)
+
+    class Client:
+        def __init__(self, cached):
+            self.cached = cached
+
+        async def request(self, method, url, **kw):
+            req = httpx.Request(method, url)
+            return httpx.Response(200, request=req, extensions={"hishel_from_cache": self.cached})
+
+    await common.request(Client(True), "GET", "https://x.org", pace=0.5)
+    assert sleeps == []
+    await common.request(Client(False), "GET", "https://x.org", pace=0.5)
+    assert sleeps == [0.5]

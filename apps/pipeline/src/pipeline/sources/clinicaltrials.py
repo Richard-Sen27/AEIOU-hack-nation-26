@@ -20,10 +20,13 @@ from pipeline.extract.common import (
     ScopeMatcher,
     disease_query_terms,
     doctor_id,
+    fetch_fingerprint,
+    fetch_is_current,
     institution_id,
     json_attrs,
     person_name_key,
     request,
+    write_fingerprint,
 )
 from pipeline.http import get_client
 from pipeline.paths import RAW
@@ -109,6 +112,10 @@ async def fetch(scope: Scope | None) -> None:
         return
     out = RAW / NAME
     out.mkdir(parents=True, exist_ok=True)
+    fingerprint = fetch_fingerprint(scope, cfg.model_dump())
+    if fetch_is_current(out, NAME, fingerprint, ["studies.json", "searches.json"]):
+        log.info("%s: raw data is current for this scope and settings; skipping fetch", NAME)
+        return
     studies: dict[str, dict[str, Any]] = {}
     searches = _searches(scope)
     async with get_client(NAME) as client:
@@ -138,6 +145,7 @@ async def fetch(scope: Scope | None) -> None:
     version = r.headers.get("x-api-version") if searches else None
     record_raw(NAME, API, out / "studies.json", version, studies=len(studies))
     record_raw(NAME, API, out / "searches.json", version)
+    write_fingerprint(out, fingerprint)
     log.info("clinicaltrials: %d searches, %d unique studies", len(searches), len(studies))
 
 

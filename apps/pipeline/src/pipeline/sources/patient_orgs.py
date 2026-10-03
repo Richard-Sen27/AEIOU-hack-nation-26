@@ -22,12 +22,15 @@ from pydantic_settings import BaseSettings, SettingsConfigDict
 from pipeline.config import settings
 from pipeline.contracts import Scope, Source, assertion, now_iso, record_raw, write_tables
 from pipeline.extract.common import (
+    fetch_fingerprint,
+    fetch_is_current,
     institution_id,
     json_attrs,
     quote_in_text,
     request,
     scrub_contacts,
     short_hash,
+    write_fingerprint,
 )
 from pipeline.http import get_client
 from pipeline.paths import CURATED, NORMALIZED, RAW
@@ -160,6 +163,15 @@ async def _discover(client, scope: Scope) -> list[str]:
 
 async def fetch(scope: Scope | None) -> None:
     data = load_curated()
+    out = RAW / NAME
+    out.mkdir(parents=True, exist_ok=True)
+    discovery = bool(settings.brightdata_api_key and bd.serp_zone)
+    fingerprint = fetch_fingerprint(
+        scope if discovery else None, CURATED_FILE.read_text(), discovery, bd.model_dump()
+    )
+    if fetch_is_current(out, NAME, fingerprint, ["pages.json"]):
+        log.info("%s: raw data is current for this scope and settings; skipping fetch", NAME)
+        return
     pages: list[dict[str, Any]] = []
     async with get_client(NAME, headers={"Accept": "text/html,application/xhtml+xml"}) as client:
         for url in curated_urls(data):
@@ -173,6 +185,7 @@ async def fetch(scope: Scope | None) -> None:
     index.parent.mkdir(parents=True, exist_ok=True)
     index.write_text(json.dumps(pages, indent=1))
     ok = sum(1 for p in pages if "file" in p)
+    write_fingerprint(out, fingerprint)
     log.info("patient_orgs: fetched %d/%d pages", ok, len(pages))
     for p in pages:
         if "error" in p:

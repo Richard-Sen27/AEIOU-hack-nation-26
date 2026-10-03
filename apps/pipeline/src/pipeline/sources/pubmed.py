@@ -25,6 +25,8 @@ from pipeline.contracts import Scope, Source, assertion, raw_record, record_raw,
 from pipeline.extract.common import (
     affiliation_country,
     disease_query_terms,
+    fetch_fingerprint,
+    fetch_is_current,
     institution_id,
     institution_name,
     json_attrs,
@@ -33,6 +35,7 @@ from pipeline.extract.common import (
     request,
     researcher_id,
     scrub_contacts,
+    write_fingerprint,
 )
 from pipeline.http import get_client
 from pipeline.paths import NORMALIZED, RAW
@@ -135,6 +138,10 @@ async def fetch(scope: Scope | None) -> None:
         return
     out = RAW / NAME
     out.mkdir(parents=True, exist_ok=True)
+    fingerprint = fetch_fingerprint(scope, cfg.model_dump())
+    if fetch_is_current(out, NAME, fingerprint, ["searches.json"]):
+        log.info("%s: raw data is current for this scope and settings; skipping fetch", NAME)
+        return
     specs = build_searches(scope)
     async with get_client(NAME) as client:
         for spec in specs:
@@ -159,6 +166,7 @@ async def fetch(scope: Scope | None) -> None:
             path = out / f"efetch_{i // EFETCH_BATCH:04d}.xml"
             path.write_bytes(r.content)
             record_raw(NAME, f"{EUTILS}/efetch.fcgi", path, "efetch", pmids=len(batch))
+    write_fingerprint(out, fingerprint)
 
 
 # ---------------------------------------------------------------------------------------------
