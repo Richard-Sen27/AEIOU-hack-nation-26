@@ -1,0 +1,132 @@
+{
+ "meta": {
+  "search_id": "1Px8VOqIaUSjXU9t88n1PQ",
+  "total": 64,
+  "offset": 0,
+  "limit": 2,
+  "sort_field": null,
+  "sort_order": "ASC",
+  "sorted_by_relevance": true,
+  "properties": {
+   "URL": "https:/reporter.nih.gov/search/1Px8VOqIaUSjXU9t88n1PQ/projects"
+  }
+ },
+ "results": [
+  {
+   "appl_id": 11322512,
+   "subproject_id": null,
+   "fiscal_year": 2026,
+   "project_num": "5F31NS141322-02",
+   "project_serial_num": "NS141322",
+   "organization": {
+    "org_name": "BAYLOR COLLEGE OF MEDICINE",
+    "city": null,
+    "country": null,
+    "org_city": "HOUSTON",
+    "org_country": "UNITED STATES",
+    "org_state": "TX",
+    "org_state_name": null,
+    "dept_type": "NEUROSCIENCES",
+    "fips_country_code": null,
+    "org_duns": [
+     "051113330"
+    ],
+    "org_ueis": [
+     "FXKMA43NTV21"
+    ],
+    "primary_duns": "051113330",
+    "primary_uei": "FXKMA43NTV21",
+    "org_fips": "US",
+    "org_ipf_code": "481201",
+    "org_zipcode": "770303411",
+    "external_org_id": 481201
+   },
+   "award_type": "5",
+   "activity_code": "F31",
+   "award_amount": 31201,
+   "is_active": true,
+   "project_num_split": {
+    "appl_type_code": "5",
+    "activity_code": "F31",
+    "ic_code": "NS",
+    "serial_num": "141322",
+    "support_year": "02",
+    "full_support_year": "02",
+    "suffix_code": ""
+   },
+   "principal_investigators": [
+    {
+     "profile_id": 78265993,
+     "first_name": "Brooke",
+     "middle_name": "",
+     "last_name": "Horist",
+     "is_contact_pi": true,
+     "full_name": "Brooke  Horist",
+     "title": ""
+    }
+   ],
+   "contact_pi_name": "HORIST, BROOKE ",
+   "agency_ic_admin": {
+    "code": "NS",
+    "abbreviation": "NINDS",
+    "name": "National Institute of Neurological Disorders and Stroke",
+    "admin_org_id": "12500053",
+    "admin_funding_url": ""
+   },
+   "agency_ic_fundings": [
+    {
+     "fy": 2026,
+     "code": "NS",
+     "name": "National Institute of Neurological Disorders and Stroke",
+     "abbreviation": "NINDS",
+     "total_cost": 31201.0,
+     "direct_cost_ic": 31201.0,
+     "indirect_cost_ic": 0.0
+    }
+   ],
+   "cong_dist": "TX-09",
+   "spending_categories": null,
+   "project_start_date": "2024-12-16T00:00:00",
+   "project_end_date": "2026-05-22T00:00:00",
+   "organization_type": {
+    "name": "SCHOOLS OF MEDICINE",
+    "code": "10",
+    "is_other": false
+   },
+   "geo_lat_lon": {
+    "lon": -95.400851,
+    "lat": 29.70926
+   },
+   "opportunity_number": "PA-23-272",
+   "full_study_section": {
+    "srg_code": "ZRG1",
+    "srg_flex": null,
+    "sra_designator_code": "F03B",
+    "sra_flex_code": "L",
+    "group_code": "20",
+    "name": "Special Emphasis Panel[ZRG1-F03B-L(20)L]"
+   },
+   "award_notice_date": "2025-12-16T00:00:00",
+   "is_new": false,
+   "mechanism_code_dc": "TR",
+   "core_project_num": "F31NS141322",
+   "terms": "<AAV vector><AAV-based vector><Acute><Address><Adeno-Associated Viruses><Affect><Alleles><Allelomorphs><Antimorphic mutation><Assay><Behavioral Assay><Bioassay><Biochemistry><Biological Assay><Biological Chemistry><Brain><Brain Nervous System><Brain region><Cessation of life><DNA Therapy><DNA mutation><Death><Dependoparvovirus><Dependovirus><Development><Development and Research><Disease><Disorder><Dominant Negative><Dominant-Negative Mutant><Dominant-Negative Mutation><Dyskinesia Syndromes><EEG><Electroencephalogram><Electroencephalography><Electrophysiology><Electrophysiology (science)><Encephalon><Encephalopathies><Environment><Epilepsy><Epileptic Seizures><Epileptics><Exhibits><Face><Gene Transfer Clinical><Genetic Change><Genetic Intervention><Genetic defect><Genetic mutation><Genotype><Goals><Heterozygote><Human><In Vitro><Individual><Intellectual disability><Intellectual functioning disability><Intellectual limitation><KI mice><KO mice><Knock-in Mouse><Knock-out Mice><Knockout Mice><Knowledge><Learning><Location><Mediating><Medical center><Medicine><Mental disorders><Mental health disorders><Mice><Mice Mammals><Missense Mutation><Mission><Modeling><Modern Man><Molecular><Movement Disorder Syndromes><Movement Disorders><Munc-18 protein><Munc18 protein><Murine><Mus><Mutation><NIH><National Institutes of Health><Nerve Cells><Nerve Unit><Nervous System Diseases><Nervous System Disorder><Neural Cell><Neural Transmission><Neurocyte><Neurodevelopmental Disorder><Neurologic><Neurologic Disorders><Neurologic Dysfunctions><Neurological><Neurological Development Disorder><Neurological Disorders><Neurons><Neurophysiology / Electrophysiology><Null Mouse><Pathogenesis><Pathogenicity><Patients><Persons><Phenotype><Physiologic><Physiological><Proteins><Psychiatric Disease><Psychiatric Disorder><Public Health><QOL><Quality of life><R & D><R&D><Reporting><Research><Research Institute><Scientist><Seizure Disorder><Seizures><Slice><Symptoms><Synapses><Synaptic><Synaptic Transmission><Techniques><Technology><Testing><Texas><Therapeutic><Therapeutic Studies><Therapy Research><Training><United States National Institutes of Health><Variant><Variation><Vesicle><adeno associated virus group><adeno-associated viral vector><adeno-associated virus vector><alleviate symptom><ameliorating symptom><autism attributes><autism indicator><autism spectrum disorder features><autism spectrum disorder indicator><autism spectrum disorder symptoms><autism symptomology><autism symptoms><autism-like symptoms><autism-related attributes><autistic features><autistic symptoms><autistic traits><autistic-like symptoms><behavior phenotype><behavioral phenotyping><career><co-morbid><co-morbidity><cognitive function><college><collegiate><common symptom><comorbidity><decrease symptom><design><designing><determine efficacy><developmental><efficacy analysis><efficacy assessment><efficacy determination><efficacy evaluation><efficacy examination><electrophysiological><epilepsia><epileptic encephalopathies><epileptogenic><evaluate efficacy><examine efficacy><experiment><experimental research><experimental study><experiments><faces><facial><fewer symptoms><gene manipulation><gene repair therapy><gene replacement><gene replacement therapy><gene therapy><gene-based therapy><genetic etiology><genetic manipulation><genetic mechanism of disease><genetic therapy><genetically manipulate><genetically perturb><genome mutation><genomic therapy><heterozygosity><impaired intellectual functioning><in vivo><insight><insoluble aggregate><intellectual and developmental disability><intellectual and developmental disorder><knockin mice><limited intellectual functioning><loss of function><mental illness><missense single nucleotide polymorphism><missense single nucleotide variant><missense variant><motor impairment><mouse model><movement impairment><movement limitation><murine model><mutant><neurodevelopmental disease><neurological disease><neurological dysfunction><neuronal><neurotransmitter release><novel><optogenetics><overexpress><overexpression><patient population><presynaptic><protein aggregate><protein aggregation><psychiatric illness><psychological disorder><reduce symptoms><relieves symptoms><research and development><success><symptom alleviation><symptom reduction><symptom relief><synapse><syntaxin binding protein 1><syntaxin binding protein Munc18><targeted drug therapy><targeted drug treatments><targeted therapeutic><targeted therapeutic agents><targeted therapy><targeted treatment><therapeutically effective>",
+   "pref_terms": "Acute;Address;Affect;Alleles;Behavioral Assay;Biochemistry;Biological Assay;Brain;Brain region;Cessation of life;Dependovirus;Development;Disease;Dominant-Negative Mutation;Electroencephalography;Electrophysiology (science);Encephalopathies;Environment;Epilepsy;Exhibits;Face;Genotype;Goals;Heterozygote;Human;In Vitro;Individual;Intellectual functioning disability;Knock-in Mouse;Knockout Mice;Knowledge;Learning;Location;Mediating;Medical center;Medicine;Mental disorders;Missense Mutation;Mission;Modeling;Molecular;Movement Disorders;Mus;Mutation;Nervous System Disorder;Neurodevelopmental Disorder;Neurologic;Neurologic Dysfunctions;Neurons;Pathogenesis;Pathogenicity;Patients;Persons;Phenotype;Physiological;Proteins;Public Health;Quality of life;Reporting;Research;Research Institute;Scientist;Seizures;Slice;Symptoms;Synapses;Synaptic Transmission;Techniques;Technology;Testing;Texas;Therapeutic;Therapeutic Studies;Training;United States National Institutes of Health;Variant;Vesicle;adeno-associated viral vector;autism symptoms;behavioral phenotyping;career;cognitive function;college;common symptom;comorbidity;design;efficacy evaluation;epileptic encephalopathies;experimental study;gene replacement;gene replacement therapy;gene therapy;genetic etiology;genetic manipulation;in vivo;insight;loss of function;motor impairment;mouse model;mutant;neurotransmitter release;novel;optogenetics;overexpression;patient population;presynaptic;protein aggregation;reduce symptoms;research and development;success;syntaxin binding protein 1;targeted treatment;therapeutically effective",
+   "abstract_text": "PROJECT SUMMARY\nSTXBP1 encodes syntaxin-binding protein 1, an essential protein for presynaptic neurotransmitter release.\nPatients with heterozygous pathogenic variants in STXBP1 are characterized by intellectual disability, epilepsy,\nmovement, and psychiatric disorders, which are collectively termed STXBP1-encephalopathy (STXBP1-E).\nSTXBP1-E is among the most common and severe forms of developmental and epileptic encephalopathy. The\ncurrent treatments at best only alleviate individual symptoms without targeting the underlying genetic defect.\nHaploinsufficiency has been clearly identified as the disease mechanism for patients with truncating variants,\nwhich is supported by multiple in vivo mammalian models that recapitulate neurological phenotypes of patients.\nIn contrast, the mechanism of action for missense variants, which make up 48% of the STXBP1-E patient\npopulation, remains unclear, in part due to the lack of in vivo mammalian models with construct and face validity.\nThis leaves a critical knowledge gap in understanding the disease mechanism and developing mechanism-based\ngenetic therapies. Thus, there is a critical need to establish a mouse model of STXBP1 missense variants to\naddress this gap. To this end, the applicant focused on one of the most common and understudied missense\nvariants in STXBP1 and has established a knock-in mouse model that recapitulates all key aspects of disease\nincluding epilepsy and impaired motor and cognitive functions. The goal of this project is to use this mouse model\nto understand the molecular and synaptic mechanisms (Aim 1) and determine the efficacy of an adeno-\nassociated virus (AAV)-based gene therapy in rescuing the neurological dysfunctions (Aim 2). The applicant will\nuse genetic manipulations in combination with various techniques including biochemistry, electrophysiology,\noptogenetics, behavioral assays, and electroencephalography (EEG) recordings. The proposed research is\nexpected to elucidate how a common missense variant contributes to neurological phenotypes in a mouse model\nof STXBP1 encephalopathy and determine the potential of gene therapy as a therapeutic option. Furthermore,\nthis project is designed to prepare the applicant for a career as an independent scientist in research and\ndevelopment and furthers the applicant\u2019s long-term goal of performing gene therapy research to reduce the\nburden of neurological disease for all people. The Sponsor, Dr. Mingshan Xue, has a strong track-record of\nsuccessful trainees and his lab conducts impactful research using mouse models of neurodevelopmental\ndisorders to discover disease mechanisms and genetic therapies to treat the disease. Furthermore, the\ncollaborative training environment of both Baylor College of Medicine and the Jan and Dan Duncan Neurological\nResearch Institute provides state-of-the-art technology cores, experts in the field of neurological disorders, and\na central location in the Texas Medical Center that facilitates the success of the project and training of the\napplicant.",
+   "project_title": "Disease mechanism and genetic therapy for a pathogenic STXBP1 variant",
+   "phr_text": "PROJECT NARRATIVE\nThe proposed research is relevant to public health because it seeks to understand the mechanism underlying a\ncommon missense variant in STXBP1 encephalopathy, and lack of knowledge about the mechanism underlying\nmissense variants in STXBP1 has limited the ability to understand the pathogenic mechanism behind this\ndisease. Furthermore, this project seeks to determine if adeno-associated virus-mediated gene replacement\ntherapy can reduce neurological phenotypes in mice with a STXBP1 missense variant, and as current treatment\noptions for STXBP1 patients are symptom specific and limited, this project presents the opportunity to establish\na potential therapeutic for patients with missense variants in STXBP1. This project is applicable to the NIH\u2019s\nmission because it will provide fundamental knowledge about the cellular mechanisms of intellectual disability\nand epilepsy, common symptoms across numerous neurodevelopmental disorders, and upon completion of this\nproject, we will have an enhanced understanding about the brain and produce the ability to reduce the burden\nof neurological disease for people.",
+   "spending_categories_desc": null,
+   "agency_code": "NIH",
+   "covid_response": null,
+   "arra_funded": "N",
+   "budget_start": "2025-12-16T00:00:00",
+   "budget_end": "2026-05-22T00:00:00",
+   "cfda_code": "93.853",
+   "funding_mechanism": "Training, Individual",
+   "direct_cost_amt": 31201,
+   "indirect_cost_amt": 0,
+   "project_detail_url": "https://reporter.nih.gov/project-details/11322512",
+   "date_added": "2025-12-20T17:04:10"
+  }
+ ]
+}
