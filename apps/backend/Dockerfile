@@ -9,21 +9,18 @@ ARG PYTHON_IMAGE=python:3.13-slim-trixie
 
 FROM ghcr.io/astral-sh/uv:0.12.19 AS uv
 
-FROM ${PYTHON_IMAGE} AS build
+# Third-party dependencies only. The virtualenv layer changes only when uv.lock changes; the
+# backend package itself is copied as source and found through PYTHONPATH.
+FROM ${PYTHON_IMAGE} AS deps
 COPY --from=uv /uv /usr/local/bin/uv
 ENV UV_LINK_MODE=copy \
     UV_NO_CACHE=1 \
+    UV_COMPILE_BYTECODE=1 \
     UV_PYTHON_DOWNLOADS=never \
     UV_PYTHON=/usr/local/bin/python3
 WORKDIR /app/backend
-# Dependencies first (cached unless the lock changes), then the project itself (editable, so
-# alembic.ini, migrations and the package all live under /app/backend).
-COPY pyproject.toml uv.lock README.md ./
+COPY pyproject.toml uv.lock ./
 RUN uv sync --frozen --no-dev --no-install-project
-COPY alembic.ini ./
-COPY migrations ./migrations
-COPY src ./src
-RUN UV_COMPILE_BYTECODE=1 uv sync --frozen --no-dev
 
 FROM ${PYTHON_IMAGE} AS runtime
 # tesseract-ocr + English data: OCR for photographed documents (Tesseract CLI).
@@ -35,9 +32,13 @@ RUN apt-get update \
 RUN useradd --uid 10001 --create-home --shell /usr/sbin/nologin app \
     && mkdir -p /data/fastembed \
     && chown app:app /data/fastembed
-COPY --from=build /app/backend /app/backend
 WORKDIR /app/backend
+COPY --from=deps /app/backend/.venv ./.venv
+COPY pyproject.toml uv.lock README.md alembic.ini ./
+COPY migrations ./migrations
+COPY src ./src
 ENV PATH=/app/backend/.venv/bin:$PATH \
+    PYTHONPATH=/app/backend/src \
     PYTHONUNBUFFERED=1 \
     PYTHONDONTWRITEBYTECODE=1 \
     FASTEMBED_CACHE_DIR=/data/fastembed \

@@ -19,14 +19,15 @@ WORKDIR /app/pipeline
 COPY pyproject.toml uv.lock seeds.yaml ./
 COPY curated ./curated
 COPY src ./src
-# Same locked versions as the backend, so this only adds the pipeline's own packages to the
-# backend's virtualenv (the backend package resolves to /app/backend through ../backend).
+# Same locked versions as the backend, so this only adds the pipeline's own third-party
+# packages to the backend's virtualenv. Both packages run from source through PYTHONPATH.
 RUN --mount=from=uv,source=/uv,target=/usr/local/bin/uv \
     UV_PROJECT_ENVIRONMENT=/app/backend/.venv UV_NO_CACHE=1 UV_PYTHON_DOWNLOADS=never \
-       uv sync --frozen --no-dev \
+       uv sync --frozen --no-dev --no-install-project --no-install-package backend \
     && mkdir -p data \
     && chown app:app data
-ENV PSQL_BIN=/usr/bin/psql
+ENV PSQL_BIN=/usr/bin/psql \
+    PYTHONPATH=/app/backend/src:/app/pipeline/src
 USER app
-ENTRYPOINT ["atlas-pipeline"]
+ENTRYPOINT ["python", "-m", "pipeline.cli"]
 CMD ["--help"]
