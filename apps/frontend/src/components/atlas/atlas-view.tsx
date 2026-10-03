@@ -14,10 +14,11 @@ import {
 import dynamic from "next/dynamic";
 import Link from "next/link";
 import { useSearchParams } from "next/navigation";
-import { useCallback, useEffect, useMemo, useRef, useState, useSyncExternalStore } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 
 import { GraphLegend } from "@/components/graph-ui";
 import { FamilyChips } from "@/components/node/family-chips";
+import { useReducedMotion } from "@/components/node/use-reduced-motion";
 import { ViewToggle, type ViewMode } from "@/components/node/view-toggle";
 import { useLens } from "@/components/providers/lens-provider";
 import { AtlasTour } from "@/components/tour/atlas-tour";
@@ -56,19 +57,6 @@ function CanvasLoading() {
     <div className="flex size-full items-center justify-center gap-2 text-sm text-muted-foreground" role="status">
       <Spinner className="size-4" /> Drawing the map…
     </div>
-  );
-}
-
-const reducedMotionQuery = "(prefers-reduced-motion: reduce)";
-function useReducedMotion() {
-  return useSyncExternalStore(
-    (cb) => {
-      const m = window.matchMedia(reducedMotionQuery);
-      m.addEventListener("change", cb);
-      return () => m.removeEventListener("change", cb);
-    },
-    () => window.matchMedia(reducedMotionQuery).matches,
-    () => false,
   );
 }
 
