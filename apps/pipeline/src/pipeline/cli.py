@@ -171,14 +171,12 @@ def snapshot() -> None:
 @app.command()
 def explain() -> None:
     """Pre-generate explanations for demo paths (backend CLI)."""
-    cmd = ["uv", "run", "--project", str(ROOT.parent / "backend"), "python", "-m", "backend.cli"]
-    cmd += ["precompute-explanations", "--language", "en", "--language", "de"]
+    cmd = [sys.executable, "-m", "backend.cli", "precompute-explanations"]
+    cmd += ["--language", "en", "--language", "de"]
+    # The backend reads its own .env relative to the working directory (repo layout only).
+    backend_dir = ROOT.parent / "backend"
     with _timed("explain"):
-        try:
-            proc = subprocess.run(cmd, cwd=ROOT.parent / "backend")
-        except FileNotFoundError:
-            log.warning("uv not found; skipping explanations")
-            return
+        proc = subprocess.run(cmd, cwd=backend_dir if backend_dir.is_dir() else None)
         if proc.returncode != 0:
             log.warning(
                 "backend.cli precompute-explanations unavailable or failed (exit %s); "
