@@ -107,6 +107,9 @@ export function useUploads({ onDone }: { onDone?: (done: UploadDone) => void } =
               onDoneRef.current?.({ key, documentId: done.documentId!, findingCount: done.findingCount ?? 0 });
             } else if (evt.type === "error") {
               finished = true;
+              if (evt.code === "sign_in_required" || evt.code === "llm_reauth_required") {
+                reportApiError(new ApiError("reauth_required", "Please sign in with ChatGPT again.", 401));
+              }
               fail(key, evt.code, evt.message);
             }
           },

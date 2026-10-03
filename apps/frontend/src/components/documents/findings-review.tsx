@@ -92,6 +92,18 @@ function Details({ f }: { f: Finding }) {
       </dl>
     );
   }
+  if (f.type === "candidate_edge") {
+    return (
+      <div className="space-y-1.5 text-sm">
+        <p>
+          <span className="font-medium">{str(p.source_label) ?? str(p.subject)}</span>
+          <span className="text-muted-foreground"> {str(p.relation)?.replaceAll("_", " ") ?? "related to"} </span>
+          <span className="font-medium">{str(p.target_label) ?? str(p.object)}</span>
+        </p>
+        {str(p.source_id_ref) && <p className="font-mono text-xs text-muted-foreground">{str(p.source_id_ref)}</p>}
+      </div>
+    );
+  }
   if (f.type === "phenotype" && p.excluded === true) {
     return <Badge variant="outline">Noted as not present</Badge>;
   }
@@ -109,7 +121,7 @@ function FindingCard({
 }) {
   const decided = f.confirmed === true ? "confirmed" : f.confirmed === false ? "rejected" : "open";
   const nodeType = NODE_TYPE[f.type];
-  const terms = [f.value, str(f.payload?.hgvs) ?? "", str(f.payload?.gene) ?? ""];
+  const terms = [f.value, str(f.payload?.hgvs) ?? "", str(f.payload?.gene) ?? "", str(f.payload?.symbol) ?? "", str(f.payload?.matched_synonym) ?? "", str(f.payload?.quote) ?? ""];
 
   return (
     <li
@@ -126,7 +138,7 @@ function FindingCard({
           <span className="font-mono text-[11px] tracking-[0.12em] text-muted-foreground uppercase">{TYPE_LABEL[f.type]}</span>
           {decided === "confirmed" && (
             <Badge variant="secondary">
-              <Check aria-hidden /> In your profile
+              <Check aria-hidden /> {f.type === "candidate_edge" ? "Confirmed" : "In your profile"}
             </Badge>
           )}
           {decided === "rejected" && <Badge variant="outline">Rejected, not used</Badge>}
@@ -140,7 +152,11 @@ function FindingCard({
         )}
         <Details f={f} />
         {f.type === "candidate_edge" && (
-          <p className="text-xs text-muted-foreground">If you confirm, it is suggested to the atlas as pending review. It is never used as evidence until checked.</p>
+          <p className="text-xs text-muted-foreground" data-testid="candidate-edge-note">
+            Confirming does not change your profile. If you have agreed to contribute and the paper has a DOI or PMID, the link is
+            suggested to the shared atlas as pending review and never used as evidence until checked; otherwise it stays a
+            private finding. Rejecting it, or deleting this document, withdraws the suggestion.
+          </p>
         )}
         {isVus(f) && <VusNotice />}
       </div>
@@ -223,7 +239,13 @@ export function FindingsReview({ documentId }: { documentId: string }) {
     try {
       await apiFetch(`/findings/${encodeURIComponent(f.id)}/${confirm ? "confirm" : "reject"}`, { method: "POST", quiet: true });
       setFindings((list) => list.map((x) => (x.id === f.id ? { ...x, confirmed: confirm, decided_at: new Date().toISOString() } : x)));
-      announce(confirm ? `${f.value} confirmed and added to your profile.` : `${f.value} rejected. It will not be used.`);
+      announce(
+        confirm
+          ? f.type === "candidate_edge"
+            ? `${f.value} confirmed.`
+            : `${f.value} confirmed and added to your profile.`
+          : `${f.value} rejected. It will not be used.`,
+      );
     } catch (e) {
       routeGlobalError(e);
       toast("Not saved", { description: "Please try again." });
@@ -270,7 +292,7 @@ export function FindingsReview({ documentId }: { documentId: string }) {
   }
 
   const open = findings.filter((f) => f.confirmed == null).length;
-  const confirmed = findings.filter((f) => f.confirmed === true).length;
+  const confirmed = findings.filter((f) => f.confirmed === true && f.type !== "candidate_edge").length;
   const reviewable = findings.length;
 
   return (
@@ -320,7 +342,8 @@ export function FindingsReview({ documentId }: { documentId: string }) {
 
       {reviewable === 0 ? (
         <p className="rounded-xl border border-dashed p-6 text-sm text-muted-foreground">
-          No findings were extracted from this document. You can delete it, or add details to your profile by hand.
+          No findings to review. Nothing in this document could be matched to diagnoses, genes, variants or symptoms in the
+          atlas, so nothing will be added. You can delete it, or add details to your profile by hand.
         </p>
       ) : (
         <>

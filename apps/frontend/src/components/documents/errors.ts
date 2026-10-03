@@ -60,9 +60,29 @@ export function uploadErrorMessage(code: string, serverMessage?: string): string
       return "Amber's server is not reachable. Please try again in a moment.";
     case "validation_error":
       return serverMessage || "This file could not be read. Please check it and try again.";
+    case "unreadable_document":
+      return "This document could not be read. Please try another copy, for example a PDF instead of a photo. Your original file has been deleted.";
+    case "encrypted_document":
+      return "This document is password-protected. Please upload a copy without a password. Your original file has been deleted.";
+    case "no_text_found":
+      return "No readable text was found in this document. A sharper photo or the original PDF may work better. Your original file has been deleted.";
+    case "llm_reauth_required":
+      return "Please sign in with ChatGPT again, then upload the document once more. Your original file has been deleted.";
+    case "llm_usage_limit_exceeded":
+      return "Your ChatGPT plan's usage limit has been reached. You can review usage and update settings for your plan in your ChatGPT settings, then try again. Your original file has been deleted.";
+    case "timeout":
+      return "Reading this document took too long. Please try again, or try a shorter document. Your original file has been deleted.";
+    case "cancelled":
+      return "Reading this document was cancelled. Your original file has been deleted.";
     case "upstream_error":
       return "A connected service did not respond. Your original file has been deleted; please try again.";
     default:
+      if (code.startsWith("ocr_")) {
+        return "Text recognition did not work for this image. Please try a PDF or a sharper photo. Your original file has been deleted.";
+      }
+      if (code.startsWith("llm_")) {
+        return "The AI service did not respond as expected. Please try again in a moment. Your original file has been deleted.";
+      }
       return serverMessage || "Something went wrong while reading this document. Your original file has been deleted.";
   }
 }
