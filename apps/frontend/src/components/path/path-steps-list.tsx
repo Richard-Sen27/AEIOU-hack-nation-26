@@ -17,6 +17,7 @@ export function PathStepsList({
   highlightedEdgeId,
   onOpenEdge,
   missing,
+  weak,
   heading = "Steps",
   idPrefix = "step",
 }: {
@@ -24,6 +25,8 @@ export function PathStepsList({
   highlightedEdgeId?: string | null;
   onOpenEdge: (edgeId: string) => void;
   missing?: MissingLinkView | null;
+  /** Weak links of an unsupported route, with what is missing. */
+  weak?: { ids: string[]; description?: string | null } | null;
   heading?: string;
   idPrefix?: string;
 }) {
@@ -41,6 +44,7 @@ export function PathStepsList({
       <ol className="relative space-y-2 border-l border-dashed border-border pl-5">
         {steps.map((s, i) => {
           const hl = highlightedEdgeId === s.edge.id;
+          const isWeak = !!weak?.ids.includes(s.edge.id);
           return (
             <li
               key={s.edge.id}
@@ -48,8 +52,10 @@ export function PathStepsList({
               data-testid="path-step"
               data-edge-id={s.edge.id}
               data-highlighted={hl || undefined}
+              data-weak={isWeak || undefined}
               className={cn(
                 "relative scroll-mt-24 rounded-lg border bg-card p-3 transition-shadow",
+                isWeak && "border-2 border-dashed border-confidence-low/60",
                 hl && "ring-3 ring-primary",
               )}
             >
@@ -60,6 +66,12 @@ export function PathStepsList({
                 {i + 1}
               </span>
               <span className="sr-only">Step {i + 1}: </span>
+              {isWeak && (
+                <p className="mb-2 text-sm font-semibold text-confidence-low" data-testid="weak-link-note">
+                  Missing link: this connection is below the confidence threshold
+                  {weak?.description ? <span className="mt-0.5 block font-normal text-foreground">{weak.description}</span> : null}
+                </p>
+              )}
               {/* Read in the stored direction so the relation stays true ("group supports people with condition"). */}
               <div className="flex flex-wrap items-center gap-x-2 gap-y-1.5 text-sm">
                 {(() => {

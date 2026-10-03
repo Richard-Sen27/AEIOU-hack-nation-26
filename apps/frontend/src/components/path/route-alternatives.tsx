@@ -62,7 +62,7 @@ export function RouteAlternatives({
                 {hyp === 0 ? "data only" : `${hyp} hypothesis link${hyp === 1 ? "" : "s"}`}
                 {flagged > 0 ? ` · ${flagged} under review` : ""}
               </span>
-              <span className="truncate text-xs">
+              <span className="line-clamp-2 text-xs">
                 via {p.steps.slice(0, -1).map((s) => s.to_node.label).join(" → ") || "a direct link"}
               </span>
             </label>

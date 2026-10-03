@@ -47,12 +47,22 @@ export function NoRouteReport({
     labels.set(s.to_node.id, s.to_node);
   }
   const ml = cov.missing_link ?? null;
+  const threshold = typeof data.threshold === "number" ? data.threshold : null;
   const lastId = steps.length ? steps[steps.length - 1].to_node.id : from.id;
-  // Draw the gap from the partial path's end towards the missing node.
+  const startId = steps[0]?.from_node.id ?? from.id;
+  const onPath = (id: string) => id === startId || steps.some((s) => s.to_node.id === id);
+  const joins = (a: string, b: string) =>
+    steps.find((s) => (s.from_node.id === a && s.to_node.id === b) || (s.from_node.id === b && s.to_node.id === a));
+  // The partial path may reach the destination but rest on a link below the
+  // threshold: then that link is the missing one, marked in place.
+  const weakStep = ml ? joins(ml.from_id, ml.to_id) : undefined;
+  const weakIds = steps
+    .filter((s) => s === weakStep || (threshold !== null && s.edge.confidence < threshold))
+    .map((s) => s.edge.id);
+  const reachesTarget = onPath(to.id) && steps.length > 0;
+  // Otherwise draw the gap (never a line) towards the node that can't be reached.
   let missing: MissingLinkView | null = null;
-  if (ml) {
-    const onPath = (id: string) =>
-      id === (steps[0]?.from_node.id ?? from.id) || steps.some((s) => s.to_node.id === id);
+  if (ml && !weakStep) {
     const [near, far] = onPath(ml.from_id)
       ? [ml.from_id, ml.to_id]
       : onPath(ml.to_id)
@@ -60,7 +70,7 @@ export function NoRouteReport({
         : [lastId, ml.to_id];
     const farNode = labels.get(far) ?? { id: far, label: far, type: "disease" };
     missing = { fromId: near, to: farNode, description: ml.description };
-  } else {
+  } else if (!ml && !reachesTarget) {
     missing = {
       fromId: lastId,
       to,
@@ -69,7 +79,6 @@ export function NoRouteReport({
   }
   const gapFrom = ml?.from_id ?? from.id;
   const gapTo = ml?.to_id ?? to.id;
-  const threshold = typeof data.threshold === "number" ? data.threshold : null;
   const sources = cov.sources_queried ?? [];
   const total = sources.reduce((n, s) => n + s.count, 0);
 
@@ -88,28 +97,33 @@ export function NoRouteReport({
         </p>
       </div>
 
+      <section className="space-y-3" aria-label="Closest partial route">
+        <div>
+          <h2 className="text-base font-semibold">Closest partial route</h2>
+          <p className="text-sm text-muted-foreground">
+            {partial
+              ? "The best chain Amber found. It is incomplete or rests on a link below the threshold, so it is not a route."
+              : "Amber found no partial chain worth showing."}
+          </p>
+        </div>
+        {(steps.length > 0 || missing) && (
+          <PathFlow
+            steps={steps}
+            missing={missing}
+            weakEdgeIds={weakIds}
+            onOpenEdge={onOpenEdge}
+            highlightedEdgeId={highlightedEdgeId}
+            label={`Incomplete route from ${from.label}: ${missing ? "it ends in a missing link" : "one or more links are below the threshold"}`}
+          />
+        )}
+      </section>
+
       <div className="grid gap-6 lg:grid-cols-[minmax(0,2fr)_minmax(0,1fr)]">
         <div className="min-w-0 space-y-4">
-          <div>
-            <h2 className="text-base font-semibold">Closest partial route</h2>
-            <p className="text-sm text-muted-foreground">
-              {partial
-                ? "The best chain Amber found. It is incomplete and below the threshold, so it is not a route."
-                : "Amber found no partial chain worth showing."}
-            </p>
-          </div>
-          {(partial || missing) && (
-            <PathFlow
-              steps={steps}
-              missing={missing}
-              onOpenEdge={onOpenEdge}
-              highlightedEdgeId={highlightedEdgeId}
-              label={`Incomplete route from ${from.label}, ending in a missing link`}
-            />
-          )}
           <PathStepsList
             steps={steps}
             missing={missing}
+            weak={weakIds.length ? { ids: weakIds } : null}
             onOpenEdge={onOpenEdge}
             highlightedEdgeId={highlightedEdgeId}
             heading="Partial route, step by step"

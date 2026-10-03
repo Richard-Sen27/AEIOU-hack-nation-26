@@ -50,6 +50,8 @@ type TrustEdgeData = {
   delay: number;
   reduce: boolean;
   highlighted: boolean;
+  /** Below the confidence threshold: the weak link of an unsupported route. */
+  weak: boolean;
   labelStyle: LabelStyle;
   onOpen: (edgeId: string) => void;
 };
@@ -121,7 +123,7 @@ const Waypoint = memo(function Waypoint({ data }: NodeProps<FlowNode<WaypointDat
 function TrustEdge({ id, sourceX, sourceY, targetX, targetY, data }: EdgeProps<FlowEdge<TrustEdgeData>>) {
   const [path, labelX, labelY] = getStraightPath({ sourceX, sourceY, targetX, targetY });
   if (!data) return null;
-  const { edge, delay, reduce, highlighted, labelStyle, onOpen, reversed, orientation } = data;
+  const { edge, delay, reduce, highlighted, labelStyle, onOpen, reversed, orientation, weak } = data;
   const arrow = orientation === "horizontal" ? (reversed ? "←" : "→") : reversed ? "↑" : "↓";
   const v = edgeVisual(edge);
   const origin = ORIGIN_META[edge.origin];
@@ -160,9 +162,11 @@ function TrustEdge({ id, sourceX, sourceY, targetX, targetY, data }: EdgeProps<F
             data-edge-id={edge.id}
             data-origin={edge.origin}
             data-highlighted={highlighted || undefined}
+            data-weak={weak || undefined}
             className={cn(
               "flex max-w-[170px] flex-col items-center gap-1 rounded-lg border bg-popover/95 px-2 py-1.5 text-center shadow-sm outline-none backdrop-blur transition hover:shadow-md focus-visible:ring-3 focus-visible:ring-ring/60",
               edge.origin !== "observed" && "border-dashed border-foreground/40",
+              weak && "border-2 border-dashed border-confidence-low/70",
               highlighted && "ring-3 ring-primary",
             )}
           >
@@ -189,6 +193,9 @@ function TrustEdge({ id, sourceX, sourceY, targetX, targetY, data }: EdgeProps<F
                   {edge.status === "under_review" ? <Flag className="size-2.5 text-status-flag" aria-hidden /> : <Hourglass className="size-2.5 text-status-flag" aria-hidden />}
                   {edge.status === "under_review" ? "Under review" : "Pending"}
                 </span>
+              )}
+              {weak && (
+                <span className="rounded-full bg-confidence-low/15 px-1.5 py-px font-semibold text-confidence-low">Below threshold</span>
               )}
               {contradicted && (
                 <span className="rounded-full bg-confidence-low/15 px-1.5 py-px text-confidence-low">Contradicted</span>
@@ -251,6 +258,7 @@ export type MissingLinkView = {
 export function PathFlow({
   steps,
   highlightedEdgeId,
+  weakEdgeIds,
   onOpenEdge,
   missing,
   className,
@@ -258,6 +266,8 @@ export function PathFlow({
 }: {
   steps: PathStep[];
   highlightedEdgeId?: string | null;
+  /** Edges to mark as the weak (unsupported) links. */
+  weakEdgeIds?: string[];
   onOpenEdge: (edgeId: string) => void;
   /** Render the route as incomplete, ending in a missing link. */
   missing?: MissingLinkView | null;
@@ -328,6 +338,7 @@ export function PathFlow({
         delay: i * STEP_STAGGER + STEP_STAGGER / 2,
         reduce,
         highlighted: highlightedEdgeId === s.edge.id,
+        weak: !!weakEdgeIds?.includes(s.edge.id),
         labelStyle,
         onOpen: onOpenEdge,
       } satisfies TrustEdgeData,
@@ -344,7 +355,7 @@ export function PathFlow({
       });
     }
     return { nodes, edges, count: total };
-  }, [steps, missing, orientation, reduce, labelStyle, highlightedEdgeId, onOpenEdge]);
+  }, [steps, missing, orientation, reduce, labelStyle, highlightedEdgeId, weakEdgeIds, onOpenEdge]);
 
   const height = orientation === "horizontal" ? 230 : Math.max(260, count * GAP_Y - 40);
 
@@ -366,7 +377,7 @@ export function PathFlow({
         edgeTypes={edgeTypes}
         colorMode={resolvedTheme === "dark" ? "dark" : "light"}
         fitView
-        fitViewOptions={{ padding: orientation === "horizontal" ? 0.05 : 0.08, maxZoom: 1 }}
+        fitViewOptions={{ padding: orientation === "horizontal" ? 0.05 : 0.08, maxZoom: 1, minZoom: 0.6 }}
         minZoom={0.3}
         maxZoom={1.6}
         nodesDraggable={false}
