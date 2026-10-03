@@ -33,7 +33,7 @@ from pipeline.extract.common import (
     write_fingerprint,
 )
 from pipeline.http import get_client
-from pipeline.paths import CURATED, NORMALIZED, RAW
+from pipeline.paths import CURATED, ENV_FILE, NORMALIZED, RAW
 
 log = logging.getLogger(__name__)
 
@@ -43,7 +43,9 @@ SOURCE_TYPE = "patient_org_site"
 
 
 class BrightDataSettings(BaseSettings):
-    model_config = SettingsConfigDict(env_prefix="BRIGHTDATA_", extra="ignore")
+    model_config = SettingsConfigDict(
+        env_prefix="BRIGHTDATA_", env_file=ENV_FILE, extra="ignore"
+    )
 
     serp_zone: str | None = None
     max_results_per_query: int = 5

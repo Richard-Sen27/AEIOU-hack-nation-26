@@ -29,7 +29,7 @@ from pipeline.extract.common import (
     write_fingerprint,
 )
 from pipeline.http import get_client
-from pipeline.paths import RAW
+from pipeline.paths import ENV_FILE, RAW
 
 log = logging.getLogger(__name__)
 
@@ -38,7 +38,9 @@ API = "https://clinicaltrials.gov/api/v2/studies"
 
 
 class TrialsSettings(BaseSettings):
-    model_config = SettingsConfigDict(env_prefix="CLINICALTRIALS_", extra="ignore")
+    model_config = SettingsConfigDict(
+        env_prefix="CLINICALTRIALS_", env_file=ENV_FILE, extra="ignore"
+    )
 
     max_per_seed_gene: int = 50
     max_per_gene: int = 10

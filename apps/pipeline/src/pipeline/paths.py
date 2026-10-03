@@ -12,5 +12,6 @@ SCOPE_DIR = DATA / "scope"
 SCOPE_FILE = SCOPE_DIR / "scope.json"
 LOGS = DATA / "logs"
 
+ENV_FILE = ROOT / ".env"  # read by every settings class
 SEEDS_FILE = ROOT / "seeds.yaml"
 CURATED = ROOT / "curated"

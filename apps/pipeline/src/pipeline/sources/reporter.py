@@ -31,7 +31,7 @@ from pipeline.extract.common import (
     write_fingerprint,
 )
 from pipeline.http import get_client
-from pipeline.paths import NORMALIZED, RAW
+from pipeline.paths import ENV_FILE, NORMALIZED, RAW
 
 log = logging.getLogger(__name__)
 
@@ -40,7 +40,9 @@ API = "https://api.reporter.nih.gov/v2/projects/search"
 
 
 class ReporterSettings(BaseSettings):
-    model_config = SettingsConfigDict(env_prefix="REPORTER_", extra="ignore")
+    model_config = SettingsConfigDict(
+        env_prefix="REPORTER_", env_file=ENV_FILE, extra="ignore"
+    )
 
     max_per_seed_term: int = 100
     max_per_term: int = 10

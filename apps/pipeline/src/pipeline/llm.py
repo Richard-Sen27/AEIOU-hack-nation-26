@@ -23,7 +23,7 @@ from pydantic import BaseModel
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
 from pipeline.config import settings
-from pipeline.paths import CACHE
+from pipeline.paths import CACHE, ENV_FILE
 
 log = logging.getLogger(__name__)
 
@@ -33,7 +33,9 @@ STOP_CODES = {"usage_limit_exceeded", "usage_unavailable", "reauth_required"}
 
 
 class LLMSettings(BaseSettings):
-    model_config = SettingsConfigDict(env_prefix="PIPELINE_LLM_", extra="ignore")
+    model_config = SettingsConfigDict(
+        env_prefix="PIPELINE_LLM_", env_file=ENV_FILE, extra="ignore"
+    )
 
     max_calls: int = 300  # uncached model calls per run; cache hits are free
     disabled: bool = False
