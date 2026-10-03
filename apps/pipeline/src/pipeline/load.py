@@ -5,6 +5,7 @@ from __future__ import annotations
 
 import json
 import logging
+import os
 import subprocess
 from pathlib import Path
 from typing import Any
@@ -12,7 +13,7 @@ from typing import Any
 import polars as pl
 
 from pipeline.build import FINAL, read_graph, require_validated
-from pipeline.config import settings
+from pipeline.config import psql_path, settings
 from pipeline.paths import GRAPH, RAW, ROOT
 
 log = logging.getLogger(__name__)
@@ -68,6 +69,8 @@ COMMIT;
 
 
 def pipeline_commit() -> str:
+    if commit := os.environ.get("PIPELINE_COMMIT"):
+        return commit.strip()
     try:
         out = subprocess.run(
             ["git", "rev-parse", "HEAD"], cwd=ROOT, capture_output=True, text=True, check=True
@@ -133,7 +136,7 @@ def counts(tables: dict[str, pl.DataFrame]) -> dict[str, Any]:
 
 
 def psql(script: str, variables: dict[str, str] | None = None) -> None:
-    cmd = [settings.psql_bin, settings.pipeline_database_url, "-X", "-q", "-v", "ON_ERROR_STOP=1"]
+    cmd = [psql_path(), settings.pipeline_database_url, "-X", "-q", "-v", "ON_ERROR_STOP=1"]
     for k, v in (variables or {}).items():
         cmd += ["-v", f"{k}={v}"]
     proc = subprocess.run(cmd, input=script, text=True, capture_output=True)

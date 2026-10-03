@@ -1,13 +1,15 @@
+import shutil
+
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
-from pipeline.paths import ROOT
+from pipeline.paths import ENV_FILE
 
 
 class Settings(BaseSettings):
-    model_config = SettingsConfigDict(env_file=ROOT / ".env", extra="ignore")
+    model_config = SettingsConfigDict(env_file=ENV_FILE, extra="ignore")
 
     pipeline_database_url: str = "postgresql://atlas_pipeline:atlas_pipeline@localhost:5432/atlas"
-    psql_bin: str = "/opt/homebrew/bin/psql"
+    psql_bin: str | None = None  # PSQL_BIN; defaults to psql on PATH
 
     ncbi_api_key: str | None = None
     omim_api_key: str | None = None
@@ -40,3 +42,10 @@ def rate_for(source: str) -> float:
     if source == "pubmed" and settings.ncbi_api_key:
         return 10.0
     return settings.rates.get(source, settings.default_rate)
+
+
+def psql_path() -> str:
+    path = settings.psql_bin or shutil.which("psql")
+    if not path:
+        raise SystemExit("psql not found: install the PostgreSQL client or set PSQL_BIN")
+    return path
