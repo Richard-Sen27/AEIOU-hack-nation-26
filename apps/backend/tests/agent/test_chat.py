@@ -410,3 +410,10 @@ async def test_session_title_is_redacted(doctor, user_llm):
     title = sessions[0]["title"]
     assert title and "Johanna" not in title and "Mustermann" not in title
     assert "STXBP1" in title
+
+
+async def test_reply_kind_absent_on_old_stored_replies():
+    from backend.schemas.chat import AgentReply
+
+    old = {**draft(), "chips": []}
+    assert AgentReply.model_validate(old).kind is None

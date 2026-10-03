@@ -83,11 +83,12 @@ class AgentReply(ApiModel):
     ai_notice: str | None = Field(
         None, description="Always set by the server: the reply comes from an AI system."
     )
-    kind: ReplyKind = Field(
-        "answer",
-        description="Set by the server: answer (default), emergency (call emergency services, "
-        "no graph answer) or declined (part of the question crossed the medical boundary and "
-        "was declined; graph context may still follow).",
+    kind: ReplyKind | None = Field(
+        None,
+        description="Always set by the server on new replies: answer, emergency (call emergency "
+        "services, no graph answer) or declined (part of the question crossed the medical "
+        "boundary and was declined; graph context may still follow). Null only on replies "
+        "stored before this field existed.",
     )
 
 
