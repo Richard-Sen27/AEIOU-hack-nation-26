@@ -43,6 +43,17 @@ async def test_guest_without_cache_gets_401(client):
     assert resp.json()["error"]["code"] == "sign_in_required"
 
 
+async def test_unconfirmed_age_gets_403_unless_cached(make_user, user_llm):
+    user = await make_user(role="patient", age_confirmed=False)
+    resp = await user.client.post("/explain", json={"edge_ids": [COUNTEREXAMPLE, PENDING]})
+    assert resp.status_code == 403
+    assert resp.json()["error"]["code"] == "age_confirmation_required"
+    status, events = await post_sse(
+        user.client, "/explain", {"edge_ids": DEMO["path_edge_ids"], "role": "guest"}
+    )
+    assert status == 200 and events[-1]["cached"] is True
+
+
 async def test_unknown_edge_404(make_user, user_llm):
     user = await make_user(role="patient")
     resp = await user.client.post("/explain", json={"edge_ids": ["e_ffffffffffff"]})
