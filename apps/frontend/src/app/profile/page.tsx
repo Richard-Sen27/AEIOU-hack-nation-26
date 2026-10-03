@@ -1,21 +1,21 @@
 import type { Metadata } from "next";
 
-import { PagePlaceholder } from "@/components/shell/page-placeholder";
+import { ProfilePage } from "@/components/account/profile-page";
+import { PageContainer, PageHeader } from "@/components/shell/page-placeholder";
 
 export const metadata: Metadata = { title: "Profile" };
 
-export default function ProfilePage() {
+export default function Page() {
   return (
-    <PagePlaceholder
-      eyebrow="Profile"
-      title="Your profile"
-      description="What Amber uses to find connections for you. Every field is editable, and only things you confirmed are here."
-      planned={[
-        "Role, language and expert mode",
-        "Confirmed diagnoses, genes, variants and symptoms (GET/PUT /profile)",
-        "Consents for upload and contribute, each withdrawable in one step",
-        "Export all your data, or delete your account",
-      ]}
-    />
+    <PageContainer className="max-w-6xl">
+      <PageHeader
+        eyebrow="Profile and privacy"
+        title="Your profile"
+        description="Your health profile, settings, consents and data in one place. You are in control of all of it."
+      />
+      <div className="mt-8">
+        <ProfilePage />
+      </div>
+    </PageContainer>
   );
 }
