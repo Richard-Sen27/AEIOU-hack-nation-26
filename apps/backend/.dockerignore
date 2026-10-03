@@ -1,0 +1,10 @@
+# Allowlist: only what the image needs. Never .env (secrets come from the env file at run time).
+*
+!pyproject.toml
+!uv.lock
+!README.md
+!alembic.ini
+!migrations/
+!src/
+**/__pycache__
+**/*.pyc
