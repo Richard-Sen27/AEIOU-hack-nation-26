@@ -28,6 +28,7 @@ export type AtlasCanvasHandle = {
   zoomOut: () => void;
   reset: () => void;
   focusNode: (id: string) => void;
+  focusEdges: (ids: string[]) => void;
 };
 
 type Props = {
@@ -37,6 +38,8 @@ type Props = {
   visibleTypes: Set<NodeType>;
   visibleFamilies: Set<EdgeFamily>;
   selectedId: string | null;
+  /** Edge ids to highlight as a path (`/atlas?path=`); unknown ids are ignored. */
+  pathEdgeIds?: string[];
   onSelect: (id: string | null) => void;
   onHover?: (id: string | null) => void;
   onError?: () => void;
@@ -95,6 +98,12 @@ export const AtlasCanvas = forwardRef<AtlasCanvasHandle, Props>(function AtlasCa
       if (c) animate({ ratio: Math.min(c.getState().ratio * 1.6, 4) });
     },
     reset: () => animate({ x: 0.5, y: 0.5, ratio: 1 }),
+    focusEdges: (ids: string[]) => {
+      const sigma = sigmaRef.current;
+      if (!sigma) return;
+      const cam = frameEdges(sigma, ids.filter((id) => sigma.getGraph().hasEdge(id)));
+      if (cam) animate(cam);
+    },
     focusNode: (id: string) => {
       const sigma = sigmaRef.current;
       if (!sigma || !sigma.getGraph().hasNode(id)) return;
@@ -136,14 +145,25 @@ export const AtlasCanvas = forwardRef<AtlasCanvasHandle, Props>(function AtlasCa
       });
     }
 
-    function focusSet(): { focus: string | null; near: Set<string> | null } {
-      const focus = hovered.current ?? propsRef.current.selectedId;
-      if (!focus || !graph.hasNode(focus)) return { focus: null, near: null };
-      return { focus, near: propsRef.current.index.neighbors.get(focus) ?? new Set() };
+    type Focus = { focus: string | null; near: Set<string> | null; path: Set<string> | null };
+    function focusSet(): Focus {
+      const { pathEdgeIds, index: idx, selectedId } = propsRef.current;
+      // A path (from `?path=`) wins over the selection's neighbourhood until the user hovers.
+      if (!hovered.current && pathEdgeIds && pathEdgeIds.length > 0) {
+        const path = new Set(pathEdgeIds.filter((id) => graph.hasEdge(id)));
+        if (path.size > 0) {
+          const near = new Set<string>();
+          path.forEach((id) => graph.extremities(id).forEach((n) => near.add(n)));
+          return { focus: selectedId && graph.hasNode(selectedId) ? selectedId : null, near, path };
+        }
+      }
+      const focus = hovered.current ?? selectedId;
+      if (!focus || !graph.hasNode(focus)) return { focus: null, near: null, path: null };
+      return { focus, near: idx.neighbors.get(focus) ?? new Set(), path: null };
     }
-    let cache = { key: "", value: focusSet() };
+    let cache: { key: string; value: Focus } = { key: "", value: focusSet() };
     const getFocus = () => {
-      const key = `${hovered.current}|${propsRef.current.selectedId}`;
+      const key = `${hovered.current}|${propsRef.current.selectedId}|${propsRef.current.pathEdgeIds?.join(",") ?? ""}`;
       if (cache.key !== key) cache = { key, value: focusSet() };
       return cache.value;
     };
@@ -211,8 +231,12 @@ export const AtlasCanvas = forwardRef<AtlasCanvasHandle, Props>(function AtlasCa
       return;
     }
     sigmaRef.current = sigma;
+    const initialPath = (propsRef.current.pathEdgeIds ?? []).filter((id) => graph.hasEdge(id));
     const initial = propsRef.current.selectedId;
-    if (initial && graph.hasNode(initial)) {
+    if (initialPath.length > 0) {
+      const cam = frameEdges(sigma, initialPath);
+      if (cam) sigma.getCamera().setState(cam);
+    } else if (initial && graph.hasNode(initial)) {
       const d = sigma.getNodeDisplayData(initial);
       if (d) sigma.getCamera().setState({ x: d.x, y: d.y, ratio: 0.3 });
     }
@@ -230,11 +254,11 @@ export const AtlasCanvas = forwardRef<AtlasCanvasHandle, Props>(function AtlasCa
       const { visibleTypes, theme, selectedId } = propsRef.current;
       const res: Partial<NodeDisplayData> & { label?: string | null } = { ...data, color: nodeColor(data) };
       if (!visibleTypes.has(data.nodeType)) return { ...res, hidden: true };
-      const { focus, near } = getFocus();
-      if (focus) {
+      const { focus, near, path } = getFocus();
+      if (focus || path) {
         if (node === focus || near?.has(node)) {
           res.zIndex = node === focus ? 2 : 1;
-          res.forceLabel = node === focus || (near?.size ?? 0) <= 40;
+          res.forceLabel = node === focus || !!path || (near?.size ?? 0) <= 40;
           if (node === selectedId || node === focus) res.highlighted = true;
         } else {
           res.color = theme.border;
@@ -251,8 +275,12 @@ export const AtlasCanvas = forwardRef<AtlasCanvasHandle, Props>(function AtlasCa
       if (!visibleFamilies.has(data.family)) return { hidden: true };
       const { s, t } = data;
       if (!visibleTypes.has(data.st) || !visibleTypes.has(data.tt)) return { hidden: true };
-      const { focus } = getFocus();
+      const { focus, path } = getFocus();
       const base = data.flagged ? theme.statusFlag : theme.edge[data.family];
+      if (path) {
+        if (!path.has(_edge)) return { hidden: true };
+        return { ...data, color: withAlpha(base, 1), size: data.size * 3.2, zIndex: 2 };
+      }
       if (focus) {
         if (s !== focus && t !== focus) return { hidden: true };
         return {
@@ -340,7 +368,7 @@ export const AtlasCanvas = forwardRef<AtlasCanvasHandle, Props>(function AtlasCa
     if (!sigma) return;
     sigma.setSetting("labelColor", { color: props.theme.label });
     sigma.refresh();
-  }, [props.theme, props.colorBy, props.visibleTypes, props.visibleFamilies, props.selectedId]);
+  }, [props.theme, props.colorBy, props.visibleTypes, props.visibleFamilies, props.selectedId, props.pathEdgeIds]);
 
   const onKeyDown = (e: React.KeyboardEvent) => {
     const sigma = sigmaRef.current;
@@ -385,3 +413,22 @@ export const AtlasCanvas = forwardRef<AtlasCanvasHandle, Props>(function AtlasCa
 });
 
 export default AtlasCanvas;
+
+/** Camera state that frames the endpoints of the given edges. */
+function frameEdges(sigma: Sigma<NodeAttrs, EdgeAttrs>, edgeIds: string[]) {
+  const graph = sigma.getGraph();
+  let minX = Infinity, minY = Infinity, maxX = -Infinity, maxY = -Infinity;
+  for (const id of edgeIds) {
+    for (const n of graph.extremities(id)) {
+      const d = sigma.getNodeDisplayData(n);
+      if (!d) continue;
+      minX = Math.min(minX, d.x);
+      maxX = Math.max(maxX, d.x);
+      minY = Math.min(minY, d.y);
+      maxY = Math.max(maxY, d.y);
+    }
+  }
+  if (!Number.isFinite(minX)) return null;
+  const ratio = Math.min(1, Math.max(0.12, Math.max(maxX - minX, maxY - minY) * 1.6));
+  return { x: (minX + maxX) / 2, y: (minY + maxY) / 2, ratio };
+}

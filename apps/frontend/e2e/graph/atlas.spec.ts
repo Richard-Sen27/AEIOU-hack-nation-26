@@ -31,6 +31,20 @@ test.describe("atlas", () => {
     expect(errors()).toEqual([]);
   });
 
+  test("?path= highlights the listed edges and ignores unknown ids", async ({ page }) => {
+    await mockApi(page, graphMocks());
+    const errors = trackConsoleErrors(page);
+    await page.goto("/atlas?focus=MONDO%3A9900003&path=e_3b8845b635b8,e_0af807385728,e_558f7d2a940d,e_nope");
+    await expect(page.getByTestId("atlas-path-banner")).toContainText("path of 3 connections");
+    await expect(page.getByTestId("atlas-panel").getByRole("heading", { level: 2 })).toContainText("SCN2A developmental");
+    await page.waitForTimeout(400);
+    await shot(page, "atlas-path-desktop");
+    await page.getByRole("button", { name: "Show everything" }).click();
+    await expect(page.getByTestId("atlas-path-banner")).toBeHidden();
+    await expect(page).not.toHaveURL(/path=/);
+    expect(errors()).toEqual([]);
+  });
+
   test("unknown focus id says so", async ({ page }) => {
     await mockApi(page, graphMocks());
     await page.goto("/atlas?focus=MONDO%3A404");

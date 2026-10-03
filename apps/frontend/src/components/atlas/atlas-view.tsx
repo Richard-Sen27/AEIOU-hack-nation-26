@@ -64,6 +64,7 @@ export function AtlasView() {
   const params = useSearchParams();
   const focusParam = params.get("focus");
   const tourParam = params.get("tour") === "1";
+  const pathParam = params.get("path");
   const { role, labelStyle } = useLens();
   const theme = useGraphTheme();
   const reducedMotion = useReducedMotion();
@@ -100,6 +101,15 @@ export function AtlasView() {
   }, [attempt]);
 
   const index = load.kind === "ready" ? load.index : null;
+  const [pathCleared, setPathCleared] = useState(false);
+  const pathEdgeIds = useMemo(() => {
+    if (!index || !pathParam || pathCleared) return [];
+    return pathParam
+      .split(",")
+      .map((s) => s.trim())
+      .filter((id) => id && index.edges.has(id))
+      .slice(0, 50);
+  }, [index, pathParam, pathCleared]);
 
   // `?focus=<id>`: select it (also when the URL changes later) and centre the camera.
   const [prevFocus, setPrevFocus] = useState(focusParam);
@@ -108,11 +118,17 @@ export function AtlasView() {
     if (focusParam) setSelected(focusParam);
   }
   const missingFocus = index && selected && !index.nodes.has(selected) ? selected : null;
+  const pathKey = pathParam ?? "";
   useEffect(() => {
-    if (!index || !focusParam || !index.nodes.has(focusParam)) return;
-    const id = requestAnimationFrame(() => canvas.current?.focusNode(focusParam));
+    if (!index) return;
+    const edgeIds = pathKey.split(",").filter((id) => index.edges.has(id));
+    if (edgeIds.length === 0 && (!focusParam || !index.nodes.has(focusParam))) return;
+    const id = requestAnimationFrame(() => {
+      if (edgeIds.length > 0) canvas.current?.focusEdges(edgeIds);
+      else if (focusParam) canvas.current?.focusNode(focusParam);
+    });
     return () => cancelAnimationFrame(id);
-  }, [index, focusParam]);
+  }, [index, focusParam, pathKey]);
 
   const select = useCallback(
     (id: string | null, { center = false } = {}) => {
@@ -323,6 +339,7 @@ export function AtlasView() {
               visibleTypes={visibleTypes}
               visibleFamilies={visibleFamilies}
               selectedId={selected}
+              pathEdgeIds={pathEdgeIds}
               onSelect={(id) => select(id)}
               onError={() => setCanvasFailed(true)}
               reducedMotion={reducedMotion}
@@ -351,6 +368,26 @@ export function AtlasView() {
               </p>
             )}
             <AtlasList index={idx} visibleTypes={visibleTypes} selectedId={selected} onSelect={(id) => select(id)} />
+          </div>
+        )}
+
+        {pathEdgeIds.length > 0 && view === "graph" && (
+          <div className="absolute top-3 left-1/2 z-10 flex -translate-x-1/2 items-center gap-3 rounded-full border bg-card py-1 pr-1 pl-3 text-sm shadow-md" role="status" data-testid="atlas-path-banner">
+            <span>
+              Showing a path of {pathEdgeIds.length} connection{pathEdgeIds.length === 1 ? "" : "s"}
+            </span>
+            <Button
+              variant="ghost"
+              size="xs"
+              onClick={() => {
+                setPathCleared(true);
+                const url = new URL(window.location.href);
+                url.searchParams.delete("path");
+                window.history.replaceState(null, "", url.pathname + url.search);
+              }}
+            >
+              Show everything
+            </Button>
           </div>
         )}
 
