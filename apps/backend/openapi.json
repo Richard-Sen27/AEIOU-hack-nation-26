@@ -54,7 +54,7 @@
           "auth"
         ],
         "summary": "Auth Start",
-        "description": "Redirect to OpenAI (OIDC + PKCE).",
+        "description": "Redirect to OpenAI (OIDC + PKCE). Failures redirect to the frontend with ?auth_error=.",
         "operationId": "authStart",
         "parameters": [
           {
@@ -80,16 +80,6 @@
           "302": {
             "description": "Successful Response"
           },
-          "501": {
-            "description": "not_implemented",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/ErrorResponse"
-                }
-              }
-            }
-          },
           "422": {
             "description": "Validation Error",
             "content": {
@@ -109,31 +99,11 @@
           "auth"
         ],
         "summary": "Auth Callback",
-        "description": "OAuth callback: sets the session cookie and redirects back.",
+        "description": "OAuth callback: sets the session cookie and redirects back (?auth_error=denied|failed).",
         "operationId": "authCallback",
         "responses": {
           "302": {
             "description": "Successful Response"
-          },
-          "400": {
-            "description": "bad_request",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/ErrorResponse"
-                }
-              }
-            }
-          },
-          "501": {
-            "description": "not_implemented",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/ErrorResponse"
-                }
-              }
-            }
           }
         }
       }
@@ -149,26 +119,6 @@
         "responses": {
           "302": {
             "description": "Successful Response"
-          },
-          "400": {
-            "description": "bad_request",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/ErrorResponse"
-                }
-              }
-            }
-          },
-          "501": {
-            "description": "not_implemented",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/ErrorResponse"
-                }
-              }
-            }
           }
         }
       }
@@ -179,21 +129,11 @@
           "auth"
         ],
         "summary": "Logout",
-        "description": "Clear the session.",
+        "description": "Revoke the stored OpenAI tokens (best effort), delete them and clear the session.",
         "operationId": "logout",
         "responses": {
           "204": {
             "description": "Successful Response"
-          },
-          "501": {
-            "description": "not_implemented",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/ErrorResponse"
-                }
-              }
-            }
           }
         }
       }
@@ -256,7 +196,7 @@
           "account"
         ],
         "summary": "Export My Data",
-        "description": "All user data as JSON.",
+        "description": "All user data as JSON (tokens excluded).",
         "operationId": "exportMyData",
         "responses": {
           "200": {
@@ -279,8 +219,8 @@
               }
             }
           },
-          "501": {
-            "description": "not_implemented",
+          "429": {
+            "description": "rate_limited",
             "content": {
               "application/json": {
                 "schema": {
@@ -298,7 +238,7 @@
           "account"
         ],
         "summary": "Delete Me",
-        "description": "Delete the account and everything in it; clears the session.",
+        "description": "Delete the account and everything in it; revokes ChatGPT tokens; clears the session.",
         "operationId": "deleteMe",
         "responses": {
           "204": {
@@ -314,8 +254,8 @@
               }
             }
           },
-          "501": {
-            "description": "not_implemented",
+          "429": {
+            "description": "rate_limited",
             "content": {
               "application/json": {
                 "schema": {
@@ -333,7 +273,7 @@
           "account"
         ],
         "summary": "Get Profile",
-        "description": "The user's PatientProfile.",
+        "description": "The user's PatientProfile; `updated_at` is the token for the next PUT.",
         "operationId": "getProfile",
         "responses": {
           "200": {
@@ -355,16 +295,6 @@
                 }
               }
             }
-          },
-          "501": {
-            "description": "not_implemented",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/ErrorResponse"
-                }
-              }
-            }
           }
         }
       },
@@ -373,7 +303,7 @@
           "account"
         ],
         "summary": "Put Profile",
-        "description": "Replace the PatientProfile.",
+        "description": "Replace the PatientProfile. Send `updated_at` from the last GET; 409 if it changed.",
         "operationId": "putProfile",
         "requestBody": {
           "content": {
@@ -406,8 +336,8 @@
               }
             }
           },
-          "422": {
-            "description": "validation_error: lists invalid field names only.",
+          "403": {
+            "description": "consent_required (no active consent of the needed type) or forbidden.",
             "content": {
               "application/json": {
                 "schema": {
@@ -416,8 +346,18 @@
               }
             }
           },
-          "501": {
-            "description": "not_implemented",
+          "409": {
+            "description": "conflict",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "validation_error: lists invalid field names only.",
             "content": {
               "application/json": {
                 "schema": {
@@ -435,7 +375,7 @@
           "account"
         ],
         "summary": "List Consents",
-        "description": "The user's consents.",
+        "description": "The user's consents, active and revoked.",
         "operationId": "listConsents",
         "responses": {
           "200": {
@@ -461,16 +401,6 @@
                 }
               }
             }
-          },
-          "501": {
-            "description": "not_implemented",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/ErrorResponse"
-                }
-              }
-            }
           }
         }
       },
@@ -479,7 +409,7 @@
           "account"
         ],
         "summary": "Grant Consent",
-        "description": "Grant a consent.",
+        "description": "Grant a consent (upload or contribute, each separately).",
         "operationId": "grantConsent",
         "requestBody": {
           "content": {
@@ -512,8 +442,8 @@
               }
             }
           },
-          "422": {
-            "description": "validation_error: lists invalid field names only.",
+          "403": {
+            "description": "consent_required (no active consent of the needed type) or forbidden.",
             "content": {
               "application/json": {
                 "schema": {
@@ -522,8 +452,18 @@
               }
             }
           },
-          "501": {
-            "description": "not_implemented",
+          "409": {
+            "description": "conflict",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "validation_error: lists invalid field names only.",
             "content": {
               "application/json": {
                 "schema": {
@@ -569,16 +509,6 @@
           },
           "404": {
             "description": "not_found",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/ErrorResponse"
-                }
-              }
-            }
-          },
-          "501": {
-            "description": "not_implemented",
             "content": {
               "application/json": {
                 "schema": {
@@ -944,7 +874,7 @@
           "graph"
         ],
         "summary": "Get Atlas",
-        "description": "Compact whole-graph layout for the Atlas view.",
+        "description": "Compact whole-graph layout for the Atlas view (ETag keyed on data_version).",
         "operationId": "getAtlas",
         "responses": {
           "200": {
@@ -956,6 +886,9 @@
                 }
               }
             }
+          },
+          "304": {
+            "description": "Not modified (If-None-Match matched the ETag)."
           },
           "501": {
             "description": "not_implemented",
@@ -2209,16 +2142,6 @@
                 }
               }
             }
-          },
-          "501": {
-            "description": "not_implemented",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/ErrorResponse"
-                }
-              }
-            }
           }
         }
       },
@@ -2227,7 +2150,7 @@
           "contributions"
         ],
         "summary": "Create Contribution",
-        "description": "Contribute a patient-reported profile or asset (status pending_review).",
+        "description": "Contribute a phenotype profile, an asset or a candidate edge (status pending_review).",
         "operationId": "createContribution",
         "requestBody": {
           "content": {
@@ -2280,8 +2203,8 @@
               }
             }
           },
-          "501": {
-            "description": "not_implemented",
+          "429": {
+            "description": "rate_limited",
             "content": {
               "application/json": {
                 "schema": {
@@ -2299,7 +2222,7 @@
           "contributions"
         ],
         "summary": "Delete Contribution",
-        "description": "Delete one of the user's contributions.",
+        "description": "Delete one of the user's contributions; it leaves the shared graph.",
         "operationId": "deleteContribution",
         "parameters": [
           {
@@ -2337,16 +2260,6 @@
               }
             }
           },
-          "501": {
-            "description": "not_implemented",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/ErrorResponse"
-                }
-              }
-            }
-          },
           "422": {
             "description": "Validation Error",
             "content": {
@@ -2366,7 +2279,7 @@
           "contributions"
         ],
         "summary": "Flag Edge",
-        "description": "Flag an edge; it is shown as under_review.",
+        "description": "Flag an edge; it is shown as under_review for everyone while the flag is open.",
         "operationId": "flagEdge",
         "parameters": [
           {
@@ -2410,6 +2323,16 @@
               }
             }
           },
+          "403": {
+            "description": "consent_required (no active consent of the needed type) or forbidden.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
           "404": {
             "description": "not_found",
             "content": {
@@ -2440,8 +2363,8 @@
               }
             }
           },
-          "501": {
-            "description": "not_implemented",
+          "429": {
+            "description": "rate_limited",
             "content": {
               "application/json": {
                 "schema": {
@@ -2750,6 +2673,29 @@
                 "type": "null"
               }
             ]
+          },
+          "gap_search": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/GapSearchRequest"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "Set when no supported route exists: body for POST /gap-search to look for the missing evidence."
+          },
+          "ai_notice": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Ai Notice",
+            "description": "Always set by the server: the reply comes from an AI system."
           }
         },
         "type": "object",
@@ -3009,7 +2955,7 @@
             "type": "string",
             "contentMediaType": "application/octet-stream",
             "title": "File",
-            "description": "PDF, PNG, JPEG, HEIC or DOCX; max 20 MB, 30 pages."
+            "description": "PDF, PNG, JPEG, HEIC, DOCX or plain text; max 20 MB, 30 pages."
           }
         },
         "type": "object",
@@ -3081,6 +3027,91 @@
         ],
         "title": "CandidateEdge",
         "description": "A candidate edge found by the gap-search agent. Never promoted automatically."
+      },
+      "CandidateEdgeContributionCreate": {
+        "properties": {
+          "kind": {
+            "type": "string",
+            "const": "candidate_edge",
+            "title": "Kind"
+          },
+          "payload": {
+            "$ref": "#/components/schemas/CandidateEdgePayload"
+          }
+        },
+        "type": "object",
+        "required": [
+          "kind",
+          "payload"
+        ],
+        "title": "CandidateEdgeContributionCreate"
+      },
+      "CandidateEdgePayload": {
+        "properties": {
+          "source_id": {
+            "type": "string",
+            "maxLength": 80,
+            "title": "Source Id",
+            "description": "Graph node ID (MONDO:, HGNC:, HP:, ...)."
+          },
+          "target_id": {
+            "type": "string",
+            "maxLength": 80,
+            "title": "Target Id",
+            "description": "Graph node ID."
+          },
+          "relation": {
+            "$ref": "#/components/schemas/Relation"
+          },
+          "source_url": {
+            "anyOf": [
+              {
+                "type": "string",
+                "maxLength": 500
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Source Url",
+            "description": "Public source URL."
+          },
+          "source_id_ref": {
+            "anyOf": [
+              {
+                "type": "string",
+                "maxLength": 40
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Source Id Ref",
+            "description": "Public source identifier (PMID:..., NCT...)."
+          },
+          "quote": {
+            "anyOf": [
+              {
+                "type": "string",
+                "maxLength": 500
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Quote",
+            "description": "Supporting span from the source."
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "required": [
+          "source_id",
+          "target_id",
+          "relation"
+        ],
+        "title": "CandidateEdgePayload",
+        "description": "A candidate edge from a researcher's paper or a gap-search result (public sources only)."
       },
       "Card": {
         "properties": {
@@ -3955,6 +3986,11 @@
           "status": {
             "$ref": "#/components/schemas/ContributionStatus"
           },
+          "origin": {
+            "$ref": "#/components/schemas/Origin",
+            "description": "patient_reported, or user_contributed for candidate edges.",
+            "default": "patient_reported"
+          },
           "consent_id": {
             "anyOf": [
               {
@@ -3990,14 +4026,18 @@
           },
           {
             "$ref": "#/components/schemas/AssetContributionCreate"
+          },
+          {
+            "$ref": "#/components/schemas/CandidateEdgeContributionCreate"
           }
         ],
         "title": "ContributionCreate",
-        "description": "A patient-reported contribution; needs an active 'contribute' consent.",
+        "description": "A user contribution; needs an active 'contribute' consent.",
         "discriminator": {
           "propertyName": "kind",
           "mapping": {
             "asset": "#/components/schemas/AssetContributionCreate",
+            "candidate_edge": "#/components/schemas/CandidateEdgeContributionCreate",
             "phenotype_profile": "#/components/schemas/PhenotypeProfileContributionCreate"
           }
         }
@@ -4006,7 +4046,8 @@
         "type": "string",
         "enum": [
           "phenotype_profile",
-          "asset"
+          "asset",
+          "candidate_edge"
         ],
         "title": "ContributionKind"
       },
@@ -4082,6 +4123,17 @@
             "type": "boolean",
             "title": "Openai Connected",
             "description": "Tokens exist (the tokens are not exported)."
+          },
+          "openai_connection": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/OpenAIConnection"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "Scopes and expiry of the ChatGPT connection, without tokens."
           },
           "consents": {
             "items": {
@@ -4454,6 +4506,7 @@
           "bad_request",
           "sign_in_required",
           "consent_required",
+          "age_confirmation_required",
           "forbidden",
           "not_found",
           "conflict",
@@ -5812,6 +5865,46 @@
         ],
         "title": "NodeType"
       },
+      "OpenAIConnection": {
+        "properties": {
+          "scopes": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array",
+            "title": "Scopes"
+          },
+          "expires_at": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "date-time"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Expires At"
+          },
+          "connected_at": {
+            "type": "string",
+            "format": "date-time",
+            "title": "Connected At"
+          },
+          "updated_at": {
+            "type": "string",
+            "format": "date-time",
+            "title": "Updated At"
+          }
+        },
+        "type": "object",
+        "required": [
+          "connected_at",
+          "updated_at"
+        ],
+        "title": "OpenAIConnection",
+        "description": "That a ChatGPT connection exists; the tokens themselves are never exported."
+      },
       "Origin": {
         "type": "string",
         "enum": [
@@ -6902,6 +6995,12 @@
             "type": "array",
             "title": "Consents",
             "description": "Active consents."
+          },
+          "gpc_opt_out": {
+            "type": "boolean",
+            "title": "Gpc Opt Out",
+            "description": "A Global Privacy Control signal was recorded for this account.",
+            "default": false
           }
         },
         "type": "object",

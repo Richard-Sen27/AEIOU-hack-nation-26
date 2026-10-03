@@ -2,7 +2,7 @@
 
 import { type Client, type ClientMeta, formDataBodySerializer, type Options as Options2, type RequestResult, type ServerSentEventsResult, type TDataShape } from './client';
 import { client } from './client.gen';
-import type { AuthCallbackData, AuthCallbackErrors, AuthLoopbackCallbackData, AuthLoopbackCallbackErrors, AuthStartData, AuthStartErrors, ChatData, ChatErrors, ChatResponse, ChatResponses, ConfirmFindingData, ConfirmFindingErrors, ConfirmFindingResponses, CreateContributionData, CreateContributionErrors, CreateContributionResponses, CreateProposalData, CreateProposalErrors, CreateProposalResponses, DeleteChatSessionData, DeleteChatSessionErrors, DeleteChatSessionResponses, DeleteContributionData, DeleteContributionErrors, DeleteContributionResponses, DeleteDocumentData, DeleteDocumentErrors, DeleteDocumentResponses, DeleteMeData, DeleteMeErrors, DeleteMeResponses, ExplainPathData, ExplainPathErrors, ExplainPathResponse, ExplainPathResponses, ExportGraphData, ExportGraphErrors, ExportGraphResponses, ExportMyDataData, ExportMyDataErrors, ExportMyDataResponses, FindPathData, FindPathErrors, FindPathResponses, FlagEdgeData, FlagEdgeErrors, FlagEdgeResponses, GapSearchData, GapSearchErrors, GapSearchResponse, GapSearchResponses, GetAtlasData, GetAtlasErrors, GetAtlasResponses, GetChatSessionData, GetChatSessionErrors, GetChatSessionResponses, GetEdgeEvidenceData, GetEdgeEvidenceErrors, GetEdgeEvidenceResponses, GetNeighborhoodData, GetNeighborhoodErrors, GetNeighborhoodResponses, GetNodeData, GetNodeErrors, GetNodeResponses, GetProfileData, GetProfileErrors, GetProfileResponses, GetSessionData, GetSessionResponses, GrantConsentData, GrantConsentErrors, GrantConsentResponses, HealthData, HealthResponses, ListChatSessionsData, ListChatSessionsErrors, ListChatSessionsResponses, ListClustersData, ListClustersErrors, ListClustersResponses, ListConsentsData, ListConsentsErrors, ListConsentsResponses, ListContributionsData, ListContributionsErrors, ListContributionsResponses, ListDocumentsData, ListDocumentsErrors, ListDocumentsResponses, ListFindingsData, ListFindingsErrors, ListFindingsResponses, LogoutData, LogoutErrors, LogoutResponses, PutProfileData, PutProfileErrors, PutProfileResponses, RejectFindingData, RejectFindingErrors, RejectFindingResponses, RevokeConsentData, RevokeConsentErrors, RevokeConsentResponses, SearchData, SearchErrors, SearchResponses, StreamJobData, StreamJobErrors, StreamJobResponse, StreamJobResponses, UpdateSettingsData, UpdateSettingsErrors, UpdateSettingsResponses, UploadDocumentData, UploadDocumentErrors, UploadDocumentResponses } from './types.gen';
+import type { AuthCallbackData, AuthLoopbackCallbackData, AuthStartData, AuthStartErrors, ChatData, ChatErrors, ChatResponse, ChatResponses, ConfirmFindingData, ConfirmFindingErrors, ConfirmFindingResponses, CreateContributionData, CreateContributionErrors, CreateContributionResponses, CreateProposalData, CreateProposalErrors, CreateProposalResponses, DeleteChatSessionData, DeleteChatSessionErrors, DeleteChatSessionResponses, DeleteContributionData, DeleteContributionErrors, DeleteContributionResponses, DeleteDocumentData, DeleteDocumentErrors, DeleteDocumentResponses, DeleteMeData, DeleteMeErrors, DeleteMeResponses, ExplainPathData, ExplainPathErrors, ExplainPathResponse, ExplainPathResponses, ExportGraphData, ExportGraphErrors, ExportGraphResponses, ExportMyDataData, ExportMyDataErrors, ExportMyDataResponses, FindPathData, FindPathErrors, FindPathResponses, FlagEdgeData, FlagEdgeErrors, FlagEdgeResponses, GapSearchData, GapSearchErrors, GapSearchResponse, GapSearchResponses, GetAtlasData, GetAtlasErrors, GetAtlasResponses, GetChatSessionData, GetChatSessionErrors, GetChatSessionResponses, GetEdgeEvidenceData, GetEdgeEvidenceErrors, GetEdgeEvidenceResponses, GetNeighborhoodData, GetNeighborhoodErrors, GetNeighborhoodResponses, GetNodeData, GetNodeErrors, GetNodeResponses, GetProfileData, GetProfileErrors, GetProfileResponses, GetSessionData, GetSessionResponses, GrantConsentData, GrantConsentErrors, GrantConsentResponses, HealthData, HealthResponses, ListChatSessionsData, ListChatSessionsErrors, ListChatSessionsResponses, ListClustersData, ListClustersErrors, ListClustersResponses, ListConsentsData, ListConsentsErrors, ListConsentsResponses, ListContributionsData, ListContributionsErrors, ListContributionsResponses, ListDocumentsData, ListDocumentsErrors, ListDocumentsResponses, ListFindingsData, ListFindingsErrors, ListFindingsResponses, LogoutData, LogoutResponses, PutProfileData, PutProfileErrors, PutProfileResponses, RejectFindingData, RejectFindingErrors, RejectFindingResponses, RevokeConsentData, RevokeConsentErrors, RevokeConsentResponses, SearchData, SearchErrors, SearchResponses, StreamJobData, StreamJobErrors, StreamJobResponse, StreamJobResponses, UpdateSettingsData, UpdateSettingsErrors, UpdateSettingsResponses, UploadDocumentData, UploadDocumentErrors, UploadDocumentResponses } from './types.gen';
 
 export type Options<TData extends TDataShape = TDataShape, ThrowOnError extends boolean = boolean, TResponse = unknown> = Options2<TData, ThrowOnError, TResponse> & {
     /**
@@ -33,30 +33,30 @@ export const getSession = <ThrowOnError extends boolean = false>(options?: Optio
 /**
  * Auth Start
  *
- * Redirect to OpenAI (OIDC + PKCE).
+ * Redirect to OpenAI (OIDC + PKCE). Failures redirect to the frontend with ?auth_error=.
  */
 export const authStart = <ThrowOnError extends boolean = false>(options?: Options<AuthStartData, ThrowOnError>): RequestResult<unknown, AuthStartErrors, ThrowOnError> => (options?.client ?? client).get<unknown, AuthStartErrors, ThrowOnError>({ url: '/auth/chatgpt/start', ...options });
 
 /**
  * Auth Callback
  *
- * OAuth callback: sets the session cookie and redirects back.
+ * OAuth callback: sets the session cookie and redirects back (?auth_error=denied|failed).
  */
-export const authCallback = <ThrowOnError extends boolean = false>(options?: Options<AuthCallbackData, ThrowOnError>): RequestResult<unknown, AuthCallbackErrors, ThrowOnError> => (options?.client ?? client).get<unknown, AuthCallbackErrors, ThrowOnError>({ url: '/auth/chatgpt/callback', ...options });
+export const authCallback = <ThrowOnError extends boolean = false>(options?: Options<AuthCallbackData, ThrowOnError>): RequestResult<unknown, unknown, ThrowOnError> => (options?.client ?? client).get<unknown, unknown, ThrowOnError>({ url: '/auth/chatgpt/callback', ...options });
 
 /**
  * Auth Loopback Callback
  *
  * Same handler on the loopback redirect path the local OAuth flow requires.
  */
-export const authLoopbackCallback = <ThrowOnError extends boolean = false>(options?: Options<AuthLoopbackCallbackData, ThrowOnError>): RequestResult<unknown, AuthLoopbackCallbackErrors, ThrowOnError> => (options?.client ?? client).get<unknown, AuthLoopbackCallbackErrors, ThrowOnError>({ url: '/auth/callback', ...options });
+export const authLoopbackCallback = <ThrowOnError extends boolean = false>(options?: Options<AuthLoopbackCallbackData, ThrowOnError>): RequestResult<unknown, unknown, ThrowOnError> => (options?.client ?? client).get<unknown, unknown, ThrowOnError>({ url: '/auth/callback', ...options });
 
 /**
  * Logout
  *
- * Clear the session.
+ * Revoke the stored OpenAI tokens (best effort), delete them and clear the session.
  */
-export const logout = <ThrowOnError extends boolean = false>(options?: Options<LogoutData, ThrowOnError>): RequestResult<LogoutResponses, LogoutErrors, ThrowOnError> => (options?.client ?? client).post<LogoutResponses, LogoutErrors, ThrowOnError>({ url: '/auth/logout', ...options });
+export const logout = <ThrowOnError extends boolean = false>(options?: Options<LogoutData, ThrowOnError>): RequestResult<LogoutResponses, unknown, ThrowOnError> => (options?.client ?? client).post<LogoutResponses, unknown, ThrowOnError>({ url: '/auth/logout', ...options });
 
 /**
  * Update Settings
@@ -75,28 +75,28 @@ export const updateSettings = <ThrowOnError extends boolean = false>(options: Op
 /**
  * Export My Data
  *
- * All user data as JSON.
+ * All user data as JSON (tokens excluded).
  */
 export const exportMyData = <ThrowOnError extends boolean = false>(options?: Options<ExportMyDataData, ThrowOnError>): RequestResult<ExportMyDataResponses, ExportMyDataErrors, ThrowOnError> => (options?.client ?? client).get<ExportMyDataResponses, ExportMyDataErrors, ThrowOnError>({ url: '/me/export', ...options });
 
 /**
  * Delete Me
  *
- * Delete the account and everything in it; clears the session.
+ * Delete the account and everything in it; revokes ChatGPT tokens; clears the session.
  */
 export const deleteMe = <ThrowOnError extends boolean = false>(options?: Options<DeleteMeData, ThrowOnError>): RequestResult<DeleteMeResponses, DeleteMeErrors, ThrowOnError> => (options?.client ?? client).delete<DeleteMeResponses, DeleteMeErrors, ThrowOnError>({ url: '/me', ...options });
 
 /**
  * Get Profile
  *
- * The user's PatientProfile.
+ * The user's PatientProfile; `updated_at` is the token for the next PUT.
  */
 export const getProfile = <ThrowOnError extends boolean = false>(options?: Options<GetProfileData, ThrowOnError>): RequestResult<GetProfileResponses, GetProfileErrors, ThrowOnError> => (options?.client ?? client).get<GetProfileResponses, GetProfileErrors, ThrowOnError>({ url: '/profile', ...options });
 
 /**
  * Put Profile
  *
- * Replace the PatientProfile.
+ * Replace the PatientProfile. Send `updated_at` from the last GET; 409 if it changed.
  */
 export const putProfile = <ThrowOnError extends boolean = false>(options: Options<PutProfileData, ThrowOnError>): RequestResult<PutProfileResponses, PutProfileErrors, ThrowOnError> => (options.client ?? client).put<PutProfileResponses, PutProfileErrors, ThrowOnError>({
     url: '/profile',
@@ -110,14 +110,14 @@ export const putProfile = <ThrowOnError extends boolean = false>(options: Option
 /**
  * List Consents
  *
- * The user's consents.
+ * The user's consents, active and revoked.
  */
 export const listConsents = <ThrowOnError extends boolean = false>(options?: Options<ListConsentsData, ThrowOnError>): RequestResult<ListConsentsResponses, ListConsentsErrors, ThrowOnError> => (options?.client ?? client).get<ListConsentsResponses, ListConsentsErrors, ThrowOnError>({ url: '/consents', ...options });
 
 /**
  * Grant Consent
  *
- * Grant a consent.
+ * Grant a consent (upload or contribute, each separately).
  */
 export const grantConsent = <ThrowOnError extends boolean = false>(options: Options<GrantConsentData, ThrowOnError>): RequestResult<GrantConsentResponses, GrantConsentErrors, ThrowOnError> => (options.client ?? client).post<GrantConsentResponses, GrantConsentErrors, ThrowOnError>({
     url: '/consents',
@@ -166,7 +166,7 @@ export const listClusters = <ThrowOnError extends boolean = false>(options?: Opt
 /**
  * Get Atlas
  *
- * Compact whole-graph layout for the Atlas view.
+ * Compact whole-graph layout for the Atlas view (ETag keyed on data_version).
  */
 export const getAtlas = <ThrowOnError extends boolean = false>(options?: Options<GetAtlasData, ThrowOnError>): RequestResult<GetAtlasResponses, GetAtlasErrors, ThrowOnError> => (options?.client ?? client).get<GetAtlasResponses, GetAtlasErrors, ThrowOnError>({ url: '/atlas.json', ...options });
 
@@ -321,7 +321,7 @@ export const listContributions = <ThrowOnError extends boolean = false>(options?
 /**
  * Create Contribution
  *
- * Contribute a patient-reported profile or asset (status pending_review).
+ * Contribute a phenotype profile, an asset or a candidate edge (status pending_review).
  */
 export const createContribution = <ThrowOnError extends boolean = false>(options: Options<CreateContributionData, ThrowOnError>): RequestResult<CreateContributionResponses, CreateContributionErrors, ThrowOnError> => (options.client ?? client).post<CreateContributionResponses, CreateContributionErrors, ThrowOnError>({
     url: '/contributions',
@@ -335,14 +335,14 @@ export const createContribution = <ThrowOnError extends boolean = false>(options
 /**
  * Delete Contribution
  *
- * Delete one of the user's contributions.
+ * Delete one of the user's contributions; it leaves the shared graph.
  */
 export const deleteContribution = <ThrowOnError extends boolean = false>(options: Options<DeleteContributionData, ThrowOnError>): RequestResult<DeleteContributionResponses, DeleteContributionErrors, ThrowOnError> => (options.client ?? client).delete<DeleteContributionResponses, DeleteContributionErrors, ThrowOnError>({ url: '/contributions/{contribution_id}', ...options });
 
 /**
  * Flag Edge
  *
- * Flag an edge; it is shown as under_review.
+ * Flag an edge; it is shown as under_review for everyone while the flag is open.
  */
 export const flagEdge = <ThrowOnError extends boolean = false>(options: Options<FlagEdgeData, ThrowOnError>): RequestResult<FlagEdgeResponses, FlagEdgeErrors, ThrowOnError> => (options.client ?? client).post<FlagEdgeResponses, FlagEdgeErrors, ThrowOnError>({
     url: '/edges/{edge_id}/flag',

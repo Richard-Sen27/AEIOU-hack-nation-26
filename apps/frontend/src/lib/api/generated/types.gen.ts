@@ -121,6 +121,16 @@ export type AgentReply = {
      */
     actions: Array<Action>;
     follow_up: FollowUp | null;
+    /**
+     * Set when no supported route exists: body for POST /gap-search to look for the missing evidence.
+     */
+    gap_search?: GapSearchRequest | null;
+    /**
+     * Ai Notice
+     *
+     * Always set by the server: the reply comes from an AI system.
+     */
+    ai_notice?: string | null;
 };
 
 /**
@@ -256,7 +266,7 @@ export type BodyUploadDocument = {
     /**
      * File
      *
-     * PDF, PNG, JPEG, HEIC or DOCX; max 20 MB, 30 pages.
+     * PDF, PNG, JPEG, HEIC, DOCX or plain text; max 20 MB, 30 pages.
      */
     file: Blob | File;
 };
@@ -307,6 +317,56 @@ export type CandidateEdge = {
      * Always pending_review.
      */
     status?: 'pending_review';
+};
+
+/**
+ * CandidateEdgeContributionCreate
+ */
+export type CandidateEdgeContributionCreate = {
+    /**
+     * Kind
+     */
+    kind: 'candidate_edge';
+    payload: CandidateEdgePayload;
+};
+
+/**
+ * CandidateEdgePayload
+ *
+ * A candidate edge from a researcher's paper or a gap-search result (public sources only).
+ */
+export type CandidateEdgePayload = {
+    /**
+     * Source Id
+     *
+     * Graph node ID (MONDO:, HGNC:, HP:, ...).
+     */
+    source_id: string;
+    /**
+     * Target Id
+     *
+     * Graph node ID.
+     */
+    target_id: string;
+    relation: Relation;
+    /**
+     * Source Url
+     *
+     * Public source URL.
+     */
+    source_url?: string | null;
+    /**
+     * Source Id Ref
+     *
+     * Public source identifier (PMID:..., NCT...).
+     */
+    source_id_ref?: string | null;
+    /**
+     * Quote
+     *
+     * Supporting span from the source.
+     */
+    quote?: string | null;
 };
 
 /**
@@ -906,6 +966,10 @@ export type Contribution = {
     };
     status: ContributionStatus;
     /**
+     * patient_reported, or user_contributed for candidate edges.
+     */
+    origin?: Origin;
+    /**
      * Consent Id
      */
     consent_id?: string | null;
@@ -918,18 +982,20 @@ export type Contribution = {
 /**
  * ContributionCreate
  *
- * A patient-reported contribution; needs an active 'contribute' consent.
+ * A user contribution; needs an active 'contribute' consent.
  */
 export type ContributionCreate = ({
     kind: 'phenotype_profile';
 } & PhenotypeProfileContributionCreate) | ({
     kind: 'asset';
-} & AssetContributionCreate);
+} & AssetContributionCreate) | ({
+    kind: 'candidate_edge';
+} & CandidateEdgeContributionCreate);
 
 /**
  * ContributionKind
  */
-export type ContributionKind = 'phenotype_profile' | 'asset';
+export type ContributionKind = 'phenotype_profile' | 'asset' | 'candidate_edge';
 
 /**
  * ContributionStatus
@@ -975,6 +1041,10 @@ export type DataExport = {
      * Tokens exist (the tokens are not exported).
      */
     openai_connected: boolean;
+    /**
+     * Scopes and expiry of the ChatGPT connection, without tokens.
+     */
+    openai_connection?: OpenAiConnection | null;
     /**
      * Consents
      */
@@ -1199,7 +1269,7 @@ export type EdgeStatus = 'active' | 'pending_review' | 'under_review';
 /**
  * ErrorCode
  */
-export type ErrorCode = 'bad_request' | 'sign_in_required' | 'consent_required' | 'forbidden' | 'not_found' | 'conflict' | 'payload_too_large' | 'unsupported_media_type' | 'validation_error' | 'rate_limited' | 'not_implemented' | 'upstream_error' | 'reauth_required' | 'internal_error';
+export type ErrorCode = 'bad_request' | 'sign_in_required' | 'consent_required' | 'age_confirmation_required' | 'forbidden' | 'not_found' | 'conflict' | 'payload_too_large' | 'unsupported_media_type' | 'validation_error' | 'rate_limited' | 'not_implemented' | 'upstream_error' | 'reauth_required' | 'internal_error';
 
 /**
  * ErrorDetail
@@ -2051,6 +2121,30 @@ export type NodeDetail = {
 export type NodeType = 'disease' | 'gene' | 'variant' | 'mechanism' | 'pathway' | 'phenotype' | 'paper' | 'claim' | 'researcher' | 'doctor' | 'institution' | 'network' | 'grant' | 'trial' | 'patient_org' | 'registry' | 'cluster';
 
 /**
+ * OpenAIConnection
+ *
+ * That a ChatGPT connection exists; the tokens themselves are never exported.
+ */
+export type OpenAiConnection = {
+    /**
+     * Scopes
+     */
+    scopes?: Array<string>;
+    /**
+     * Expires At
+     */
+    expires_at?: string | null;
+    /**
+     * Connected At
+     */
+    connected_at: string;
+    /**
+     * Updated At
+     */
+    updated_at: string;
+};
+
+/**
  * Origin
  */
 export type Origin = 'observed' | 'inferred' | 'patient_reported' | 'user_contributed';
@@ -2708,6 +2802,12 @@ export type SessionUser = {
      * Active consents.
      */
     consents?: Array<ConsentType>;
+    /**
+     * Gpc Opt Out
+     *
+     * A Global Privacy Control signal was recorded for this account.
+     */
+    gpc_opt_out?: boolean;
 };
 
 /**
@@ -2846,10 +2946,6 @@ export type AuthStartErrors = {
      * Validation Error
      */
     422: HttpValidationError;
-    /**
-     * not_implemented
-     */
-    501: ErrorResponse;
 };
 
 export type AuthStartError = AuthStartErrors[keyof AuthStartErrors];
@@ -2861,19 +2957,6 @@ export type AuthCallbackData = {
     url: '/auth/chatgpt/callback';
 };
 
-export type AuthCallbackErrors = {
-    /**
-     * bad_request
-     */
-    400: ErrorResponse;
-    /**
-     * not_implemented
-     */
-    501: ErrorResponse;
-};
-
-export type AuthCallbackError = AuthCallbackErrors[keyof AuthCallbackErrors];
-
 export type AuthLoopbackCallbackData = {
     body?: never;
     path?: never;
@@ -2881,34 +2964,12 @@ export type AuthLoopbackCallbackData = {
     url: '/auth/callback';
 };
 
-export type AuthLoopbackCallbackErrors = {
-    /**
-     * bad_request
-     */
-    400: ErrorResponse;
-    /**
-     * not_implemented
-     */
-    501: ErrorResponse;
-};
-
-export type AuthLoopbackCallbackError = AuthLoopbackCallbackErrors[keyof AuthLoopbackCallbackErrors];
-
 export type LogoutData = {
     body?: never;
     path?: never;
     query?: never;
     url: '/auth/logout';
 };
-
-export type LogoutErrors = {
-    /**
-     * not_implemented
-     */
-    501: ErrorResponse;
-};
-
-export type LogoutError = LogoutErrors[keyof LogoutErrors];
 
 export type LogoutResponses = {
     /**
@@ -2961,9 +3022,9 @@ export type ExportMyDataErrors = {
      */
     401: ErrorResponse;
     /**
-     * not_implemented
+     * rate_limited
      */
-    501: ErrorResponse;
+    429: ErrorResponse;
 };
 
 export type ExportMyDataError = ExportMyDataErrors[keyof ExportMyDataErrors];
@@ -2990,9 +3051,9 @@ export type DeleteMeErrors = {
      */
     401: ErrorResponse;
     /**
-     * not_implemented
+     * rate_limited
      */
-    501: ErrorResponse;
+    429: ErrorResponse;
 };
 
 export type DeleteMeError = DeleteMeErrors[keyof DeleteMeErrors];
@@ -3018,10 +3079,6 @@ export type GetProfileErrors = {
      * sign_in_required: guest, or the session expired.
      */
     401: ErrorResponse;
-    /**
-     * not_implemented
-     */
-    501: ErrorResponse;
 };
 
 export type GetProfileError = GetProfileErrors[keyof GetProfileErrors];
@@ -3048,13 +3105,17 @@ export type PutProfileErrors = {
      */
     401: ErrorResponse;
     /**
+     * consent_required (no active consent of the needed type) or forbidden.
+     */
+    403: ErrorResponse;
+    /**
+     * conflict
+     */
+    409: ErrorResponse;
+    /**
      * validation_error: lists invalid field names only.
      */
     422: ErrorResponse;
-    /**
-     * not_implemented
-     */
-    501: ErrorResponse;
 };
 
 export type PutProfileError = PutProfileErrors[keyof PutProfileErrors];
@@ -3080,10 +3141,6 @@ export type ListConsentsErrors = {
      * sign_in_required: guest, or the session expired.
      */
     401: ErrorResponse;
-    /**
-     * not_implemented
-     */
-    501: ErrorResponse;
 };
 
 export type ListConsentsError = ListConsentsErrors[keyof ListConsentsErrors];
@@ -3112,13 +3169,17 @@ export type GrantConsentErrors = {
      */
     401: ErrorResponse;
     /**
+     * consent_required (no active consent of the needed type) or forbidden.
+     */
+    403: ErrorResponse;
+    /**
+     * conflict
+     */
+    409: ErrorResponse;
+    /**
      * validation_error: lists invalid field names only.
      */
     422: ErrorResponse;
-    /**
-     * not_implemented
-     */
-    501: ErrorResponse;
 };
 
 export type GrantConsentError = GrantConsentErrors[keyof GrantConsentErrors];
@@ -3154,10 +3215,6 @@ export type RevokeConsentErrors = {
      * Validation Error
      */
     422: HttpValidationError;
-    /**
-     * not_implemented
-     */
-    501: ErrorResponse;
 };
 
 export type RevokeConsentError = RevokeConsentErrors[keyof RevokeConsentErrors];
@@ -4059,10 +4116,6 @@ export type ListContributionsErrors = {
      * sign_in_required: guest, or the session expired.
      */
     401: ErrorResponse;
-    /**
-     * not_implemented
-     */
-    501: ErrorResponse;
 };
 
 export type ListContributionsError = ListContributionsErrors[keyof ListContributionsErrors];
@@ -4099,9 +4152,9 @@ export type CreateContributionErrors = {
      */
     422: ErrorResponse;
     /**
-     * not_implemented
+     * rate_limited
      */
-    501: ErrorResponse;
+    429: ErrorResponse;
 };
 
 export type CreateContributionError = CreateContributionErrors[keyof CreateContributionErrors];
@@ -4140,10 +4193,6 @@ export type DeleteContributionErrors = {
      * Validation Error
      */
     422: HttpValidationError;
-    /**
-     * not_implemented
-     */
-    501: ErrorResponse;
 };
 
 export type DeleteContributionError = DeleteContributionErrors[keyof DeleteContributionErrors];
@@ -4175,6 +4224,10 @@ export type FlagEdgeErrors = {
      */
     401: ErrorResponse;
     /**
+     * consent_required (no active consent of the needed type) or forbidden.
+     */
+    403: ErrorResponse;
+    /**
      * not_found
      */
     404: ErrorResponse;
@@ -4187,9 +4240,9 @@ export type FlagEdgeErrors = {
      */
     422: ErrorResponse;
     /**
-     * not_implemented
+     * rate_limited
      */
-    501: ErrorResponse;
+    429: ErrorResponse;
 };
 
 export type FlagEdgeError = FlagEdgeErrors[keyof FlagEdgeErrors];
