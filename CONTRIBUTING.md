@@ -37,4 +37,4 @@ Project for **Hack-Nation 7 (2026)**.
 
 ## AI assistants
 
-Rules for Claude Code live in `CLAUDE.md`; the `/commit` skill is in `.claude/skills/commit/`.
+Shared rules for Claude Code and Codex live in `AGENTS.md` (`CLAUDE.md` imports it). The `commit` skill is in `.claude/skills/commit/`, symlinked to `.agents/skills/commit/` for Codex.
