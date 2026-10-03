@@ -99,7 +99,9 @@ async def test_atlas_etag_and_caching(client):
     assert etag.startswith('"fixture.')
     assert "max-age" in resp.headers["cache-control"]
     body = resp.json()
-    assert len(body["nodes"]) == 69 and len(body["edges"]) == 136
+    # other suites may leave shared contributions behind; count the pipeline graph only
+    assert len([n for n in body["nodes"] if not n["id"].startswith("CONTRIB:")]) == 69
+    assert len([e for e in body["edges"] if not e["id"].startswith("c_")]) == 136
     assert body["data_version"] == "fixture"
     assert all(n["x"] is not None for n in body["nodes"])
     again = await client.get("/atlas.json", headers={"If-None-Match": etag})

@@ -530,6 +530,11 @@ def build_contribution_overlay(
             diseases = [d for d in payload.get("disease_ids") or () if d in store.nodes]
             nid = _overlay_id(CONTRIB_NODE_PREFIX, str(row["id"]))
             anchor = store.nodes[diseases[0]] if diseases else None
+            h = int(hashlib.sha1(nid.encode()).hexdigest()[:8], 16)
+            if anchor is not None and anchor.x is not None and anchor.y is not None:
+                x, y = anchor.x + 40, anchor.y + 40
+            else:
+                x, y = float(h % 2000 - 1000), float((h >> 11) % 2000 - 1000)
             nodes[nid] = Node(
                 id=nid,
                 type=NodeType.registry,
@@ -542,8 +547,8 @@ def build_contribution_overlay(
                     "status": EdgeStatus.pending_review.value,
                     "contributed": True,
                 },
-                x=(anchor.x + 40) if anchor and anchor.x is not None else None,
-                y=(anchor.y + 40) if anchor and anchor.y is not None else None,
+                x=x,
+                y=y,
             )
             for disease in diseases:
                 edge = _overlay_edge(
