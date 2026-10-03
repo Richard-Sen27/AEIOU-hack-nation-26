@@ -25,6 +25,7 @@ from backend.schemas.enums import (
     edge_id,
 )
 
+from pipeline.config import settings
 from pipeline.contracts import read_table
 from pipeline.paths import GRAPH
 
@@ -86,10 +87,57 @@ def merge_nodes(nodes: pl.DataFrame) -> dict[str, dict[str, Any]]:
     return merged
 
 
+WORK_RELATIONS = ("authored", "pi_of", "investigator_of")
+
+
+def prune_people(
+    nodes: pl.DataFrame, assertions: pl.DataFrame, min_links: int | None = None
+) -> tuple[pl.DataFrame, dict[str, int]]:
+    """Drop researchers who connect fewer than ``min_links`` works (papers, grants, trials) and
+    whose works do not touch two different diseases. Returns filtered assertions and stats.
+    Institutions that lose all their people become orphans and are pruned by ``merge``."""
+    min_links = settings.researcher_min_links if min_links is None else min_links
+    researchers = set(nodes.filter(pl.col("type") == "researcher")["id"].to_list())
+    if not researchers:
+        return assertions, {"researchers_before": 0, "researchers_kept": 0, "min_links": min_links}
+    work = assertions.filter(pl.col("relation").is_in(WORK_RELATIONS))
+    topics = assertions.filter(
+        pl.col("relation").is_in(["about", "funds_research_on", "studies"])
+        & pl.col("target_id").str.starts_with("MONDO:")
+    ).select(pl.col("source_id").alias("work"), pl.col("target_id").alias("disease"))
+    person_work = work.select(
+        pl.col("source_id").alias("person"), pl.col("target_id").alias("work")
+    ).unique()
+    links = person_work.group_by("person").len("n_works")
+    diseases = (
+        person_work.join(topics, on="work")
+        .group_by("person")
+        .agg(pl.col("disease").n_unique().alias("n_diseases"))
+    )
+    stats = links.join(diseases, on="person", how="left").fill_null(0)
+    keep = set(
+        stats.filter((pl.col("n_works") >= min_links) | (pl.col("n_diseases") >= 2))[
+            "person"
+        ].to_list()
+    )
+    drop = researchers - keep
+    out = assertions.filter(
+        ~pl.col("source_id").is_in(list(drop)) & ~pl.col("target_id").is_in(list(drop))
+    )
+    info = {
+        "researchers_before": len(researchers),
+        "researchers_kept": len(researchers & keep),
+        "min_links": min_links,
+    }
+    log.info("people pruning: %s", info)
+    return out, info
+
+
 def merge(
     nodes: pl.DataFrame, synonyms: pl.DataFrame, assertions: pl.DataFrame
 ) -> dict[str, pl.DataFrame]:
     """Merge contract tables into graph tables: nodes, synonyms, edges, evidence."""
+    assertions, prune_info = prune_people(nodes, assertions)
     node_map = merge_nodes(nodes)
     bad_type = [n for n in node_map.values() if n["type"] not in NodeType.__members__]
     for n in bad_type:
@@ -176,7 +224,11 @@ def merge(
             }
         )
     edge_df = pl.DataFrame(edges, infer_schema_length=None) if edges else pl.DataFrame()
-    used = set(edge_df["source_id"].to_list()) | set(edge_df["target_id"].to_list()) if edges else set()
+    used = (
+        set(edge_df["source_id"].to_list()) | set(edge_df["target_id"].to_list())
+        if edges
+        else set()
+    )
     orphans = [nid for nid in node_map if nid not in used]
     if orphans:
         log.info("pruning %d orphan nodes", len(orphans))
@@ -194,7 +246,12 @@ def merge(
         .select("node_id", "synonym", "source")
     )
     ev_df = pl.DataFrame(evidence, infer_schema_length=None)
+    PRUNE_INFO.clear()
+    PRUNE_INFO.update(prune_info, orphans_pruned=len(orphans))
     return {"nodes": node_df, "synonyms": syn, "edges": edge_df, "evidence": ev_df}
+
+
+PRUNE_INFO: dict[str, Any] = {}
 
 
 def write_graph(tables: dict[str, pl.DataFrame], out: Path) -> None:
@@ -241,6 +298,7 @@ def summarize(tables: dict[str, pl.DataFrame]) -> dict[str, Any]:
         "nodes_by_type": dict(sorted(n.group_by("type").len().iter_rows())),
         "edges_by_relation": dict(sorted(e.group_by("relation").len().iter_rows())),
         "edges_supported": int((e["confidence"] >= 0.6).sum()),
+        "pruning": dict(PRUNE_INFO),
     }
 
 

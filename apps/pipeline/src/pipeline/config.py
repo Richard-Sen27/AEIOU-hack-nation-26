@@ -28,6 +28,9 @@ class Settings(BaseSettings):
     # HTTP cache TTL for API responses (bulk downloads are cached as files).
     cache_ttl_days: float = 30.0
     llm_concurrency: int = 8
+    # Stage 4: keep a researcher only if they connect at least this many things (papers, grants,
+    # trials) or link two in-scope diseases; institutions left without people are pruned.
+    researcher_min_links: int = 2
 
 
 settings = Settings()
