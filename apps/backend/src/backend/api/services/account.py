@@ -276,7 +276,11 @@ _ID_PATTERNS = {
     "CLINVAR": re.compile(r"^CLINVAR:\d{1,10}$"),
 }
 _GENE_SYMBOL = re.compile(r"^[A-Za-z0-9][A-Za-z0-9._-]{0,29}$")
-_HGVS = re.compile(r"^[A-Za-z0-9_.:>+*()\[\];=,-]{3,200}$")
+_GENE_PREFIX = r"[A-Z0-9][A-Z0-9-]{0,14}(?:orf[0-9]{1,3}[A-Z0-9-]{0,5})?"  # HGNC symbol
+_HGVS_TOKEN = r"[A-Za-z0-9_.:>+*()\[\];=,-]{3,200}"
+# HGVS notation, optionally as a ClinVar label ("STXBP1 c.1216C>T") or variation name
+# ("NM_003165.6(STXBP1):c.1216C>T (p.Arg406Cys)"). No free text, so no digit-run rule here.
+_HGVS = re.compile(rf"^(?:{_GENE_PREFIX} )?{_HGVS_TOKEN}(?: \(p\.[A-Za-z0-9_*=?>]+\))?$")
 _ONSET_LABEL = re.compile(r"^[A-Za-z][A-Za-z ,'-]{0,59}$")
 _LONG_DIGITS = re.compile(r"\d{5,}")
 _MAX_LABEL = 120
@@ -325,7 +329,7 @@ def validate_profile(profile: PatientProfile) -> None:
     for i, v in enumerate(profile.variants):
         if v.hgvs is None and v.clinvar_id is None:
             raise _invalid(f"variants.{i}")
-        if v.hgvs is not None and not _HGVS.match(v.hgvs):
+        if v.hgvs is not None and (len(v.hgvs) > 200 or not _HGVS.match(v.hgvs)):
             raise _invalid(f"variants.{i}.hgvs")
         _check_id(v.clinvar_id, "CLINVAR", f"variants.{i}.clinvar_id")
         _check_id(v.gene_id, "HGNC", f"variants.{i}.gene_id")

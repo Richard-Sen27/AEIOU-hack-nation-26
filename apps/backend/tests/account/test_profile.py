@@ -85,6 +85,7 @@ async def test_validation(make_user):
         },
         {**PROFILE, "phenotypes": [{"id": "HP:0001250", "label": "a@b.example", "source": "chat"}]},
         {**PROFILE, "variants": [{"hgvs": "has spaces in it", "source": "chat"}]},
+        {**PROFILE, "variants": [{"hgvs": "Jane c.1A>G", "source": "chat"}]},
         {**PROFILE, "variants": [{"source": "chat"}]},
         {**PROFILE, "country": "Austria"},
         {**PROFILE, "age_years": 200},
@@ -96,6 +97,29 @@ async def test_validation(make_user):
         r = await user.client.put("/profile", json=body)
         assert_error(r, 422, "validation_error")
         assert "Jane" not in r.text and "0664" not in r.text
+
+
+async def test_variant_strings_are_storable(make_user):
+    """The digit-run rule keeps phone numbers out of labels; HGVS and ClinVar strings are exempt."""
+    user = await make_user()
+    hgvs_values = [
+        "NM_003165.6:c.1216C>T",
+        "c.12345G>A",
+        "NC_000009.12:g.127663352C>T",
+        "NM_003165.6(STXBP1):c.1216C>T (p.Arg406Cys)",  # ClinVar variation name
+        "STXBP1 c.1216C>T",  # ClinVar-derived node label, as a confirmed chat chip sends it
+        "STXBP1 p.Arg406Cys",
+    ]
+    variants = [
+        {"hgvs": h, "clinvar_id": f"CLINVAR:{100000 + i}", "source": "chat"}
+        for i, h in enumerate(hgvs_values)
+    ]
+    variants.append(
+        {"clinvar_id": "CLINVAR:1234567", "gene_id": "HGNC:11444", "source": "document"}
+    )
+    r = await user.client.put("/profile", json={**PROFILE, "variants": variants})
+    assert r.status_code == 200, r.text
+    assert [v["hgvs"] for v in r.json()["variants"][: len(hgvs_values)]] == hgvs_values
 
 
 async def test_age_confirmation_required_for_put(make_user):
