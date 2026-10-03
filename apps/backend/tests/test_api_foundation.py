@@ -20,7 +20,7 @@ async def test_session_guest(client):
 
 
 async def test_session_signed_in(make_user):
-    user = await make_user(role="researcher", consents=["upload"])
+    user = await make_user(role="researcher", consents=["health_data"])
     r = await user.client.get("/auth/session", headers={"Sec-GPC": "1"})
     assert r.status_code == 200
     body = r.json()
@@ -28,7 +28,7 @@ async def test_session_signed_in(make_user):
     assert body["user"]["id"] == str(user.id)
     assert body["user"]["role"] == "researcher"
     assert body["user"]["age_confirmed"] is True
-    assert body["user"]["consents"] == ["upload"]
+    assert body["user"]["consents"] == ["health_data"]
 
 
 async def test_gpc_recorded_on_profile(make_user, connect_as):
@@ -69,7 +69,7 @@ async def test_require_user(client):
 
 async def test_require_consent(make_user):
     body = {"kind": "asset", "payload": {"asset_type": "registry", "name": "x"}}
-    no_consent = await make_user(consents=["upload"])
+    no_consent = await make_user(consents=["health_data"])
     r = await no_consent.client.post("/contributions", json=body)
     assert r.status_code == 403
     assert r.json()["error"]["code"] == "consent_required"

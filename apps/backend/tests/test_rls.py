@@ -126,7 +126,7 @@ async def test_user_cannot_write_other_users_rows(two_users):
         "openai_tokens": ("INSERT INTO openai_tokens (user_id) VALUES ($1)", (b,)),
         "profiles": ("INSERT INTO profiles (user_id) VALUES ($1)", (b,)),
         "consents": (
-            "INSERT INTO consents (user_id, consent_type, version) VALUES ($1, 'upload', 'v')",
+            "INSERT INTO consents (user_id, consent_type, version) VALUES ($1, 'health_data', 'v')",
             (b,),
         ),
         "patient_profiles": ("INSERT INTO patient_profiles (user_id) VALUES ($1)", (b,)),

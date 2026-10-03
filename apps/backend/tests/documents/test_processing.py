@@ -46,7 +46,7 @@ async def _upload_report(user, llm, extraction=None, data=None, **kw):
 
 
 async def test_genetic_report_flow_with_redaction(make_user, llm, connect_as):
-    user = await make_user(consents=["upload"])
+    user = await make_user(consents=["health_data"])
     accepted = await _upload_report(user, llm)
 
     events = await job_events(user, accepted["job_id"])
@@ -91,7 +91,7 @@ async def test_genetic_report_flow_with_redaction(make_user, llm, connect_as):
 
 
 async def test_grounding_drops_hallucinated_findings(make_user, llm):
-    user = await make_user(consents=["upload"])
+    user = await make_user(consents=["health_data"])
     extraction = {
         "variants": [
             # snippet is not in the document at all
@@ -113,7 +113,7 @@ async def test_grounding_drops_hallucinated_findings(make_user, llm):
 
 
 async def test_unsupported_classification_is_cleared(make_user, llm):
-    user = await make_user(consents=["upload"])
+    user = await make_user(consents=["health_data"])
     accepted = await _upload_report(
         user, llm, variant_extraction(classification="pathogenic", test_date="2020-01-01")
     )
@@ -125,7 +125,7 @@ async def test_unsupported_classification_is_cleared(make_user, llm):
 
 
 async def test_clinical_letter_docx_maps_to_mondo_and_hpo(make_user, llm):
-    user = await make_user(consents=["upload"])
+    user = await make_user(consents=["health_data"])
     lines = [
         "Neuropaediatric clinic letter",
         "Dear colleague, we saw Mr. Peter Example today.",
@@ -184,7 +184,7 @@ async def test_clinical_letter_docx_maps_to_mondo_and_hpo(make_user, llm):
 
 @pytest.mark.skipif(not tesseract_path(), reason="tesseract not installed")
 async def test_photo_is_ocred_locally(make_user, llm):
-    user = await make_user(consents=["upload"])
+    user = await make_user(consents=["health_data"])
     lines = ["Genetic Test Report", "Gene STXBP1 heterozygous variant c.1631G>A"]
     snippet = "Gene STXBP1 heterozygous variant c.1631G>A"
     extraction = variant_extraction(
@@ -200,7 +200,7 @@ async def test_photo_is_ocred_locally(make_user, llm):
 
 
 async def test_plain_text_upload(make_user, llm):
-    user = await make_user(consents=["upload"])
+    user = await make_user(consents=["health_data"])
     accepted = await _upload_report(
         user, llm, data="\n".join(REPORT_LINES).encode(), filename="r.txt", ctype="text/plain"
     )
@@ -209,7 +209,7 @@ async def test_plain_text_upload(make_user, llm):
 
 
 async def test_failure_records_code_and_deletes_raw(make_user, llm, connect_as):
-    user = await make_user(consents=["upload"])
+    user = await make_user(consents=["health_data"])
     llm.configure(fail_mode="usage_limit")
     resp = await upload(user, text_pdf())
     accepted = resp.json()
@@ -230,7 +230,7 @@ async def test_failure_records_code_and_deletes_raw(make_user, llm, connect_as):
 
 
 async def test_reauth_maps_to_sign_in_required(make_user, llm):
-    user = await make_user(consents=["upload"])
+    user = await make_user(consents=["health_data"])
     llm.enqueue({"error": {"status": 401, "code": "token_expired"}})
     accepted = (await upload(user, text_pdf())).json()
     events = await job_events(user, accepted["job_id"])
@@ -238,7 +238,7 @@ async def test_reauth_maps_to_sign_in_required(make_user, llm):
 
 
 async def test_no_text_document_fails_cleanly(make_user, llm):
-    user = await make_user(consents=["upload"])
+    user = await make_user(consents=["health_data"])
     accepted = (await upload(user, text_pdf([" "]))).json()
     events = await job_events(user, accepted["job_id"])
     if tesseract_path():
@@ -248,7 +248,7 @@ async def test_no_text_document_fails_cleanly(make_user, llm):
 
 
 async def test_cancellation_still_deletes_raw(make_user, llm, monkeypatch):
-    user = await make_user(consents=["upload"])
+    user = await make_user(consents=["health_data"])
     async with user_transaction(user.id) as db:
         doc = DocumentRecord(user_id=user.id, status="queued", page_count=1)
         db.add(doc)
@@ -285,8 +285,8 @@ async def test_cancellation_still_deletes_raw(make_user, llm, monkeypatch):
 
 
 async def test_owner_only_access(make_user, llm):
-    alice = await make_user(consents=["upload"])
-    bob = await make_user(consents=["upload"])
+    alice = await make_user(consents=["health_data"])
+    bob = await make_user(consents=["health_data"])
     accepted = await _upload_report(alice, llm)
     doc_id, job_id = accepted["document_id"], accepted["job_id"]
     findings = (await alice.client.get(f"/documents/{doc_id}/findings")).json()

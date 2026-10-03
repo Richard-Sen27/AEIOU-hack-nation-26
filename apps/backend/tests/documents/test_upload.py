@@ -64,21 +64,21 @@ async def test_no_consent_gets_403(make_user):
 
 
 async def test_age_not_confirmed_gets_403(make_user):
-    user = await make_user(consents=["upload"], age_confirmed=False)
+    user = await make_user(consents=["health_data"], age_confirmed=False)
     resp = await upload(user, text_pdf())
     assert resp.status_code == 403
     assert resp.json()["error"]["code"] == "age_confirmation_required"
 
 
 async def test_wrong_type_rejected(make_user):
-    user = await make_user(consents=["upload"])
+    user = await make_user(consents=["health_data"])
     resp = await upload(user, b"GIF89a" + b"\x00" * 200, "report.pdf", "application/pdf")
     assert resp.status_code == 415
     assert resp.json()["error"]["code"] == "unsupported_media_type"
 
 
 async def test_oversize_rejected(make_user):
-    user = await make_user(consents=["upload"])
+    user = await make_user(consents=["health_data"])
     data = b"%PDF-1.4\n" + b"0" * (MAX_UPLOAD_BYTES + 10)
     resp = await upload(user, data)
     assert resp.status_code == 413
@@ -86,7 +86,7 @@ async def test_oversize_rejected(make_user):
 
 
 async def test_too_many_pages_rejected(make_user):
-    user = await make_user(consents=["upload"])
+    user = await make_user(consents=["health_data"])
     resp = await upload(user, text_pdf(["page"], pages=31))
     assert resp.status_code == 413
     assert "30 pages" in resp.json()["error"]["message"]
@@ -94,11 +94,11 @@ async def test_too_many_pages_rejected(make_user):
 
 async def test_rate_limit_ten_per_hour(make_user):
     limiter.reset()
-    user = await make_user(consents=["upload"])
+    user = await make_user(consents=["health_data"])
     bad = b"GIF89a" + b"\x00" * 50  # rejected quickly, still counts against the limit
     codes = [(await upload(user, bad)).status_code for _ in range(11)]
     assert codes[:10] == [415] * 10
     assert codes[10] == 429
-    other = await make_user(consents=["upload"])
+    other = await make_user(consents=["health_data"])
     assert (await upload(other, bad)).status_code == 415
     limiter.reset()

@@ -134,7 +134,7 @@ async def _call(app, scope: dict) -> tuple[list[dict], bool]:
 
 
 async def test_oversized_upload_rejected_before_body(app, make_user):
-    user = await make_user(consents=["upload"])
+    user = await make_user(consents=["health_data"])
     cookie = "; ".join(f"{k}={v}" for k, v in user.cookies.items())
     scope = _scope(
         "POST",
@@ -159,7 +159,7 @@ async def test_oversized_upload_rejected_before_body(app, make_user):
 
 
 async def test_upload_within_limit_reaches_route(client, make_user):
-    user = await make_user(consents=["upload"])
+    user = await make_user(consents=["health_data"])
     r = await user.client.post(
         "/documents",
         files={"file": ("a.bin", b"\x00\x01", "application/octet-stream")},

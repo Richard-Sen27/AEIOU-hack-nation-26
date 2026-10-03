@@ -1,7 +1,7 @@
 from datetime import datetime
 from uuid import UUID
 
-from pydantic import Field, field_validator, model_validator
+from pydantic import Field, ValidationInfo, field_validator, model_validator
 
 from backend.schemas.chat import ChatMessage, ChatSession
 from backend.schemas.common import LANGUAGE_PATTERN, ApiModel
@@ -34,13 +34,35 @@ class Consent(ApiModel):
     active: bool = Field(description="True while not revoked.")
 
 
+# The consent texts the frontend shows (components/privacy/consent-texts.ts). A grant must
+# name the current version, so every stored consent refers to a text that existed. Bump both
+# sides together when a text changes.
+CONSENT_TEXT_VERSIONS: dict[ConsentType, str] = {
+    ConsentType.health_data: "health-data-2026-10-04",
+    ConsentType.contribute: "contribute-2026-10-04",
+}
+
+
 class ConsentGrant(ApiModel):
     consent_type: ConsentType
-    version: str = Field(min_length=1, max_length=40, description="Consent text version shown.")
+    version: str = Field(
+        min_length=1,
+        max_length=40,
+        description="Consent text version shown; must be the current version for the type "
+        "(health_data: health-data-2026-10-04, contribute: contribute-2026-10-04).",
+    )
     about_child: bool = Field(False, description="Consent covers data about a child.")
     parental_responsibility_confirmed: bool = Field(
         False, description="Required true when about_child is true."
     )
+
+    @field_validator("version", mode="after")
+    @classmethod
+    def _current_text_version(cls, value: str, info: ValidationInfo) -> str:
+        consent_type = info.data.get("consent_type")
+        if consent_type is not None and value != CONSENT_TEXT_VERSIONS[consent_type]:
+            raise ValueError("unknown consent text version")
+        return value
 
     @model_validator(mode="after")
     def _child_needs_parental_responsibility(self) -> "ConsentGrant":

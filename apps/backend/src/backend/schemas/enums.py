@@ -176,7 +176,10 @@ class Role(StrEnum):
 
 
 class ConsentType(StrEnum):
-    upload = "upload"
+    """health_data: one consent to process the user's own health and genetic data (chat,
+    profile, documents); contribute: share data with the atlas, a separate purpose."""
+
+    health_data = "health_data"
     contribute = "contribute"
 
 

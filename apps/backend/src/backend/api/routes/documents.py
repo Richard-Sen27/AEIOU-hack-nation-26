@@ -3,7 +3,7 @@ from uuid import UUID
 
 from fastapi import APIRouter, BackgroundTasks, File, Request, UploadFile
 
-from backend.api.deps import DB, UploadConsentUser, User
+from backend.api.deps import DB, HealthDataConsentUser, User
 from backend.api.errors import responses
 from backend.api.ratelimit import UPLOAD_LIMIT, limiter
 from backend.api.services import documents
@@ -31,7 +31,7 @@ async def upload_document(
         UploadFile,
         File(description="PDF, PNG, JPEG, HEIC, DOCX or plain text; max 20 MB, 30 pages."),
     ],
-    user: UploadConsentUser,
+    user: HealthDataConsentUser,
 ) -> JobAccepted:
     """Upload a document for extraction; returns the job to follow."""
     return await documents.accept_upload(db, user, file, background)

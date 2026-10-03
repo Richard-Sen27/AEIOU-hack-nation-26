@@ -257,7 +257,7 @@ async def revoke_consent(db: AsyncSession, user: CurrentUser, consent_type: Cons
         text("UPDATE consents SET revoked_at = now() WHERE id = :id"), {"id": existing["id"]}
     )
     params = {"uid": user.id}
-    if consent_type == ConsentType.upload:
+    if consent_type == ConsentType.health_data:
         await db.execute(text("DELETE FROM jobs WHERE user_id = :uid"), params)
         await db.execute(text("DELETE FROM documents WHERE user_id = :uid"), params)
         await db.execute(text("DELETE FROM findings WHERE user_id = :uid"), params)

@@ -22,7 +22,7 @@ async def test_guest(client):
 
 
 async def test_needs_contribute_consent(make_user):
-    user = await make_user(consents=["upload"])
+    user = await make_user(consents=["health_data"])
     assert_error(await user.client.post("/contributions", json=PHENO), 403, "consent_required")
 
 

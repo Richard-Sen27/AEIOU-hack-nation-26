@@ -60,7 +60,7 @@ async def test_guest(client):
 
 
 async def test_export_contains_everything_and_no_secrets(make_user, connect_as, edge_ids):
-    user = await make_user(consents=["upload", "contribute"])
+    user = await make_user(consents=["health_data", "contribute"])
     await seed_everything(connect_as, user, edge_ids[0])
     r = await user.client.get("/me/export")
     assert r.status_code == 200, r.text
@@ -71,7 +71,7 @@ async def test_export_contains_everything_and_no_secrets(make_user, connect_as, 
     assert data["openai_connected"] is True
     assert data["openai_connection"]["scopes"] == ["openid", "email"]
     assert data["openai_connection"]["expires_at"]
-    assert {c["consent_type"] for c in data["consents"]} == {"upload", "contribute"}
+    assert {c["consent_type"] for c in data["consents"]} == {"health_data", "contribute"}
     assert data["patient_profile"]["genes"][0]["id"] == "HGNC:11444"
     assert data["chat_sessions"][0]["messages"][0]["content"] == "my daughter has seizures"
     assert len(data["documents"]) == 1
@@ -84,7 +84,7 @@ async def test_export_contains_everything_and_no_secrets(make_user, connect_as, 
 
 
 async def test_export_is_own_data_only(make_user, connect_as, edge_ids):
-    a = await make_user(consents=["upload", "contribute"])
+    a = await make_user(consents=["health_data", "contribute"])
     await seed_everything(connect_as, a, edge_ids[0])
     b = await make_user()
     data = (await b.client.get("/me/export")).json()
@@ -104,7 +104,7 @@ async def test_export_is_own_data_only(make_user, connect_as, edge_ids):
 
 
 async def test_delete_leaves_nothing(make_user, connect_as, edge_ids, superuser):
-    user = await make_user(consents=["upload", "contribute"])
+    user = await make_user(consents=["health_data", "contribute"])
     other = await make_user(consents=["contribute"])
     await seed_everything(connect_as, user, edge_ids[0])
     await seed_everything(connect_as, other, edge_ids[1])

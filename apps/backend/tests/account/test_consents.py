@@ -9,11 +9,13 @@ from account_helpers import ASSET, assert_error
 async def test_guest_needs_sign_in(client):
     assert_error(await client.get("/consents"), 401, "sign_in_required")
     assert_error(
-        await client.post("/consents", json={"consent_type": "upload", "version": "v1"}),
+        await client.post(
+            "/consents", json={"consent_type": "health_data", "version": "health-data-2026-10-04"}
+        ),
         401,
         "sign_in_required",
     )
-    assert_error(await client.delete("/consents/upload"), 401, "sign_in_required")
+    assert_error(await client.delete("/consents/health_data"), 401, "sign_in_required")
 
 
 async def test_no_consent_at_sign_up(make_user):
@@ -26,26 +28,32 @@ async def test_no_consent_at_sign_up(make_user):
 
 async def test_grant_list_revoke_regrant(make_user):
     user = await make_user()
-    r = await user.client.post("/consents", json={"consent_type": "upload", "version": "v1"})
+    r = await user.client.post(
+        "/consents", json={"consent_type": "health_data", "version": "health-data-2026-10-04"}
+    )
     assert r.status_code == 201, r.text
     first = r.json()
-    assert first["consent_type"] == "upload"
-    assert first["version"] == "v1"
+    assert first["consent_type"] == "health_data"
+    assert first["version"] == "health-data-2026-10-04"
     assert first["active"] is True
     assert first["granted_at"]
 
-    # Granular: upload does not imply contribute.
+    # Granular: health_data does not imply contribute.
     session = (await user.client.get("/auth/session")).json()["user"]
-    assert session["consents"] == ["upload"]
+    assert session["consents"] == ["health_data"]
 
     # Idempotent while identical and active.
-    again = await user.client.post("/consents", json={"consent_type": "upload", "version": "v1"})
+    again = await user.client.post(
+        "/consents", json={"consent_type": "health_data", "version": "health-data-2026-10-04"}
+    )
     assert again.json()["id"] == first["id"]
 
-    assert (await user.client.delete("/consents/upload")).status_code == 204
-    assert_error(await user.client.delete("/consents/upload"), 404, "not_found")
+    assert (await user.client.delete("/consents/health_data")).status_code == 204
+    assert_error(await user.client.delete("/consents/health_data"), 404, "not_found")
 
-    r = await user.client.post("/consents", json={"consent_type": "upload", "version": "v2"})
+    r = await user.client.post(
+        "/consents", json={"consent_type": "health_data", "version": "health-data-2026-10-04"}
+    )
     assert r.status_code == 201
     assert r.json()["id"] != first["id"]
 
@@ -58,7 +66,9 @@ async def test_grant_list_revoke_regrant(make_user):
 async def test_new_version_supersedes_and_keeps_contributions(make_user, superuser):
     user = await make_user(consents=["contribute"])
     assert (await user.client.post("/contributions", json=ASSET)).status_code == 201
-    r = await user.client.post("/consents", json={"consent_type": "contribute", "version": "v2"})
+    r = await user.client.post(
+        "/consents", json={"consent_type": "contribute", "version": "contribute-2026-10-04"}
+    )
     assert r.status_code == 201
     new_id = uuid.UUID(r.json()["id"])
     consent_ids = await superuser.fetch(
@@ -72,14 +82,19 @@ async def test_new_version_supersedes_and_keeps_contributions(make_user, superus
 async def test_child_needs_parental_responsibility(make_user):
     user = await make_user()
     r = await user.client.post(
-        "/consents", json={"consent_type": "upload", "version": "v1", "about_child": True}
+        "/consents",
+        json={
+            "consent_type": "health_data",
+            "version": "health-data-2026-10-04",
+            "about_child": True,
+        },
     )
     assert_error(r, 422, "validation_error")
     r = await user.client.post(
         "/consents",
         json={
-            "consent_type": "upload",
-            "version": "v1",
+            "consent_type": "health_data",
+            "version": "health-data-2026-10-04",
             "about_child": True,
             "parental_responsibility_confirmed": True,
         },
@@ -93,7 +108,9 @@ async def test_child_profile_requires_child_consent(make_user):
     user = await make_user()
     profile = {"about_child": True, "parental_responsibility_confirmed": True, "updated_at": None}
     assert (await user.client.put("/profile", json=profile)).status_code == 200
-    r = await user.client.post("/consents", json={"consent_type": "contribute", "version": "v1"})
+    r = await user.client.post(
+        "/consents", json={"consent_type": "contribute", "version": "contribute-2026-10-04"}
+    )
     assert_error(r, 422, "validation_error")
 
 
@@ -105,15 +122,17 @@ async def test_validation(make_user):
         "validation_error",
     )
     assert_error(
-        await user.client.post("/consents", json={"consent_type": "upload"}),
+        await user.client.post("/consents", json={"consent_type": "health_data"}),
         422,
         "validation_error",
     )
     assert_error(await user.client.delete("/consents/marketing"), 422, "validation_error")
 
 
-async def test_revoke_upload_deletes_documents_findings_and_profile_items(make_user, connect_as):
-    user = await make_user(consents=["upload"])
+async def test_revoke_health_data_deletes_documents_findings_and_profile_items(
+    make_user, connect_as
+):
+    user = await make_user(consents=["health_data"])
     app = await connect_as("atlas_app")
     async with app.transaction():
         await app.execute("SELECT set_config('app.user_id', $1, true)", str(user.id))
@@ -149,7 +168,7 @@ async def test_revoke_upload_deletes_documents_findings_and_profile_items(make_u
             json.dumps(profile),
         )
 
-    assert (await user.client.delete("/consents/upload")).status_code == 204
+    assert (await user.client.delete("/consents/health_data")).status_code == 204
 
     su = await connect_as("atlas")
     for table in ("documents", "findings", "jobs"):
@@ -179,9 +198,23 @@ async def test_revoke_contribute_removes_contributions_from_shared_graph(make_us
 
 
 async def test_cross_user_isolation(make_user):
-    a = await make_user(consents=["upload", "contribute"])
+    a = await make_user(consents=["health_data", "contribute"])
     b = await make_user()
     assert (await b.client.get("/consents")).json() == []
     # B revoking affects only B (404: B has none); A's consents stay.
-    assert_error(await b.client.delete("/consents/upload"), 404, "not_found")
+    assert_error(await b.client.delete("/consents/health_data"), 404, "not_found")
     assert len((await a.client.get("/consents")).json()) == 2
+
+
+async def test_only_current_text_versions_are_accepted(make_user):
+    user = await make_user()
+    for body in (
+        {"consent_type": "health_data", "version": "v1"},
+        {"consent_type": "health_data", "version": "contribute-2026-10-04"},
+        {"consent_type": "contribute", "version": "health-data-2026-10-04"},
+        {"consent_type": "health_data", "version": "upload-2026-10-04"},
+    ):
+        r = await user.client.post("/consents", json=body)
+        assert_error(r, 422, "validation_error")
+        assert "version" in r.json()["error"]["message"]
+    assert (await user.client.get("/consents")).json() == []

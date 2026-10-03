@@ -4,7 +4,7 @@ Fixtures:
     test_db       session  TestDatabase with per-role URLs for the session database
     app           session  FastAPI app with lifespan, settings pointed at the session database
     client        function guest httpx.AsyncClient over ASGI (alias: guest_client)
-    make_user     function async factory: await make_user(role="patient", consents=["upload"])
+    make_user     function async factory: await make_user(role="patient", consents=["health_data"])
                            -> TestUser(id, sub, cookies, client)
     connect_as    function async factory: await connect_as("atlas_app") -> asyncpg.Connection
                            roles: atlas (superuser), atlas_owner, atlas_app, atlas_pipeline

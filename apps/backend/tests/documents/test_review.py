@@ -47,14 +47,14 @@ async def _paper(user, llm):
 
 
 async def test_nothing_unconfirmed_reaches_profile(make_user, llm):
-    user = await make_user(consents=["upload"])
+    user = await make_user(consents=["health_data"])
     await _report(user, llm)
     profile = (await user.client.get("/profile")).json()
     assert profile["genes"] == [] and profile["variants"] == []
 
 
 async def test_confirm_merges_and_is_idempotent(make_user, llm):
-    user = await make_user(consents=["upload"])
+    user = await make_user(consents=["health_data"])
     _, f = await _report(user, llm)
 
     resp = await user.client.post(f"/findings/{f['variant']['id']}/confirm")
@@ -81,7 +81,7 @@ async def test_confirm_merges_and_is_idempotent(make_user, llm):
 
 
 async def test_reject_keeps_out_and_removes_after_confirm(make_user, llm):
-    user = await make_user(consents=["upload"])
+    user = await make_user(consents=["health_data"])
     _, f = await _report(user, llm)
     profile = (await user.client.post(f"/findings/{f['gene']['id']}/reject")).json()
     assert profile["genes"] == []
@@ -95,7 +95,7 @@ async def test_reject_keeps_out_and_removes_after_confirm(make_user, llm):
 
 
 async def test_delete_cascades_to_findings_jobs_and_profile(make_user, llm, connect_as):
-    user = await make_user(consents=["upload"])
+    user = await make_user(consents=["health_data"])
     doc_id, f = await _report(user, llm)
     await user.client.post(f"/findings/{f['gene']['id']}/confirm")
     await user.client.post(f"/findings/{f['variant']['id']}/confirm")
@@ -118,7 +118,7 @@ async def test_delete_cascades_to_findings_jobs_and_profile(make_user, llm, conn
 
 
 async def test_research_paper_candidate_edges_stay_private_without_consent(make_user, llm):
-    user = await make_user(role="researcher", consents=["upload"])
+    user = await make_user(role="researcher", consents=["health_data"])
     findings = await _paper(user, llm)
     assert len(findings) == 1  # the ataxia quote is not in the paper
     edge = findings[0]
@@ -136,7 +136,7 @@ async def test_research_paper_candidate_edges_stay_private_without_consent(make_
 
 
 async def test_confirmed_candidate_edge_becomes_contribution_with_consent(make_user, llm):
-    user = await make_user(role="researcher", consents=["upload", "contribute"])
+    user = await make_user(role="researcher", consents=["health_data", "contribute"])
     edge = (await _paper(user, llm))[0]
     await user.client.post(f"/findings/{edge['id']}/confirm")
     await user.client.post(f"/findings/{edge['id']}/confirm")  # idempotent
@@ -153,7 +153,7 @@ async def test_confirmed_candidate_edge_becomes_contribution_with_consent(make_u
 
 
 async def test_job_stream_reports_stages(make_user, llm):
-    user = await make_user(consents=["upload"])
+    user = await make_user(consents=["health_data"])
     llm.enqueue(GENETIC, {"json": variant_extraction()})
     accepted = (await upload(user, text_pdf())).json()
     events = await job_events(user, accepted["job_id"])

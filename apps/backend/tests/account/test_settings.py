@@ -38,7 +38,9 @@ async def test_age_gate(make_user, edge_ids):
     user = await make_user(age_confirmed=False, consents=["contribute"])
     gated = [
         user.client.put("/profile", json={"updated_at": None}),
-        user.client.post("/consents", json={"consent_type": "upload", "version": "v1"}),
+        user.client.post(
+            "/consents", json={"consent_type": "health_data", "version": "health-data-2026-10-04"}
+        ),
         user.client.post("/contributions", json=ASSET),
         user.client.post(f"/edges/{edge_ids[0]}/flag", json={"reason": "Wrong direction"}),
         user.client.post("/chat", json={"message": "hello"}),
@@ -61,7 +63,9 @@ async def test_age_gate(make_user, edge_ids):
 
     r = await user.client.patch("/me/settings", json={"age_confirmed_16": True})
     assert r.json()["age_confirmed"] is True
-    r = await user.client.post("/consents", json={"consent_type": "upload", "version": "v1"})
+    r = await user.client.post(
+        "/consents", json={"consent_type": "health_data", "version": "health-data-2026-10-04"}
+    )
     assert r.status_code == 201
 
 
