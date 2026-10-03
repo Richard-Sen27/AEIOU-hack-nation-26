@@ -17,7 +17,7 @@ The atlas processes health and genetic data of EU residents, often about childre
 
 ### Lawful basis
 
-- **Health and genetic data:** explicit consent (Art. 9(2)(a)). MUST be separate for "upload" and "contribute", granular, not bundled with sign-up, and as easy to withdraw as to give (Art. 7(3)). Store consent type, text version and timestamp.
+- **Health and genetic data:** explicit consent (Art. 9(2)(a)). One general consent (`health_data`) covers all processing of the user's own health and genetic data for the service: chat messages, the patient profile, uploaded documents and extracted findings. A purpose that goes beyond the user's own use MUST have its own separate consent; today that is `contribute` (sharing into the shared graph). Consent MUST NOT be bundled with sign-up, is asked just in time before the first such processing, and is as easy to withdraw as to give (Art. 7(3)). Store consent type, text version and timestamp.
 - **Children:** many patients are minors. Accounts are for users aged 16 or older (the strictest age of digital consent in the EU, Art. 8). When a user uploads or describes data about a child, they MUST confirm they hold parental responsibility.
 - **Account and core service:** performance of a contract (Art. 6(1)(b)).
 - **Security logs and abuse prevention:** legitimate interest (Art. 6(1)(f)).
@@ -49,14 +49,14 @@ Respond within one month. Signed-in users are verified by their session; never a
 | Access and portability (Art. 15, 20) | `GET /me/export`: all user data as machine-readable JSON |
 | Rectification (Art. 16) | Edit profile and findings in the app |
 | Erasure (Art. 17) | `DELETE /me` with cascade; contributions removed from the shared graph; deleted from backups within the backup cycle |
-| Withdraw consent (Art. 7(3)) | `DELETE /consents/{type}`: stops processing and deletes data held under that consent |
+| Withdraw consent (Art. 7(3)) | `DELETE /consents/{type}`: stops processing and deletes data held under that consent (`health_data`: profile, chats, documents and findings; `contribute`: contributions) |
 | Object (Art. 21) | Researchers and doctors: claim-or-remove flow for their node |
 | Automated decisions (Art. 22) | The atlas makes no decisions with legal or similarly significant effect. It shows information, never a diagnosis or trial eligibility verdict; such questions are labeled "needs expert review" |
 
 ### Transparency (Art. 12–14)
 
 - A layered privacy notice in plain language and in the user's language: what is collected, why, legal basis, processors, transfers, retention, rights, contact.
-- Just-in-time notices in the upload and contribute dialogs.
+- Just-in-time notices in the health-data consent dialog (shown before the first chat message, profile save or upload) and the contribute dialog.
 - Make it unmistakable that users are talking to an AI system. The EU AI Act's transparency duty for AI systems that interact with people (Art. 50) applies alongside GDPR.
 
 ### Security incidents (Art. 33–34)
@@ -116,7 +116,7 @@ For California users, the CCPA/CPRA governs personal information and treats heal
 
 ### Notice at collection
 
-- At or before collection (sign-up dialog, upload dialog, contribute dialog), show: categories of personal and sensitive information collected, purposes, that nothing is sold or shared, retention period per category, and a link to the privacy policy.
+- At or before collection (sign-up dialog, health-data consent dialog, contribute dialog), show: categories of personal and sensitive information collected, purposes, that nothing is sold or shared, retention period per category, and a link to the privacy policy.
 - The privacy policy describes California rights and how to use them, and is reviewed at least every 12 months.
 
 ### Consumer rights as product features

@@ -132,7 +132,7 @@ W1 → W3 → W4 together are the one complete journey the 24h goal asks for.
 
 **W2 — Documents** (handled by the document service, not by the agent)
 
-1. Upload requires sign-in and an active `upload` consent (`POST /documents`); guests see the inline sign-in dialog first.
+1. Upload requires sign-in and an active `health_data` consent (`POST /documents`); guests see the inline sign-in dialog first.
 2. The service extracts text locally, redacts with Presidio, classifies, runs structured extraction and stores findings with page and snippet; raw bytes are deleted on completion.
 3. The user confirms or rejects each finding on the review screen (`POST /findings/{id}/confirm` · `/reject`).
 4. Confirmed findings update the `PatientProfile`; the agent then re-runs W3 with the enriched profile. VUS findings carry the standard uncertainty sentence.
@@ -186,6 +186,7 @@ The agent is a navigator, not a clinician: it may say what the evidence connects
 
 - Presidio redaction runs before every LLM call on user content, including chat messages, not only uploads.
 - The agent never sees raw uploads; only confirmed findings reach the profile.
+- Chat, the profile and uploads run under one `health_data` consent, asked once before the first chat message, profile save or upload; without it the agent does not process the user's messages.
 - Profiles are private to the user; contributions to the shared graph need an active `contribute` consent and are stored as `patient_reported`.
 - Gap search and web search never receive user data.
 - All agent LLM calls run on the signed-in user's own ChatGPT plan; guests never reach the agent.

@@ -290,7 +290,7 @@ One database: Postgres (with pgvector) holds the pipeline's staging schema, the 
 | `users` | `id` (UUID), `chatgpt_sub` (unique), `email`, `name`, `created_at`, `last_login_at` |
 | `openai_tokens` | `user_id`, encrypted access and refresh token, `expires_at`, `scopes` (used to bill LLM calls to the user's ChatGPT plan) |
 | `profiles` | `user_id`, `role` (patient / doctor / researcher), `role_verified`, `orcid_id`, `language`, `gpc_opt_out` |
-| `consents` | `user_id`, `consent_type` (upload / contribute), `version`, `granted_at`, `revoked_at` |
+| `consents` | `user_id`, `consent_type` (health_data / contribute), `version`, `granted_at`, `revoked_at` |
 | `patient_profiles` | `user_id`, `profile` (JSON matching the `PatientProfile` schema), `updated_at` |
 | `chat_sessions` / `chat_messages` | `user_id`, session and message content |
 | `documents` | `id`, `user_id`, `status`, `doc_type`, `created_at`, `raw_deleted_at` |
@@ -334,7 +334,7 @@ Guests never trigger an LLM call, so there is no team key for guests; the team's
    2. `GET /auth/chatgpt/callback` validates `state`, exchanges the code, and verifies the ID token: signature against OpenAI's published keys, `iss`, `aud`, `exp`, `nonce`.
    3. The backend calls `auth_find_or_create_user` with `sub`, `email`, `name`: a known `chatgpt_sub` signs into the existing user, a new one creates a user. The OpenAI tokens are stored encrypted in `openai_tokens`.
    4. The backend sets the session cookie (below) and redirects back to where the user was.
-4. First sign-in: the user picks a role (patient, doctor, researcher). Before the first upload, a consent screen explains what is processed, that personal data is redacted, that raw files are deleted after extraction, and that nothing is shared without a separate opt-in. The consent is stored with timestamp and text version (GDPR Article 9).
+4. First sign-in: the user picks a role (patient, doctor, researcher). Before the first chat message, profile save or upload, whichever comes first, one consent screen covers all processing of the user's own health and genetic data (`health_data`). It explains what is processed, that personal data is redacted, that raw files are deleted after extraction, and that nothing is shared without the separate `contribute` opt-in. The consent is stored with timestamp and text version (GDPR Article 9).
 5. The requested feature proceeds.
 
 ### Sessions
@@ -349,7 +349,7 @@ Guests never trigger an LLM call, so there is no team key for guests; the team's
 
 - `get_optional_user`: verifies the session cookie; returns the user (`user_id`, `role`, `role_verified`) or `None` for guests, and sets `app.user_id` on the request's database transaction.
 - `require_user`: `401` with code `sign_in_required` for guests.
-- `require_consent(type)`: `403` with code `consent_required` if no active consent of that type.
+- `require_consent(type)`: `403` with code `consent_required` if no active consent of that type. There are two types: `health_data` (one general consent for chat, profile and uploads) and `contribute` (sharing into the shared graph).
 
 ### Role lenses
 
@@ -397,7 +397,7 @@ Detailed design in [`agent.md`](agent.md).
 
 ### Documents
 
-- Requires `require_user` and `require_consent("upload")`.
+- Requires `require_user` and `require_consent("health_data")`.
 - Upload limits: 20 MB, 30 pages; type checked with `python-magic` (PDF, PNG, JPEG, HEIC, DOCX); `slowapi` limit of 10 uploads per user per hour.
 - Pipeline per job: extract text (PyMuPDF for text PDFs, docTR or Tesseract OCR for scans and photos) → Presidio redaction of names, birth dates, addresses, patient IDs → classify (genetic report, clinical letter, research paper, registry or study document) → structured extraction with Structured Outputs → findings with page and snippet.
 - Raw bytes live only in memory or a temp file deleted in `finally`; `raw_deleted_at` is set on completion.
@@ -440,14 +440,14 @@ Detailed design in [`agent.md`](agent.md).
 | GET | `/path?from=&to=&family=` | Anyone | Ordered path steps, or `no_supported_route` + coverage report |
 | GET | `/edge/{id}/evidence` | Anyone | Sources, quotes, tiers, contradictions |
 | POST | `/explain` (SSE) | Anyone for cached explanations; signed in to generate new ones | Streamed role-specific explanation with citation IDs |
-| POST | `/chat` (SSE) | Signed in | Streamed reply, chips, cards, follow-up question |
+| POST | `/chat` (SSE) | Signed in + health-data consent | Streamed reply, chips, cards, follow-up question |
 | POST | `/gap-search` (SSE) | Signed in, rate-limited | Agent progress + candidate edges |
 | GET | `/export/graph` | Anyone | CSV / GraphML of the requested subgraph |
-| GET / PUT | `/profile` | Signed in | The `PatientProfile` |
-| POST | `/documents` | Signed in + upload consent | `job_id` |
+| GET / PUT | `/profile` | Signed in (PUT: + health-data consent) | The `PatientProfile` |
+| POST | `/documents` | Signed in + health-data consent | `job_id` |
 | GET | `/documents` | Owner | Own documents |
 | GET | `/documents/{id}/findings` | Owner | Findings with page and snippet |
-| POST | `/findings/{id}/confirm` · `/reject` | Owner | Updated profile |
+| POST | `/findings/{id}/confirm` · `/reject` | Owner + health-data consent | Updated profile |
 | DELETE | `/documents/{id}` | Owner | Document and findings removed |
 | GET | `/jobs/{id}` (SSE) | Owner | Job progress |
 | POST / DELETE | `/consents` · `/consents/{type}` | Signed in | Grant or revoke |
