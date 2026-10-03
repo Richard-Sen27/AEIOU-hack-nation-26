@@ -150,7 +150,10 @@ export function AtlasTour({
     let el: HTMLElement | null = null;
     const id = requestAnimationFrame(() => {
       el = findTarget(step.target);
-      setAnchor(el);
+      // A target as tall as most of the screen (the map itself) leaves no room
+      // above or below it, so the card sits centred over it instead.
+      const r = el?.getBoundingClientRect();
+      setAnchor(el && r && r.height < window.innerHeight * 0.6 ? el : null);
       if (el) el.setAttribute("data-tour-active", "");
     });
     announce(`Tour step ${i + 1} of ${steps.length}: ${step.title}`);
