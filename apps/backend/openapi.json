@@ -1,0 +1,7061 @@
+{
+  "openapi": "3.1.0",
+  "info": {
+    "title": "Amber — Rare Disease Atlas API",
+    "version": "0.1.0"
+  },
+  "paths": {
+    "/health": {
+      "get": {
+        "tags": [
+          "health"
+        ],
+        "summary": "Health",
+        "operationId": "health",
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Health"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/auth/session": {
+      "get": {
+        "tags": [
+          "auth"
+        ],
+        "summary": "Get Session",
+        "description": "The signed-in user (or null for guests), GPC signal, demo mode and data version.",
+        "operationId": "getSession",
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/SessionInfo"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/auth/chatgpt/start": {
+      "get": {
+        "tags": [
+          "auth"
+        ],
+        "summary": "Auth Start",
+        "description": "Redirect to OpenAI (OIDC + PKCE).",
+        "operationId": "authStart",
+        "parameters": [
+          {
+            "name": "return_to",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "description": "Relative frontend path to return to.",
+              "title": "Return To"
+            },
+            "description": "Relative frontend path to return to."
+          }
+        ],
+        "responses": {
+          "302": {
+            "description": "Successful Response"
+          },
+          "501": {
+            "description": "not_implemented",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/auth/chatgpt/callback": {
+      "get": {
+        "tags": [
+          "auth"
+        ],
+        "summary": "Auth Callback",
+        "description": "OAuth callback: sets the session cookie and redirects back.",
+        "operationId": "authCallback",
+        "responses": {
+          "302": {
+            "description": "Successful Response"
+          },
+          "400": {
+            "description": "bad_request",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "501": {
+            "description": "not_implemented",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/auth/callback": {
+      "get": {
+        "tags": [
+          "auth"
+        ],
+        "summary": "Auth Loopback Callback",
+        "description": "Same handler on the loopback redirect path the local OAuth flow requires.",
+        "operationId": "authLoopbackCallback",
+        "responses": {
+          "302": {
+            "description": "Successful Response"
+          },
+          "400": {
+            "description": "bad_request",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "501": {
+            "description": "not_implemented",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/auth/logout": {
+      "post": {
+        "tags": [
+          "auth"
+        ],
+        "summary": "Logout",
+        "description": "Clear the session.",
+        "operationId": "logout",
+        "responses": {
+          "204": {
+            "description": "Successful Response"
+          },
+          "501": {
+            "description": "not_implemented",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/me/settings": {
+      "patch": {
+        "tags": [
+          "account"
+        ],
+        "summary": "Update Settings",
+        "description": "Role, language, expert mode, 16+ confirmation. First sign-in role choice uses this.",
+        "operationId": "updateSettings",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/SettingsUpdate"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/SessionUser"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "sign_in_required: guest, or the session expired.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "validation_error: lists invalid field names only.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/me/export": {
+      "get": {
+        "tags": [
+          "account"
+        ],
+        "summary": "Export My Data",
+        "description": "All user data as JSON.",
+        "operationId": "exportMyData",
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/DataExport"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "sign_in_required: guest, or the session expired.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "501": {
+            "description": "not_implemented",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/me": {
+      "delete": {
+        "tags": [
+          "account"
+        ],
+        "summary": "Delete Me",
+        "description": "Delete the account and everything in it; clears the session.",
+        "operationId": "deleteMe",
+        "responses": {
+          "204": {
+            "description": "Successful Response"
+          },
+          "401": {
+            "description": "sign_in_required: guest, or the session expired.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "501": {
+            "description": "not_implemented",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/profile": {
+      "get": {
+        "tags": [
+          "account"
+        ],
+        "summary": "Get Profile",
+        "description": "The user's PatientProfile.",
+        "operationId": "getProfile",
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/PatientProfile"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "sign_in_required: guest, or the session expired.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "501": {
+            "description": "not_implemented",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          }
+        }
+      },
+      "put": {
+        "tags": [
+          "account"
+        ],
+        "summary": "Put Profile",
+        "description": "Replace the PatientProfile.",
+        "operationId": "putProfile",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/PatientProfile"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/PatientProfile"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "sign_in_required: guest, or the session expired.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "validation_error: lists invalid field names only.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "501": {
+            "description": "not_implemented",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/consents": {
+      "get": {
+        "tags": [
+          "account"
+        ],
+        "summary": "List Consents",
+        "description": "The user's consents.",
+        "operationId": "listConsents",
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "items": {
+                    "$ref": "#/components/schemas/Consent"
+                  },
+                  "type": "array",
+                  "title": "Response Listconsents"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "sign_in_required: guest, or the session expired.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "501": {
+            "description": "not_implemented",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          }
+        }
+      },
+      "post": {
+        "tags": [
+          "account"
+        ],
+        "summary": "Grant Consent",
+        "description": "Grant a consent.",
+        "operationId": "grantConsent",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ConsentGrant"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "201": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Consent"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "sign_in_required: guest, or the session expired.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "validation_error: lists invalid field names only.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "501": {
+            "description": "not_implemented",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/consents/{consent_type}": {
+      "delete": {
+        "tags": [
+          "account"
+        ],
+        "summary": "Revoke Consent",
+        "description": "Revoke a consent and delete the data held under it.",
+        "operationId": "revokeConsent",
+        "parameters": [
+          {
+            "name": "consent_type",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "$ref": "#/components/schemas/ConsentType"
+            }
+          }
+        ],
+        "responses": {
+          "204": {
+            "description": "Successful Response"
+          },
+          "401": {
+            "description": "sign_in_required: guest, or the session expired.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "not_found",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "501": {
+            "description": "not_implemented",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/search": {
+      "get": {
+        "tags": [
+          "graph"
+        ],
+        "summary": "Search Nodes",
+        "description": "Typed matches with the matched synonym.",
+        "operationId": "search",
+        "parameters": [
+          {
+            "name": "q",
+            "in": "query",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "minLength": 1,
+              "maxLength": 200,
+              "description": "Search text.",
+              "title": "Q"
+            },
+            "description": "Search text."
+          },
+          {
+            "name": "types",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "array",
+                  "items": {
+                    "$ref": "#/components/schemas/NodeType"
+                  }
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "description": "Restrict to node types.",
+              "title": "Types"
+            },
+            "description": "Restrict to node types."
+          },
+          {
+            "name": "limit",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "integer",
+              "maximum": 50,
+              "minimum": 1,
+              "default": 10,
+              "title": "Limit"
+            }
+          },
+          {
+            "name": "expert",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "boolean",
+              "description": "Expert mode: rank clusters.",
+              "default": false,
+              "title": "Expert"
+            },
+            "description": "Expert mode: rank clusters."
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/SearchResponse"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "validation_error: lists invalid field names only.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "501": {
+            "description": "not_implemented",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/node/{node_id}": {
+      "get": {
+        "tags": [
+          "graph"
+        ],
+        "summary": "Get Node",
+        "description": "Node details and summary for the side panel.",
+        "operationId": "getNode",
+        "parameters": [
+          {
+            "name": "node_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "title": "Node Id"
+            }
+          },
+          {
+            "name": "role",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "$ref": "#/components/schemas/Role"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "description": "Presentation role override.",
+              "title": "Role"
+            },
+            "description": "Presentation role override."
+          },
+          {
+            "name": "language",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string",
+                  "pattern": "^[a-z]{2,3}(-[A-Za-z0-9]{2,8})?$"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "description": "Output language override.",
+              "title": "Language"
+            },
+            "description": "Output language override."
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/NodeDetail"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "not_found",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "501": {
+            "description": "not_implemented",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/neighborhood/{node_id}": {
+      "get": {
+        "tags": [
+          "graph"
+        ],
+        "summary": "Get Neighborhood",
+        "description": "Full neighborhood with positions and role presentation hints.",
+        "operationId": "getNeighborhood",
+        "parameters": [
+          {
+            "name": "node_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "title": "Node Id"
+            }
+          },
+          {
+            "name": "role",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "$ref": "#/components/schemas/Role"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "description": "Presentation role override.",
+              "title": "Role"
+            },
+            "description": "Presentation role override."
+          },
+          {
+            "name": "language",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string",
+                  "pattern": "^[a-z]{2,3}(-[A-Za-z0-9]{2,8})?$"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "description": "Output language override.",
+              "title": "Language"
+            },
+            "description": "Output language override."
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Neighborhood"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "not_found",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "501": {
+            "description": "not_implemented",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/clusters": {
+      "get": {
+        "tags": [
+          "graph"
+        ],
+        "summary": "List Clusters",
+        "description": "Cluster IDs, labels and sizes.",
+        "operationId": "listClusters",
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "items": {
+                    "$ref": "#/components/schemas/ClusterSummary"
+                  },
+                  "type": "array",
+                  "title": "Response Listclusters"
+                }
+              }
+            }
+          },
+          "501": {
+            "description": "not_implemented",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/atlas.json": {
+      "get": {
+        "tags": [
+          "graph"
+        ],
+        "summary": "Get Atlas",
+        "description": "Compact whole-graph layout for the Atlas view.",
+        "operationId": "getAtlas",
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/AtlasLayout"
+                }
+              }
+            }
+          },
+          "501": {
+            "description": "not_implemented",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/edge/{edge_id}/evidence": {
+      "get": {
+        "tags": [
+          "graph"
+        ],
+        "summary": "Get Edge Evidence",
+        "description": "Sources, quotes, tiers, contradictions and the confidence breakdown.",
+        "operationId": "getEdgeEvidence",
+        "parameters": [
+          {
+            "name": "edge_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "title": "Edge Id"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/EdgeEvidence"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "not_found",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "501": {
+            "description": "not_implemented",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/export/graph": {
+      "get": {
+        "tags": [
+          "graph"
+        ],
+        "summary": "Export Graph",
+        "description": "CSV or GraphML of the subgraph around a node.",
+        "operationId": "exportGraph",
+        "parameters": [
+          {
+            "name": "node",
+            "in": "query",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "description": "Center node ID.",
+              "title": "Node"
+            },
+            "description": "Center node ID."
+          },
+          {
+            "name": "depth",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "integer",
+              "maximum": 3,
+              "minimum": 1,
+              "default": 1,
+              "title": "Depth"
+            }
+          },
+          {
+            "name": "format",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "$ref": "#/components/schemas/GraphExportFormat",
+              "default": "csv"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "The subgraph as CSV or GraphML.",
+            "content": {
+              "text/csv": {
+                "schema": {
+                  "type": "string"
+                }
+              },
+              "application/graphml+xml": {
+                "schema": {
+                  "type": "string"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "not_found",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "validation_error: lists invalid field names only.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "501": {
+            "description": "not_implemented",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/path": {
+      "get": {
+        "tags": [
+          "graph"
+        ],
+        "summary": "Find Path",
+        "description": "Ordered path steps, or no_supported_route with a coverage report.",
+        "operationId": "findPath",
+        "parameters": [
+          {
+            "name": "from",
+            "in": "query",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "description": "Start node ID.",
+              "title": "From"
+            },
+            "description": "Start node ID."
+          },
+          {
+            "name": "to",
+            "in": "query",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "description": "End node ID.",
+              "title": "To"
+            },
+            "description": "End node ID."
+          },
+          {
+            "name": "family",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "$ref": "#/components/schemas/PathFamily",
+              "default": "all"
+            }
+          },
+          {
+            "name": "k",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "integer",
+              "maximum": 10,
+              "minimum": 1,
+              "default": 3,
+              "title": "K"
+            }
+          },
+          {
+            "name": "include_vus",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "boolean",
+              "description": "Allow VUS variants on paths.",
+              "default": false,
+              "title": "Include Vus"
+            },
+            "description": "Allow VUS variants on paths."
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/PathResponse"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "not_found",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "validation_error: lists invalid field names only.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "501": {
+            "description": "not_implemented",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/explain": {
+      "post": {
+        "tags": [
+          "explain"
+        ],
+        "summary": "Explain",
+        "description": "Role-specific explanation with citation IDs. Cached: anyone; new: signed in.",
+        "operationId": "explainPath",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ExplainRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "Stream of ExplainEvent (delta..., final).",
+            "content": {
+              "text/event-stream": {
+                "schema": {
+                  "$ref": "#/components/schemas/ExplainEvent"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "sign_in_required: guest, or the session expired.",
+            "content": {
+              "text/event-stream": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "not_found",
+            "content": {
+              "text/event-stream": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "validation_error: lists invalid field names only.",
+            "content": {
+              "text/event-stream": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "429": {
+            "description": "rate_limited",
+            "content": {
+              "text/event-stream": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "501": {
+            "description": "not_implemented",
+            "content": {
+              "text/event-stream": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/chat": {
+      "post": {
+        "tags": [
+          "chat"
+        ],
+        "summary": "Post Chat",
+        "description": "Send a message; streams the structured agent reply.",
+        "operationId": "chat",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ChatRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "Stream of ChatEvent (status, summary_delta, ..., final).",
+            "content": {
+              "text/event-stream": {
+                "schema": {
+                  "$ref": "#/components/schemas/ChatEvent"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "sign_in_required: guest, or the session expired.",
+            "content": {
+              "text/event-stream": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "not_found",
+            "content": {
+              "text/event-stream": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "validation_error: lists invalid field names only.",
+            "content": {
+              "text/event-stream": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "429": {
+            "description": "rate_limited",
+            "content": {
+              "text/event-stream": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "501": {
+            "description": "not_implemented",
+            "content": {
+              "text/event-stream": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/chat/sessions": {
+      "get": {
+        "tags": [
+          "chat"
+        ],
+        "summary": "List Sessions",
+        "description": "The user's chat sessions.",
+        "operationId": "listChatSessions",
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "items": {
+                    "$ref": "#/components/schemas/ChatSession"
+                  },
+                  "type": "array",
+                  "title": "Response Listchatsessions"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "sign_in_required: guest, or the session expired.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "501": {
+            "description": "not_implemented",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/chat/sessions/{session_id}": {
+      "get": {
+        "tags": [
+          "chat"
+        ],
+        "summary": "Get Session",
+        "description": "One session with its messages.",
+        "operationId": "getChatSession",
+        "parameters": [
+          {
+            "name": "session_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid",
+              "title": "Session Id"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ChatSessionDetail"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "sign_in_required: guest, or the session expired.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "not_found",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "501": {
+            "description": "not_implemented",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      },
+      "delete": {
+        "tags": [
+          "chat"
+        ],
+        "summary": "Delete Session",
+        "description": "Delete a session and its messages.",
+        "operationId": "deleteChatSession",
+        "parameters": [
+          {
+            "name": "session_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid",
+              "title": "Session Id"
+            }
+          }
+        ],
+        "responses": {
+          "204": {
+            "description": "Successful Response"
+          },
+          "401": {
+            "description": "sign_in_required: guest, or the session expired.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "not_found",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "501": {
+            "description": "not_implemented",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/gap-search": {
+      "post": {
+        "tags": [
+          "gap-search"
+        ],
+        "summary": "Post Gap Search",
+        "description": "Agent progress and pending_review candidate edges for a missing link.",
+        "operationId": "gapSearch",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/GapSearchRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "Stream of GapSearchEvent (progress, candidate..., final).",
+            "content": {
+              "text/event-stream": {
+                "schema": {
+                  "$ref": "#/components/schemas/GapSearchEvent"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "sign_in_required: guest, or the session expired.",
+            "content": {
+              "text/event-stream": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "not_found",
+            "content": {
+              "text/event-stream": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "validation_error: lists invalid field names only.",
+            "content": {
+              "text/event-stream": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "429": {
+            "description": "rate_limited",
+            "content": {
+              "text/event-stream": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "501": {
+            "description": "not_implemented",
+            "content": {
+              "text/event-stream": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/documents": {
+      "get": {
+        "tags": [
+          "documents"
+        ],
+        "summary": "List Documents",
+        "description": "The user's documents.",
+        "operationId": "listDocuments",
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "items": {
+                    "$ref": "#/components/schemas/Document"
+                  },
+                  "type": "array",
+                  "title": "Response Listdocuments"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "sign_in_required: guest, or the session expired.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "501": {
+            "description": "not_implemented",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          }
+        }
+      },
+      "post": {
+        "tags": [
+          "documents"
+        ],
+        "summary": "Upload Document",
+        "description": "Upload a document for extraction; returns the job to follow.",
+        "operationId": "uploadDocument",
+        "requestBody": {
+          "content": {
+            "multipart/form-data": {
+              "schema": {
+                "$ref": "#/components/schemas/Body_uploadDocument"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "202": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/JobAccepted"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "sign_in_required: guest, or the session expired.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "consent_required (no active consent of the needed type) or forbidden.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "413": {
+            "description": "payload_too_large",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "415": {
+            "description": "unsupported_media_type",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "validation_error: lists invalid field names only.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "429": {
+            "description": "rate_limited",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "501": {
+            "description": "not_implemented",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/documents/{document_id}/findings": {
+      "get": {
+        "tags": [
+          "documents"
+        ],
+        "summary": "List Findings",
+        "description": "Findings with page and snippet.",
+        "operationId": "listFindings",
+        "parameters": [
+          {
+            "name": "document_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid",
+              "title": "Document Id"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "array",
+                  "items": {
+                    "$ref": "#/components/schemas/Finding"
+                  },
+                  "title": "Response Listfindings"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "sign_in_required: guest, or the session expired.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "not_found",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "501": {
+            "description": "not_implemented",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/documents/{document_id}": {
+      "delete": {
+        "tags": [
+          "documents"
+        ],
+        "summary": "Delete Document",
+        "description": "Delete a document and its findings.",
+        "operationId": "deleteDocument",
+        "parameters": [
+          {
+            "name": "document_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid",
+              "title": "Document Id"
+            }
+          }
+        ],
+        "responses": {
+          "204": {
+            "description": "Successful Response"
+          },
+          "401": {
+            "description": "sign_in_required: guest, or the session expired.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "not_found",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "501": {
+            "description": "not_implemented",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/findings/{finding_id}/confirm": {
+      "post": {
+        "tags": [
+          "documents"
+        ],
+        "summary": "Confirm Finding",
+        "description": "Confirm a finding; returns the updated profile.",
+        "operationId": "confirmFinding",
+        "parameters": [
+          {
+            "name": "finding_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid",
+              "title": "Finding Id"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/PatientProfile"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "sign_in_required: guest, or the session expired.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "not_found",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "501": {
+            "description": "not_implemented",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/findings/{finding_id}/reject": {
+      "post": {
+        "tags": [
+          "documents"
+        ],
+        "summary": "Reject Finding",
+        "description": "Reject a finding; returns the updated profile.",
+        "operationId": "rejectFinding",
+        "parameters": [
+          {
+            "name": "finding_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid",
+              "title": "Finding Id"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/PatientProfile"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "sign_in_required: guest, or the session expired.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "not_found",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "501": {
+            "description": "not_implemented",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/jobs/{job_id}": {
+      "get": {
+        "tags": [
+          "documents"
+        ],
+        "summary": "Stream Job",
+        "description": "Job progress.",
+        "operationId": "streamJob",
+        "parameters": [
+          {
+            "name": "job_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid",
+              "title": "Job Id"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Stream of JobEvent (progress..., done | error).",
+            "content": {
+              "text/event-stream": {
+                "schema": {
+                  "$ref": "#/components/schemas/JobEvent"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "sign_in_required: guest, or the session expired.",
+            "content": {
+              "text/event-stream": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "not_found",
+            "content": {
+              "text/event-stream": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "501": {
+            "description": "not_implemented",
+            "content": {
+              "text/event-stream": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/contributions": {
+      "get": {
+        "tags": [
+          "contributions"
+        ],
+        "summary": "List Contributions",
+        "description": "The user's own contributions.",
+        "operationId": "listContributions",
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "items": {
+                    "$ref": "#/components/schemas/Contribution"
+                  },
+                  "type": "array",
+                  "title": "Response Listcontributions"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "sign_in_required: guest, or the session expired.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "501": {
+            "description": "not_implemented",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          }
+        }
+      },
+      "post": {
+        "tags": [
+          "contributions"
+        ],
+        "summary": "Create Contribution",
+        "description": "Contribute a patient-reported profile or asset (status pending_review).",
+        "operationId": "createContribution",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ContributionCreate"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "201": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Contribution"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "sign_in_required: guest, or the session expired.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "consent_required (no active consent of the needed type) or forbidden.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "validation_error: lists invalid field names only.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "501": {
+            "description": "not_implemented",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/contributions/{contribution_id}": {
+      "delete": {
+        "tags": [
+          "contributions"
+        ],
+        "summary": "Delete Contribution",
+        "description": "Delete one of the user's contributions.",
+        "operationId": "deleteContribution",
+        "parameters": [
+          {
+            "name": "contribution_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid",
+              "title": "Contribution Id"
+            }
+          }
+        ],
+        "responses": {
+          "204": {
+            "description": "Successful Response"
+          },
+          "401": {
+            "description": "sign_in_required: guest, or the session expired.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "not_found",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "501": {
+            "description": "not_implemented",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/edges/{edge_id}/flag": {
+      "post": {
+        "tags": [
+          "contributions"
+        ],
+        "summary": "Flag Edge",
+        "description": "Flag an edge; it is shown as under_review.",
+        "operationId": "flagEdge",
+        "parameters": [
+          {
+            "name": "edge_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "title": "Edge Id"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/FlagCreate"
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/FlagResult"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "sign_in_required: guest, or the session expired.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "not_found",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "conflict",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "validation_error: lists invalid field names only.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "501": {
+            "description": "not_implemented",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/proposal": {
+      "post": {
+        "tags": [
+          "proposal"
+        ],
+        "summary": "Create Proposal",
+        "description": "One-page sourced proposal as HTML (print to PDF).",
+        "operationId": "createProposal",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ProposalRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "One-page sourced proposal.",
+            "content": {
+              "text/html": {
+                "schema": {
+                  "type": "string"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "sign_in_required: guest, or the session expired.",
+            "content": {
+              "text/html": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "not_found",
+            "content": {
+              "text/html": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "validation_error: lists invalid field names only.",
+            "content": {
+              "text/html": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "501": {
+            "description": "not_implemented",
+            "content": {
+              "text/html": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          }
+        }
+      }
+    }
+  },
+  "components": {
+    "schemas": {
+      "AccountInfo": {
+        "properties": {
+          "id": {
+            "type": "string",
+            "format": "uuid",
+            "title": "Id"
+          },
+          "email": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Email"
+          },
+          "name": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Name"
+          },
+          "created_at": {
+            "type": "string",
+            "format": "date-time",
+            "title": "Created At"
+          },
+          "last_login_at": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "date-time"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Last Login At"
+          }
+        },
+        "type": "object",
+        "required": [
+          "id",
+          "created_at"
+        ],
+        "title": "AccountInfo"
+      },
+      "Action": {
+        "properties": {
+          "title": {
+            "type": "string",
+            "title": "Title"
+          },
+          "type": {
+            "$ref": "#/components/schemas/ActionType"
+          },
+          "viable": {
+            "type": "boolean",
+            "title": "Viable",
+            "description": "All supporting edges observed and active, no contradiction."
+          },
+          "edge_ids": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array",
+            "title": "Edge Ids"
+          },
+          "timeline_today": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Timeline Today",
+            "description": "Today's timeline for this milestone."
+          },
+          "timeline_proposed": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Timeline Proposed",
+            "description": "Timeline with the proposed route."
+          },
+          "assumptions": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array",
+            "title": "Assumptions"
+          }
+        },
+        "type": "object",
+        "required": [
+          "title",
+          "type",
+          "viable",
+          "edge_ids",
+          "timeline_today",
+          "timeline_proposed",
+          "assumptions"
+        ],
+        "title": "Action"
+      },
+      "ActionType": {
+        "type": "string",
+        "enum": [
+          "reuse_asset",
+          "contact",
+          "join_trial",
+          "fund"
+        ],
+        "title": "ActionType"
+      },
+      "AgeRange": {
+        "type": "string",
+        "enum": [
+          "0-1",
+          "1-5",
+          "6-12",
+          "13-17",
+          "18-39",
+          "40-64",
+          "65+"
+        ],
+        "title": "AgeRange"
+      },
+      "AgentReply": {
+        "properties": {
+          "summary": {
+            "type": "string",
+            "title": "Summary",
+            "description": "Plain-language answer, max 3 sentences."
+          },
+          "uncertainty": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Uncertainty",
+            "description": "Null or one sentence."
+          },
+          "chips": {
+            "items": {
+              "$ref": "#/components/schemas/Chip"
+            },
+            "type": "array",
+            "title": "Chips"
+          },
+          "claims": {
+            "items": {
+              "$ref": "#/components/schemas/Claim"
+            },
+            "type": "array",
+            "title": "Claims"
+          },
+          "contradictions": {
+            "items": {
+              "$ref": "#/components/schemas/Contradiction"
+            },
+            "type": "array",
+            "title": "Contradictions"
+          },
+          "missing_evidence": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array",
+            "title": "Missing Evidence"
+          },
+          "cards": {
+            "items": {
+              "$ref": "#/components/schemas/Card"
+            },
+            "type": "array",
+            "title": "Cards"
+          },
+          "graph_focus": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/GraphFocus"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "actions": {
+            "items": {
+              "$ref": "#/components/schemas/Action"
+            },
+            "type": "array",
+            "title": "Actions"
+          },
+          "follow_up": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/FollowUp"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          }
+        },
+        "type": "object",
+        "required": [
+          "summary",
+          "uncertainty",
+          "chips",
+          "claims",
+          "contradictions",
+          "missing_evidence",
+          "cards",
+          "graph_focus",
+          "actions",
+          "follow_up"
+        ],
+        "title": "AgentReply",
+        "description": "One structured agent turn (all fields required, nullable where noted)."
+      },
+      "AssetContributionCreate": {
+        "properties": {
+          "kind": {
+            "type": "string",
+            "const": "asset",
+            "title": "Kind"
+          },
+          "payload": {
+            "$ref": "#/components/schemas/AssetPayload"
+          }
+        },
+        "type": "object",
+        "required": [
+          "kind",
+          "payload"
+        ],
+        "title": "AssetContributionCreate"
+      },
+      "AssetPayload": {
+        "properties": {
+          "asset_type": {
+            "$ref": "#/components/schemas/AssetType"
+          },
+          "name": {
+            "type": "string",
+            "maxLength": 200,
+            "title": "Name"
+          },
+          "url": {
+            "anyOf": [
+              {
+                "type": "string",
+                "maxLength": 500
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Url"
+          },
+          "description": {
+            "anyOf": [
+              {
+                "type": "string",
+                "maxLength": 2000
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Description"
+          },
+          "disease_ids": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array",
+            "title": "Disease Ids",
+            "description": "MONDO IDs it relates to."
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "required": [
+          "asset_type",
+          "name"
+        ],
+        "title": "AssetPayload"
+      },
+      "AssetType": {
+        "type": "string",
+        "enum": [
+          "registry",
+          "natural_history_study",
+          "model",
+          "biomarker",
+          "other"
+        ],
+        "title": "AssetType"
+      },
+      "AtlasEdge": {
+        "properties": {
+          "id": {
+            "type": "string",
+            "title": "Id"
+          },
+          "source": {
+            "type": "string",
+            "title": "Source",
+            "description": "Source node ID."
+          },
+          "target": {
+            "type": "string",
+            "title": "Target",
+            "description": "Target node ID."
+          },
+          "relation": {
+            "$ref": "#/components/schemas/Relation"
+          },
+          "family": {
+            "$ref": "#/components/schemas/EdgeFamily"
+          },
+          "confidence": {
+            "type": "number",
+            "title": "Confidence"
+          },
+          "origin": {
+            "$ref": "#/components/schemas/Origin"
+          },
+          "status": {
+            "$ref": "#/components/schemas/EdgeStatus"
+          }
+        },
+        "type": "object",
+        "required": [
+          "id",
+          "source",
+          "target",
+          "relation",
+          "family",
+          "confidence",
+          "origin",
+          "status"
+        ],
+        "title": "AtlasEdge"
+      },
+      "AtlasLayout": {
+        "properties": {
+          "nodes": {
+            "items": {
+              "$ref": "#/components/schemas/AtlasNode"
+            },
+            "type": "array",
+            "title": "Nodes"
+          },
+          "edges": {
+            "items": {
+              "$ref": "#/components/schemas/AtlasEdge"
+            },
+            "type": "array",
+            "title": "Edges"
+          },
+          "clusters": {
+            "items": {
+              "$ref": "#/components/schemas/ClusterSummary"
+            },
+            "type": "array",
+            "title": "Clusters"
+          },
+          "data_version": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Data Version"
+          }
+        },
+        "type": "object",
+        "required": [
+          "nodes",
+          "edges"
+        ],
+        "title": "AtlasLayout",
+        "description": "Compact whole-graph layout for the Atlas view."
+      },
+      "AtlasNode": {
+        "properties": {
+          "id": {
+            "type": "string",
+            "title": "Id"
+          },
+          "type": {
+            "$ref": "#/components/schemas/NodeType"
+          },
+          "label": {
+            "type": "string",
+            "title": "Label"
+          },
+          "x": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "X"
+          },
+          "y": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Y"
+          },
+          "cluster_id": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Cluster Id"
+          },
+          "centrality": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Centrality"
+          }
+        },
+        "type": "object",
+        "required": [
+          "id",
+          "type",
+          "label"
+        ],
+        "title": "AtlasNode"
+      },
+      "Body_uploadDocument": {
+        "properties": {
+          "file": {
+            "type": "string",
+            "contentMediaType": "application/octet-stream",
+            "title": "File",
+            "description": "PDF, PNG, JPEG, HEIC or DOCX; max 20 MB, 30 pages."
+          }
+        },
+        "type": "object",
+        "required": [
+          "file"
+        ],
+        "title": "Body_uploadDocument"
+      },
+      "CandidateEdge": {
+        "properties": {
+          "source_id": {
+            "type": "string",
+            "title": "Source Id"
+          },
+          "target_id": {
+            "type": "string",
+            "title": "Target Id"
+          },
+          "relation": {
+            "$ref": "#/components/schemas/Relation"
+          },
+          "quote": {
+            "type": "string",
+            "title": "Quote",
+            "description": "Exact supporting span from the source."
+          },
+          "source_url": {
+            "type": "string",
+            "title": "Source Url",
+            "description": "Where the quote was found."
+          },
+          "source_type": {
+            "type": "string",
+            "title": "Source Type",
+            "description": "pubmed, clinicaltrials or web."
+          },
+          "source_id_ref": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Source Id Ref",
+            "description": "Source identifier (PMID, NCT ...)."
+          },
+          "origin": {
+            "$ref": "#/components/schemas/Origin",
+            "default": "inferred"
+          },
+          "status": {
+            "type": "string",
+            "const": "pending_review",
+            "title": "Status",
+            "description": "Always pending_review.",
+            "default": "pending_review"
+          }
+        },
+        "type": "object",
+        "required": [
+          "source_id",
+          "target_id",
+          "relation",
+          "quote",
+          "source_url",
+          "source_type"
+        ],
+        "title": "CandidateEdge",
+        "description": "A candidate edge found by the gap-search agent. Never promoted automatically."
+      },
+      "Card": {
+        "properties": {
+          "type": {
+            "$ref": "#/components/schemas/CardType"
+          },
+          "node_ids": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array",
+            "title": "Node Ids"
+          },
+          "edge_ids": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array",
+            "title": "Edge Ids"
+          }
+        },
+        "type": "object",
+        "required": [
+          "type",
+          "node_ids",
+          "edge_ids"
+        ],
+        "title": "Card"
+      },
+      "CardType": {
+        "type": "string",
+        "enum": [
+          "mini_graph",
+          "patient_group",
+          "evidence",
+          "open_in_atlas"
+        ],
+        "title": "CardType"
+      },
+      "ChatActionsEvent": {
+        "properties": {
+          "type": {
+            "type": "string",
+            "const": "actions",
+            "title": "Type",
+            "default": "actions"
+          },
+          "actions": {
+            "items": {
+              "$ref": "#/components/schemas/Action"
+            },
+            "type": "array",
+            "title": "Actions"
+          }
+        },
+        "type": "object",
+        "required": [
+          "actions"
+        ],
+        "title": "ChatActionsEvent"
+      },
+      "ChatCardsEvent": {
+        "properties": {
+          "type": {
+            "type": "string",
+            "const": "cards",
+            "title": "Type",
+            "default": "cards"
+          },
+          "cards": {
+            "items": {
+              "$ref": "#/components/schemas/Card"
+            },
+            "type": "array",
+            "title": "Cards"
+          }
+        },
+        "type": "object",
+        "required": [
+          "cards"
+        ],
+        "title": "ChatCardsEvent"
+      },
+      "ChatChipsEvent": {
+        "properties": {
+          "type": {
+            "type": "string",
+            "const": "chips",
+            "title": "Type",
+            "default": "chips"
+          },
+          "chips": {
+            "items": {
+              "$ref": "#/components/schemas/Chip"
+            },
+            "type": "array",
+            "title": "Chips"
+          }
+        },
+        "type": "object",
+        "required": [
+          "chips"
+        ],
+        "title": "ChatChipsEvent"
+      },
+      "ChatClaimsEvent": {
+        "properties": {
+          "type": {
+            "type": "string",
+            "const": "claims",
+            "title": "Type",
+            "default": "claims"
+          },
+          "claims": {
+            "items": {
+              "$ref": "#/components/schemas/Claim"
+            },
+            "type": "array",
+            "title": "Claims"
+          },
+          "contradictions": {
+            "items": {
+              "$ref": "#/components/schemas/Contradiction"
+            },
+            "type": "array",
+            "title": "Contradictions"
+          }
+        },
+        "type": "object",
+        "required": [
+          "claims"
+        ],
+        "title": "ChatClaimsEvent"
+      },
+      "ChatErrorEvent": {
+        "properties": {
+          "code": {
+            "$ref": "#/components/schemas/ErrorCode",
+            "description": "Stable error code."
+          },
+          "message": {
+            "type": "string",
+            "title": "Message",
+            "description": "Human-readable message. Never echoes user content."
+          },
+          "type": {
+            "type": "string",
+            "const": "error",
+            "title": "Type",
+            "default": "error"
+          }
+        },
+        "type": "object",
+        "required": [
+          "code",
+          "message"
+        ],
+        "title": "ChatErrorEvent"
+      },
+      "ChatEvent": {
+        "oneOf": [
+          {
+            "$ref": "#/components/schemas/ChatStatusEvent"
+          },
+          {
+            "$ref": "#/components/schemas/ChatSummaryDeltaEvent"
+          },
+          {
+            "$ref": "#/components/schemas/ChatChipsEvent"
+          },
+          {
+            "$ref": "#/components/schemas/ChatClaimsEvent"
+          },
+          {
+            "$ref": "#/components/schemas/ChatCardsEvent"
+          },
+          {
+            "$ref": "#/components/schemas/ChatActionsEvent"
+          },
+          {
+            "$ref": "#/components/schemas/ChatFollowUpEvent"
+          },
+          {
+            "$ref": "#/components/schemas/ChatFinalEvent"
+          },
+          {
+            "$ref": "#/components/schemas/ChatErrorEvent"
+          }
+        ],
+        "title": "ChatEvent",
+        "description": "One event of the POST /chat stream.",
+        "discriminator": {
+          "propertyName": "type",
+          "mapping": {
+            "actions": "#/components/schemas/ChatActionsEvent",
+            "cards": "#/components/schemas/ChatCardsEvent",
+            "chips": "#/components/schemas/ChatChipsEvent",
+            "claims": "#/components/schemas/ChatClaimsEvent",
+            "error": "#/components/schemas/ChatErrorEvent",
+            "final": "#/components/schemas/ChatFinalEvent",
+            "follow_up": "#/components/schemas/ChatFollowUpEvent",
+            "status": "#/components/schemas/ChatStatusEvent",
+            "summary_delta": "#/components/schemas/ChatSummaryDeltaEvent"
+          }
+        }
+      },
+      "ChatFinalEvent": {
+        "properties": {
+          "type": {
+            "type": "string",
+            "const": "final",
+            "title": "Type",
+            "default": "final"
+          },
+          "reply": {
+            "$ref": "#/components/schemas/AgentReply"
+          },
+          "session_id": {
+            "type": "string",
+            "format": "uuid",
+            "title": "Session Id"
+          },
+          "message_id": {
+            "type": "string",
+            "format": "uuid",
+            "title": "Message Id"
+          }
+        },
+        "type": "object",
+        "required": [
+          "reply",
+          "session_id",
+          "message_id"
+        ],
+        "title": "ChatFinalEvent"
+      },
+      "ChatFollowUpEvent": {
+        "properties": {
+          "type": {
+            "type": "string",
+            "const": "follow_up",
+            "title": "Type",
+            "default": "follow_up"
+          },
+          "follow_up": {
+            "$ref": "#/components/schemas/FollowUp"
+          }
+        },
+        "type": "object",
+        "required": [
+          "follow_up"
+        ],
+        "title": "ChatFollowUpEvent"
+      },
+      "ChatMessage": {
+        "properties": {
+          "id": {
+            "type": "string",
+            "format": "uuid",
+            "title": "Id"
+          },
+          "session_id": {
+            "type": "string",
+            "format": "uuid",
+            "title": "Session Id"
+          },
+          "role": {
+            "$ref": "#/components/schemas/ChatRole"
+          },
+          "content": {
+            "type": "string",
+            "title": "Content",
+            "description": "Redacted message text."
+          },
+          "reply": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/AgentReply"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "Structured reply (assistant only)."
+          },
+          "created_at": {
+            "type": "string",
+            "format": "date-time",
+            "title": "Created At"
+          }
+        },
+        "type": "object",
+        "required": [
+          "id",
+          "session_id",
+          "role",
+          "content",
+          "created_at"
+        ],
+        "title": "ChatMessage"
+      },
+      "ChatRequest": {
+        "properties": {
+          "session_id": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "uuid"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Session Id",
+            "description": "Existing session; omit to start one."
+          },
+          "message": {
+            "type": "string",
+            "maxLength": 4000,
+            "minLength": 1,
+            "title": "Message",
+            "description": "The user's message."
+          },
+          "expert_mode": {
+            "anyOf": [
+              {
+                "type": "boolean"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Expert Mode",
+            "description": "Override the profile's expert mode."
+          }
+        },
+        "type": "object",
+        "required": [
+          "message"
+        ],
+        "title": "ChatRequest"
+      },
+      "ChatRole": {
+        "type": "string",
+        "enum": [
+          "user",
+          "assistant"
+        ],
+        "title": "ChatRole"
+      },
+      "ChatSession": {
+        "properties": {
+          "id": {
+            "type": "string",
+            "format": "uuid",
+            "title": "Id"
+          },
+          "title": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Title"
+          },
+          "created_at": {
+            "type": "string",
+            "format": "date-time",
+            "title": "Created At"
+          },
+          "updated_at": {
+            "type": "string",
+            "format": "date-time",
+            "title": "Updated At"
+          }
+        },
+        "type": "object",
+        "required": [
+          "id",
+          "created_at",
+          "updated_at"
+        ],
+        "title": "ChatSession"
+      },
+      "ChatSessionDetail": {
+        "properties": {
+          "session": {
+            "$ref": "#/components/schemas/ChatSession"
+          },
+          "messages": {
+            "items": {
+              "$ref": "#/components/schemas/ChatMessage"
+            },
+            "type": "array",
+            "title": "Messages"
+          }
+        },
+        "type": "object",
+        "required": [
+          "session",
+          "messages"
+        ],
+        "title": "ChatSessionDetail"
+      },
+      "ChatSessionExport": {
+        "properties": {
+          "session": {
+            "$ref": "#/components/schemas/ChatSession"
+          },
+          "messages": {
+            "items": {
+              "$ref": "#/components/schemas/ChatMessage"
+            },
+            "type": "array",
+            "title": "Messages"
+          }
+        },
+        "type": "object",
+        "required": [
+          "session",
+          "messages"
+        ],
+        "title": "ChatSessionExport"
+      },
+      "ChatStatusEvent": {
+        "properties": {
+          "type": {
+            "type": "string",
+            "const": "status",
+            "title": "Type",
+            "default": "status"
+          },
+          "tool": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Tool",
+            "description": "Tool currently running, e.g. find_path."
+          },
+          "message": {
+            "type": "string",
+            "title": "Message",
+            "description": "Short progress text."
+          },
+          "progress": {
+            "anyOf": [
+              {
+                "type": "number",
+                "maximum": 1.0,
+                "minimum": 0.0
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Progress",
+            "description": "Optional progress 0..1."
+          }
+        },
+        "type": "object",
+        "required": [
+          "message"
+        ],
+        "title": "ChatStatusEvent"
+      },
+      "ChatSummaryDeltaEvent": {
+        "properties": {
+          "type": {
+            "type": "string",
+            "const": "summary_delta",
+            "title": "Type",
+            "default": "summary_delta"
+          },
+          "text": {
+            "type": "string",
+            "title": "Text",
+            "description": "Next chunk of the summary."
+          }
+        },
+        "type": "object",
+        "required": [
+          "text"
+        ],
+        "title": "ChatSummaryDeltaEvent"
+      },
+      "Chip": {
+        "properties": {
+          "type": {
+            "$ref": "#/components/schemas/ChipType",
+            "description": "disease, gene, variant or symptom."
+          },
+          "id": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Id",
+            "description": "Resolved stable ID (MONDO, HGNC, CLINVAR, HP) or null."
+          },
+          "label": {
+            "type": "string",
+            "title": "Label",
+            "description": "Label shown on the chip."
+          },
+          "negated": {
+            "type": "boolean",
+            "title": "Negated",
+            "description": "True for negations ('no feeding problems')."
+          },
+          "confirmed": {
+            "type": "boolean",
+            "title": "Confirmed",
+            "description": "True once the user confirmed the chip."
+          }
+        },
+        "type": "object",
+        "required": [
+          "type",
+          "id",
+          "label",
+          "negated",
+          "confirmed"
+        ],
+        "title": "Chip"
+      },
+      "ChipType": {
+        "type": "string",
+        "enum": [
+          "disease",
+          "gene",
+          "variant",
+          "symptom"
+        ],
+        "title": "ChipType"
+      },
+      "Claim": {
+        "properties": {
+          "text": {
+            "type": "string",
+            "title": "Text",
+            "description": "One claim, in the lens's language and reading level."
+          },
+          "edge_ids": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array",
+            "title": "Edge Ids",
+            "description": "Edges backing the claim (from this turn's tools)."
+          },
+          "origin": {
+            "$ref": "#/components/schemas/Origin",
+            "description": "observed = data, inferred = hypothesis, and others."
+          },
+          "confidence": {
+            "$ref": "#/components/schemas/ConfidenceLevel"
+          }
+        },
+        "type": "object",
+        "required": [
+          "text",
+          "edge_ids",
+          "origin",
+          "confidence"
+        ],
+        "title": "Claim"
+      },
+      "ClaimType": {
+        "type": "string",
+        "enum": [
+          "patient_observation",
+          "experimental",
+          "review",
+          "hypothesis"
+        ],
+        "title": "ClaimType"
+      },
+      "ClusterSummary": {
+        "properties": {
+          "id": {
+            "type": "string",
+            "title": "Id",
+            "description": "Cluster ID, e.g. CLUSTER:1."
+          },
+          "label": {
+            "type": "string",
+            "title": "Label",
+            "description": "Cluster label (model-written, inferred)."
+          },
+          "mechanism_summary": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Mechanism Summary",
+            "description": "Shared mechanism, plain text."
+          },
+          "member_count": {
+            "type": "integer",
+            "title": "Member Count",
+            "description": "Number of member nodes."
+          },
+          "attrs": {
+            "additionalProperties": true,
+            "type": "object",
+            "title": "Attrs",
+            "description": "Extra metadata (top genes, pathways, centroid ...)."
+          },
+          "origin": {
+            "$ref": "#/components/schemas/Origin",
+            "description": "Cluster labels are always inferred.",
+            "default": "inferred"
+          }
+        },
+        "type": "object",
+        "required": [
+          "id",
+          "label",
+          "member_count"
+        ],
+        "title": "ClusterSummary"
+      },
+      "ConfidenceBreakdown": {
+        "properties": {
+          "supporting": {
+            "items": {
+              "$ref": "#/components/schemas/ConfidenceTerm"
+            },
+            "type": "array",
+            "title": "Supporting",
+            "description": "Supporting evidence terms."
+          },
+          "support_score": {
+            "type": "number",
+            "title": "Support Score",
+            "description": "1 - prod(1 - w_i) over supporting evidence."
+          },
+          "n_contradicting": {
+            "type": "integer",
+            "title": "N Contradicting",
+            "description": "Number of contradicting evidence items."
+          },
+          "penalty_per_contradiction": {
+            "type": "number",
+            "title": "Penalty Per Contradiction",
+            "description": "Penalty p per contradiction."
+          },
+          "penalty": {
+            "type": "number",
+            "title": "Penalty",
+            "description": "p * n_contradicting."
+          },
+          "result": {
+            "type": "number",
+            "title": "Result",
+            "description": "Clamped confidence, 0..1."
+          },
+          "level": {
+            "$ref": "#/components/schemas/ConfidenceLevel",
+            "description": "High / Medium / Low."
+          },
+          "formula": {
+            "type": "string",
+            "title": "Formula",
+            "description": "Human-readable formula with the numbers filled in."
+          }
+        },
+        "type": "object",
+        "required": [
+          "supporting",
+          "support_score",
+          "n_contradicting",
+          "penalty_per_contradiction",
+          "penalty",
+          "result",
+          "level",
+          "formula"
+        ],
+        "title": "ConfidenceBreakdown"
+      },
+      "ConfidenceLevel": {
+        "type": "string",
+        "enum": [
+          "high",
+          "medium",
+          "low"
+        ],
+        "title": "ConfidenceLevel"
+      },
+      "ConfidenceTerm": {
+        "properties": {
+          "evidence_id": {
+            "type": "integer",
+            "title": "Evidence Id",
+            "description": "Evidence row ID."
+          },
+          "tier": {
+            "$ref": "#/components/schemas/EvidenceTier",
+            "description": "Evidence tier."
+          },
+          "weight": {
+            "type": "number",
+            "title": "Weight",
+            "description": "Tier weight w_i."
+          }
+        },
+        "type": "object",
+        "required": [
+          "evidence_id",
+          "tier",
+          "weight"
+        ],
+        "title": "ConfidenceTerm"
+      },
+      "Consent": {
+        "properties": {
+          "id": {
+            "type": "string",
+            "format": "uuid",
+            "title": "Id"
+          },
+          "consent_type": {
+            "$ref": "#/components/schemas/ConsentType"
+          },
+          "version": {
+            "type": "string",
+            "title": "Version",
+            "description": "Version of the consent text the user agreed to."
+          },
+          "granted_at": {
+            "type": "string",
+            "format": "date-time",
+            "title": "Granted At"
+          },
+          "revoked_at": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "date-time"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Revoked At"
+          },
+          "about_child": {
+            "type": "boolean",
+            "title": "About Child",
+            "default": false
+          },
+          "parental_responsibility_confirmed": {
+            "type": "boolean",
+            "title": "Parental Responsibility Confirmed",
+            "default": false
+          },
+          "active": {
+            "type": "boolean",
+            "title": "Active",
+            "description": "True while not revoked."
+          }
+        },
+        "type": "object",
+        "required": [
+          "id",
+          "consent_type",
+          "version",
+          "granted_at",
+          "active"
+        ],
+        "title": "Consent"
+      },
+      "ConsentGrant": {
+        "properties": {
+          "consent_type": {
+            "$ref": "#/components/schemas/ConsentType"
+          },
+          "version": {
+            "type": "string",
+            "maxLength": 40,
+            "minLength": 1,
+            "title": "Version",
+            "description": "Consent text version shown."
+          },
+          "about_child": {
+            "type": "boolean",
+            "title": "About Child",
+            "description": "Consent covers data about a child.",
+            "default": false
+          },
+          "parental_responsibility_confirmed": {
+            "type": "boolean",
+            "title": "Parental Responsibility Confirmed",
+            "description": "Required true when about_child is true.",
+            "default": false
+          }
+        },
+        "type": "object",
+        "required": [
+          "consent_type",
+          "version"
+        ],
+        "title": "ConsentGrant"
+      },
+      "ConsentType": {
+        "type": "string",
+        "enum": [
+          "upload",
+          "contribute"
+        ],
+        "title": "ConsentType"
+      },
+      "Contradiction": {
+        "properties": {
+          "claim_index": {
+            "type": "integer",
+            "title": "Claim Index",
+            "description": "Index into claims[]."
+          },
+          "edge_ids": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array",
+            "title": "Edge Ids",
+            "description": "Edges carrying the contradicting evidence."
+          },
+          "note": {
+            "type": "string",
+            "title": "Note"
+          }
+        },
+        "type": "object",
+        "required": [
+          "claim_index",
+          "edge_ids",
+          "note"
+        ],
+        "title": "Contradiction"
+      },
+      "Contribution": {
+        "properties": {
+          "id": {
+            "type": "string",
+            "format": "uuid",
+            "title": "Id"
+          },
+          "kind": {
+            "$ref": "#/components/schemas/ContributionKind"
+          },
+          "payload": {
+            "additionalProperties": true,
+            "type": "object",
+            "title": "Payload"
+          },
+          "status": {
+            "$ref": "#/components/schemas/ContributionStatus"
+          },
+          "consent_id": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "uuid"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Consent Id"
+          },
+          "created_at": {
+            "type": "string",
+            "format": "date-time",
+            "title": "Created At"
+          }
+        },
+        "type": "object",
+        "required": [
+          "id",
+          "kind",
+          "payload",
+          "status",
+          "created_at"
+        ],
+        "title": "Contribution"
+      },
+      "ContributionCreate": {
+        "oneOf": [
+          {
+            "$ref": "#/components/schemas/PhenotypeProfileContributionCreate"
+          },
+          {
+            "$ref": "#/components/schemas/AssetContributionCreate"
+          }
+        ],
+        "title": "ContributionCreate",
+        "description": "A patient-reported contribution; needs an active 'contribute' consent.",
+        "discriminator": {
+          "propertyName": "kind",
+          "mapping": {
+            "asset": "#/components/schemas/AssetContributionCreate",
+            "phenotype_profile": "#/components/schemas/PhenotypeProfileContributionCreate"
+          }
+        }
+      },
+      "ContributionKind": {
+        "type": "string",
+        "enum": [
+          "phenotype_profile",
+          "asset"
+        ],
+        "title": "ContributionKind"
+      },
+      "ContributionStatus": {
+        "type": "string",
+        "enum": [
+          "pending_review",
+          "accepted",
+          "rejected"
+        ],
+        "title": "ContributionStatus"
+      },
+      "CoverageReport": {
+        "properties": {
+          "sources_queried": {
+            "items": {
+              "$ref": "#/components/schemas/SourceCount"
+            },
+            "type": "array",
+            "title": "Sources Queried"
+          },
+          "closest_partial_path": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/Path"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "Best path found, even though it is below the threshold."
+          },
+          "missing_link": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/MissingLink"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "suggested_question": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Suggested Question",
+            "description": "Suggested next question."
+          }
+        },
+        "type": "object",
+        "title": "CoverageReport"
+      },
+      "DataExport": {
+        "properties": {
+          "exported_at": {
+            "type": "string",
+            "format": "date-time",
+            "title": "Exported At"
+          },
+          "account": {
+            "$ref": "#/components/schemas/AccountInfo"
+          },
+          "settings": {
+            "$ref": "#/components/schemas/ProfileSettings"
+          },
+          "openai_connected": {
+            "type": "boolean",
+            "title": "Openai Connected",
+            "description": "Tokens exist (the tokens are not exported)."
+          },
+          "consents": {
+            "items": {
+              "$ref": "#/components/schemas/Consent"
+            },
+            "type": "array",
+            "title": "Consents"
+          },
+          "patient_profile": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/PatientProfile"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "chat_sessions": {
+            "items": {
+              "$ref": "#/components/schemas/ChatSessionExport"
+            },
+            "type": "array",
+            "title": "Chat Sessions"
+          },
+          "documents": {
+            "items": {
+              "$ref": "#/components/schemas/Document"
+            },
+            "type": "array",
+            "title": "Documents"
+          },
+          "findings": {
+            "items": {
+              "$ref": "#/components/schemas/Finding"
+            },
+            "type": "array",
+            "title": "Findings"
+          },
+          "contributions": {
+            "items": {
+              "$ref": "#/components/schemas/Contribution"
+            },
+            "type": "array",
+            "title": "Contributions"
+          },
+          "edge_flags": {
+            "items": {
+              "$ref": "#/components/schemas/EdgeFlag"
+            },
+            "type": "array",
+            "title": "Edge Flags"
+          },
+          "jobs": {
+            "items": {
+              "$ref": "#/components/schemas/Job"
+            },
+            "type": "array",
+            "title": "Jobs"
+          }
+        },
+        "type": "object",
+        "required": [
+          "exported_at",
+          "account",
+          "settings",
+          "openai_connected",
+          "consents",
+          "patient_profile",
+          "chat_sessions",
+          "documents",
+          "findings",
+          "contributions",
+          "edge_flags",
+          "jobs"
+        ],
+        "title": "DataExport",
+        "description": "Everything stored about the user (GDPR Art. 15/20, CCPA right to know)."
+      },
+      "DocType": {
+        "type": "string",
+        "enum": [
+          "genetic_report",
+          "clinical_letter",
+          "research_paper",
+          "registry_document"
+        ],
+        "title": "DocType"
+      },
+      "Document": {
+        "properties": {
+          "id": {
+            "type": "string",
+            "format": "uuid",
+            "title": "Id"
+          },
+          "status": {
+            "$ref": "#/components/schemas/DocumentStatus"
+          },
+          "doc_type": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/DocType"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "Classification, once known."
+          },
+          "page_count": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Page Count"
+          },
+          "created_at": {
+            "type": "string",
+            "format": "date-time",
+            "title": "Created At"
+          },
+          "raw_deleted_at": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "date-time"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Raw Deleted At",
+            "description": "When the raw bytes were deleted."
+          }
+        },
+        "type": "object",
+        "required": [
+          "id",
+          "status",
+          "created_at"
+        ],
+        "title": "Document",
+        "description": "Uploaded document metadata. The filename and raw bytes are never stored."
+      },
+      "DocumentStatus": {
+        "type": "string",
+        "enum": [
+          "queued",
+          "processing",
+          "ready",
+          "failed"
+        ],
+        "title": "DocumentStatus"
+      },
+      "Edge": {
+        "properties": {
+          "id": {
+            "type": "string",
+            "title": "Id",
+            "description": "Edge ID, 'e_' + 12 hex chars."
+          },
+          "source_id": {
+            "type": "string",
+            "title": "Source Id",
+            "description": "Source node ID."
+          },
+          "target_id": {
+            "type": "string",
+            "title": "Target Id",
+            "description": "Target node ID."
+          },
+          "relation": {
+            "$ref": "#/components/schemas/Relation",
+            "description": "Relation type."
+          },
+          "family": {
+            "$ref": "#/components/schemas/EdgeFamily",
+            "description": "Edge family: dna, symptoms, research, community."
+          },
+          "confidence": {
+            "type": "number",
+            "maximum": 1.0,
+            "minimum": 0.0,
+            "title": "Confidence",
+            "description": "Stage 4 confidence, 0..1."
+          },
+          "confidence_level": {
+            "$ref": "#/components/schemas/ConfidenceLevel",
+            "description": "High >= 0.8, Medium >= 0.5, else Low."
+          },
+          "origin": {
+            "$ref": "#/components/schemas/Origin",
+            "description": "observed (data) vs inferred (hypothesis) and others."
+          },
+          "status": {
+            "$ref": "#/components/schemas/EdgeStatus",
+            "description": "active, pending_review, or under_review (open user flags)."
+          },
+          "features": {
+            "anyOf": [
+              {
+                "additionalProperties": true,
+                "type": "object"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Features",
+            "description": "Features behind inferred edges (shared HPO terms, scores ...)."
+          },
+          "data_version": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Data Version",
+            "description": "Graph data version."
+          },
+          "evidence_count": {
+            "type": "integer",
+            "minimum": 0.0,
+            "title": "Evidence Count",
+            "description": "Number of evidence rows.",
+            "default": 0
+          },
+          "contradiction_count": {
+            "type": "integer",
+            "minimum": 0.0,
+            "title": "Contradiction Count",
+            "description": "Evidence rows that contradict.",
+            "default": 0
+          },
+          "flagged": {
+            "type": "boolean",
+            "title": "Flagged",
+            "description": "True when the edge has open user flags.",
+            "default": false
+          }
+        },
+        "type": "object",
+        "required": [
+          "id",
+          "source_id",
+          "target_id",
+          "relation",
+          "family",
+          "confidence",
+          "confidence_level",
+          "origin",
+          "status"
+        ],
+        "title": "Edge"
+      },
+      "EdgeEvidence": {
+        "properties": {
+          "edge": {
+            "$ref": "#/components/schemas/Edge"
+          },
+          "source": {
+            "$ref": "#/components/schemas/Node",
+            "description": "Source node of the edge."
+          },
+          "target": {
+            "$ref": "#/components/schemas/Node",
+            "description": "Target node of the edge."
+          },
+          "supporting": {
+            "items": {
+              "$ref": "#/components/schemas/Evidence"
+            },
+            "type": "array",
+            "title": "Supporting",
+            "description": "Evidence with polarity 'supports'."
+          },
+          "contradicting": {
+            "items": {
+              "$ref": "#/components/schemas/Evidence"
+            },
+            "type": "array",
+            "title": "Contradicting",
+            "description": "Evidence with polarity 'contradicts'."
+          },
+          "confidence_breakdown": {
+            "$ref": "#/components/schemas/ConfidenceBreakdown"
+          },
+          "open_flags": {
+            "type": "integer",
+            "title": "Open Flags",
+            "description": "Number of open user flags (no flagger identity).",
+            "default": 0
+          }
+        },
+        "type": "object",
+        "required": [
+          "edge",
+          "source",
+          "target",
+          "supporting",
+          "contradicting",
+          "confidence_breakdown"
+        ],
+        "title": "EdgeEvidence"
+      },
+      "EdgeFamily": {
+        "type": "string",
+        "enum": [
+          "dna",
+          "symptoms",
+          "research",
+          "community"
+        ],
+        "title": "EdgeFamily"
+      },
+      "EdgeFlag": {
+        "properties": {
+          "id": {
+            "type": "string",
+            "format": "uuid",
+            "title": "Id"
+          },
+          "edge_id": {
+            "type": "string",
+            "title": "Edge Id"
+          },
+          "reason": {
+            "type": "string",
+            "title": "Reason"
+          },
+          "status": {
+            "$ref": "#/components/schemas/FlagStatus"
+          },
+          "created_at": {
+            "type": "string",
+            "format": "date-time",
+            "title": "Created At"
+          }
+        },
+        "type": "object",
+        "required": [
+          "id",
+          "edge_id",
+          "reason",
+          "status",
+          "created_at"
+        ],
+        "title": "EdgeFlag"
+      },
+      "EdgeStatus": {
+        "type": "string",
+        "enum": [
+          "active",
+          "pending_review",
+          "under_review"
+        ],
+        "title": "EdgeStatus"
+      },
+      "ErrorCode": {
+        "type": "string",
+        "enum": [
+          "bad_request",
+          "sign_in_required",
+          "consent_required",
+          "forbidden",
+          "not_found",
+          "conflict",
+          "payload_too_large",
+          "unsupported_media_type",
+          "validation_error",
+          "rate_limited",
+          "not_implemented",
+          "upstream_error",
+          "reauth_required",
+          "internal_error"
+        ],
+        "title": "ErrorCode"
+      },
+      "ErrorDetail": {
+        "properties": {
+          "code": {
+            "$ref": "#/components/schemas/ErrorCode",
+            "description": "Stable machine-readable error code."
+          },
+          "message": {
+            "type": "string",
+            "title": "Message",
+            "description": "Human-readable message. Never echoes user content."
+          }
+        },
+        "type": "object",
+        "required": [
+          "code",
+          "message"
+        ],
+        "title": "ErrorDetail"
+      },
+      "ErrorResponse": {
+        "properties": {
+          "error": {
+            "$ref": "#/components/schemas/ErrorDetail"
+          }
+        },
+        "type": "object",
+        "required": [
+          "error"
+        ],
+        "title": "ErrorResponse",
+        "description": "The single error envelope used by every endpoint."
+      },
+      "Evidence": {
+        "properties": {
+          "id": {
+            "type": "integer",
+            "title": "Id",
+            "description": "Evidence row ID."
+          },
+          "edge_id": {
+            "type": "string",
+            "title": "Edge Id",
+            "description": "Edge this evidence belongs to."
+          },
+          "tier": {
+            "$ref": "#/components/schemas/EvidenceTier",
+            "description": "Evidence tier."
+          },
+          "tier_weight": {
+            "type": "number",
+            "title": "Tier Weight",
+            "description": "Weight of the tier in the confidence formula."
+          },
+          "source_type": {
+            "type": "string",
+            "title": "Source Type",
+            "description": "Source kind, e.g. ClinVar, PubMed, HPO, fixture."
+          },
+          "source_id": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Source Id",
+            "description": "Source identifier (PMID, NCT, VCV ...)."
+          },
+          "url": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Url",
+            "description": "Link to the source."
+          },
+          "quote": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Quote",
+            "description": "Exact supporting span from the source."
+          },
+          "retrieved_at": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "date-time"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Retrieved At",
+            "description": "When the source was retrieved."
+          },
+          "polarity": {
+            "$ref": "#/components/schemas/Polarity",
+            "description": "Whether this item supports or contradicts the edge."
+          },
+          "claim_type": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/ClaimType"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "Kind of claim, for literature."
+          }
+        },
+        "type": "object",
+        "required": [
+          "id",
+          "edge_id",
+          "tier",
+          "tier_weight",
+          "source_type",
+          "polarity"
+        ],
+        "title": "Evidence"
+      },
+      "EvidenceTier": {
+        "type": "string",
+        "enum": [
+          "curated_db",
+          "peer_reviewed",
+          "review",
+          "preprint",
+          "llm_inferred",
+          "patient_reported"
+        ],
+        "title": "EvidenceTier"
+      },
+      "ExplainDeltaEvent": {
+        "properties": {
+          "type": {
+            "type": "string",
+            "const": "delta",
+            "title": "Type",
+            "default": "delta"
+          },
+          "text": {
+            "type": "string",
+            "title": "Text"
+          }
+        },
+        "type": "object",
+        "required": [
+          "text"
+        ],
+        "title": "ExplainDeltaEvent"
+      },
+      "ExplainErrorEvent": {
+        "properties": {
+          "code": {
+            "$ref": "#/components/schemas/ErrorCode",
+            "description": "Stable error code."
+          },
+          "message": {
+            "type": "string",
+            "title": "Message",
+            "description": "Human-readable message. Never echoes user content."
+          },
+          "type": {
+            "type": "string",
+            "const": "error",
+            "title": "Type",
+            "default": "error"
+          }
+        },
+        "type": "object",
+        "required": [
+          "code",
+          "message"
+        ],
+        "title": "ExplainErrorEvent"
+      },
+      "ExplainEvent": {
+        "oneOf": [
+          {
+            "$ref": "#/components/schemas/ExplainDeltaEvent"
+          },
+          {
+            "$ref": "#/components/schemas/ExplainFinalEvent"
+          },
+          {
+            "$ref": "#/components/schemas/ExplainErrorEvent"
+          }
+        ],
+        "title": "ExplainEvent",
+        "description": "One event of the POST /explain stream.",
+        "discriminator": {
+          "propertyName": "type",
+          "mapping": {
+            "delta": "#/components/schemas/ExplainDeltaEvent",
+            "error": "#/components/schemas/ExplainErrorEvent",
+            "final": "#/components/schemas/ExplainFinalEvent"
+          }
+        }
+      },
+      "ExplainFinalEvent": {
+        "properties": {
+          "type": {
+            "type": "string",
+            "const": "final",
+            "title": "Type",
+            "default": "final"
+          },
+          "path_id": {
+            "type": "string",
+            "title": "Path Id"
+          },
+          "text": {
+            "type": "string",
+            "title": "Text",
+            "description": "Full explanation; citations appear inline as [e_...]."
+          },
+          "citations": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array",
+            "title": "Citations",
+            "description": "Edge IDs cited; always a subset of the path."
+          },
+          "cached": {
+            "type": "boolean",
+            "title": "Cached"
+          },
+          "reading_grade": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Reading Grade",
+            "description": "Flesch-Kincaid grade of the text."
+          },
+          "role": {
+            "$ref": "#/components/schemas/Role"
+          },
+          "language": {
+            "type": "string",
+            "title": "Language"
+          },
+          "data_version": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Data Version"
+          }
+        },
+        "type": "object",
+        "required": [
+          "path_id",
+          "text",
+          "citations",
+          "cached",
+          "role",
+          "language"
+        ],
+        "title": "ExplainFinalEvent"
+      },
+      "ExplainRequest": {
+        "properties": {
+          "edge_ids": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array",
+            "maxItems": 20,
+            "minItems": 1,
+            "title": "Edge Ids",
+            "description": "Path edges in traversal order."
+          },
+          "role": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/Role"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "Lens role; defaults to the user's role."
+          },
+          "language": {
+            "anyOf": [
+              {
+                "type": "string",
+                "pattern": "^[a-z]{2,3}(-[A-Za-z0-9]{2,8})?$"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Language",
+            "description": "Output language; defaults to the profile."
+          }
+        },
+        "type": "object",
+        "required": [
+          "edge_ids"
+        ],
+        "title": "ExplainRequest"
+      },
+      "Finding": {
+        "properties": {
+          "id": {
+            "type": "string",
+            "format": "uuid",
+            "title": "Id"
+          },
+          "document_id": {
+            "type": "string",
+            "format": "uuid",
+            "title": "Document Id"
+          },
+          "type": {
+            "$ref": "#/components/schemas/FindingType"
+          },
+          "value": {
+            "type": "string",
+            "title": "Value",
+            "description": "Extracted value as shown to the user (redacted)."
+          },
+          "normalized_id": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Normalized Id",
+            "description": "Resolved ID (MONDO, HGNC, HP, CLINVAR)."
+          },
+          "page": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Page",
+            "description": "1-based page number."
+          },
+          "snippet": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Snippet",
+            "description": "Redacted source snippet to highlight."
+          },
+          "confirmed": {
+            "anyOf": [
+              {
+                "type": "boolean"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Confirmed",
+            "description": "true confirmed, false rejected, null open."
+          },
+          "payload": {
+            "additionalProperties": true,
+            "type": "object",
+            "title": "Payload",
+            "description": "Structured details (variant: hgvs, zygosity, classification, test_date)."
+          },
+          "vus_notice": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Vus Notice",
+            "description": "Set for uncertain_significance variants."
+          },
+          "decided_at": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "date-time"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Decided At"
+          }
+        },
+        "type": "object",
+        "required": [
+          "id",
+          "document_id",
+          "type",
+          "value"
+        ],
+        "title": "Finding"
+      },
+      "FindingType": {
+        "type": "string",
+        "enum": [
+          "disease",
+          "gene",
+          "variant",
+          "phenotype",
+          "candidate_edge"
+        ],
+        "title": "FindingType"
+      },
+      "FlagCreate": {
+        "properties": {
+          "reason": {
+            "type": "string",
+            "maxLength": 500,
+            "minLength": 1,
+            "title": "Reason",
+            "description": "Why the edge looks wrong."
+          }
+        },
+        "type": "object",
+        "required": [
+          "reason"
+        ],
+        "title": "FlagCreate"
+      },
+      "FlagResult": {
+        "properties": {
+          "edge_id": {
+            "type": "string",
+            "title": "Edge Id"
+          },
+          "status": {
+            "$ref": "#/components/schemas/EdgeStatus",
+            "description": "under_review once flagged."
+          },
+          "open_flags": {
+            "type": "integer",
+            "title": "Open Flags"
+          }
+        },
+        "type": "object",
+        "required": [
+          "edge_id",
+          "status",
+          "open_flags"
+        ],
+        "title": "FlagResult"
+      },
+      "FlagStatus": {
+        "type": "string",
+        "enum": [
+          "open",
+          "resolved",
+          "dismissed"
+        ],
+        "title": "FlagStatus"
+      },
+      "FollowUp": {
+        "properties": {
+          "question": {
+            "type": "string",
+            "title": "Question"
+          },
+          "quick_replies": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array",
+            "title": "Quick Replies"
+          },
+          "skippable": {
+            "type": "boolean",
+            "title": "Skippable",
+            "description": "Always true."
+          }
+        },
+        "type": "object",
+        "required": [
+          "question",
+          "quick_replies",
+          "skippable"
+        ],
+        "title": "FollowUp"
+      },
+      "GapCandidateEvent": {
+        "properties": {
+          "type": {
+            "type": "string",
+            "const": "candidate",
+            "title": "Type",
+            "default": "candidate"
+          },
+          "candidate": {
+            "$ref": "#/components/schemas/CandidateEdge"
+          }
+        },
+        "type": "object",
+        "required": [
+          "candidate"
+        ],
+        "title": "GapCandidateEvent"
+      },
+      "GapErrorEvent": {
+        "properties": {
+          "code": {
+            "$ref": "#/components/schemas/ErrorCode",
+            "description": "Stable error code."
+          },
+          "message": {
+            "type": "string",
+            "title": "Message",
+            "description": "Human-readable message. Never echoes user content."
+          },
+          "type": {
+            "type": "string",
+            "const": "error",
+            "title": "Type",
+            "default": "error"
+          }
+        },
+        "type": "object",
+        "required": [
+          "code",
+          "message"
+        ],
+        "title": "GapErrorEvent"
+      },
+      "GapFinalEvent": {
+        "properties": {
+          "type": {
+            "type": "string",
+            "const": "final",
+            "title": "Type",
+            "default": "final"
+          },
+          "candidate_count": {
+            "type": "integer",
+            "title": "Candidate Count"
+          },
+          "stop_reason": {
+            "$ref": "#/components/schemas/GapStopReason"
+          }
+        },
+        "type": "object",
+        "required": [
+          "candidate_count",
+          "stop_reason"
+        ],
+        "title": "GapFinalEvent"
+      },
+      "GapProgressEvent": {
+        "properties": {
+          "type": {
+            "type": "string",
+            "const": "progress",
+            "title": "Type",
+            "default": "progress"
+          },
+          "step": {
+            "type": "integer",
+            "title": "Step",
+            "description": "Agent step number."
+          },
+          "tool": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Tool",
+            "description": "pubmed_search, clinicaltrials_search, ..."
+          },
+          "message": {
+            "type": "string",
+            "title": "Message"
+          },
+          "elapsed_s": {
+            "type": "number",
+            "title": "Elapsed S",
+            "default": 0.0
+          }
+        },
+        "type": "object",
+        "required": [
+          "step",
+          "message"
+        ],
+        "title": "GapProgressEvent"
+      },
+      "GapSearchEvent": {
+        "oneOf": [
+          {
+            "$ref": "#/components/schemas/GapProgressEvent"
+          },
+          {
+            "$ref": "#/components/schemas/GapCandidateEvent"
+          },
+          {
+            "$ref": "#/components/schemas/GapFinalEvent"
+          },
+          {
+            "$ref": "#/components/schemas/GapErrorEvent"
+          }
+        ],
+        "title": "GapSearchEvent",
+        "description": "One event of the POST /gap-search stream.",
+        "discriminator": {
+          "propertyName": "type",
+          "mapping": {
+            "candidate": "#/components/schemas/GapCandidateEvent",
+            "error": "#/components/schemas/GapErrorEvent",
+            "final": "#/components/schemas/GapFinalEvent",
+            "progress": "#/components/schemas/GapProgressEvent"
+          }
+        }
+      },
+      "GapSearchRequest": {
+        "properties": {
+          "from_id": {
+            "type": "string",
+            "title": "From Id",
+            "description": "Node ID at one end of the missing link."
+          },
+          "to_id": {
+            "type": "string",
+            "title": "To Id",
+            "description": "Node ID at the other end."
+          },
+          "family": {
+            "$ref": "#/components/schemas/PathFamily",
+            "description": "Edge family of the failed path.",
+            "default": "all"
+          }
+        },
+        "type": "object",
+        "required": [
+          "from_id",
+          "to_id"
+        ],
+        "title": "GapSearchRequest"
+      },
+      "GapStopReason": {
+        "type": "string",
+        "enum": [
+          "completed",
+          "max_steps",
+          "max_tokens",
+          "timeout"
+        ],
+        "title": "GapStopReason"
+      },
+      "GraphExportFormat": {
+        "type": "string",
+        "enum": [
+          "csv",
+          "graphml"
+        ],
+        "title": "GraphExportFormat"
+      },
+      "GraphFocus": {
+        "properties": {
+          "node_ids": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array",
+            "title": "Node Ids",
+            "description": "Nodes to focus in the graph view."
+          },
+          "highlight_path": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array",
+            "title": "Highlight Path",
+            "description": "Edge IDs of a path to highlight, in order."
+          }
+        },
+        "type": "object",
+        "required": [
+          "node_ids",
+          "highlight_path"
+        ],
+        "title": "GraphFocus"
+      },
+      "HTTPValidationError": {
+        "properties": {
+          "detail": {
+            "items": {
+              "$ref": "#/components/schemas/ValidationError"
+            },
+            "type": "array",
+            "title": "Detail"
+          }
+        },
+        "type": "object",
+        "title": "HTTPValidationError"
+      },
+      "Health": {
+        "properties": {
+          "status": {
+            "type": "string",
+            "title": "Status",
+            "default": "ok"
+          }
+        },
+        "type": "object",
+        "title": "Health"
+      },
+      "Job": {
+        "properties": {
+          "id": {
+            "type": "string",
+            "format": "uuid",
+            "title": "Id"
+          },
+          "kind": {
+            "$ref": "#/components/schemas/JobKind"
+          },
+          "status": {
+            "$ref": "#/components/schemas/JobStatus"
+          },
+          "progress": {
+            "type": "integer",
+            "maximum": 100.0,
+            "minimum": 0.0,
+            "title": "Progress",
+            "description": "Percent complete.",
+            "default": 0
+          },
+          "document_id": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "uuid"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Document Id"
+          },
+          "error": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Error",
+            "description": "Error code only, never content."
+          },
+          "created_at": {
+            "type": "string",
+            "format": "date-time",
+            "title": "Created At"
+          }
+        },
+        "type": "object",
+        "required": [
+          "id",
+          "kind",
+          "status",
+          "created_at"
+        ],
+        "title": "Job"
+      },
+      "JobAccepted": {
+        "properties": {
+          "job_id": {
+            "type": "string",
+            "format": "uuid",
+            "title": "Job Id"
+          },
+          "document_id": {
+            "type": "string",
+            "format": "uuid",
+            "title": "Document Id"
+          }
+        },
+        "type": "object",
+        "required": [
+          "job_id",
+          "document_id"
+        ],
+        "title": "JobAccepted"
+      },
+      "JobDoneEvent": {
+        "properties": {
+          "type": {
+            "type": "string",
+            "const": "done",
+            "title": "Type",
+            "default": "done"
+          },
+          "job_id": {
+            "type": "string",
+            "format": "uuid",
+            "title": "Job Id"
+          },
+          "document_id": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "uuid"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Document Id"
+          },
+          "finding_count": {
+            "type": "integer",
+            "title": "Finding Count",
+            "default": 0
+          }
+        },
+        "type": "object",
+        "required": [
+          "job_id"
+        ],
+        "title": "JobDoneEvent"
+      },
+      "JobErrorEvent": {
+        "properties": {
+          "code": {
+            "$ref": "#/components/schemas/ErrorCode",
+            "description": "Stable error code."
+          },
+          "message": {
+            "type": "string",
+            "title": "Message",
+            "description": "Human-readable message. Never echoes user content."
+          },
+          "type": {
+            "type": "string",
+            "const": "error",
+            "title": "Type",
+            "default": "error"
+          },
+          "job_id": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "uuid"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Job Id"
+          }
+        },
+        "type": "object",
+        "required": [
+          "code",
+          "message"
+        ],
+        "title": "JobErrorEvent"
+      },
+      "JobEvent": {
+        "oneOf": [
+          {
+            "$ref": "#/components/schemas/JobProgressEvent"
+          },
+          {
+            "$ref": "#/components/schemas/JobDoneEvent"
+          },
+          {
+            "$ref": "#/components/schemas/JobErrorEvent"
+          }
+        ],
+        "title": "JobEvent",
+        "description": "One event of the GET /jobs/{id} stream.",
+        "discriminator": {
+          "propertyName": "type",
+          "mapping": {
+            "done": "#/components/schemas/JobDoneEvent",
+            "error": "#/components/schemas/JobErrorEvent",
+            "progress": "#/components/schemas/JobProgressEvent"
+          }
+        }
+      },
+      "JobKind": {
+        "type": "string",
+        "enum": [
+          "document_extraction"
+        ],
+        "title": "JobKind"
+      },
+      "JobProgressEvent": {
+        "properties": {
+          "type": {
+            "type": "string",
+            "const": "progress",
+            "title": "Type",
+            "default": "progress"
+          },
+          "job_id": {
+            "type": "string",
+            "format": "uuid",
+            "title": "Job Id"
+          },
+          "stage": {
+            "$ref": "#/components/schemas/JobStage"
+          },
+          "percent": {
+            "type": "integer",
+            "maximum": 100.0,
+            "minimum": 0.0,
+            "title": "Percent"
+          }
+        },
+        "type": "object",
+        "required": [
+          "job_id",
+          "stage",
+          "percent"
+        ],
+        "title": "JobProgressEvent"
+      },
+      "JobStage": {
+        "type": "string",
+        "enum": [
+          "queued",
+          "extracting_text",
+          "redacting",
+          "classifying",
+          "extracting_findings",
+          "done"
+        ],
+        "title": "JobStage"
+      },
+      "JobStatus": {
+        "type": "string",
+        "enum": [
+          "queued",
+          "running",
+          "succeeded",
+          "failed"
+        ],
+        "title": "JobStatus"
+      },
+      "LabelStyle": {
+        "type": "string",
+        "enum": [
+          "plain",
+          "clinical",
+          "technical"
+        ],
+        "title": "LabelStyle"
+      },
+      "LayoutHints": {
+        "properties": {
+          "start_layout": {
+            "$ref": "#/components/schemas/StartLayout",
+            "description": "Initial layout for the view."
+          },
+          "label_style": {
+            "$ref": "#/components/schemas/LabelStyle",
+            "description": "plain, clinical or technical labels."
+          },
+          "highlight_family": {
+            "items": {
+              "$ref": "#/components/schemas/EdgeFamily"
+            },
+            "type": "array",
+            "title": "Highlight Family",
+            "description": "Edge families highlighted first, in priority order."
+          },
+          "highlight_node_types": {
+            "items": {
+              "$ref": "#/components/schemas/NodeType"
+            },
+            "type": "array",
+            "title": "Highlight Node Types",
+            "description": "Node types highlighted first."
+          },
+          "show_ids": {
+            "type": "boolean",
+            "title": "Show Ids",
+            "description": "Show stable IDs next to labels.",
+            "default": false
+          },
+          "reading_grade_target": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Reading Grade Target",
+            "description": "Target Flesch-Kincaid grade for text in this lens."
+          }
+        },
+        "type": "object",
+        "required": [
+          "start_layout",
+          "label_style"
+        ],
+        "title": "LayoutHints",
+        "description": "Role presentation hints. They never hide anything."
+      },
+      "MatchKind": {
+        "type": "string",
+        "enum": [
+          "exact",
+          "trigram",
+          "vector"
+        ],
+        "title": "MatchKind"
+      },
+      "MissingLink": {
+        "properties": {
+          "from_id": {
+            "type": "string",
+            "title": "From Id"
+          },
+          "to_id": {
+            "type": "string",
+            "title": "To Id"
+          },
+          "description": {
+            "type": "string",
+            "title": "Description",
+            "description": "What evidence is missing, in plain language."
+          }
+        },
+        "type": "object",
+        "required": [
+          "from_id",
+          "to_id",
+          "description"
+        ],
+        "title": "MissingLink"
+      },
+      "Neighborhood": {
+        "properties": {
+          "center": {
+            "$ref": "#/components/schemas/Node"
+          },
+          "nodes": {
+            "items": {
+              "$ref": "#/components/schemas/Node"
+            },
+            "type": "array",
+            "title": "Nodes",
+            "description": "All nodes in the neighborhood, center included."
+          },
+          "edges": {
+            "items": {
+              "$ref": "#/components/schemas/Edge"
+            },
+            "type": "array",
+            "title": "Edges",
+            "description": "All edges between the returned nodes."
+          },
+          "cluster": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/ClusterSummary"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "Cluster of the center node."
+          },
+          "hints": {
+            "$ref": "#/components/schemas/LayoutHints"
+          },
+          "data_version": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Data Version",
+            "description": "Graph data version."
+          }
+        },
+        "type": "object",
+        "required": [
+          "center",
+          "nodes",
+          "edges",
+          "hints"
+        ],
+        "title": "Neighborhood"
+      },
+      "Node": {
+        "properties": {
+          "id": {
+            "type": "string",
+            "title": "Id",
+            "description": "Stable node ID, e.g. MONDO:0100135, HGNC:11444, HP:0001250."
+          },
+          "type": {
+            "$ref": "#/components/schemas/NodeType",
+            "description": "Node type."
+          },
+          "label": {
+            "type": "string",
+            "title": "Label",
+            "description": "Display label."
+          },
+          "description": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Description",
+            "description": "Short description from the source."
+          },
+          "url": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Url",
+            "description": "Link to the authoritative source page."
+          },
+          "attrs": {
+            "additionalProperties": true,
+            "type": "object",
+            "title": "Attrs",
+            "description": "Type-specific attributes (e.g. variant classification, registry kind)."
+          },
+          "cluster_id": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Cluster Id",
+            "description": "Mechanism/phenotype cluster, if any."
+          },
+          "x": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "X",
+            "description": "Precomputed layout x position."
+          },
+          "y": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Y",
+            "description": "Precomputed layout y position."
+          },
+          "centrality": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Centrality",
+            "description": "Precomputed centrality score (0..1)."
+          }
+        },
+        "type": "object",
+        "required": [
+          "id",
+          "type",
+          "label"
+        ],
+        "title": "Node"
+      },
+      "NodeDetail": {
+        "properties": {
+          "node": {
+            "$ref": "#/components/schemas/Node"
+          },
+          "synonyms": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array",
+            "title": "Synonyms",
+            "description": "Known name variants."
+          },
+          "summary": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Summary",
+            "description": "Short summary for the side panel."
+          },
+          "relation_counts": {
+            "items": {
+              "$ref": "#/components/schemas/RelationCount"
+            },
+            "type": "array",
+            "title": "Relation Counts",
+            "description": "Edge counts by relation."
+          },
+          "degree": {
+            "type": "integer",
+            "title": "Degree",
+            "description": "Total number of edges touching the node.",
+            "default": 0
+          },
+          "cluster": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/ClusterSummary"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "The node's cluster, if any."
+          },
+          "classification": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/VariantClassification"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "For variants: the clinical classification."
+          },
+          "vus_notice": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Vus Notice",
+            "description": "Standard VUS notice when classification is uncertain_significance."
+          }
+        },
+        "type": "object",
+        "required": [
+          "node"
+        ],
+        "title": "NodeDetail"
+      },
+      "NodeType": {
+        "type": "string",
+        "enum": [
+          "disease",
+          "gene",
+          "variant",
+          "mechanism",
+          "pathway",
+          "phenotype",
+          "paper",
+          "claim",
+          "researcher",
+          "doctor",
+          "institution",
+          "network",
+          "grant",
+          "trial",
+          "patient_org",
+          "registry",
+          "cluster"
+        ],
+        "title": "NodeType"
+      },
+      "Origin": {
+        "type": "string",
+        "enum": [
+          "observed",
+          "inferred",
+          "patient_reported",
+          "user_contributed"
+        ],
+        "title": "Origin"
+      },
+      "Path": {
+        "properties": {
+          "path_id": {
+            "type": "string",
+            "title": "Path Id",
+            "description": "path_id(edge_ids): 'p_' + 16 hex chars."
+          },
+          "steps": {
+            "items": {
+              "$ref": "#/components/schemas/PathStep"
+            },
+            "type": "array",
+            "title": "Steps"
+          },
+          "edge_ids": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array",
+            "title": "Edge Ids",
+            "description": "Edge IDs in traversal order."
+          },
+          "total_cost": {
+            "type": "number",
+            "title": "Total Cost",
+            "description": "Sum of -log(confidence) over the edges."
+          },
+          "min_confidence": {
+            "type": "number",
+            "title": "Min Confidence",
+            "description": "Lowest edge confidence on the path."
+          },
+          "min_confidence_level": {
+            "$ref": "#/components/schemas/ConfidenceLevel"
+          },
+          "all_observed": {
+            "type": "boolean",
+            "title": "All Observed",
+            "description": "Every edge has origin 'observed'."
+          },
+          "all_active": {
+            "type": "boolean",
+            "title": "All Active",
+            "description": "Every edge has status 'active'."
+          },
+          "supported": {
+            "type": "boolean",
+            "title": "Supported",
+            "description": "Every edge passes the confidence threshold."
+          }
+        },
+        "type": "object",
+        "required": [
+          "path_id",
+          "steps",
+          "edge_ids",
+          "total_cost",
+          "min_confidence",
+          "min_confidence_level",
+          "all_observed",
+          "all_active",
+          "supported"
+        ],
+        "title": "Path"
+      },
+      "PathFamily": {
+        "type": "string",
+        "enum": [
+          "dna",
+          "symptoms",
+          "research",
+          "all"
+        ],
+        "title": "PathFamily"
+      },
+      "PathResponse": {
+        "properties": {
+          "status": {
+            "$ref": "#/components/schemas/PathStatus"
+          },
+          "from_id": {
+            "type": "string",
+            "title": "From Id"
+          },
+          "to_id": {
+            "type": "string",
+            "title": "To Id"
+          },
+          "family": {
+            "$ref": "#/components/schemas/PathFamily"
+          },
+          "threshold": {
+            "type": "number",
+            "title": "Threshold",
+            "description": "Confidence threshold used.",
+            "default": 0.6
+          },
+          "paths": {
+            "items": {
+              "$ref": "#/components/schemas/Path"
+            },
+            "type": "array",
+            "title": "Paths",
+            "description": "Top-k supported paths."
+          },
+          "coverage": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/CoverageReport"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "Present when status is no_supported_route."
+          }
+        },
+        "type": "object",
+        "required": [
+          "status",
+          "from_id",
+          "to_id",
+          "family"
+        ],
+        "title": "PathResponse"
+      },
+      "PathStatus": {
+        "type": "string",
+        "enum": [
+          "ok",
+          "no_supported_route"
+        ],
+        "title": "PathStatus"
+      },
+      "PathStep": {
+        "properties": {
+          "edge": {
+            "$ref": "#/components/schemas/Edge"
+          },
+          "from_node": {
+            "$ref": "#/components/schemas/Node",
+            "description": "Node the step starts at (in traversal order)."
+          },
+          "to_node": {
+            "$ref": "#/components/schemas/Node",
+            "description": "Node the step ends at (in traversal order)."
+          },
+          "reversed": {
+            "type": "boolean",
+            "title": "Reversed",
+            "description": "True when traversed against the stored edge direction.",
+            "default": false
+          }
+        },
+        "type": "object",
+        "required": [
+          "edge",
+          "from_node",
+          "to_node"
+        ],
+        "title": "PathStep"
+      },
+      "PatientProfile": {
+        "properties": {
+          "diseases": {
+            "items": {
+              "$ref": "#/components/schemas/ProfileDisease"
+            },
+            "type": "array",
+            "title": "Diseases"
+          },
+          "genes": {
+            "items": {
+              "$ref": "#/components/schemas/ProfileGene"
+            },
+            "type": "array",
+            "title": "Genes"
+          },
+          "variants": {
+            "items": {
+              "$ref": "#/components/schemas/ProfileVariant"
+            },
+            "type": "array",
+            "title": "Variants"
+          },
+          "phenotypes": {
+            "items": {
+              "$ref": "#/components/schemas/ProfilePhenotype"
+            },
+            "type": "array",
+            "title": "Phenotypes"
+          },
+          "age_years": {
+            "anyOf": [
+              {
+                "type": "integer",
+                "maximum": 120.0,
+                "minimum": 0.0
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Age Years",
+            "description": "Age in years (no birth date)."
+          },
+          "age_range": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/AgeRange"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "Age range, alternative to age_years."
+          },
+          "onset": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Onset",
+            "description": "Disease onset: HPO onset term ID or label."
+          },
+          "country": {
+            "anyOf": [
+              {
+                "type": "string",
+                "pattern": "^[A-Z]{2}$"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Country",
+            "description": "Optional ISO 3166-1 alpha-2 country, only to find nearby groups."
+          },
+          "about_child": {
+            "type": "boolean",
+            "title": "About Child",
+            "description": "The profile describes a child.",
+            "default": false
+          },
+          "parental_responsibility_confirmed": {
+            "type": "boolean",
+            "title": "Parental Responsibility Confirmed",
+            "description": "Required true when about_child is true.",
+            "default": false
+          },
+          "updated_at": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "date-time"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Updated At",
+            "description": "Server-set last update time."
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "title": "PatientProfile"
+      },
+      "PhenotypeProfileContributionCreate": {
+        "properties": {
+          "kind": {
+            "type": "string",
+            "const": "phenotype_profile",
+            "title": "Kind"
+          },
+          "payload": {
+            "$ref": "#/components/schemas/PhenotypeProfilePayload"
+          }
+        },
+        "type": "object",
+        "required": [
+          "kind",
+          "payload"
+        ],
+        "title": "PhenotypeProfileContributionCreate"
+      },
+      "PhenotypeProfilePayload": {
+        "properties": {
+          "disease_id": {
+            "type": "string",
+            "title": "Disease Id",
+            "description": "MONDO ID of the disease."
+          },
+          "phenotype_ids": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array",
+            "title": "Phenotype Ids",
+            "description": "HPO IDs present."
+          },
+          "excluded_phenotype_ids": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array",
+            "title": "Excluded Phenotype Ids",
+            "description": "HPO IDs absent."
+          },
+          "age_range": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Age Range",
+            "description": "Optional age range (no birth date)."
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "required": [
+          "disease_id",
+          "phenotype_ids"
+        ],
+        "title": "PhenotypeProfilePayload"
+      },
+      "Polarity": {
+        "type": "string",
+        "enum": [
+          "supports",
+          "contradicts"
+        ],
+        "title": "Polarity"
+      },
+      "ProfileDisease": {
+        "properties": {
+          "source": {
+            "$ref": "#/components/schemas/ProfileSource",
+            "description": "Where the item came from: chat, document, manual."
+          },
+          "confirmed_at": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "date-time"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Confirmed At",
+            "description": "When the user confirmed it."
+          },
+          "finding_id": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "uuid"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Finding Id",
+            "description": "Document finding it came from, if any."
+          },
+          "id": {
+            "type": "string",
+            "title": "Id",
+            "description": "MONDO ID."
+          },
+          "label": {
+            "type": "string",
+            "title": "Label"
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "required": [
+          "source",
+          "id",
+          "label"
+        ],
+        "title": "ProfileDisease"
+      },
+      "ProfileGene": {
+        "properties": {
+          "source": {
+            "$ref": "#/components/schemas/ProfileSource",
+            "description": "Where the item came from: chat, document, manual."
+          },
+          "confirmed_at": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "date-time"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Confirmed At",
+            "description": "When the user confirmed it."
+          },
+          "finding_id": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "uuid"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Finding Id",
+            "description": "Document finding it came from, if any."
+          },
+          "id": {
+            "type": "string",
+            "title": "Id",
+            "description": "HGNC ID."
+          },
+          "label": {
+            "type": "string",
+            "title": "Label",
+            "description": "Gene symbol."
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "required": [
+          "source",
+          "id",
+          "label"
+        ],
+        "title": "ProfileGene"
+      },
+      "ProfilePhenotype": {
+        "properties": {
+          "source": {
+            "$ref": "#/components/schemas/ProfileSource",
+            "description": "Where the item came from: chat, document, manual."
+          },
+          "confirmed_at": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "date-time"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Confirmed At",
+            "description": "When the user confirmed it."
+          },
+          "finding_id": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "uuid"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Finding Id",
+            "description": "Document finding it came from, if any."
+          },
+          "id": {
+            "type": "string",
+            "title": "Id",
+            "description": "HPO ID."
+          },
+          "label": {
+            "type": "string",
+            "title": "Label"
+          },
+          "excluded": {
+            "type": "boolean",
+            "title": "Excluded",
+            "description": "True for negations ('no feeding problems').",
+            "default": false
+          },
+          "onset": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Onset",
+            "description": "HPO onset term ID or short label."
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "required": [
+          "source",
+          "id",
+          "label"
+        ],
+        "title": "ProfilePhenotype"
+      },
+      "ProfileSettings": {
+        "properties": {
+          "role": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/Role"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "role_verified": {
+            "type": "boolean",
+            "title": "Role Verified",
+            "default": false
+          },
+          "orcid_id": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Orcid Id"
+          },
+          "language": {
+            "type": "string",
+            "title": "Language",
+            "default": "en"
+          },
+          "expert_mode": {
+            "type": "boolean",
+            "title": "Expert Mode",
+            "default": false
+          },
+          "gpc_opt_out": {
+            "type": "boolean",
+            "title": "Gpc Opt Out",
+            "default": false
+          },
+          "age_confirmed_at": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "date-time"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Age Confirmed At"
+          }
+        },
+        "type": "object",
+        "title": "ProfileSettings"
+      },
+      "ProfileSource": {
+        "type": "string",
+        "enum": [
+          "chat",
+          "document",
+          "manual"
+        ],
+        "title": "ProfileSource"
+      },
+      "ProfileVariant": {
+        "properties": {
+          "source": {
+            "$ref": "#/components/schemas/ProfileSource",
+            "description": "Where the item came from: chat, document, manual."
+          },
+          "confirmed_at": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "date-time"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Confirmed At",
+            "description": "When the user confirmed it."
+          },
+          "finding_id": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "uuid"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Finding Id",
+            "description": "Document finding it came from, if any."
+          },
+          "hgvs": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Hgvs",
+            "description": "HGVS notation, e.g. NM_003165.6:c.1631G>A."
+          },
+          "clinvar_id": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Clinvar Id",
+            "description": "CLINVAR:<VariationID>, if resolved."
+          },
+          "gene_id": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Gene Id",
+            "description": "HGNC ID of the gene."
+          },
+          "zygosity": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/Zygosity"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "classification": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/VariantClassification"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "test_date": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "date"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Test Date",
+            "description": "Date of the genetic test."
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "required": [
+          "source"
+        ],
+        "title": "ProfileVariant"
+      },
+      "ProposalRequest": {
+        "properties": {
+          "edge_ids": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array",
+            "maxItems": 50,
+            "minItems": 1,
+            "title": "Edge Ids",
+            "description": "Path or action edges."
+          },
+          "actions": {
+            "anyOf": [
+              {
+                "items": {
+                  "$ref": "#/components/schemas/Action"
+                },
+                "type": "array"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Actions",
+            "description": "Action cards from the agent reply."
+          },
+          "title": {
+            "anyOf": [
+              {
+                "type": "string",
+                "maxLength": 200
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Title"
+          },
+          "role": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/Role"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "Lens role; defaults to the user's role."
+          },
+          "language": {
+            "anyOf": [
+              {
+                "type": "string",
+                "pattern": "^[a-z]{2,3}(-[A-Za-z0-9]{2,8})?$"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Language"
+          }
+        },
+        "type": "object",
+        "required": [
+          "edge_ids"
+        ],
+        "title": "ProposalRequest"
+      },
+      "RankedCluster": {
+        "properties": {
+          "cluster": {
+            "$ref": "#/components/schemas/ClusterSummary"
+          },
+          "score": {
+            "type": "number",
+            "title": "Score",
+            "description": "Ranking score for the queried mechanism."
+          },
+          "member_count": {
+            "type": "integer",
+            "title": "Member Count",
+            "description": "Diseases in the cluster."
+          },
+          "trial_count": {
+            "type": "integer",
+            "title": "Trial Count",
+            "description": "Trials linked to cluster members."
+          },
+          "evidence_strength": {
+            "type": "number",
+            "title": "Evidence Strength",
+            "description": "Mean confidence of supporting edges, 0..1."
+          },
+          "evidence_level": {
+            "$ref": "#/components/schemas/ConfidenceLevel",
+            "description": "evidence_strength as High/Medium/Low."
+          },
+          "matched_node_ids": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array",
+            "title": "Matched Node Ids",
+            "description": "Nodes (mechanism, pathway, gene) that matched."
+          },
+          "edge_ids": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array",
+            "title": "Edge Ids",
+            "description": "Edges supporting the ranking, for citations."
+          }
+        },
+        "type": "object",
+        "required": [
+          "cluster",
+          "score",
+          "member_count",
+          "trial_count",
+          "evidence_strength",
+          "evidence_level"
+        ],
+        "title": "RankedCluster"
+      },
+      "Relation": {
+        "type": "string",
+        "enum": [
+          "caused_by_variant_in",
+          "acts_via",
+          "participates_in",
+          "has_phenotype",
+          "same_gene_same_mechanism",
+          "same_gene_different_mechanism",
+          "shared_pathway",
+          "similar_symptoms",
+          "shared_researcher",
+          "asserts",
+          "authored",
+          "pi_of",
+          "funds_research_on",
+          "serves",
+          "runs",
+          "studies",
+          "investigator_of",
+          "affiliated_with",
+          "variant_of",
+          "observed_in",
+          "member_of",
+          "about"
+        ],
+        "title": "Relation"
+      },
+      "RelationCount": {
+        "properties": {
+          "relation": {
+            "$ref": "#/components/schemas/Relation"
+          },
+          "family": {
+            "$ref": "#/components/schemas/EdgeFamily"
+          },
+          "count": {
+            "type": "integer",
+            "title": "Count",
+            "description": "Number of edges of this relation touching the node."
+          }
+        },
+        "type": "object",
+        "required": [
+          "relation",
+          "family",
+          "count"
+        ],
+        "title": "RelationCount"
+      },
+      "Role": {
+        "type": "string",
+        "enum": [
+          "guest",
+          "patient",
+          "doctor",
+          "researcher"
+        ],
+        "title": "Role"
+      },
+      "SearchResponse": {
+        "properties": {
+          "results": {
+            "items": {
+              "$ref": "#/components/schemas/SearchResult"
+            },
+            "type": "array",
+            "title": "Results"
+          },
+          "ranked_clusters": {
+            "items": {
+              "$ref": "#/components/schemas/RankedCluster"
+            },
+            "type": "array",
+            "title": "Ranked Clusters",
+            "description": "Expert mode mechanism queries only."
+          },
+          "data_version": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Data Version"
+          }
+        },
+        "type": "object",
+        "required": [
+          "results"
+        ],
+        "title": "SearchResponse"
+      },
+      "SearchResult": {
+        "properties": {
+          "id": {
+            "type": "string",
+            "title": "Id",
+            "description": "Node ID."
+          },
+          "type": {
+            "$ref": "#/components/schemas/NodeType",
+            "description": "Node type."
+          },
+          "label": {
+            "type": "string",
+            "title": "Label",
+            "description": "Canonical label of the node."
+          },
+          "matched_synonym": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Matched Synonym",
+            "description": "Synonym that matched, e.g. 'Ohtahara syndrome' for STXBP1 DEE."
+          },
+          "score": {
+            "type": "number",
+            "title": "Score",
+            "description": "Combined ranking score (higher is better)."
+          },
+          "match_kind": {
+            "$ref": "#/components/schemas/MatchKind",
+            "description": "exact, trigram or vector."
+          },
+          "cluster_id": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Cluster Id",
+            "description": "Cluster of the node, if any."
+          }
+        },
+        "type": "object",
+        "required": [
+          "id",
+          "type",
+          "label",
+          "score",
+          "match_kind"
+        ],
+        "title": "SearchResult"
+      },
+      "SessionInfo": {
+        "properties": {
+          "user": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/SessionUser"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "Null for guests."
+          },
+          "gpc": {
+            "type": "boolean",
+            "title": "Gpc",
+            "description": "Global Privacy Control signal seen on this request.",
+            "default": false
+          },
+          "demo_mode": {
+            "type": "boolean",
+            "title": "Demo Mode",
+            "default": false
+          },
+          "data_version": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Data Version",
+            "description": "Graph data version served."
+          }
+        },
+        "type": "object",
+        "title": "SessionInfo"
+      },
+      "SessionUser": {
+        "properties": {
+          "id": {
+            "type": "string",
+            "format": "uuid",
+            "title": "Id"
+          },
+          "name": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Name"
+          },
+          "email": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Email"
+          },
+          "role": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/Role"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "Null until the user picks a role."
+          },
+          "role_verified": {
+            "type": "boolean",
+            "title": "Role Verified",
+            "default": false
+          },
+          "language": {
+            "type": "string",
+            "title": "Language",
+            "default": "en"
+          },
+          "expert_mode": {
+            "type": "boolean",
+            "title": "Expert Mode",
+            "default": false
+          },
+          "age_confirmed": {
+            "type": "boolean",
+            "title": "Age Confirmed",
+            "description": "User confirmed they are 16 or older.",
+            "default": false
+          },
+          "consents": {
+            "items": {
+              "$ref": "#/components/schemas/ConsentType"
+            },
+            "type": "array",
+            "title": "Consents",
+            "description": "Active consents."
+          }
+        },
+        "type": "object",
+        "required": [
+          "id"
+        ],
+        "title": "SessionUser"
+      },
+      "SettingsUpdate": {
+        "properties": {
+          "role": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/Role"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "patient, doctor or researcher (not guest)."
+          },
+          "language": {
+            "anyOf": [
+              {
+                "type": "string",
+                "pattern": "^[a-z]{2,3}(-[A-Za-z0-9]{2,8})?$"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Language"
+          },
+          "expert_mode": {
+            "anyOf": [
+              {
+                "type": "boolean"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Expert Mode"
+          },
+          "age_confirmed_16": {
+            "anyOf": [
+              {
+                "type": "boolean"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Age Confirmed 16",
+            "description": "Confirm the user is 16 or older."
+          }
+        },
+        "type": "object",
+        "title": "SettingsUpdate"
+      },
+      "SourceCount": {
+        "properties": {
+          "source": {
+            "type": "string",
+            "title": "Source",
+            "description": "Source name, e.g. ClinVar, HPO, PubMed."
+          },
+          "count": {
+            "type": "integer",
+            "title": "Count",
+            "description": "Number of results the source contributed."
+          }
+        },
+        "type": "object",
+        "required": [
+          "source",
+          "count"
+        ],
+        "title": "SourceCount"
+      },
+      "StartLayout": {
+        "type": "string",
+        "enum": [
+          "ring",
+          "force",
+          "hierarchy",
+          "cluster",
+          "tour"
+        ],
+        "title": "StartLayout"
+      },
+      "ValidationError": {
+        "properties": {
+          "loc": {
+            "items": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "integer"
+                }
+              ]
+            },
+            "type": "array",
+            "title": "Location"
+          },
+          "msg": {
+            "type": "string",
+            "title": "Message"
+          },
+          "type": {
+            "type": "string",
+            "title": "Error Type"
+          },
+          "input": {
+            "title": "Input"
+          },
+          "ctx": {
+            "type": "object",
+            "title": "Context"
+          }
+        },
+        "type": "object",
+        "required": [
+          "loc",
+          "msg",
+          "type"
+        ],
+        "title": "ValidationError"
+      },
+      "VariantClassification": {
+        "type": "string",
+        "enum": [
+          "pathogenic",
+          "likely_pathogenic",
+          "uncertain_significance",
+          "likely_benign",
+          "benign"
+        ],
+        "title": "VariantClassification"
+      },
+      "Zygosity": {
+        "type": "string",
+        "enum": [
+          "heterozygous",
+          "homozygous",
+          "hemizygous",
+          "compound_heterozygous",
+          "mosaic",
+          "unknown"
+        ],
+        "title": "Zygosity"
+      }
+    }
+  }
+}
