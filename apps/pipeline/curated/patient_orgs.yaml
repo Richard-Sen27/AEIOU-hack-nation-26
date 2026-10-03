@@ -1,0 +1,386 @@
+# Curated patient organizations, registries and umbrella networks for the demo cluster
+# (developmental and epileptic encephalopathies / channelopathies).
+#
+# Every claim carries the page that states it and a verbatim quote from that page. At build time
+# `sources/patient_orgs.py` fetches each page, cleans it with trafilatura and keeps a claim only if
+# its quote occurs in the cleaned text (same whitespace/unicode normalization as abstract quote
+# verification). An entry whose identity quote is not found is dropped entirely. All entries were
+# checked against the live pages on 2026-10-03.
+#
+# Not listed because their sites refuse automated fetches (HTTP 403 bot challenge) or did not
+# resolve when checked, so nothing could be verified: International Foundation for CDKL5 Research
+# (cdkl5.com), SynGAP Research Fund, KCNQ2 Cure Alliance, Dravet Syndrome UK's own site, Loulou
+# Foundation, NORD and EURORDIS member directories.
+
+networks:
+  - id: NET:dravet-europe
+    name: Dravet Syndrome European Federation
+    url: https://dravet.eu/
+    country: Europe
+    kind: patient_federation
+    identity:
+      url: https://dravet.eu/european-patient-registry/
+      quote: "DSEF finds it very important to collect data in a proper, easy and ethical way"
+
+  - id: NET:epicare
+    name: EpiCARE (European Reference Network for rare and complex epilepsies)
+    url: https://epi-care.eu/
+    country: Europe
+    kind: european_reference_network
+    identity:
+      url: https://epi-care.eu/
+      quote: "EpiCARE is the European Reference Network for all rare and complex epilepsies."
+
+  - id: NET:esco
+    name: European STXBP1 Consortium (ESCO)
+    url: https://stxbp1eu.org/
+    country: Europe
+    kind: research_consortium
+    identity:
+      url: https://stxbp1eu.org/
+      quote: "ESCO brings together all the relevant stakeholders in the space, including industrial partners and family associations"
+
+organizations:
+  - id: ORG:stxbp1-foundation
+    name: STXBP1 Foundation
+    url: https://www.stxbp1disorders.org/
+    country: United States
+    genes: [STXBP1]
+    identity:
+      url: https://www.stxbp1disorders.org/about
+      quote: "Founded in 2017, STXBP1 Foundation is a parent-led advocacy organization."
+    serves:
+      - disease: MONDO:0012812
+        url: https://www.stxbp1disorders.org/
+        quote: "Welcome to the STXBP1 Foundation, a 501(c)3 dedicated to raising awareness and finding a cure for STXBP1-Related Disorder"
+
+  - id: ORG:dravet-syndrome-foundation
+    name: Dravet Syndrome Foundation
+    url: https://dravetfoundation.org/
+    country: United States
+    genes: [SCN1A]
+    identity:
+      url: https://dravetfoundation.org/about-dsf/partnerships/
+      quote: "DSF engages in partnerships to elevate the patient voice"
+    serves:
+      - disease: MONDO:0100135
+        url: https://dravetfoundation.org/
+        quote: "Dravet syndrome, also known as Severe Myoclonic Epilepsy of Infancy (SMEI), is a rare form of intractable epilepsy"
+
+  - id: ORG:dravet-canada
+    name: Dravet Canada
+    url: https://dravet.ca/
+    country: Canada
+    genes: [SCN1A]
+    identity:
+      url: https://dravet.ca/
+      quote: "Support Dravet Canada"
+    serves:
+      - disease: MONDO:0100135
+        url: https://dravet.ca/
+        quote: "Sharing the stories of families and individuals living with Dravet Syndrome."
+
+  - id: ORG:familiescn2a-foundation
+    name: FamilieSCN2A Foundation
+    url: https://www.scn2a.org/
+    country: United States
+    genes: [SCN2A]
+    identity:
+      url: https://www.scn2a.org/
+      quote: "Welcome to The FamilieSCN2A Foundation"
+    serves:
+      - disease: MONDO:1060245
+        url: https://www.scn2a.org/research/clinical-trials-and-research-opportunities/
+        quote: "a Patient Registry with global reach to study SCN2A-related disorders (SRDs)"
+      - disease: MONDO:0013388
+        url: https://www.scn2a.org/
+        quote: "SCN2A is the name of a gene that is commonly associated with early-onset epilepsy"
+
+  - id: ORG:cute-syndrome-foundation
+    name: The Cute Syndrome Foundation
+    url: https://thecutesyndrome.com/
+    country: United States
+    genes: [SCN8A]
+    identity:
+      url: https://thecutesyndrome.com/
+      quote: "The Cute Syndrome Foundation raises awareness of SCN8A mutations"
+    serves:
+      - disease: MONDO:0013801
+        url: https://thecutesyndrome.com/
+        quote: "The Cute Syndrome Foundation raises awareness of SCN8A mutations, funds the dedicated and talented scientists researching SCN8A, and supports the families around the world who are affected by this disorder."
+
+  - id: ORG:kcnt1-epilepsy-foundation
+    name: KCNT1 Epilepsy Foundation
+    url: https://www.kcnt1epilepsy.org/
+    country: United States
+    genes: [KCNT1]
+    identity:
+      url: https://www.kcnt1epilepsy.org/kcnt1-international-registry/
+      quote: "managed by the KCNT1 Epilepsy Foundation"
+    serves:
+      - disease: MONDO:0013989
+        url: https://www.kcnt1epilepsy.org/kcnt1-international-registry/
+        quote: "dedicated to individuals with changes in the KCNT1 gene and KCNT1 related disorders"
+
+  - id: ORG:glut1-deficiency-foundation
+    name: GLUT1 Deficiency Foundation
+    url: https://www.g1dfoundation.org/
+    country: United States
+    genes: [SLC2A1]
+    identity:
+      url: https://www.g1dfoundation.org/
+      quote: "At the GLUT1 Deficiency Foundation, we don’t just support families and provide resources."
+    serves:
+      - disease: MONDO:0000188
+        url: https://www.g1dfoundation.org/
+        quote: "GLUT1 Deficiency is a rare genetic condition that impairs brain metabolism."
+
+  - id: ORG:pcdh19-alliance
+    name: PCDH19 Alliance
+    url: https://pcdh19info.org/
+    country: United States
+    genes: [PCDH19]
+    identity:
+      url: https://pcdh19info.org/
+      quote: "The PCDH19 Alliance raises and directs funds to scientific research"
+    serves:
+      - disease: MONDO:0010246
+        url: https://pcdh19info.org/
+        quote: "We are improving the lives of those living with PCDH19 Epilepsy through research and support."
+
+  # National Dravet syndrome associations listed as members on the federation's members map.
+  - id: ORG:dravet-italia
+    name: Dravet Italia Onlus
+    url: https://www.dravet-italia.org/
+    country: Italy
+    genes: [SCN1A]
+    identity:
+      url: https://dravet.eu/members-map/
+      quote: "Dravet Italia Onlus"
+    serves:
+      - disease: MONDO:0100135
+        url: https://dravet.eu/european-patient-registry/
+        quote: "is a project of the Associazione Dravet Italia Onlus, established in Verona in 2010 with the specific aim of sustaining scientific research into Dravet Syndrome"
+    member_of:
+      - network: NET:dravet-europe
+        url: https://dravet.eu/members-map/
+        quote: "Dravet Italia Onlus"
+
+  - id: ORG:dravet-syndrome-uk
+    name: Dravet Syndrome UK
+    url: https://www.dravet.org.uk/
+    country: United Kingdom
+    genes: [SCN1A]
+    identity:
+      url: https://dravet.eu/members-map/
+      quote: "Dravet Syndrome UK"
+    serves:
+      - disease: MONDO:0100135
+        url: https://dravet.eu/members-map/
+        quote: "Dravet Syndrome UK"
+    member_of:
+      - network: NET:dravet-europe
+        url: https://dravet.eu/members-map/
+        quote: "Dravet Syndrome UK"
+
+  - id: ORG:dravet-syndrom-ev
+    name: Dravet-Syndrom e.V.
+    url: https://dravet.de/
+    country: Germany
+    genes: [SCN1A]
+    identity:
+      url: https://dravet.eu/members-map/
+      quote: "Dravet-Syndrom e.V."
+    serves:
+      - disease: MONDO:0100135
+        url: https://dravet.eu/members-map/
+        quote: "Dravet-Syndrom e.V."
+    member_of:
+      - network: NET:dravet-europe
+        url: https://dravet.eu/members-map/
+        quote: "Dravet-Syndrom e.V."
+
+  - id: ORG:alliance-syndrome-de-dravet
+    name: Alliance syndrome de Dravet
+    url: https://www.dravet.fr/
+    country: France
+    genes: [SCN1A]
+    identity:
+      url: https://dravet.eu/members-map/
+      quote: "Alliance syndrome de Dravet"
+    serves:
+      - disease: MONDO:0100135
+        url: https://dravet.eu/members-map/
+        quote: "Alliance syndrome de Dravet"
+    member_of:
+      - network: NET:dravet-europe
+        url: https://dravet.eu/members-map/
+        quote: "Alliance syndrome de Dravet"
+
+  - id: ORG:fundacion-sindrome-de-dravet
+    name: Fundación Síndrome de Dravet
+    url: https://www.dravetfoundation.eu/
+    country: Spain
+    genes: [SCN1A]
+    identity:
+      url: https://dravet.eu/members-map/
+      quote: "Fundación Síndrome de Dravet"
+    serves:
+      - disease: MONDO:0100135
+        url: https://dravet.eu/members-map/
+        quote: "Fundación Síndrome de Dravet"
+    member_of:
+      - network: NET:dravet-europe
+        url: https://dravet.eu/members-map/
+        quote: "Fundación Síndrome de Dravet"
+
+  - id: ORG:dravetsyndroom-nederland-vlaanderen
+    name: Stichting Dravetsyndroom Nederland Vlaanderen
+    url: https://www.dravetsyndroom.eu/
+    country: Netherlands
+    genes: [SCN1A]
+    identity:
+      url: https://dravet.eu/members-map/
+      quote: "Stichting Dravetsyndroom Nederland Vlaanderen"
+    serves:
+      - disease: MONDO:0100135
+        url: https://dravet.eu/members-map/
+        quote: "Stichting Dravetsyndroom Nederland Vlaanderen"
+    member_of:
+      - network: NET:dravet-europe
+        url: https://dravet.eu/members-map/
+        quote: "Stichting Dravetsyndroom Nederland Vlaanderen"
+
+  - id: ORG:dravet-syndrome-ireland
+    name: Dravet Syndrome Ireland
+    url: https://www.dravetsyndromeireland.org/
+    country: Ireland
+    genes: [SCN1A]
+    identity:
+      url: https://dravet.eu/members-map/
+      quote: "Dravet Syndrome Ireland"
+    serves:
+      - disease: MONDO:0100135
+        url: https://dravet.eu/members-map/
+        quote: "Dravet Syndrome Ireland"
+    member_of:
+      - network: NET:dravet-europe
+        url: https://dravet.eu/members-map/
+        quote: "Dravet Syndrome Ireland"
+
+  - id: ORG:swiss-dravet-syndrome-association
+    name: Swiss Dravet Syndrome Association
+    url: https://www.dravet.ch/
+    country: Switzerland
+    genes: [SCN1A]
+    identity:
+      url: https://dravet.eu/members-map/
+      quote: "Swiss Dravet Syndrome Association"
+    serves:
+      - disease: MONDO:0100135
+        url: https://dravet.eu/members-map/
+        quote: "Swiss Dravet Syndrome Association"
+    member_of:
+      - network: NET:dravet-europe
+        url: https://dravet.eu/members-map/
+        quote: "Swiss Dravet Syndrome Association"
+
+registries:
+  - id: REG:dragonfly-scn2a
+    name: DRAGONFLY Study (global SCN2A patient registry)
+    kind: registry
+    url: https://www.scn2a.org/research/clinical-trials-and-research-opportunities/
+    runs:
+      - by: ORG:familiescn2a-foundation
+        url: https://www.scn2a.org/research/clinical-trials-and-research-opportunities/
+        quote: "The FamilieSCN2A Foundation, in partnership with the National Organization for Rare Disorders (NORD), has launched the DRAGONFLY Study, a Patient Registry"
+    studies:
+      - disease: MONDO:1060245
+        url: https://www.scn2a.org/research/clinical-trials-and-research-opportunities/
+        quote: "a Patient Registry with global reach to study SCN2A-related disorders (SRDs)"
+
+  - id: REG:kcnt1-international-registry
+    name: KCNT1 International Registry
+    kind: registry
+    url: https://www.kcnt1epilepsy.org/kcnt1-international-registry/
+    runs:
+      - by: ORG:kcnt1-epilepsy-foundation
+        url: https://www.kcnt1epilepsy.org/kcnt1-international-registry/
+        quote: "The KCNT1 International Registry is a comprehensive database managed by the KCNT1 Epilepsy Foundation"
+    studies:
+      - disease: MONDO:0013989
+        url: https://www.kcnt1epilepsy.org/kcnt1-international-registry/
+        quote: "dedicated to individuals with changes in the KCNT1 gene and KCNT1 related disorders"
+
+  - id: REG:glut1-natural-history-study
+    name: GLUT1 Deficiency Natural History Study
+    kind: natural_history_study
+    url: https://www.g1dfoundation.org/natural-history-study/
+    runs:
+      - by: ORG:glut1-deficiency-foundation
+        url: https://www.g1dfoundation.org/natural-history-study/
+        quote: "The G1DF has established two opportunities to bring the power of natural history studies to the GLUT1 Deficiency patient community."
+    studies:
+      - disease: MONDO:0000188
+        url: https://www.g1dfoundation.org/natural-history-study/
+        quote: "The GLUT1 Deficiency Natural History Study is a patient-powered data collection project"
+
+  - id: REG:pcdh19-patient-family-registry
+    name: PCDH19 Patient & Family Registry
+    kind: registry
+    url: https://pcdh19info.org/resources/researchers/
+    runs:
+      - by: ORG:pcdh19-alliance
+        url: https://pcdh19info.org/resources/researchers/
+        quote: "Patient & Family Registry Connect with our patient community through our registry to support recruitment, data collection, and longitudinal studies."
+    studies:
+      - disease: MONDO:0010246
+        url: https://pcdh19info.org/resources/researchers/
+        quote: "improve understanding, diagnosis, and treatment of PCDH19-related epilepsy"
+
+  - id: REG:residras
+    name: RESIDRAS (international registry of Dravet syndrome and SCN1A/PCDH19-related syndromes)
+    kind: registry
+    url: https://dravet.eu/european-patient-registry/
+    runs:
+      - by: ORG:dravet-italia
+        url: https://dravet.eu/european-patient-registry/
+        quote: "is a project of the Associazione Dravet Italia Onlus"
+    studies:
+      - disease: MONDO:0100135
+        url: https://dravet.eu/european-patient-registry/
+        quote: "RESIDRAS – international Registry of Dravet Syndrome and other Syndromes related to mutation on SCN1A and PCDH19 genes"
+
+  - id: REG:scn8a-registry
+    name: International SCN8A Registry
+    kind: registry
+    url: https://scn8a.net/
+    runs:
+      - by: University of Arizona
+        url: https://thecutesyndrome.com/scn8a-research/
+        quote: "The SCN8A Registry Research Study, created and managed by the Hammer Lab at the University of Arizona"
+    studies:
+      - disease: MONDO:0013801
+        url: https://scn8a.net/
+        quote: "Welcome to the home base for the International SCN8A Registry"
+
+  # Same registry as ClinicalTrials.gov NCT06625112, so it reuses that registry node's id.
+  - id: REG:nct06625112
+    name: ESCO Registry and Natural History Study
+    kind: registry
+    url: https://stxbp1eu.org/esco-patient-registry/
+    runs:
+      - by: NET:esco
+        url: https://stxbp1eu.org/esco-patient-registry/
+        quote: "ESCO’s Registry is planned as an overarching infrastructure that will contain the NHS."
+    studies:
+      - disease: MONDO:0012812
+        url: https://stxbp1eu.org/esco-patient-registry/
+        quote: "improve the quality of life for those affected by STXBP1-RD"
+
+institutions:
+  - name: Hospital Sant Joan de Déu
+    member_of:
+      - network: NET:epicare
+        url: https://epi-care.eu/
+        quote: "the administrative coordination of EpiCARE was entrusted to the Hospital Sant Joan de Déu in Barcelona"

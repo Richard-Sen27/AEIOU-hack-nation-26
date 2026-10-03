@@ -1,0 +1,116 @@
+KCNT1 International Registry
+Join our community in advancing research and understanding genetic changes in the KCNT1 gene and related disorders.
+The Importance of the Registry
+Welcome! The KCNT1 International Registry is a comprehensive database managed by the KCNT1 Epilepsy Foundation and hosted on the National Organization for Rare Disorders (NORD®) IAMRARE® platform and dedicated to individuals with changes in the KCNT1 gene and KCNT1 related disorders. Changes in the KCNT1 gene can be associated with a spectrum of conditions, including epilepsy, neurodevelopmental disorders, and intellectual disabilities. This registry serves as a vital hub for collecting and organizing essential information about individuals with KCNT1 mutations, fostering collaboration between patients, caregivers, and researchers.
+KCNT1 genetic changes can affect people in many different ways, and the full spectrum of associated features is still being understood. This registry will collect information about health history, development, treatments, interventions, and changes over time. By gathering firsthand reports from caregivers and individuals, we aim to deepen understanding of KCNT1, identify patterns across the evolving spectrum, and support future research that may improve care and clinical development.
+What is a Patient Registry?
+A patient registry is a collection of standardized information about a group of patients who share a condition. The information may be used for a variety of purposes such as conducting natural history studies and the development of new treatments. The KCNT1 International Registry serves to:
+Clinical Trial Support
+Support the design of clinical trials that explore new rare disease treatments.
+Understanding Variability
+Describe the people who have KCNT1 related disorders and to better understand the variability and stages of individuals affected by KCNT1.
+Lifetime Changes
+Understand how KCNT1 related disorders change over a person’s lifetime.
+Clinical Patterns
+Learn about clinical practice patterns and variations over the course of treatment.
+Best Practices
+Help to develop best practices, management guidelines, and recommendations so that clinicians can know how to give the best care to improve the quality of life and outcomes of people with KCNT1 related disorders.
+Research Recruitment
+Identify people with KCNT1 related disorders who might be willing to take part in other research studies or clinical trials. You will be able to choose whether you want to hear about these other studies.
+What types of data will be collected in the KCNT1 International Registry?
+The KCNT1 International Registry collects data on the following topics:
+Socio-demographics
+Medical history and diagnostics
+Treatment and disease progression
+Management of care
+Quality of life
+Economic impact
+How To Register
+Thank you for your interest in the KCNT1 International Registry. Register here! If you have additional questions, please contact us!
+We are rolling out additional languages throughout the year, and some materials are already available in other languages via a language toggle on the site.
+How to Sign Up
+Step-by-Step Guide
+Registering is simple and takes just a few minutes. Follow the steps below to create your account and begin contributing to KCNT1 research.
+Create Your Account — Enter your name, email address, and create a secure password.
+Review & Sign Informed Consent — Read through the informed consent document carefully and sign electronically to confirm your participation.
+Complete Your First Survey — Fill out the baseline survey with your (or your child’s) medical history and background information.
+You’re In! — You’ll receive a confirmation email with next steps and resources.
+Coming soon! Screenshots will be added here to guide you through each step visually.
+Informed Consent
+Before you begin, you will be asked to review and sign an informed consent form. This is a standard and important part of participating in any research registry.
+What the Consent Covers
+- The purpose of the KCNT1 International Registry
+- What data will be collected and how it will be used
+- How your privacy and data are protected
+- Your right to withdraw at any time, without penalty
+- How your data may be shared with researchers (in de-identified form)
+Your Rights as a Participant
+Participation is completely voluntary. You may withdraw from the registry at any time and request that your data be removed. Signing the consent form does not obligate you to complete every survey or remain in the registry indefinitely.
+[Screenshot placeholder: Informed consent screen]
+Changing Your Language
+The KCNT1 International Registry is available in multiple languages. We are rolling out additional languages throughout the year — you can switch your preferred language at any time using the language toggle.
+Find the Language Toggle — Look for the language selector in the top navigation bar or settings menu.
+Select Your Language — Choose your preferred language from the dropdown list.
+Content Updates Automatically — The registry interface and available materials will display in your selected language.
+[Screenshot placeholder: Language toggle location in the navigation bar]
+Not all materials may be available in every language yet. Check back often to see if new languages are available.
+Surveys and Longitudinal Participation
+This is a longitudinal study. After your initial registration and baseline survey, you’ll be invited to complete follow-up surveys over time. Your ongoing participation helps researchers understand changes and outcomes.
+Baseline Survey
+Completed right after consent; captures key background and medical history.
+Follow-up Surveys
+Sent periodically (e.g., every 6–12 months) to track changes in health, treatments, and quality of life.
+Event-Driven Updates
+You can log in anytime to update significant changes (e.g., new diagnosis, treatment, or test result).
+Annual Refresh
+A short yearly check-in to keep your information current.
+We’ll email you reminders when a new survey is available. You can also opt out of emails at any time.
+What You’ll Receive in Return
+Your participation matters — and we want to give back. As data is collected and analyzed, we will share insights and findings with the community.
+Data Insights
+We will periodically share aggregate findings and trends from the registry with all participants, so you can see the impact of your contribution.
+Email Updates
+You’ll receive registry newsletters, research highlights, and reminders for upcoming surveys directly to your inbox.
+Research Impact
+Your data helps researchers identify patterns, design clinical trials, and develop better treatments for KCNT1 related disorders.
+All shared insights are based on de-identified, aggregate data to protect participant privacy.
+Join the KCNT1 International Registry
+By joining our registry, you become an integral part of a community working towards a better future for KCNT1-affected individuals. Your participation directly contributes to scientific advancements, potentially leading to improved diagnostic tools, treatment options, and a deeper understanding of KCNT1 related disorders. Together, we can glow together to shine light on our rare disease and make a significant impact on the lives of those affected by KCNT1 variants.
+The KCNT1 International Registry is sponsored by the KCNT1 Epilepsy Foundation.
+Is the data secure?
+The KCNT1 International Registry follows strict government guidelines to assure patient information is protected. The platform is served over HTTPS, which means that the data is encrypted when being sent from the user’s browser to the NORD servers. The data is also kept encrypted in the NORD database. Communications between the registry platform application server and the database are also encrypted. As with any information one provides electronically, there is a very rare chance that privacy could be compromised. However, the registry and the security measures minimize the chance of this occurring.
+Video links:
+Janet Woodcock, Former Director CDER FDA on NORD Registry Program
+For Researchers
+About – For Researchers
+The KCNT1 International Registry collects disease-specific natural history data about individuals with KCNT1 related disorders, with the goal of improving the understanding of KCNT1 related disorders and informing treatment development. Registry questionnaires were built from common data element standards and cover the following topics:
+- Socio-demographics
+- Medical history and diagnostics
+- Treatment and disease progression
+- Management of care
+- Quality of life
+- Economic impact
+Research and Data Inquiries
+Researchers, clinicians, and industry partners interested in aggregated or de-identified data from the KCNT1 International Registry for research or therapeutic development are invited to contact us.
+The registry supports research collaborations, feasibility assessments for clinical studies, and efforts to better understand KCNT1-related disorders.
+Initial inquiries may be exploratory, and details can be shared confidentially if needed.
+Please contact our registry administrator at
+registry@example.org
+Include your name, institutional affiliation, and a brief description of your request. Our team will follow up with additional information about the data request process.
+Access to KCNT1 International Registry data is contingent upon project approval by the Registry Advisory Board.
+FAQ
+Thank you for your interest in the KCNT1 International Registry. Please see below some frequently asked questions. If you have additional questions that are not listed, please contact us!
+Is the registry available in other languages?
+We are actively rolling out additional languages throughout the year, and some materials are already available in other languages — users can switch languages using the language toggle available on the site.
+Contact Section
+Sponsor Name
+KCNT1 Epilepsy Foundation
+Sponsor Address
+32531 N Scottsdale Rd, Suite 105-530; Scottsdale, AZ 85266
+Sponsor URL
+KCNT1epilepsy.org
+Registry Contact Person
+Amanda Abuhl
+Registry Email
+IRB Name
+North Star Review Board
