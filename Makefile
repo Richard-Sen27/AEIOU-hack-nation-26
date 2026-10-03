@@ -68,6 +68,7 @@ openapi: ## export apps/backend/openapi.json
 
 pipeline: ## run every pipeline stage (fetch ... load, snapshot, explanations)
 	cd $(PIPELINE) && uv run $(PIPELINE_ENV) atlas-pipeline all
+	@echo "Restart the API (make backend) so it serves the new graph and cached explanations."
 
 pipeline-login: ## one-time Sign in with ChatGPT for the pipeline's LLM steps
 	cd $(PIPELINE) && uv run atlas-pipeline login
@@ -91,7 +92,9 @@ up-all: ## build and start database, migrations, API and frontend in Docker
 down-all: ## stop everything started by up-all (data volume kept)
 	$(COMPOSE) --profile app --profile pipeline down
 
-pipeline-docker: ## run the pipeline and precompute explanations in Docker
+pipeline-docker: ## run the pipeline and explanations in Docker, then restart the api container
 	mkdir -p -m 700 "$(AMBER_CONFIG_DIR)"
 	$(COMPOSE) run --build --rm pipeline all --skip-explain
 	$(COMPOSE) run --rm explain
+	@if [ -n "$$($(COMPOSE) ps -q api)" ]; then $(COMPOSE) restart api; \
+	else echo "Restart the API so it serves the new graph and cached explanations."; fi
