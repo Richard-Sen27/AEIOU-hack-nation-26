@@ -933,7 +933,7 @@ export type ConsentGrant = {
     /**
      * Version
      *
-     * Consent text version shown.
+     * Consent text version shown; must be the current version for the type (health_data: health-data-2026-10-04, contribute: contribute-2026-10-04).
      */
     version: string;
     /**
@@ -952,8 +952,11 @@ export type ConsentGrant = {
 
 /**
  * ConsentType
+ *
+ * health_data: one consent to process the user's own health and genetic data (chat,
+ * profile, documents); contribute: share data with the atlas, a separate purpose.
  */
-export type ConsentType = 'upload' | 'contribute';
+export type ConsentType = 'health_data' | 'contribute';
 
 /**
  * Contradiction
