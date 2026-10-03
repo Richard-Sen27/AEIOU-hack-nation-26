@@ -44,7 +44,7 @@ from pipeline.contracts import (
     raw_record,
     read_table,
 )
-from pipeline.paths import CACHE, GRAPH
+from pipeline.paths import CACHE, GRAPH, SCOPE_FILE
 
 log = logging.getLogger(__name__)
 
@@ -602,6 +602,11 @@ def cluster_diseases(
     return {d: order[membership[i]] for d, i in idx.items()}
 
 
+def _top(counter: Counter, n: int, labels: dict[str, str]) -> list[str]:
+    """most_common with a deterministic tie-break on the label."""
+    return sorted(counter, key=lambda k: (-counter[k], labels.get(k, k)))[:n]
+
+
 class ClusterLabel(BaseModel):
     label: str
     mechanism_summary: str
@@ -657,13 +662,14 @@ async def label_clusters(
         mechs = Counter(
             m["mechanism"] for (g, d), m in mech.items() if d in ds and m["mechanism"] != "non_lof"
         )
-        top_genes = [labels.get(g, g) for g, _ in genes.most_common(4)]
+        top_genes = [labels.get(g, g) for g in _top(genes, 4, labels)]
+
         def distinct(p: str, pws=pws) -> tuple[float, str]:
             return (-(pws[p] ** 2) * math.log(1 + n_clusters / df_pw[p]), labels.get(p, p))
 
         ranked_pw = sorted(pws, key=distinct)
         top_pw = [labels.get(p, p) for p in ranked_pw[:3]]
-        top_ph = [labels.get(p, p) for p, _ in phs.most_common(5)]
+        top_ph = [labels.get(p, p) for p in _top(phs, 5, labels)]
         if len(ds) == 1:
             label = labels.get(ds[0], ds[0])
         elif top_genes:
@@ -673,7 +679,8 @@ async def label_clusters(
         else:
             label = f"{top_ph[0]} spectrum" if top_ph else f"Cluster {c}"
         if mechs:
-            m, k = mechs.most_common(1)[0]
+            m = _top(mechs, 1, {})[0]
+            k = mechs[m]
             summary = (
                 f"Mostly {m.replace('_', ' ')} ({k} of {sum(mechs.values())} gene-disease pairs "
                 f"with a known mechanism)"
@@ -833,7 +840,7 @@ def node_clusters(
             votes[t][out[s]] += 1
         elif rel == "has_phenotype" and s in membership:
             votes[t][out[s]] += 1
-    gene_c = {g: v.most_common(1)[0][0] for g, v in votes.items()}
+    gene_c = {g: _top(v, 1, {})[0] for g, v in votes.items()}
     out.update({k: v for k, v in gene_c.items() if k not in out})
     for s, t, rel in edges.select("source_id", "target_id", "relation").iter_rows():
         if rel == "variant_of" and t in out:
@@ -841,7 +848,7 @@ def node_clusters(
         elif rel == "participates_in" and s in out:
             votes[t][out[s]] += 1
     for k, v in votes.items():
-        out.setdefault(k, v.most_common(1)[0][0])
+        out.setdefault(k, _top(v, 1, {})[0])
     return out
 
 
@@ -868,6 +875,14 @@ def embeddings(nodes: pl.DataFrame) -> dict[str, list[float]]:
             cached[h] = [float(x) for x in v]
         pl.DataFrame({"hash": list(cached), "vec": list(cached.values())}).write_parquet(cache_file)
     return {nid: cached[h] for nid, h in keyed.items()}
+
+
+def sync_scope_version(version: str) -> None:
+    """scope.json carries the data_version of the graph built from it."""
+    data = json.loads(SCOPE_FILE.read_text())
+    if data.get("data_version") != version:
+        data["data_version"] = version
+        SCOPE_FILE.write_text(json.dumps(data, indent=1))
 
 
 def cluster_nodes(clusters: list[dict], nodes: pl.DataFrame) -> pl.DataFrame:
@@ -971,6 +986,7 @@ async def run() -> dict[str, Any]:
         | {"nodes": n.drop("embedding", "x", "y", "centrality")}
     )
     version = assign_version(digest)
+    sync_scope_version(version)
     clusters = await label_clusters(membership, tables, mech, version)
     tables["clusters"] = pl.DataFrame(clusters)
     tables["nodes"] = pl.concat(

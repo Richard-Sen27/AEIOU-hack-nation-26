@@ -142,7 +142,7 @@ def shared_terms(terms_a, terms_b, limit: int = 12) -> list[dict]:
     for t in exact | common:
         covered |= ancestors(t) - {t}
     candidates = [t for t in exact | common if t not in covered]
-    ranked = sorted(candidates, key=lambda t: -ic(t))[:limit]
+    ranked = sorted(candidates, key=lambda t: (-ic(t), t))[:limit]
     out = []
     for t in ranked:
         obj = term(t)
