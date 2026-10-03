@@ -1,6 +1,6 @@
 "use client";
 
-import { ArrowLeft, ArrowRight, Check, Loader2, MessageCircle, ShieldCheck, UserRound, X } from "lucide-react";
+import { ArrowLeft, ArrowRight, Check, Loader2, MessageCircle, Pencil, ShieldCheck, UserRound, X } from "lucide-react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useCallback, useEffect, useState } from "react";
@@ -9,7 +9,10 @@ import { toast } from "sonner";
 import { routeGlobalError } from "@/components/account/api-errors";
 import { CLASSIFICATION_LABEL, DOC_TYPE_LABEL, ZYGOSITY_LABEL, formatDate } from "@/components/account/labels";
 import { SessionLoading, SignInPrompt } from "@/components/account/sign-in-prompt";
+import { CorrectPanel } from "@/components/chat/chips";
+import type { TurnChip } from "@/components/chat/types";
 import { NodeChip, VusNotice } from "@/components/graph-ui";
+import { useGate } from "@/components/providers/gate-provider";
 import { useSession } from "@/components/providers/session-provider";
 import { AiDisclosure } from "@/components/shell/ai-disclosure";
 import { Badge } from "@/components/ui/badge";
@@ -21,9 +24,11 @@ import type {
   Document,
   Finding,
   FindingType,
+  PatientProfile,
   VariantClassification,
   Zygosity,
 } from "@/lib/api/generated/types.gen";
+import type { SearchHit } from "@/lib/api/types";
 import { cn } from "@/lib/utils";
 
 import { DeleteDocumentButton } from "./document-list";
@@ -35,6 +40,36 @@ const TYPE_LABEL: Record<FindingType, string> = {
   phenotype: "Symptom",
   candidate_edge: "Suggested link",
 };
+
+/** Finding types that can be corrected by picking the right entity from search. */
+const CORRECTABLE: Partial<Record<FindingType, TurnChip["type"]>> = {
+  disease: "disease",
+  gene: "gene",
+  phenotype: "symptom",
+};
+
+type Corrected = { id: string; label: string };
+
+/** Put the corrected entity into the profile, linked to the finding it replaces. */
+function addCorrected(profile: PatientProfile, f: Finding, pick: Corrected): PatientProfile {
+  const item = { id: pick.id, label: pick.label, source: "document" as const, finding_id: f.id, confirmed_at: new Date().toISOString() };
+  switch (f.type) {
+    case "disease":
+      return { ...profile, diseases: [...(profile.diseases ?? []).filter((d) => d.id !== pick.id), item] };
+    case "gene":
+      return { ...profile, genes: [...(profile.genes ?? []).filter((g) => g.id !== pick.id), item] };
+    case "phenotype":
+      return {
+        ...profile,
+        phenotypes: [
+          ...(profile.phenotypes ?? []).filter((p) => p.id !== pick.id),
+          { ...item, excluded: f.payload?.excluded === true },
+        ],
+      };
+    default:
+      return profile;
+  }
+}
 
 const NODE_TYPE: Partial<Record<FindingType, string>> = {
   disease: "disease",
@@ -113,13 +148,19 @@ function Details({ f }: { f: Finding }) {
 function FindingCard({
   f,
   onDecide,
+  onCorrect,
+  corrected,
   busy,
 }: {
   f: Finding;
   onDecide: (f: Finding, confirm: boolean) => void;
+  onCorrect: (f: Finding, pick: Corrected) => void;
+  corrected?: Corrected;
   busy: boolean;
 }) {
-  const decided = f.confirmed === true ? "confirmed" : f.confirmed === false ? "rejected" : "open";
+  const [correcting, setCorrecting] = useState(false);
+  const decided = corrected ? "corrected" : f.confirmed === true ? "confirmed" : f.confirmed === false ? "rejected" : "open";
+  const chipType = CORRECTABLE[f.type];
   const nodeType = NODE_TYPE[f.type];
   const terms = [f.value, str(f.payload?.hgvs) ?? "", str(f.payload?.gene) ?? "", str(f.payload?.symbol) ?? "", str(f.payload?.matched_synonym) ?? "", str(f.payload?.quote) ?? ""];
 
@@ -142,6 +183,11 @@ function FindingCard({
             </Badge>
           )}
           {decided === "rejected" && <Badge variant="outline">Rejected, not used</Badge>}
+          {corrected && (
+            <Badge variant="secondary" data-testid="finding-corrected">
+              <Check aria-hidden /> Corrected to {corrected.label}, in your profile
+            </Badge>
+          )}
         </div>
         <p className="text-base font-semibold tracking-tight break-words">{f.value}</p>
         {f.normalized_id && nodeType && (
@@ -175,13 +221,34 @@ function FindingCard({
             <p className="text-sm text-muted-foreground">No snippet available.</p>
           )}
         </figure>
+        {correcting && chipType && (
+          <CorrectPanel
+            chip={{ type: chipType, id: f.normalized_id ?? null, label: f.value, negated: false, confirmed: false, state: "pending" }}
+            onPick={(hit: SearchHit) => {
+              setCorrecting(false);
+              onCorrect(f, { id: hit.id, label: hit.label });
+            }}
+            onCancel={() => setCorrecting(false)}
+          />
+        )}
         <div className="flex flex-wrap justify-end gap-2">
-          {decided !== "rejected" && (
+          {chipType && !corrected && f.confirmed !== true && (
+            <Button
+              variant="ghost"
+              onClick={() => setCorrecting((c) => !c)}
+              disabled={busy}
+              aria-expanded={correcting}
+              aria-label={`Correct ${TYPE_LABEL[f.type].toLowerCase()} ${f.value}`}
+            >
+              <Pencil aria-hidden /> Correct
+            </Button>
+          )}
+          {decided !== "rejected" && decided !== "corrected" && (
             <Button variant="outline" onClick={() => onDecide(f, false)} disabled={busy} aria-label={`Reject ${TYPE_LABEL[f.type].toLowerCase()} ${f.value}`}>
               <X aria-hidden /> {decided === "confirmed" ? "Remove" : "Reject"}
             </Button>
           )}
-          {decided !== "confirmed" && (
+          {decided !== "confirmed" && decided !== "corrected" && (
             <Button onClick={() => onDecide(f, true)} disabled={busy} aria-label={`Confirm ${TYPE_LABEL[f.type].toLowerCase()} ${f.value}`}>
               {busy ? <Loader2 className="animate-spin" aria-hidden /> : <Check aria-hidden />}
               {decided === "rejected" ? "Confirm instead" : "Confirm"}
@@ -202,6 +269,8 @@ export function FindingsReview({ documentId }: { documentId: string }) {
   const [doc, setDoc] = useState<Document | null>(null);
   const [findings, setFindings] = useState<Finding[]>([]);
   const [busy, setBusy] = useState<string | null>(null);
+  const [corrected, setCorrected] = useState<Record<string, Corrected>>({});
+  const { requireConsent } = useGate();
 
   const fetchAll = useCallback(async () => {
     try {
@@ -254,6 +323,39 @@ export function FindingsReview({ documentId }: { documentId: string }) {
     }
   }
 
+  /**
+   * The extraction was wrong: the finding itself is rejected (the API stores
+   * findings as extracted) and the entity the user picked goes into the
+   * profile instead, linked to that finding.
+   */
+  async function correct(f: Finding, pick: Corrected) {
+    if (!(await requireConsent("health_data", "Saving to your profile needs your consent to use health information."))) return;
+    setBusy(f.id);
+    try {
+      if (f.confirmed !== false) {
+        await apiFetch(`/findings/${encodeURIComponent(f.id)}/reject`, { method: "POST", quiet: true });
+      }
+      for (let attempt = 0; ; attempt++) {
+        const current = (await apiFetch<PatientProfile>("/profile", { quiet: true, cache: "no-store" })) ?? {};
+        try {
+          await apiFetch<PatientProfile>("/profile", { method: "PUT", json: addCorrected(current, f, pick), quiet: true });
+          break;
+        } catch (e) {
+          if (attempt === 0 && (e as { status?: number }).status === 409) continue;
+          throw e;
+        }
+      }
+      setFindings((list) => list.map((x) => (x.id === f.id ? { ...x, confirmed: false, decided_at: new Date().toISOString() } : x)));
+      setCorrected((c) => ({ ...c, [f.id]: pick }));
+      announce(`Corrected to ${pick.label} and added to your profile.`);
+    } catch (e) {
+      routeGlobalError(e);
+      toast("Not saved", { description: "Please try again." });
+    } finally {
+      setBusy(null);
+    }
+  }
+
   if (status === "loading") return <SessionLoading />;
   if (!user) {
     return (
@@ -292,7 +394,8 @@ export function FindingsReview({ documentId }: { documentId: string }) {
   }
 
   const open = findings.filter((f) => f.confirmed == null).length;
-  const confirmed = findings.filter((f) => f.confirmed === true && f.type !== "candidate_edge").length;
+  const confirmed =
+    findings.filter((f) => f.confirmed === true && f.type !== "candidate_edge").length + Object.keys(corrected).length;
   const reviewable = findings.length;
 
   return (
@@ -355,7 +458,14 @@ export function FindingsReview({ documentId }: { documentId: string }) {
           </div>
           <ul className="space-y-3">
             {findings.map((f) => (
-              <FindingCard key={f.id} f={f} onDecide={(x, c) => void decide(x, c)} busy={busy === f.id} />
+              <FindingCard
+                key={f.id}
+                f={f}
+                onDecide={(x, c) => void decide(x, c)}
+                onCorrect={(x, pick) => void correct(x, pick)}
+                corrected={corrected[f.id]}
+                busy={busy === f.id}
+              />
             ))}
           </ul>
         </>

@@ -17,7 +17,8 @@ import type { TurnChip } from "./types";
 
 const CHIP_NODE_TYPE = { disease: "disease", gene: "gene", variant: "variant", symptom: "phenotype" } as const;
 
-function CorrectPanel({
+/** Re-resolve an item through the entity search (chat chips, document findings). */
+export function CorrectPanel({
   chip,
   onPick,
   onCancel,
