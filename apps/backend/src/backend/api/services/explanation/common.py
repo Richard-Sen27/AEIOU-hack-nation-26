@@ -3,6 +3,7 @@
 import re
 
 import textstat
+from textstat.textstat import textstatistics
 
 from backend.llm import LLMError
 from backend.schemas.enums import VUS_NOTICE, ErrorCode, Role
@@ -24,6 +25,17 @@ def _grade_targets() -> dict[Role, float]:
 
 
 GRADE_TARGETS: dict[Role, float] = _grade_targets()
+
+# German is graded with the first Wiener Sachtextformel, which estimates a German school year
+# (4 = very easy ... 15 = very hard), the same unit as the Flesch-Kincaid US grade. German
+# compounds make it run higher on equivalent text, so each role's grade target gets this
+# allowance (guest 8, patient 10, doctor 14, researcher 16).
+GERMAN_GRADE_ALLOWANCE = 2.0
+
+# A separate textstat instance for German, so the module-level (English) one never changes
+# language under concurrent requests.
+_GERMAN = textstatistics()
+_GERMAN.set_lang("de")
 
 LANGUAGE_NAMES = {
     "en": "English",
@@ -91,18 +103,30 @@ def split_sentences(text: str) -> list[str]:
 
 
 def reading_grade(text: str, language: str) -> float | None:
-    """Flesch-Kincaid grade. textstat's grade formula is calibrated for English only, so other
-    languages get None (no gate)."""
-    if base_language(language) != "en":
+    """School-grade reading level: Flesch-Kincaid for English, Wiener Sachtextformel for
+    German. textstat has no grade formula calibrated for the other languages the UI may get,
+    so they return None (no gate)."""
+    lang = base_language(language)
+    if lang not in ("en", "de"):
         return None
     clean = strip_citations(text).strip()
     if not clean:
         return None
+    if lang == "de":
+        return round(float(_GERMAN.wiener_sachtextformel(clean, 1)), 1)
     return round(float(textstat.flesch_kincaid_grade(clean)), 1)
 
 
-def passes_grade(grade: float | None, role: Role) -> bool:
-    return grade is None or grade <= GRADE_TARGETS.get(role, 8.0)
+def grade_target(role: Role, language: str = "en") -> float:
+    """The role's reading-grade target on the scale reading_grade uses for the language."""
+    target = GRADE_TARGETS.get(role, 8.0)
+    if base_language(language) == "de":
+        target += GERMAN_GRADE_ALLOWANCE
+    return target
+
+
+def passes_grade(grade: float | None, role: Role, language: str = "en") -> bool:
+    return grade is None or grade <= grade_target(role, language)
 
 
 LLM_ERRORS: dict[str, tuple[ErrorCode, str]] = {

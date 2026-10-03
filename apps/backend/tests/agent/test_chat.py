@@ -503,3 +503,16 @@ async def test_profile_hints_drop_invalid_values(doctor, user_llm):
     )
     reply = final(await turn(doctor, "Something without hints."))
     assert reply["profile_hints"] is None
+
+
+async def test_patient_summary_reading_gate_german(make_user, user_llm, llm_calls):
+    user = await make_user(role="patient")
+    hard = (
+        "Die heterogene elektrophysiologische Charakterisierung demonstriert pathophysiologisch "
+        "unterschiedliche neuroentwicklungsbezogene Manifestationen bei Kanalopathien."
+    )
+    easy = "Diese Leiden sehen oft gleich aus."
+    user_llm.enqueue({"json": draft(summary=hard)}, {"text": easy})
+    reply = final(await turn(user, "Was ist mit meinen Kanalkrankheiten und wie ist das?"))
+    assert reply["summary"] == easy
+    assert "grade 8" in llm_calls()[-1]["instructions"]

@@ -180,3 +180,35 @@ async def test_cli_precompute_template_fallback(app):
     assert {(r.role, r.language) for r in rows} >= expected
     second = await precompute_explanations(["en", "de"], limit=3, use_llm=False, out=io.StringIO())
     assert second.template == 0 and second.skipped == len(paths) * 4 * 2
+
+
+COMPLEX_DE = (
+    "Die heterogene elektrophysiologische Charakterisierung spannungsabhängiger "
+    "Natriumkanalfunktionsstörungen demonstriert pathophysiologisch unterschiedliche "
+    f"Funktionsgewinn- und Funktionsverlustmechanismen [{COUNTEREXAMPLE}]."
+)
+SIMPLE_DE = (
+    f"Diese zwei Leiden haben wohl ein Gen gemeinsam [{COUNTEREXAMPLE}]. "
+    f"Das Gen wirkt bei jedem anders [{COUNTEREXAMPLE}]."
+)
+
+
+def test_reading_grade_languages():
+    assert reading_grade(COMPLEX_DE, "de") > reading_grade(SIMPLE_DE, "de-AT")
+    assert reading_grade(SIMPLE_DE, "de") is not None
+    # textstat has no calibrated grade formula for these: no gate.
+    assert reading_grade("Ces deux maladies partagent un gène.", "fr") is None
+
+
+async def test_reading_level_regeneration_german(make_user, user_llm, llm_calls):
+    user = await make_user(role="patient")
+    user_llm.enqueue({"text": COMPLEX_DE}, {"text": SIMPLE_DE})
+    status, events = await post_sse(
+        user.client, "/explain", {"edge_ids": [COUNTEREXAMPLE], "language": "de"}
+    )
+    assert status == 200, events
+    final = events[-1]
+    assert final["reading_grade"] is not None and final["reading_grade"] <= 10
+    bodies = llm_calls()
+    assert len(bodies) == 2
+    assert "simpler" in bodies[1]["input"][-1]["content"]

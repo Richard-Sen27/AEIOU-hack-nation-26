@@ -4,9 +4,9 @@ import json
 from dataclasses import dataclass, field
 
 from backend.api.services.explanation.common import (
-    GRADE_TARGETS,
     VUS_NOTICES,
     cited_edges,
+    grade_target,
     language_name,
     passes_grade,
     pick,
@@ -156,11 +156,11 @@ async def generate_explanation(
             )
             if best is None or (grade or 0) < (best.reading_grade or 0):
                 best = candidate
-            if passes_grade(grade, role):
+            if passes_grade(grade, role, language):
                 return candidate
             problem = (
                 f"The text reads at grade {grade}; the target is grade "
-                f"{GRADE_TARGETS.get(role, 8.0):g} or lower. Rewrite it simpler: shorter "
+                f"{grade_target(role, language):g} or lower. Rewrite it simpler: shorter "
                 "sentences, everyday words, same facts and citations."
             )
         items = [

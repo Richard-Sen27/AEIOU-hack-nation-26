@@ -507,7 +507,10 @@ async def _reading_gate(
     grade = reading_grade(text, state.reply_language)
     best, best_grade = text, grade
     attempts = 0
-    while not passes_grade(best_grade, state.lens.role) and attempts < MAX_SIMPLIFY_ATTEMPTS:
+    while (
+        not passes_grade(best_grade, state.lens.role, state.reply_language)
+        and attempts < MAX_SIMPLIFY_ATTEMPTS
+    ):
         attempts += 1
         try:
             rewritten = await llm.complete_text(instructions=SIMPLIFY, input=best, kind="small")
