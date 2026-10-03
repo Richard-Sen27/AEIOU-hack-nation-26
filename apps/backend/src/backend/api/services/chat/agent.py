@@ -141,6 +141,7 @@ def emergency_result(message: str, lens: Lens) -> TurnResult:
         actions=[],
         follow_up=None,
         ai_notice=pick(AI_NOTICES, language),
+        kind="emergency",
     )
     return TurnResult(reply=reply, emergency=True)
 

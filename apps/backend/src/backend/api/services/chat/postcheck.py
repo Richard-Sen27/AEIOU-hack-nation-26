@@ -403,6 +403,7 @@ async def check_reply(
         follow_up=follow_up,
         gap_search=gap_search,
         ai_notice=pick(AI_NOTICES, lang),
+        kind="declined" if decline else "answer",
     )
     return reply, report
 

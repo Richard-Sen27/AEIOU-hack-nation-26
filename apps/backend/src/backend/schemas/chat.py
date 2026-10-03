@@ -1,6 +1,7 @@
 """Chat schemas. AgentReply mirrors the output contract in docs/specs/agent.md."""
 
 from datetime import datetime
+from typing import Literal
 from uuid import UUID
 
 from pydantic import Field
@@ -58,6 +59,9 @@ class FollowUp(ApiModel):
     skippable: bool = Field(description="Always true.")
 
 
+ReplyKind = Literal["answer", "emergency", "declined"]
+
+
 class AgentReply(ApiModel):
     """One structured agent turn (all fields required, nullable where noted)."""
 
@@ -78,6 +82,12 @@ class AgentReply(ApiModel):
     )
     ai_notice: str | None = Field(
         None, description="Always set by the server: the reply comes from an AI system."
+    )
+    kind: ReplyKind = Field(
+        "answer",
+        description="Set by the server: answer (default), emergency (call emergency services, "
+        "no graph answer) or declined (part of the question crossed the medical boundary and "
+        "was declined; graph context may still follow).",
     )
 
 

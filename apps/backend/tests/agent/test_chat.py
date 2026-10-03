@@ -112,7 +112,10 @@ async def test_emergency_short_circuit(make_user, mock_openai_env, llm_calls, me
     assert needle in reply["summary"]
     assert reply["claims"] == [] and reply["graph_focus"] is None
     assert reply["ai_notice"]
+    assert reply["kind"] == "emergency"
     assert llm_calls() == []
+    detail = (await user.client.get(f"/chat/sessions/{events[-1]['session_id']}")).json()
+    assert detail["messages"][1]["reply"]["kind"] == "emergency"
 
 
 async def test_redaction_before_model(doctor, user_llm, llm_calls):
@@ -139,12 +142,14 @@ async def test_tool_loop_with_mock(doctor, user_llm, llm_calls):
     tools = [e.get("tool") for e in events if e["type"] == "status" and e.get("tool")]
     assert tools[:3] == ["extract_entities", "resolve_to_ids", "search_graph"]
     first_delta = types.index("summary_delta")
-    assert all(t == "status" for t in types[:first_delta])
+    assert all(t in ("status", "uncertainty") for t in types[:first_delta])
     tail = [t for t in types[first_delta:] if t != "summary_delta"]
     assert tail == [t for t in EVENT_ORDER if t in tail]
     reply = final(events)
     deltas = "".join(e["text"] for e in events if e["type"] == "summary_delta")
     assert deltas == reply["summary"]
+    assert reply["kind"] == "answer"
+    assert ("uncertainty" in types) == bool(reply["uncertainty"])
     store = get_graph()
     assert all(e in store.edges for c in reply["claims"] for e in c["edge_ids"])
     assert reply["chips"] and all(c["confirmed"] is False for c in reply["chips"])
@@ -243,6 +248,7 @@ async def test_diagnosis_declined_with_graph_context(doctor, user_llm, llm_calls
     assert reply["summary"].startswith("I can't say if this is the diagnosis")
     assert "Your daughter has" not in reply["summary"]
     assert reply["claims"]
+    assert reply["kind"] == "declined"
     assert "Do not answer that part" in llm_calls()[0]["instructions"]
 
 
@@ -329,11 +335,17 @@ async def test_no_supported_route(doctor, user_llm):
         },
         {"json": draft(summary="Here is what I found.")},
     )
-    reply = final(await turn(doctor, "How is SYNGAP1 linked to Dravet?"))
+    events = await turn(doctor, "How is SYNGAP1 linked to Dravet?")
+    reply = final(events)
     assert reply["summary"].startswith("I found no supported route between"), reply
     assert reply["gap_search"] == {"from_id": route["from"], "to_id": route["to"], "family": "all"}
     assert reply["uncertainty"]
     assert any("gap search" in m.lower() for m in reply["missing_evidence"])
+    # The one-line uncertainty statement arrives before any summary content.
+    types = [e["type"] for e in events]
+    assert types.count("uncertainty") == 1
+    assert types.index("uncertainty") < types.index("summary_delta")
+    assert events[types.index("uncertainty")]["text"] == reply["uncertainty"]
 
 
 async def test_vus_notice(doctor, user_llm):
@@ -387,3 +399,14 @@ async def test_sessions_persist_and_are_isolated(make_user, user_llm, llm_calls)
 
     assert (await alice.client.delete(f"/chat/sessions/{sid}")).status_code == 204
     assert (await alice.client.get(f"/chat/sessions/{sid}")).status_code == 404
+
+
+async def test_session_title_is_redacted(doctor, user_llm):
+    user_llm.enqueue({"json": draft()})
+    events = await turn(doctor, "Johanna Mustermann has STXBP1 encephalopathy")
+    final(events)
+    sessions = (await doctor.client.get("/chat/sessions")).json()
+    assert len(sessions) == 1
+    title = sessions[0]["title"]
+    assert title and "Johanna" not in title and "Mustermann" not in title
+    assert "STXBP1" in title

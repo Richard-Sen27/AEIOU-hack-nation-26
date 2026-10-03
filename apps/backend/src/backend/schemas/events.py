@@ -29,6 +29,11 @@ class ChatStatusEvent(ApiModel):
     progress: float | None = Field(None, ge=0, le=1, description="Optional progress 0..1.")
 
 
+class ChatUncertaintyEvent(ApiModel):
+    type: Literal["uncertainty"] = "uncertainty"
+    text: str = Field(description="One-line uncertainty statement; sent before the summary.")
+
+
 class ChatSummaryDeltaEvent(ApiModel):
     type: Literal["summary_delta"] = "summary_delta"
     text: str = Field(description="Next chunk of the summary.")
@@ -75,6 +80,7 @@ class ChatEvent(
     RootModel[
         Annotated[
             ChatStatusEvent
+            | ChatUncertaintyEvent
             | ChatSummaryDeltaEvent
             | ChatChipsEvent
             | ChatClaimsEvent
@@ -198,6 +204,7 @@ class JobEvent(
 
 AnyEvent = (
     ChatStatusEvent
+    | ChatUncertaintyEvent
     | ChatSummaryDeltaEvent
     | ChatChipsEvent
     | ChatClaimsEvent

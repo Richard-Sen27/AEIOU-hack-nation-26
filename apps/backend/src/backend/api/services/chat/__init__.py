@@ -1,8 +1,9 @@
 """Chat orchestrator ("Dr. Wu"): see docs/specs/agent.md.
 
 Turn order: redact the message -> emergency detection (no model call) -> tool loop on the
-user's ChatGPT plan -> post-checks in code -> stream status, summary deltas, chips, claims,
-cards, actions, follow_up, final. Stored messages and traces hold redacted text only."""
+user's ChatGPT plan -> post-checks in code -> stream status, uncertainty (if any), summary
+deltas, chips, claims, cards, actions, follow_up, final. Stored messages and traces hold
+redacted text only."""
 
 import asyncio
 import contextlib
@@ -51,6 +52,7 @@ from backend.schemas.events import (
     ChatFollowUpEvent,
     ChatStatusEvent,
     ChatSummaryDeltaEvent,
+    ChatUncertaintyEvent,
 )
 from backend.schemas.profile import PatientProfile
 
@@ -403,6 +405,8 @@ async def _stream(prepared: _Prepared, user: CurrentUser, lens: Lens) -> AsyncIt
 
     reply = result.reply
     message_id = await _save_reply(user.id, session_id, reply)
+    if reply.uncertainty:
+        yield ChatEvent(ChatUncertaintyEvent(text=reply.uncertainty))
     for chunk in chunk_text(reply.summary):
         yield ChatEvent(ChatSummaryDeltaEvent(text=chunk))
     yield ChatEvent(ChatChipsEvent(chips=reply.chips))
