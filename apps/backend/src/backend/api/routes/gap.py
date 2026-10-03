@@ -1,6 +1,6 @@
 from fastapi import APIRouter, Request
 
-from backend.api.deps import User
+from backend.api.deps import DB, User
 from backend.api.errors import responses
 from backend.api.ratelimit import GAP_SEARCH_LIMIT, limiter
 from backend.api.services import gap_search
@@ -15,12 +15,20 @@ router = APIRouter(tags=["gap-search"])
     "/gap-search",
     response_class=EventStream,
     responses={
-        **sse_doc(GapSearchEvent, "Stream of GapSearchEvent (progress, candidate..., final)."),
+        **sse_doc(
+            GapSearchEvent, "Stream of GapSearchEvent (progress..., candidate..., final | error)."
+        ),
         **responses(401, 404, 422, 429, 501),
     },
     operation_id="gapSearch",
 )
 @limiter.limit(GAP_SEARCH_LIMIT)
-async def post_gap_search(request: Request, body: GapSearchRequest, user: User) -> EventStream:
-    """Agent progress and pending_review candidate edges for a missing link."""
-    return sse_response(gap_search.run(body, user))
+async def post_gap_search(
+    request: Request, body: GapSearchRequest, db: DB, user: User
+) -> EventStream:
+    """Agent progress and pending_review candidate edges for a missing link.
+
+    Queries are built from the two nodes' public graph terms only, never from user data.
+    """
+    prepared = await gap_search.prepare(db, body, user)
+    return sse_response(gap_search.run(body, user, prepared=prepared))
