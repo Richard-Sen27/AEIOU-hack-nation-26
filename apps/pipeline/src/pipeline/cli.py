@@ -172,7 +172,7 @@ def snapshot() -> None:
 def explain() -> None:
     """Pre-generate explanations for demo paths (backend CLI)."""
     cmd = ["uv", "run", "--project", str(ROOT.parent / "backend"), "python", "-m", "backend.cli"]
-    cmd.append("precompute-explanations")
+    cmd += ["precompute-explanations", "--language", "en", "--language", "de"]
     with _timed("explain"):
         try:
             proc = subprocess.run(cmd, cwd=ROOT.parent / "backend")
