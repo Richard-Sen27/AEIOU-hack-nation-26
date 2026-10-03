@@ -11,14 +11,20 @@ EDGE_ID_RE = re.compile(r"\be_[0-9a-f]{12}\b")
 _CITATION_GROUP_RE = re.compile(r"\s*\[\s*e_[0-9a-f]{12}(?:\s*[,;]\s*e_[0-9a-f]{12})*\s*\]")
 _SENTENCE_RE = re.compile(r"(?<=[.!?])\s+(?=[\"'(\[A-ZÄÖÜ0-9])")
 
-# Flesch-Kincaid grade targets per lens. Patients and guests: grade 8 (spec). Doctors and
-# researchers read clinical and technical prose, so the gate only stops runaway jargon there.
-GRADE_TARGETS: dict[Role, float] = {
-    Role.guest: 8.0,
-    Role.patient: 8.0,
-    Role.doctor: 14.0,
-    Role.researcher: 16.0,
-}
+
+
+def _grade_targets() -> dict[Role, float]:
+    """Flesch-Kincaid targets per lens, from the graph service's role hints (one source of
+    truth: guest 6, patient 8, doctor 12, researcher 14)."""
+    from backend.api.services.graph import ROLE_HINTS
+
+    return {
+        role: float(h.reading_grade_target) if h.reading_grade_target is not None else 8.0
+        for role, h in ROLE_HINTS.items()
+    }
+
+
+GRADE_TARGETS: dict[Role, float] = _grade_targets()
 
 LANGUAGE_NAMES = {
     "en": "English",
