@@ -95,7 +95,7 @@ export function ProfilePage() {
         <Panel
           id="consents"
           title="Consents"
-          description="Uploading documents and contributing to the shared atlas each need their own consent. Withdrawing is one click."
+          description="One consent covers the use of your health information (chats, profile, documents); contributing to the shared atlas needs its own. Withdrawing is one click."
         >
           <ConsentsSection />
         </Panel>
