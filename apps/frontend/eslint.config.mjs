@@ -12,6 +12,13 @@ const eslintConfig = defineConfig([
     "out/**",
     "build/**",
     "next-env.d.ts",
+    // Parallel dev servers (NEXT_DIST_DIR=.next-<name>)
+    ".next-*/**",
+    // Generated API client (pnpm gen:api)
+    "src/lib/api/generated/**",
+    // Playwright output
+    "test-results/**",
+    "playwright-report/**",
   ]),
 ]);
 
