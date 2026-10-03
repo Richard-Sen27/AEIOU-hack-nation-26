@@ -1,0 +1,10 @@
+# Allowlist: code, seeds and curated inputs only. data/ is mounted at run time; .env is never
+# copied (settings come from the environment).
+*
+!pyproject.toml
+!uv.lock
+!seeds.yaml
+!curated/
+!src/
+**/__pycache__
+**/*.pyc
