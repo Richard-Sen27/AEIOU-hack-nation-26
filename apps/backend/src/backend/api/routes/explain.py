@@ -5,6 +5,7 @@ from fastapi import APIRouter
 from backend.api.deps import DB, OptionalUser, build_lens
 from backend.api.errors import ApiError, responses
 from backend.api.services import explanation
+from backend.api.services.explanation.common import chunk_text
 from backend.api.sse import EventStream, sse_doc, sse_response
 from backend.schemas.enums import ErrorCode
 from backend.schemas.events import ExplainDeltaEvent, ExplainEvent, ExplainFinalEvent
@@ -14,7 +15,8 @@ router = APIRouter(tags=["explain"])
 
 
 async def _replay(cached: ExplainFinalEvent) -> AsyncIterator[ExplainEvent]:
-    yield ExplainEvent(ExplainDeltaEvent(text=cached.text))
+    for chunk in chunk_text(cached.text, words=6):
+        yield ExplainEvent(ExplainDeltaEvent(text=chunk))
     yield ExplainEvent(cached)
 
 
@@ -35,4 +37,4 @@ async def explain(body: ExplainRequest, db: DB, user: OptionalUser) -> EventStre
         return sse_response(_replay(cached))
     if user is None:
         raise ApiError(401, ErrorCode.sign_in_required)
-    return sse_response(explanation.generate(body.edge_ids, lens, user))
+    return sse_response(await explanation.start_generation(body.edge_ids, lens, user))
