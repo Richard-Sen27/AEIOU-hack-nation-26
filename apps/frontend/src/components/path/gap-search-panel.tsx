@@ -71,6 +71,12 @@ function errorEnding(code: string): string {
       return "Gap search isn't available on this server yet.";
     case "network_error":
       return "Amber's server can't be reached. Please try again in a moment.";
+    case "not_found":
+      return "One of these is no longer in the atlas, so the gap can't be searched.";
+    case "validation_error":
+      return "The gap can't be searched: both ends point to the same node.";
+    case "age_confirmation_required":
+      return "Please confirm you are 16 or older in your account before using gap search.";
     default:
       return "The search stopped unexpectedly. Please try again.";
   }
@@ -224,7 +230,11 @@ export function GapSearchPanel({
     } catch (err) {
       const e = err as ApiError;
       if (e.code === "sign_in_required") {
-        setEnding({ kind: "error", code: e.code, message: "Please sign in again to run gap search." });
+        setEnding({
+          kind: "error",
+          code: "reauth_required",
+          message: "Gap search needs a working ChatGPT connection. Please sign in with ChatGPT again.",
+        });
       } else {
         setEnding({ kind: "error", code: e.code, message: errorEnding(e.code) });
       }
@@ -354,7 +364,7 @@ export function GapSearchPanel({
           )}
           <span>
             {ending.kind === "final"
-              ? `${ENDING_COPY[ending.reason]} ${ending.count === 0 ? "No candidate links found." : `${ending.count} candidate link${ending.count === 1 ? "" : "s"} found.`}`
+              ? `${ENDING_COPY[ending.reason]} ${ending.count === 0 ? "Nothing found in the sources searched." : `${ending.count} candidate link${ending.count === 1 ? "" : "s"} found.`}`
               : ending.kind === "error"
                 ? ending.message
                 : `Stopped. ${candidates.length} candidate${candidates.length === 1 ? "" : "s"} found so far.`}
