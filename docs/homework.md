@@ -16,6 +16,9 @@ Work deliberately left for later. Add an item when you leave something for later
 - **Selecting the busiest node** costs one frame of 100–150 ms in dev mode, mostly the panel mounting.
 - **"Other organisations"** still holds 29 institutions after the name keyword rule (`institution_kind` in `atlas_tree.py`).
 - **`GET /atlas.json`** (`api/routes/graph.py`, `graph.atlas_payload`) is no longer used by the frontend and can be removed, together with its mock in `apps/frontend/e2e/graph/fixtures.ts`.
+- **Symptom panel sections from the data rework plan:** a phenotype's summary has no "Shared genes" section (genes linked to two or more of its diseases), no "Hypotheses" section (from `candidate_phenotype`) and no frequency per disease; `SummarySectionKey` has none of these keys.
+- **"Possibly relevant" researchers and trials** of a neighbouring focus disease are not shown in a core disease's panel (wide-scope plan, Stage C).
+- **Wide map (wide-scope plan, Stage B)** is not built and awaits the user's go-ahead: the core tier on the map, edges on demand (`GET /atlas/edges/{id}`, `POST /atlas/edges`), a disease supergroup level and genes by cytoband.
 
 ## Node, path and panels
 
@@ -37,6 +40,8 @@ Work deliberately left for later. Add an item when you leave something for later
 - **Dock has no history:** the Atlas dock starts empty and never loads stored sessions, so a stored failed turn shows on `/chat` only; the dock's live retry does not store the message twice.
 - **Retry of an older failed turn** returns 409 when a later message exists in the session; the UI still offers "Try again" on such turns in a reloaded session.
 - **Real model untested:** answer quality, document extraction, the gap-search agent, written explanations and summaries were covered only by the mock.
+- **No ranking card for `match_phenotypes`:** the frontend has no Dr. Wu card for the symptom-overlap ranking; it shows only through the normal reply and `graph_focus`.
+- **No eval for symptom matching:** `evals/golden.yaml` has no chronic-cough case expecting primary ciliary dyskinesia 25 (`MONDO:0014203`) in `graph_focus`.
 
 ## Data and pipeline
 
@@ -52,6 +57,9 @@ Work deliberately left for later. Add an item when you leave something for later
 - **Model steps never run:** abstract extraction, cluster labels and model-written explanations need `make pipeline-login` and a run with `PIPELINE_LLM_MAX_CALLS`.
 - **Docker run:** a full pipeline run inside Docker is unverified.
 - **Stale graph after a load:** the API keeps serving the old graph until it is restarted. Fix: a reload hook.
+- **Candidate links not produced:** `candidate_phenotype` and `suggested_by_neighbour` have caps (`build.INFERRED_CONFIDENCE_CAPS`), validation and enums, but `analytics.py` writes none. They need a studiedness measure first (PubMed counts for every core disease, number of HPO terms and P/LP variants, ClinGen validity, prevalence → `little_studied`), from the data rework plan, Stage 2 / wide-scope Stage C.
+- **Cough / primary ciliary dyskinesia focus region:** the planned seed genes (DNAAF4, DNAH5, CCDC39, …) and a `phenotype_seeds` rule in `scope.py` are not in `seeds.yaml`; PCD 25 is core only.
+- **Linking outside the model budget** (`linking.py`, `_get_llm`): linking decisions call the model directly, without the `data/cache/llm` disk cache and without `PIPELINE_LLM_MAX_CALLS`; extraction and cluster labels use both.
 
 ## Privacy and compliance
 
