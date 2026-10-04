@@ -444,8 +444,9 @@ async def test_usage_limit_error(doctor, user_llm):
     assert events[-1] == {
         "type": "error",
         "code": "rate_limited",
-        "message": "Your ChatGPT plan's usage limit is reached. Please try again later.",
+        "message": "The AI usage limit is reached. Please try again later.",
     }
+    assert "ChatGPT" not in events[-1]["message"]  # also true for Google accounts (server key)
 
 
 async def test_no_supported_route(doctor, user_llm):

@@ -12,7 +12,7 @@ from backend.schemas.chat import ChatRequest
 from backend.schemas.enums import Role
 
 MESSAGE = "STXBP1 encephalopathy, who works on it?"
-LIMIT = "Your ChatGPT plan's usage limit is reached. Please try again later."
+LIMIT = "The AI usage limit is reached. Please try again later."
 
 
 def draft(summary: str = "A group serves this disease.") -> dict:

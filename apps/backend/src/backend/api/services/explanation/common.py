@@ -132,11 +132,12 @@ def passes_grade(grade: float | None, role: Role, language: str = "en") -> bool:
 LLM_ERRORS: dict[str, tuple[ErrorCode, str]] = {
     "usage_limit_exceeded": (
         ErrorCode.rate_limited,
-        "Your ChatGPT plan's usage limit is reached. Please try again later.",
+        # True for both kinds of account: a ChatGPT plan, or Amber's API key for Google sign-ins.
+        "The AI usage limit is reached. Please try again later.",
     ),
     "usage_unavailable": (
         ErrorCode.upstream_error,
-        "ChatGPT plan usage is not available for this account right now.",
+        "AI usage is not available for this account right now.",
     ),
     "reauth_required": (ErrorCode.sign_in_required, "Please sign in with ChatGPT again."),
     "timeout": (ErrorCode.upstream_error, "Dr. Wu took too long to answer. Please try again."),
