@@ -266,6 +266,30 @@ class Profile(Base):
     )
     atlas_node_id: Mapped[str | None] = mapped_column(Text)
     professional_updated_at: Mapped[datetime | None] = mapped_column()
+    # Verification and the opt-in public card (contract basis; off by default). Other users see
+    # a card only through professional_cards(), only while card_visible AND role_verified.
+    orcid_verified_at: Mapped[datetime | None] = mapped_column()
+    verified_name: Mapped[str | None] = mapped_column(Text)  # from ORCID or the reviewer
+    verification_method: Mapped[str | None] = mapped_column(Text)
+    verified_at: Mapped[datetime | None] = mapped_column()
+    verification_reason: Mapped[str | None] = mapped_column(Text)  # operator's logged reason
+    verification_request: Mapped[dict[str, Any] | None] = mapped_column(JSONB)
+    atlas_link_verified: Mapped[bool] = mapped_column(
+        Boolean, nullable=False, server_default="false"
+    )
+    card_id: Mapped[uuid.UUID | None] = mapped_column(UUID(as_uuid=True))  # opaque, public
+    card_visible: Mapped[bool] = mapped_column(Boolean, nullable=False, server_default="false")
+    card_visible_since: Mapped[datetime | None] = mapped_column()
+    card_headline: Mapped[str | None] = mapped_column(Text)
+    card_show_institutions: Mapped[bool] = mapped_column(
+        Boolean, nullable=False, server_default="true"
+    )
+    card_show_atlas_entry: Mapped[bool] = mapped_column(
+        Boolean, nullable=False, server_default="true"
+    )
+    accepts_patient_messages: Mapped[bool] = mapped_column(
+        Boolean, nullable=False, server_default="false"
+    )  # stored flag only; messaging is not built
     language: Mapped[str] = mapped_column(Text, nullable=False, server_default="en")
     gpc_opt_out: Mapped[bool] = mapped_column(Boolean, nullable=False, server_default="false")
     expert_mode: Mapped[bool] = mapped_column(Boolean, nullable=False, server_default="false")
