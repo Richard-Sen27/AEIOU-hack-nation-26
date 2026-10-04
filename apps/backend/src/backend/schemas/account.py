@@ -11,6 +11,7 @@ from backend.schemas.common import LANGUAGE_PATTERN, ApiModel
 from backend.schemas.contributions import Contribution, EdgeFlag
 from backend.schemas.documents import Document, Finding, Job
 from backend.schemas.enums import ConsentType, NodeType, Role
+from backend.schemas.follows import FollowExport, NotificationExport
 from backend.schemas.profile import PatientProfile
 
 
@@ -354,3 +355,7 @@ class DataExport(ApiModel):
     contributions: list[Contribution]
     edge_flags: list[EdgeFlag]
     jobs: list[Job]
+    follows: list[FollowExport] = Field(description="Followed diseases.")
+    notifications: list[NotificationExport] = Field(
+        description="In-app notifications (no stored text)."
+    )

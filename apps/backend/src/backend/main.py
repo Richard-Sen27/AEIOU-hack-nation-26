@@ -18,6 +18,7 @@ from backend.api.routes import (
     contributions,
     documents,
     explain,
+    follows,
     gap,
     graph,
     health,
@@ -48,6 +49,7 @@ ROUTERS = (
     documents,
     contributions,
     proposal,
+    follows,
 )
 
 

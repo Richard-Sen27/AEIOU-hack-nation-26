@@ -15,6 +15,7 @@ from sqlalchemy.exc import IntegrityError
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from backend.api.errors import ApiError
+from backend.api.services import follows as follows_service
 from backend.api.services.chat import message_from_row as chat_message_from_row
 from backend.api.services.contributions import contribution_from_row, refresh_shared_graph
 from backend.api.services.professional import (
@@ -270,9 +271,10 @@ async def grant_consent(db: AsyncSession, user: CurrentUser, body: ConsentGrant)
 async def revoke_consent(db: AsyncSession, user: CurrentUser, consent_type: ConsentType) -> None:
     """Revoke and delete the data held under that consent (Art. 7(3)); 404 if none is active.
 
-    health_data: the patient profile, chat sessions and messages, documents, findings and
-    document jobs. The account, settings, work details and the contribute consent with its
-    contributions stay (work details are not health data and not held under this consent).
+    health_data: the patient profile, chat sessions and messages, documents, findings, document
+    jobs, followed diseases and the notifications about them. The account, settings, work
+    details and the contribute consent with its contributions stay (work details are not health
+    data and not held under this consent).
     contribute: every contribution, which removes it from the shared graph.
     """
     existing = await _active_consent(db, user.id, consent_type)
@@ -291,6 +293,7 @@ async def revoke_consent(db: AsyncSession, user: CurrentUser, consent_type: Cons
         for table in ("findings", "documents", "chat_messages", "chat_sessions"):
             await db.execute(text(f"DELETE FROM {table} WHERE user_id = :uid"), params)
         await db.execute(text("DELETE FROM patient_profiles WHERE user_id = :uid"), params)
+        await follows_service.delete_health_data(db, user.id)
     else:
         await db.execute(text("DELETE FROM contributions WHERE user_id = :uid"), params)
         await refresh_shared_graph(db, contributions=True)
@@ -639,6 +642,7 @@ async def export_data(db: AsyncSession, user: CurrentUser) -> DataExport:
         " WHERE user_id = :uid ORDER BY created_at, id",
         uid,
     )
+    follows, notifications = await follows_service.export(db, uid)
     return DataExport(
         exported_at=datetime.now(UTC),
         account=AccountInfo.model_validate(dict(account)),
@@ -664,6 +668,8 @@ async def export_data(db: AsyncSession, user: CurrentUser) -> DataExport:
         contributions=[contribution_from_row(c) for c in contributions],
         edge_flags=[EdgeFlag.model_validate(dict(f)) for f in flags],
         jobs=[Job.model_validate(dict(j)) for j in jobs],
+        follows=follows,
+        notifications=notifications,
     )
 
 
