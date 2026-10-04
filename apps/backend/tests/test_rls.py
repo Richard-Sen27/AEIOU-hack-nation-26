@@ -126,7 +126,9 @@ async def test_user_cannot_read_other_users_rows(two_users):
         for table in USER_TABLES:
             col = OWNER_COLUMN[table]
             assert await app.fetchval(f"SELECT count(*) FROM {table} WHERE {col} = $1", b) == 0
-            own = await app.fetchval(f"SELECT count(*) FROM {table}")
+            # Published calls are readable by every signed-in user (proven in test_calls.py).
+            visible = " WHERE status <> 'published'" if table == "calls" else ""
+            own = await app.fetchval(f"SELECT count(*) FROM {table}{visible}")
             mine = await app.fetchval(f"SELECT count(*) FROM {table} WHERE {col} = $1", a)
             assert own == mine >= 1, table
 
