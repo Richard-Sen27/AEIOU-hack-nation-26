@@ -170,7 +170,7 @@ test.describe("messages, patient", () => {
     await page.getByRole("radio", { name: "18 or older" }).click();
     await page.getByTestId("age-group-continue").click();
     await expect(page.getByTestId("message-body").last()).toContainText("Hi");
-    expect(bodies(m.calls, "POST", /^\/consents$/)).toEqual([expect.objectContaining({ consent_type: "connect", version: "connect-2026-10-04" })]);
+    expect(bodies(m.calls, "POST", /^\/consents$/)).toEqual([expect.objectContaining({ consent_type: "connect", version: "connect-signups-2026-10-04" })]);
     expect(bodies(m.calls, "PUT", /age-group$/)).toEqual([{ age_group: "18_plus" }]);
   });
 
@@ -188,7 +188,7 @@ test.describe("messages, patient", () => {
     await mockApi(page, m.mocks);
     await page.goto("/profile#consents");
     const box = page.getByTestId("consent-connect");
-    await expect(box).toContainText("Withdrawing deletes your messages and closes your conversations.");
+    await expect(box).toContainText("Withdrawing deletes your messages, withdraws your sign-ups, switches suggestions off and closes your conversations.");
     await box.getByTestId("withdraw-connect").click();
     await expect(page.getByTestId("consent-connect-state")).toHaveText("Not given");
     expect(m.calls.some((c) => c.method === "DELETE" && c.url.endsWith("/consents/connect"))).toBe(true);

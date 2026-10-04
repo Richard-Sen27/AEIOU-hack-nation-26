@@ -85,25 +85,29 @@ export const CONSENT_NOTICES: Record<ConsentType, ConsentNotice> = {
   },
   connect: {
     summary:
-      "Studies, surveys and contacts: Amber lets you write to verified doctors and researchers who accept messages. This is a separate purpose, so we ask for your separate consent.",
+      "Studies, surveys and contacts: Amber lets you write to verified doctors and researchers who accept messages, sign up to studies, surveys and trials, and, if you switch it on, get suggestions of calls that match the confirmed items of your profile. This is a separate purpose, so we ask for your separate consent.",
     processed: [
-      "The messages you write and receive, and the display name you choose for a conversation.",
-      "Your age group (18 or older, or 16 or 17) and, if you are 16 or 17, that a parent or guardian agrees (self-declared, not checked).",
+      "The messages you write and receive, and the display name you choose.",
+      "Suggestions (only if you switch them on): the confirmed items of your profile, compared with published calls.",
+      "Sign-ups: the items you tick, your display name and an optional note.",
+      "You tell us your age group; if you are 16 or 17, you confirm that a parent or guardian agrees (self-declared, not checked).",
     ],
     purpose:
-      "Only to let you contact the person you choose. Messages are not a medical consultation or a medical record.",
+      "Only to let you contact the people and take part in the calls you choose. Messages are not a medical consultation.",
     safeguards: [
-      "Messages are stored encrypted and shown only to you and the person you write to.",
-      "No AI model reads them. The Amber team reads a conversation only when you report it, and every such access is logged.",
-      "Your e-mail, account name and profile are never shown to the other person.",
+      "Suggestions are worked out inside your account; nobody else sees them and study teams never learn who was suggested.",
+      "When you sign up, only the items you tick are sent, to the team that runs the call.",
+      "We store your messages encrypted and show them only to you and the person you write to.",
+      "No AI model reads them, and the Amber team reads a conversation only when you report it, and every such access is logged.",
     ],
     retention: [
       "Messages: until you delete them, withdraw this consent or delete your account; conversations inactive for 12 months are deleted.",
+      "Sign-ups: until you withdraw them, or 90 days after the call closes. After a withdrawal the team keeps only a note that you withdrew, for 30 days.",
     ],
     withdrawal:
-      "You can withdraw at any time in your profile with one click. Withdrawing deletes your messages and closes your conversations.",
+      "You can withdraw at any time in your profile with one click. Withdrawing this consent deletes your messages, withdraws your sign-ups, switches suggestions off and closes your conversations.",
     agreement:
-      "I consent to Amber processing my messages and age group so I can contact doctors and researchers, as described above.",
+      "I consent to Amber processing my messages, sign-ups, age group and, if I switch them on, suggestions, as described above.",
     grantLabel: "I agree, continue",
   },
 };
@@ -113,7 +117,7 @@ export const WITHDRAWAL_EFFECT: Record<ConsentType, string> = {
   health_data:
     "Withdrawing deletes your profile, your chats with Dr. Wu, and your documents with their findings and processing jobs. Your account, settings and contributions stay.",
   contribute: "Withdrawing removes all your contributions from the shared atlas.",
-  connect: "Withdrawing deletes your messages and closes your conversations.",
+  connect: "Withdrawing deletes your messages, withdraws your sign-ups, switches suggestions off and closes your conversations.",
 };
 
 export const CONSENT_LABELS: Record<ConsentType, { title: string; description: string }> = {
@@ -127,6 +131,6 @@ export const CONSENT_LABELS: Record<ConsentType, { title: string; description: s
   },
   connect: {
     title: "Studies, surveys and contacts",
-    description: "Lets you write to verified doctors and researchers who accept messages.",
+    description: "Lets you write to verified doctors and researchers, sign up to calls and, if you switch them on, get suggestions.",
   },
 };

@@ -118,14 +118,28 @@ export function useConnectFlow() {
     }
   }, []);
 
-  const ensure = useCallback(async (force = false): Promise<ConnectStatus | null> => {
+  /**
+   * `current`: suggestions and sign-ups need a consent to the current text
+   * (`consent_current`); a consent given to the earlier, messaging-only text
+   * is asked again.
+   */
+  const ensure = useCallback(async (force = false, { current = false }: { current?: boolean } = {}): Promise<ConnectStatus | null> => {
     // Already settled in this session: no extra request per message.
-    if (!force && hasConsent(user, "connect") && status?.consent_active && status.age_group) return status;
-    if (!(await requireConsent("connect", "Messages need an account."))) return null;
+    if (!force && hasConsent(user, "connect") && status?.consent_active && status.age_group && (!current || status.consent_current)) return status;
+    const reason = current ? "Sign-ups and suggestions need an account." : "Messages need an account.";
+    if (!(await requireConsent("connect", reason))) return null;
     let s = await load();
     if (!s) {
       toast("Amber's server is not reachable. Please try again.");
       return null;
+    }
+    if (current && !s.consent_current) {
+      if (!(await requireConsent("connect", reason, { renew: true }))) return null;
+      s = await load();
+      if (!s?.consent_current) {
+        if (!s) toast("Amber's server is not reachable. Please try again.");
+        return null;
+      }
     }
     if (!s.age_group) {
       const group = await new Promise<AgeGroup | null>((resolve) => setAsking(() => resolve));

@@ -20,8 +20,10 @@ type GateContextValue = {
   /**
    * Resolves `true` if the signed-in user holds an active consent of `type`.
    * Otherwise asks for sign-in first, then opens the consent dialog.
+   * `renew`: open the dialog even with an active consent, because it was
+   * given to an earlier text (granting the current text supersedes it).
    */
-  requireConsent: (type: ConsentType, reason?: string) => Promise<boolean>;
+  requireConsent: (type: ConsentType, reason?: string, options?: { renew?: boolean }) => Promise<boolean>;
   /** Open the sign-in dialog without waiting (e.g. from a header button). */
   openSignIn: (reason?: string) => void;
 };
@@ -59,9 +61,9 @@ export function GateProvider({ children }: { children: React.ReactNode }) {
   );
 
   const requireConsent = useCallback(
-    async (type: ConsentType, reason?: string) => {
+    async (type: ConsentType, reason?: string, options?: { renew?: boolean }) => {
       if (!(await requireSignIn(reason))) return false;
-      if (hasConsent(user, type)) return true;
+      if (hasConsent(user, type) && !options?.renew) return true;
       return new Promise<boolean>((resolve) => {
         consentWaiters.current.push(resolve);
         setConsentType(type);
