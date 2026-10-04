@@ -5686,7 +5686,7 @@ export type SignupOptions = {
     /**
      * About Child
      *
-     * The profile describes a child (parental responsibility).
+     * The profile describes a child (parental responsibility confirmed).
      */
     about_child: boolean;
     availability: SignupAvailability;

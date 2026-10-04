@@ -15924,7 +15924,7 @@
           "about_child": {
             "type": "boolean",
             "title": "About Child",
-            "description": "The profile describes a child (parental responsibility)."
+            "description": "The profile describes a child (parental responsibility confirmed)."
           },
           "availability": {
             "$ref": "#/components/schemas/SignupAvailability"
