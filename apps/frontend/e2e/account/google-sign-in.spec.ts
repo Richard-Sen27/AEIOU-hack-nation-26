@@ -53,3 +53,26 @@ test("a Google account gets no ChatGPT-plan notice in onboarding", async ({ page
   await expect(page.getByRole("heading", { level: 1 })).toBeVisible();
   await expect(page.getByTestId("chatgpt-plan-notice")).toHaveCount(0);
 });
+
+// Hosted without partner mode: the API leaves "openai" out (it could not work there).
+test("hosted with Google only: one Google button, no ChatGPT", async ({ page }) => {
+  await mockApi(page, { "GET /auth/session": { ...guestSession, sign_in_methods: ["google"] } });
+  await page.goto("/atlas");
+  await expect(page.getByRole("button", { name: "Continue with ChatGPT" })).toHaveCount(0);
+  await page.getByTestId("header-sign-in").click();
+  const dialog = page.getByTestId("sign-in-dialog");
+  await expect(dialog.getByRole("button", { name: "Continue with Google" })).toHaveCount(1);
+  await expect(dialog.getByRole("button", { name: "Continue with ChatGPT" })).toHaveCount(0);
+  await expect(dialog).not.toContainText("ChatGPT plan");
+});
+
+test("no sign-in method: a short line instead of buttons, the atlas stays open", async ({ page }) => {
+  await mockApi(page, { "GET /auth/session": { ...guestSession, sign_in_methods: [] } });
+  await page.goto("/atlas");
+  await expect(page.getByTestId("sign-in-unavailable").first()).toBeVisible();
+  await expect(page.getByTestId("header-sign-in")).toHaveCount(0);
+  await expect(page.getByRole("button", { name: /Continue with (ChatGPT|Google)/ })).toHaveCount(0);
+  const dialog = await openDialog(page);
+  await expect(dialog.getByTestId("sign-in-unavailable")).toHaveText("Sign-in is not available here.");
+  await expect(dialog.getByRole("button", { name: /Continue with (ChatGPT|Google)/ })).toHaveCount(0);
+});
