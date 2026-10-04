@@ -66,6 +66,8 @@ export function NodeView({ nodeId }: { nodeId: string }) {
 
   const [detail, setDetail] = useState<Load<Schemas.NodeDetail>>({ kind: "loading" });
   const [hood, setHood] = useState<Load<Schemas.Neighborhood>>({ kind: "loading" });
+  /** Hubs are capped at their strongest neighbours; the full count comes in a response header. */
+  const [hoodTotal, setHoodTotal] = useState<number | null>(null);
   const [attempt, setAttempt] = useState(0);
   const [view, setView] = useState<ViewMode>("graph");
   const [hiddenFamilies, setHiddenFamilies] = useState<Set<EdgeFamily>>(new Set());
@@ -94,8 +96,11 @@ export function NodeView({ nodeId }: { nodeId: string }) {
   useEffect(() => {
     let alive = true;
     getNeighborhood({ path: { node_id: nodeId }, query: { role }, meta: { quiet: true } })
-      .then(({ data, error }) => {
+      .then(({ data, error, response }) => {
         if (!alive) return;
+        const total = Number(response?.headers.get("X-Neighborhood-Total"));
+        const truncated = response?.headers.get("X-Neighborhood-Truncated") === "true";
+        setHoodTotal(truncated && Number.isFinite(total) && total > 0 ? total : null);
         if (data) {
           setHood((prev) => {
             // Keep the element arrays stable across lens switches when the set is unchanged,
@@ -272,6 +277,11 @@ export function NodeView({ nodeId }: { nodeId: string }) {
               </span>
             )}
           </p>
+          {hoodData && hoodTotal != null && hoodTotal > hoodData.nodes.length - 1 && (
+            <p className="text-xs text-muted-foreground" data-testid="node-truncated">
+              Showing the {(hoodData.nodes.length - 1).toLocaleString("en")} strongest of {hoodTotal.toLocaleString("en")} links
+            </p>
+          )}
         </div>
         <div className="flex flex-wrap items-center gap-2">
           <Button variant="outline" size="sm" onClick={() => setPathOpen(true)} data-testid="find-path">
