@@ -1,4 +1,5 @@
-"""Calls: publishing, review, browsing, wording check, row-level security, rights, CLI."""
+"""Calls: publishing (self-published or reviewed), browsing, wording check, row-level security,
+rights, CLI."""
 
 import io
 import uuid
@@ -10,6 +11,8 @@ from account_helpers import assert_error
 from backend import calls_cli, cli
 from backend.api.ratelimit import limiter
 from backend.api.services.calls import WORDING_RULES, wording_issues
+from backend.config import Settings, get_settings
+from backend.schemas.calls import REVIEW_BADGE, SELF_PUBLISHED_BADGE
 
 DRAVET = "MONDO:0100135"
 STXBP1 = "MONDO:9900007"
@@ -83,6 +86,27 @@ def _reset_limits():
     limiter.reset()
     yield
     limiter.reset()
+
+
+@pytest.fixture(autouse=True)
+def _review_required(monkeypatch):
+    """The review flow (CALLS_REVIEW_REQUIRED=true) is the baseline of this module; the tests
+    that take `self_publish` run in the default mode."""
+    monkeypatch.setattr(get_settings(), "calls_review_required", True)
+
+
+@pytest.fixture
+def self_publish(_review_required, monkeypatch):
+    monkeypatch.setattr(get_settings(), "calls_review_required", False)
+
+
+async def as_user(connect_as, user_id, sql, *args):
+    """Run one statement as the API role acting for `user_id` (None: no user)."""
+    app = await connect_as("atlas_app")
+    async with app.transaction():
+        if user_id is not None:
+            await app.execute("SELECT set_config('app.user_id', $1, true)", str(user_id))
+        return await app.fetchval(sql, *args)
 
 
 # ---- who may publish ----------------------------------------------------------------------
@@ -211,8 +235,12 @@ async def test_publish_flow_and_browse(make_user, connect_as, superuser):
     assert (await patient.client.get("/calls")).json()["items"] == []
     assert_error(await patient.client.get(f"/calls/{call['id']}"), 404, "not_found")
 
+    mine = (await pub.client.get("/me/calls")).json()
+    assert mine["review_required"] is True and mine["items"][0]["review_badge"] == REVIEW_BADGE
+
     sent = await submit(pub, call["id"])
     assert sent["status"] == "pending_review" and sent["submitted_at"]
+    assert sent["self_published"] is False
     assert (await patient.client.get("/calls")).json()["items"] == []
     # Editing a pending call takes it back to draft.
     r = await pub.client.put(f"/me/calls/{call['id']}", json={**TRIAL, "title": "New title"})
@@ -230,6 +258,7 @@ async def test_publish_flow_and_browse(make_user, connect_as, superuser):
     assert item["title"] == "New title" and item["publisher"]["name"] == "Ada Doe"
     assert item["publisher"]["institutions"] == [{"node_id": None, "label": "Test Institute"}]
     assert "not for scientific quality" in item["review_badge"]
+    assert item["self_published"] is False
     assert "Ask your doctor" in item["notice"]
     assert "publisher_id" not in item and "status" not in item
     assert (await patient.client.get(f"/calls/{call['id']}")).json()["id"] == call["id"]
@@ -251,7 +280,148 @@ async def test_publish_flow_and_browse(make_user, connect_as, superuser):
     )
     assert [r["action"] for r in log][-1] == "approved"
     assert "viewed" in {r["action"] for r in log}
+    assert "self_published" not in {r["action"] for r in log}
     assert {r["operator"] for r in log} == {"Test Operator"}
+
+
+# ---- self-publishing (CALLS_REVIEW_REQUIRED off, the default) ------------------------------
+
+
+def test_review_is_off_by_default():
+    assert Settings.model_fields["calls_review_required"].default is False
+
+
+async def test_self_publish_from_the_form(self_publish, make_user, connect_as, superuser):
+    pub = await make_publisher(make_user, connect_as)
+    patient = await make_user()
+    call = await create(pub, TRIAL)
+    cid = uuid.UUID(call["id"])
+    mine = (await pub.client.get("/me/calls")).json()
+    assert mine["review_required"] is False
+    assert mine["items"][0]["status"] == "draft"
+    assert mine["items"][0]["review_badge"] == SELF_PUBLISHED_BADGE
+
+    live = await submit(pub, call["id"])
+    assert live["status"] == "published" and live["self_published"] is True
+    assert live["published_at"] and live["submitted_at"] and live["reviewed_at"] is None
+    assert live["review_badge"] == "Published by the expert. Not reviewed by the Amber team."
+    # A second click changes nothing.
+    again = await submit(pub, call["id"])
+    assert again["status"] == "published" and again["published_at"] == live["published_at"]
+
+    item = next(
+        c for c in (await patient.client.get("/calls")).json()["items"] if c["id"] == call["id"]
+    )
+    assert item["self_published"] is True and item["review_badge"] == SELF_PUBLISHED_BADGE
+    assert "Reviewed" not in item["review_badge"]
+    assert item["publisher"]["name"] == "Ada Doe" and "Ask your doctor" in item["notice"]
+    assert (await patient.client.get(f"/calls/{call['id']}")).json()["self_published"] is True
+
+    # Logged, once, as a self-publication.
+    log = await superuser.fetch("SELECT action, operator FROM call_reviews WHERE call_id = $1", cid)
+    assert [(r["action"], r["operator"]) for r in log] == [("self_published", "publisher")]
+    export = (await pub.client.get("/me/export")).json()
+    assert [r["action"] for r in export["call_reviews"]] == ["self_published"]
+    assert export["calls"][0]["self_published"] is True
+
+    # Published content stays frozen: not through the API, not for the API role in the database.
+    assert_error(await pub.client.put(f"/me/calls/{call['id']}", json=TRIAL), 409, "conflict")
+    for sql in (
+        "UPDATE calls SET summary = 'Free medication' WHERE id = $1",
+        "UPDATE calls SET self_published = false WHERE id = $1",
+    ):
+        with pytest.raises(asyncpg.InsufficientPrivilegeError):
+            await as_user(connect_as, pub.id, sql, cid)
+    closed = (await pub.client.post(f"/me/calls/{call['id']}/close")).json()
+    assert closed["status"] == "closed" and closed["review_badge"] == SELF_PUBLISHED_BADGE
+    assert_error(await pub.client.post(f"/me/calls/{call['id']}/submit"), 409, "conflict")
+
+
+async def test_self_publish_runs_the_wording_check(self_publish, make_user, connect_as):
+    pub = await make_publisher(make_user, connect_as)
+    call = await create(pub, {**SURVEY, "summary": "Free medication and a cure, guaranteed."})
+    r = await pub.client.post(f"/me/calls/{call['id']}/submit")
+    assert_error(r, 422, "validation_error")
+    assert "summary ('cure')" in r.json()["error"]["message"]
+    assert (await pub.client.get(f"/me/calls/{call['id']}")).json()["status"] == "draft"
+    reader = await make_user()
+    assert call["id"] not in {c["id"] for c in (await reader.client.get("/calls")).json()["items"]}
+
+
+async def test_self_publish_only_for_the_owner_with_a_visible_card(
+    self_publish, make_user, connect_as, superuser
+):
+    pub = await make_publisher(make_user, connect_as)
+    call = await create(pub)
+    cid = uuid.UUID(call["id"])
+    publish = "SELECT publish_own_call($1)"
+
+    # Another publisher: not through the API, not through the function.
+    other = await make_publisher(make_user, connect_as, name="Bo Roe")
+    assert_error(await other.client.post(f"/me/calls/{call['id']}/submit"), 404, "not_found")
+    with pytest.raises(asyncpg.InsufficientPrivilegeError, match="no such call"):
+        await as_user(connect_as, other.id, publish, cid)
+    # No user at all.
+    with pytest.raises(asyncpg.InsufficientPrivilegeError):
+        await as_user(connect_as, None, publish, cid)
+    # A patient, even one who owns a call row, has no card.
+    patient = await make_user()
+    assert_error(await patient.client.post(f"/me/calls/{call['id']}/submit"), 403, "forbidden")
+    theirs = await superuser.fetchval(
+        "INSERT INTO calls (publisher_id, kind, title, summary, participation, disease_ids)"
+        " VALUES ($1, 'survey', 't', 's', 'p', ARRAY['MONDO:0100135']) RETURNING id",
+        patient.id,
+    )
+    with pytest.raises(asyncpg.InsufficientPrivilegeError, match="visible card"):
+        await as_user(connect_as, patient.id, publish, theirs)
+
+    # The owner, once their card is hidden.
+    await as_user(
+        connect_as,
+        pub.id,
+        "UPDATE profiles SET card_visible = false WHERE user_id = $1 RETURNING 1",
+        pub.id,
+    )
+    assert_error(await pub.client.post(f"/me/calls/{call['id']}/submit"), 403, "forbidden")
+    with pytest.raises(asyncpg.InsufficientPrivilegeError, match="visible card"):
+        await as_user(connect_as, pub.id, publish, cid)
+    assert await superuser.fetchval("SELECT status FROM calls WHERE id = $1", cid) == "draft"
+    assert (
+        await superuser.fetchval("SELECT count(*) FROM call_reviews WHERE call_id = $1", cid) == 0
+    )
+
+    # With the card back, the owner publishes; the function refuses a second run.
+    await as_user(
+        connect_as,
+        pub.id,
+        "UPDATE profiles SET card_visible = true WHERE user_id = $1 RETURNING 1",
+        pub.id,
+    )
+    assert (await submit(pub, call["id"]))["status"] == "published"
+    with pytest.raises(asyncpg.InsufficientPrivilegeError, match="status published"):
+        await as_user(connect_as, pub.id, publish, cid)
+
+
+async def test_self_publish_after_a_review_decision(make_user, connect_as, monkeypatch):
+    """Calls left over from review mode: a pending one can be published by its owner, a rejected
+    one only after it was edited."""
+    pub = await make_publisher(make_user, connect_as)
+    pending = await create(pub)
+    rejected = await create(pub, {**SURVEY, "title": "Rejected one"})
+    for call in (pending, rejected):
+        assert (await submit(pub, call["id"]))["status"] == "pending_review"
+    calls_cli.review(rejected["id"], "reject", "Op", "Add the ethics body.", out=io.StringIO())
+
+    monkeypatch.setattr(get_settings(), "calls_review_required", False)
+    assert (await submit(pub, pending["id"]))["status"] == "published"
+    assert_error(await pub.client.post(f"/me/calls/{rejected['id']}/submit"), 409, "conflict")
+    with pytest.raises(asyncpg.InsufficientPrivilegeError, match="status rejected"):
+        await as_user(connect_as, pub.id, "SELECT publish_own_call($1)", uuid.UUID(rejected["id"]))
+    r = await pub.client.put(f"/me/calls/{rejected['id']}", json={**SURVEY, "title": "Edited"})
+    assert r.status_code == 200 and r.json()["status"] == "draft"
+    live = await submit(pub, rejected["id"])
+    assert live["status"] == "published" and live["self_published"] is True
+    assert live["review_note"] is None
 
 
 async def test_reject_and_resubmit(make_user, connect_as):
@@ -361,6 +531,7 @@ async def test_database_refuses_self_publishing(make_user, connect_as):
         "UPDATE calls SET status = 'published' WHERE id = $1",
         "UPDATE calls SET review_note = 'ok' WHERE id = $1",
         "UPDATE calls SET demo = true WHERE id = $1",
+        "UPDATE calls SET self_published = true WHERE id = $1",
     ):
         with pytest.raises(asyncpg.InsufficientPrivilegeError):
             async with app.transaction():
@@ -375,6 +546,15 @@ async def test_database_refuses_self_publishing(make_user, connect_as):
                 " ARRAY['MONDO:0100135'], 'published')",
                 pub.id,
             )
+    with pytest.raises(asyncpg.InsufficientPrivilegeError):
+        await as_user(
+            connect_as,
+            pub.id,
+            "INSERT INTO calls (publisher_id, kind, title, summary, participation, disease_ids,"
+            " self_published) VALUES ($1, 'survey', 't', 's', 'p', ARRAY['MONDO:0100135'], true)"
+            " RETURNING id",
+            pub.id,
+        )
     for fn in ("pending_calls('x')", f"review_call('{call['id']}', 'approve', null, 'x')"):
         with pytest.raises(asyncpg.InsufficientPrivilegeError):
             await app.fetch(f"SELECT * FROM {fn}")
