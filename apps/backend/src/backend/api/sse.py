@@ -15,9 +15,16 @@ log = logging.getLogger(__name__)
 
 
 class EventStream(EventSourceResponse):
-    """EventSourceResponse with a class-level media type, so OpenAPI documents it."""
+    """EventSourceResponse with a class-level media type, so OpenAPI documents it.
+
+    `no-transform` keeps proxies that compress (the Next.js rewrite to the API in hosted
+    deployments) from buffering the stream until it ends."""
 
     media_type = "text/event-stream"
+
+    def __init__(self, *args: Any, headers: dict[str, str] | None = None, **kwargs: Any):
+        headers = {"Cache-Control": "no-store, no-transform", **(headers or {})}
+        super().__init__(*args, headers=headers, **kwargs)
 
 
 def sse_doc(event_model: type[BaseModel], description: str) -> dict[int | str, dict[str, Any]]:
