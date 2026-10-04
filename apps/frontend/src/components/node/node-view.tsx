@@ -328,7 +328,7 @@ export function NodeView({ nodeId }: { nodeId: string }) {
             )}
             <ViewToggle value={view} onChange={setView} graphLabel="Graph" className="ml-auto" />
           </div>
-          <div className={cn("relative", view === "graph" ? "bg-atlas-grid h-[min(62vh,620px)] min-h-[380px]" : "max-h-[620px] min-h-[380px]")}>
+          <div className={cn("relative", view === "graph" ? "bg-atlas-grid h-[min(62vh,620px)] min-h-[380px]" : "min-h-[380px]")}>
             {hood.kind === "error" ? (
               <div className="flex h-full items-center justify-center p-6 text-center text-sm text-muted-foreground" role="status" data-testid="hood-error">
                 {hood.code === "not_implemented"
@@ -397,7 +397,7 @@ export function NodeView({ nodeId }: { nodeId: string }) {
         <aside
           id="node-side"
           aria-label={selectedEdge ? "Connection details" : "Summary and connections"}
-          className="min-w-0 overflow-y-auto rounded-xl border bg-card lg:max-h-[calc(100dvh-7rem)] lg:self-start lg:sticky lg:top-[4.5rem]"
+          className="min-w-0 rounded-xl border bg-card lg:self-start"
         >
           {selectedEdge ? (
             <EdgePanel
