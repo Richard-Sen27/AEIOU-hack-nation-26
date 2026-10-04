@@ -15,7 +15,7 @@ import {
   X,
 } from "lucide-react";
 import Link from "next/link";
-import { Fragment, useEffect, useMemo, useState } from "react";
+import { Fragment, useEffect, useState } from "react";
 
 import { FollowButton } from "@/components/follows/follow-button";
 import { ConfidenceBadge, OriginBadge, StatusFlag, VusNotice } from "@/components/graph-ui";
@@ -26,12 +26,10 @@ import { AiDisclosure } from "@/components/shell/ai-disclosure";
 import { Button, buttonVariants } from "@/components/ui/button";
 import { Skeleton } from "@/components/ui/skeleton";
 import { announce } from "@/lib/a11y";
-import { getAtlasSummary, getNeighborhood, streamSSE, type Schemas } from "@/lib/api";
+import { getAtlasSummary, streamSSE, type Schemas } from "@/lib/api";
 import type { ApiError } from "@/lib/api/errors";
 import { nodeTypeMeta, type LabelStyle } from "@/lib/graph/meta";
 import { cn } from "@/lib/utils";
-
-import { loadEdge } from "@/components/chat/graph-data";
 
 import { categoryLabel } from "./atlas-categories";
 import { idLinks, OffMapMark } from "./atlas-offmap";
@@ -49,6 +47,7 @@ const SECTION_HEADING: Record<SectionKey, string> = {
   clusters: "Mechanism group",
   diseases: "Conditions",
   similar_diseases: "Similar conditions",
+  shared_gene_diseases: "Same gene",
   genes: "Genes",
   variants: "Gene changes",
   mechanisms: "Mechanisms",
@@ -381,8 +380,7 @@ function EntityPanel({
   }, [offMap, load.kind, nodeId, onMissing]);
 
   const data = load.kind === "ready" ? load.data : null;
-  const details = useOffMapDetails(offMap ? data : null);
-  const sections = useMemo(() => (data ? sortByFrequency(data.sections, details) : []), [data, details]);
+  const sections = data?.sections ?? [];
   const type = data?.node.type ?? treeNode?.entity_type ?? "disease";
   const meta = nodeTypeMeta(type);
   const Icon = meta.icon;
@@ -397,7 +395,9 @@ function EntityPanel({
           kicker={meta.label[labelStyle]}
           title={label}
           id={nodeId}
-          ids={offMap ? <OffMapIds node={data?.node ?? { id: nodeId }} /> : undefined}
+          ids={
+            offMap || type === "disease" ? <NodeIds node={data?.node ?? { id: nodeId }} offMap={offMap} /> : undefined
+          }
           icon={<Icon className="size-4" aria-hidden />}
           colorVar={meta.colorVar}
           index={index}
@@ -486,7 +486,6 @@ function EntityPanel({
               key={s.key}
               section={s}
               index={index}
-              details={details}
               onSelect={onSelect}
               onShowChain={onShowChain}
             />
@@ -500,13 +499,11 @@ function EntityPanel({
 function SummarySectionView({
   section,
   index,
-  details,
   onSelect,
   onShowChain,
 }: {
   section: Schemas.SummarySection;
   index: TreeIndex;
-  details: Details;
   onSelect: (id: string) => void;
   onShowChain: (edgeIds: string[]) => void;
 }) {
@@ -528,7 +525,7 @@ function SummarySectionView({
             item={item}
             // Only a chain whose links are all on the map can be drawn.
             drawable={item.via.length > 0 && item.via.every((id) => index.edges.has(id))}
-            detail={item.via.length === 1 ? details.get(item.via[0])?.text : undefined}
+            detail={itemDetail(item)}
             onSelect={onSelect}
             onShowChain={onShowChain}
           />
@@ -569,9 +566,18 @@ function SummaryItemRow({
   const Icon = meta.icon;
   // Cluster membership is a stored attribute, not an edge: no chain, no confidence.
   const membership = item.via.length === 0;
-  const via = item.via_label ?? (membership ? "Same mechanism group" : item.hops <= 1 ? "Direct" : `${item.hops} steps`);
+  // A computed link (inferred, one step) is never worded as a fact and is drawn dashed.
+  const computed = !membership && item.inferred && item.hops <= 1;
+  const via =
+    item.via_label ??
+    (membership ? "Same mechanism group" : computed ? "Computed link" : item.hops <= 1 ? "Direct" : `${item.hops} steps`);
   return (
-    <li className="rounded-lg border bg-background/50 px-2.5 py-1.5" data-testid="atlas-summary-item" data-membership={membership || undefined}>
+    <li
+      className={cn("rounded-lg border bg-background/50 px-2.5 py-1.5", computed && "border-dashed border-foreground/30")}
+      data-testid="atlas-summary-item"
+      data-membership={membership || undefined}
+      data-computed={computed || undefined}
+    >
       <div className="flex items-start gap-2">
         <button
           type="button"
@@ -596,9 +602,12 @@ function SummaryItemRow({
         )}
       </div>
       <div className="mt-0.5 flex flex-wrap items-center gap-1.5 pl-5">
-        <span className="text-xs text-muted-foreground" data-testid="atlas-summary-via">
-          {via}
-        </span>
+        {/* A plain "Direct" adds nothing next to a detail (frequency, sources). */}
+        {!(detail && via === "Direct") && (
+          <span className="text-xs text-muted-foreground" data-testid="atlas-summary-via">
+            {via}
+          </span>
+        )}
         {detail && (
           <span className="text-xs font-medium text-foreground/80" data-testid="atlas-summary-detail">
             {detail}
@@ -621,11 +630,11 @@ function SummaryItemRow({
 // Nodes that are not on the map
 
 /** The node's standard ids, each linked to its public page by id (no names in URLs). */
-function OffMapIds({ node }: { node: { id: string; attrs?: Record<string, unknown> | null } }) {
+function NodeIds({ node, offMap }: { node: { id: string; attrs?: Record<string, unknown> | null }; offMap: boolean }) {
   const links = idLinks(node);
   return (
     <div className="mt-1 flex flex-wrap items-center gap-x-2 gap-y-1" data-testid="atlas-panel-ids">
-      <OffMapMark />
+      {offMap && <OffMapMark />}
       {links.length === 0 && <span className="font-mono text-[10.5px] break-all text-muted-foreground">{node.id}</span>}
       {links.map((l) => (
         <a
@@ -658,10 +667,6 @@ function CoverageLine({ count, disease }: { count: number; disease: boolean }) {
   );
 }
 
-/** Per direct edge id: a short fact to show (frequency label, gene sources) and a frequency to sort by. */
-type Details = ReadonlyMap<string, { text?: string; frequency?: number | null }>;
-const NO_DETAILS: Details = new Map();
-
 const SOURCE_NAMES: Record<string, string> = {
   orphanet: "Orphanet",
   hpo: "HPO",
@@ -674,69 +679,16 @@ const SOURCE_NAMES: Record<string, string> = {
 };
 
 /**
- * The summary items carry no frequency or source, so for a node that is not
- * on the map they come from the direct edges: symptom frequencies from its
- * neighbourhood (one request), a gene's sources from that link's evidence
- * (at most a few requests, cached). Public graph ids only.
+ * One short fact about an item's direct link, as the summary gives it: a
+ * symptom's frequency label (the source's wording, no invented percentage)
+ * or where a gene link comes from. The summary already sorts symptoms by
+ * frequency.
  */
-function useOffMapDetails(data: Summary | null): Details {
-  const [state, setState] = useState<{ key: string; details: Details }>({ key: "", details: NO_DETAILS });
-  const symptomEdges = useMemo(
-    () => data?.sections.find((s) => s.key === "symptoms")?.items.filter((i) => i.via.length === 1).map((i) => i.via[0]) ?? [],
-    [data],
-  );
-  const geneEdges = useMemo(
-    () => data?.sections.find((s) => s.key === "genes")?.items.filter((i) => i.via.length === 1).slice(0, 5).map((i) => i.via[0]) ?? [],
-    [data],
-  );
-  const nodeId = data?.node.id ?? "";
-  const key = `${nodeId}|${symptomEdges.join(",")}|${geneEdges.join(",")}`;
-
-  useEffect(() => {
-    if (!nodeId || (symptomEdges.length === 0 && geneEdges.length === 0)) return;
-    let alive = true;
-    const out = new Map<string, { text?: string; frequency?: number | null }>();
-    const wanted = new Set(symptomEdges);
-    const hood =
-      symptomEdges.length === 0
-        ? Promise.resolve()
-        : getNeighborhood({ path: { node_id: nodeId }, meta: { quiet: true } })
-            .then(({ data: hoodData }) => {
-              for (const e of hoodData?.edges ?? []) {
-                if (!wanted.has(e.id)) continue;
-                const f = e.features as { frequency?: unknown; frequency_label?: unknown } | null;
-                const label = typeof f?.frequency_label === "string" ? f.frequency_label : undefined;
-                const frequency = typeof f?.frequency === "number" ? f.frequency : null;
-                out.set(e.id, { text: label, frequency });
-              }
-            })
-            .catch(() => undefined);
-    const genes = Promise.all(
-      geneEdges.map(async (id) => {
-        const ev = await loadEdge(id);
-        const names = [...new Set((ev?.supporting ?? []).map((x) => SOURCE_NAMES[x.source_type] ?? x.source_type))];
-        if (names.length > 0) out.set(id, { text: names.join(" · ") });
-      }),
-    );
-    void Promise.all([hood, genes]).then(() => {
-      if (alive) setState({ key, details: out });
-    });
-    return () => {
-      alive = false;
-    };
-  }, [key, nodeId, symptomEdges, geneEdges]);
-
-  return state.key === key ? state.details : NO_DETAILS;
-}
-
-/** Symptoms with a known frequency first, most frequent first; the rest keep the summary's order. */
-function sortByFrequency(sections: Schemas.SummarySection[], details: Details): Schemas.SummarySection[] {
-  if (details.size === 0) return sections;
-  return sections.map((s) => {
-    if (s.key !== "symptoms") return s;
-    const freq = (i: SummaryItem) => (i.via.length === 1 ? (details.get(i.via[0])?.frequency ?? -1) : -1);
-    return { ...s, items: s.items.map((item, i) => ({ item, i })).sort((a, b) => freq(b.item) - freq(a.item) || a.i - b.i).map((x) => x.item) };
-  });
+function itemDetail(item: SummaryItem): string | undefined {
+  if (item.frequency_label) return item.frequency_label;
+  const sources = item.sources ?? [];
+  if (sources.length > 0) return [...new Set(sources.map((s) => SOURCE_NAMES[s] ?? s))].join(" · ");
+  return undefined;
 }
 
 /** The headline, clamped to three lines with a toggle for the rest. */
