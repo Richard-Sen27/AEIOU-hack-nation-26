@@ -5,8 +5,8 @@ export function SiteFooter() {
     <footer className="border-t bg-background">
       <div className="mx-auto flex w-full max-w-[1440px] flex-col gap-3 px-4 py-6 text-xs text-muted-foreground sm:flex-row sm:items-center sm:justify-between sm:px-6">
         <p className="max-w-xl leading-relaxed">
-          <span className="font-medium text-foreground">Amber provides information, not medical advice.</span>{" "}
-          It never gives a diagnosis. Talk to your doctor or a genetic counselor about decisions.
+          <span className="block font-medium text-foreground">Amber provides information, not medical advice.</span>
+          <span className="block">It never gives a diagnosis. Talk to your doctor or a genetic counselor about decisions.</span>
         </p>
         <nav aria-label="Footer">
           <ul className="flex flex-wrap items-center gap-x-5 gap-y-2">
