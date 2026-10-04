@@ -129,6 +129,8 @@ test.describe("landing", () => {
     const follow = page.getByTestId("connect-follow");
     await expect(follow).not.toContainText("Coming soon");
     await expect(follow.getByRole("link")).toHaveAttribute("href", "/atlas");
+    await expect(page.getByTestId("connect-calls")).not.toContainText("Coming soon");
+    await expect(page.getByTestId("connect-calls").getByRole("link")).toHaveAttribute("href", "/calls");
     for (const key of ["choose"]) {
       const card = page.getByTestId(`connect-${key}`);
       await expect(card).toContainText("Coming soon");
