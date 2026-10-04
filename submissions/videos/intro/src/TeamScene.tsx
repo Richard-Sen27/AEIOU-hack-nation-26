@@ -73,7 +73,7 @@ export const TeamScene: React.FC<{members: Member[]}> = ({members}) => {
                   borderRadius: '50%',
                   overflow: 'hidden',
                   border: `6px solid ${COLORS.accent}`,
-                  boxShadow: '0 24px 60px rgba(0,0,0,0.55)',
+                  boxShadow: '0 24px 60px rgba(0,0,0,0.18)',
                 }}
               >
                 <Img

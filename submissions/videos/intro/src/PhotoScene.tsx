@@ -7,7 +7,7 @@ import {
   useCurrentFrame,
   useVideoConfig,
 } from 'remotion';
-import {COLORS} from './theme';
+import {COLORS, RADIUS} from './theme';
 
 type Props = {
   src: string;
@@ -59,16 +59,17 @@ export const PhotoScene: React.FC<Props> = ({
             style={{
               ...imageStyle,
               objectFit: 'cover',
-              filter: 'blur(40px) brightness(0.45)',
+              filter: 'blur(40px)',
             }}
           />
+          <AbsoluteFill style={{backgroundColor: COLORS.background, opacity: 0.6}} />
           <AbsoluteFill style={{justifyContent: 'center', alignItems: 'center'}}>
             <Img
               src={src}
               style={{
                 height: '88%',
                 borderRadius: 16,
-                boxShadow: '0 30px 80px rgba(0,0,0,0.6)',
+                boxShadow: '0 30px 80px rgba(0,0,0,0.18)',
                 transform: `scale(${scale * 0.96})`,
               }}
             />
@@ -78,14 +79,6 @@ export const PhotoScene: React.FC<Props> = ({
         <Img src={src} style={{...imageStyle, objectFit: 'cover', objectPosition}} />
       )}
 
-      {/* bottom gradient for caption legibility */}
-      <AbsoluteFill
-        style={{
-          background:
-            'linear-gradient(to top, rgba(5,6,9,0.88) 0%, rgba(5,6,9,0.35) 22%, rgba(5,6,9,0) 45%)',
-        }}
-      />
-
       <AbsoluteFill
         style={{
           justifyContent: 'flex-end',
@@ -94,28 +87,40 @@ export const PhotoScene: React.FC<Props> = ({
           transform: `translateY(${captionY}px)`,
         }}
       >
+        {/* light card behind the caption, so it stays legible on any photo */}
         <div
           style={{
-            color: COLORS.accent,
-            fontSize: 28,
-            fontWeight: 700,
-            letterSpacing: 6,
-            textTransform: 'uppercase',
-            marginBottom: 14,
+            alignSelf: 'flex-start',
+            backgroundColor: COLORS.surface,
+            border: `2px solid ${COLORS.border}`,
+            borderRadius: RADIUS,
+            boxShadow: '0 20px 50px rgba(0,0,0,0.18)',
+            padding: '28px 40px 32px',
           }}
         >
-          {eyebrow}
-        </div>
-        <div
-          style={{
-            color: COLORS.text,
-            fontSize: 58,
-            fontWeight: 800,
-            lineHeight: 1.1,
-            maxWidth: 1300,
-          }}
-        >
-          {caption}
+          <div
+            style={{
+              color: COLORS.accent,
+              fontSize: 28,
+              fontWeight: 700,
+              letterSpacing: 6,
+              textTransform: 'uppercase',
+              marginBottom: 14,
+            }}
+          >
+            {eyebrow}
+          </div>
+          <div
+            style={{
+              color: COLORS.text,
+              fontSize: 58,
+              fontWeight: 800,
+              lineHeight: 1.1,
+              maxWidth: 1300,
+            }}
+          >
+            {caption}
+          </div>
         </div>
       </AbsoluteFill>
     </AbsoluteFill>
