@@ -1,6 +1,6 @@
 "use client";
 
-import { Boxes, Compass, Minus, Plus, RotateCcw, SlidersHorizontal, TriangleAlert, WifiOff } from "lucide-react";
+import { Boxes, ChevronDown, ChevronUp, Compass, Minus, Plus, RotateCcw, SlidersHorizontal, TriangleAlert, WifiOff } from "lucide-react";
 import dynamic from "next/dynamic";
 import Link from "next/link";
 import { useSearchParams } from "next/navigation";
@@ -81,7 +81,13 @@ export function AtlasView() {
   const [tourOpen, setTourOpen] = useState(tourParam);
   const [startCategory] = useState(() => lensStartCategory(role));
   // The panel floats over the right of the canvas from lg up; framing keeps clear of it.
-  const [wide, setWide] = useState(false);
+  // Read synchronously on the client so the panel mounts in its final place (the loading
+  // state rendered during hydration does not depend on it).
+  const [wide, setWide] = useState(
+    () => typeof window !== "undefined" && window.matchMedia("(min-width: 1024px)").matches,
+  );
+  /** Phone: the summary sheet starts short and can be expanded. */
+  const [sheetExpanded, setSheetExpanded] = useState(false);
   useEffect(() => {
     const mq = window.matchMedia("(min-width: 1024px)");
     const sync = () => setWide(mq.matches);
@@ -151,6 +157,7 @@ export function AtlasView() {
   const select: AtlasSelect = useCallback(
     (id, { center = false, persist = true } = {}) => {
       setSelected(id);
+      setSheetExpanded(false);
       if (!id) setPanelChain([]);
       editUrl((p) => {
         // Anything Dr. Wu found stays out of the URL (docs/compliance.md): drop a stale focus too.
@@ -353,6 +360,37 @@ export function AtlasView() {
     const idx = load.index;
     const showGraph = view === "graph" && !canvasFailed;
     const panelOpen = !!selected && idx.nodes.has(selected);
+    const panel = (className: string) => (
+      <AtlasPanel
+        index={idx}
+        nodeId={selected}
+        onSelect={(id) => select(id, { center: true })}
+        onShowChain={setPanelChain}
+        onClose={() => select(null)}
+        className={className}
+      />
+    );
+    const sheet = (className: string, inOutline: boolean) => (
+      <div
+        className={cn(
+          "flex flex-col",
+          sheetExpanded ? (inOutline ? "max-h-[70dvh]" : "max-h-[78dvh]") : "max-h-[40dvh]",
+          className,
+        )}
+        data-testid="atlas-sheet"
+      >
+        <button
+          type="button"
+          aria-expanded={sheetExpanded}
+          onClick={() => setSheetExpanded((e) => !e)}
+          className="z-10 mx-auto -mb-2.5 flex h-6 shrink-0 items-center gap-1 rounded-full border bg-card px-3 text-xs font-medium text-muted-foreground shadow-sm outline-none focus-visible:ring-2 focus-visible:ring-ring"
+        >
+          {sheetExpanded ? <ChevronDown className="size-3.5" aria-hidden /> : <ChevronUp className="size-3.5" aria-hidden />}
+          {sheetExpanded ? "Show less" : "Show more"}
+        </button>
+        {panel("min-h-0 shrink")}
+      </div>
+    );
     body = (
       <div className="relative flex min-h-0 flex-1">
         {showGraph ? (
@@ -380,7 +418,7 @@ export function AtlasView() {
               found={found}
               startCategory={startCategory}
               insetRight={wide && panelOpen ? 376 : 0}
-              insetBottomShare={!wide && selected && idx.nodes.has(selected) ? 0.62 : 0}
+              insetBottomShare={!wide && panelOpen ? (sheetExpanded ? 0.7 : 0.55) : 0}
               onSelect={(id) => {
                 setPanelChain([]);
                 select(id);
@@ -426,6 +464,8 @@ export function AtlasView() {
               onSelect={(id) => select(id)}
               className="min-h-0 flex-1"
             />
+            {/* Phone: the sheet sits below the outline instead of over it. */}
+            {panelOpen && !wide && sheet("shrink-0 border-t px-2 pt-1 pb-2", true)}
           </div>
         )}
 
@@ -492,17 +532,10 @@ export function AtlasView() {
           )}
         />
 
-        {/* The panel exists only while something is selected: no card, no reserved space otherwise. */}
-        {panelOpen && (
-          <AtlasPanel
-            index={idx}
-            nodeId={selected}
-            onSelect={(id) => select(id, { center: true })}
-            onShowChain={setPanelChain}
-            onClose={() => select(null)}
-            className="absolute z-30 max-lg:inset-x-2 max-lg:bottom-2 max-lg:max-h-[62%] lg:top-3 lg:right-3 lg:bottom-3 lg:w-[22rem]"
-          />
-        )}
+        {/* The panel exists only while something is selected: no card, no reserved space otherwise.
+            Desktop: floating on the right. Phone: a short sheet over the map that can be expanded. */}
+        {panelOpen && wide && panel("absolute top-3 right-3 bottom-3 z-30 w-[22rem]")}
+        {panelOpen && !wide && showGraph && sheet("absolute inset-x-2 bottom-2 z-30", false)}
       </div>
     );
   }
