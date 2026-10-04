@@ -6,6 +6,7 @@ import { ConnectSettings } from "@/components/messages/connect-settings";
 import { useSession } from "@/components/providers/session-provider";
 import { cn } from "@/lib/utils";
 
+import { CardSection, WorkNote } from "./card-section";
 import { ConsentsSection } from "./consents-section";
 import { ContributionsSection } from "./contributions-section";
 import { FollowingSection } from "./following-section";
