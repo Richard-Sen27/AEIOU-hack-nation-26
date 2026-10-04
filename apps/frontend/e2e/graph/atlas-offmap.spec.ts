@@ -289,7 +289,9 @@ test("about-data states the inclusion rule with live counts", async ({ page }) =
   await page.goto("/about-data");
   const section = page.locator("#scope");
   await expect(page.getByTestId("scope-counts")).toHaveText(": 7,430 diseases, 5,172 genes and 10,541 symptoms right now.");
-  await expect(page.getByTestId("scope-rule")).toContainText("every rare disease with at least one known gene and one recorded symptom");
+  await expect(page.getByTestId("scope-rule")).toContainText(
+    "every rare disease with a MONDO identifier, at least one known gene and one recorded symptom, leaving out susceptibilities and broad disease groups",
+  );
   await expect(section).toContainText("Focus diseases also have papers, trials");
   await expect(section).toContainText("Counts of ClinVar variants per gene; individual variants only for focus genes.");
   await expect(section).toContainText("Reactome");
@@ -299,6 +301,6 @@ test("about-data reads well without the counts", async ({ page }) => {
   await mockApi(page, { "GET /auth/session": { user: null, gpc: false, demo_mode: false, data_version: "fixture" }, "GET /stats": "offline" });
   await page.goto("/about-data");
   await expect(page.getByTestId("scope-rule")).toHaveText(
-    "The atlas includes every rare disease with at least one known gene and one recorded symptom.",
+    "The atlas includes every rare disease with a MONDO identifier, at least one known gene and one recorded symptom, leaving out susceptibilities and broad disease groups.",
   );
 });

@@ -20,7 +20,8 @@ export function ScopeCounts() {
   }, []);
   return (
     <p data-testid="scope-rule">
-      The atlas includes every rare disease with at least one known gene and one recorded symptom
+      The atlas includes every rare disease with a MONDO identifier, at least one known gene and one recorded symptom,
+      leaving out susceptibilities and broad disease groups
       {stats ? (
         <span data-testid="scope-counts">
           : {fmt(stats.diseases)} diseases, {fmt(stats.genes)} genes and {fmt(stats.symptoms)} symptoms right now.
