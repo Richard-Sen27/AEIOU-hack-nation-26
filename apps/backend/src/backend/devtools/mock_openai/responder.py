@@ -215,6 +215,9 @@ def build_context(body: dict[str, Any]) -> Context:
             if text.startswith("<tool_result"):
                 json_results += 1
                 tool_outputs.append(text)
+                name = re.match(r'<tool_result name="([^"]+)"', text)
+                if name and item.get("role") == "developer":
+                    called.append(name.group(1))  # a tool result the caller supplied itself
             elif item.get("role") == "user" and not text.startswith(FEEDBACK_PREFIXES):
                 user_texts.append(text)
             else:

@@ -241,6 +241,8 @@ async def _sse(
         return f"event: {etype}\ndata: {json.dumps(payload)}\n\n"
 
     async def stream() -> AsyncIterator[str]:
+        if script and script.get("delay_s"):
+            await asyncio.sleep(float(script["delay_s"]))  # model latency before the first event
         yield ev("response.created", response=_response_obj(rid, body, "in_progress", []))
         yield ev("response.in_progress", response=_response_obj(rid, body, "in_progress", []))
         index = 0
@@ -405,6 +407,9 @@ def build_router(state: MockState) -> APIRouter:
             )
         if script and "fail" in script:
             plan = Plan()
+        elif script and "tool_calls" in script and body.get("tool_choice") == "none":
+            # Tools are disabled for this call: a model that wanted another look must answer.
+            plan = plan_response(body)
         elif script:
             plan = _plan_from_script(script, body)
         else:

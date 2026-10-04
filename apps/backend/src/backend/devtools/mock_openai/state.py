@@ -134,7 +134,9 @@ class MockState:
         An entry may carry "kind": "tools" (requests offering tools), "structured"
         (json_schema / JSON-only requests without tools) or "text"; it is then only used by a
         request of that kind, so e.g. a structured() call made inside a tool handler does not
-        consume the tool loop's scripted answer. Entries without "kind" match any request."""
+        consume the tool loop's scripted answer. Entries without "kind" match any request.
+        "delay_s" delays the response by that many seconds. Scripted tool_calls on a request
+        with tool_choice "none" are consumed and answered with a generated final answer."""
         with self.lock:
             self.queue.extend(responses)
 
