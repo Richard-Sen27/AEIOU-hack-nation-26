@@ -65,6 +65,7 @@ Work deliberately left for later. Add an item when you leave something for later
 
 - **Missing documents:** `docs/incident.md`, `docs/dpia.md`, `docs/ropa.md`; `ropa.md` must include the work details of doctors and researchers as a purpose (contract, Art. 6(1)(b)).
 - **`/privacy` placeholders** (`apps/frontend/src/app/privacy/page.tsx`, `ToBeCompleted`): controller name and address, `NEXT_PUBLIC_PRIVACY_EMAIL`, hosting provider and region, supervisory authority.
+- **HPO release date hard-coded** (`apps/frontend/src/app/about-data/page.tsx`, "Data version"): "2 September 2026" goes stale at the next fetch; it should come from `ingestion_runs.source_versions` via `GET /stats`.
 - **Privacy notices** are English only.
 - **Redaction** misses a bare first name in unlabelled prose (worse in German).
 - **Test addresses** (`apps/backend/tests/platform/test_redaction.py`): two invented addresses at real mail domains (gmail.com, outlook.com); switch to example domains.
