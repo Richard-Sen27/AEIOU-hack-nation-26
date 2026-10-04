@@ -9559,7 +9559,19 @@
           "member_count": {
             "type": "integer",
             "title": "Member Count",
-            "description": "Number of member nodes."
+            "description": "Number of member diseases."
+          },
+          "focus_member_count": {
+            "type": "integer",
+            "title": "Focus Member Count",
+            "description": "Member diseases in the focus set (the ones drawn on the Atlas map).",
+            "default": 0
+          },
+          "on_map": {
+            "type": "boolean",
+            "title": "On Map",
+            "description": "True when the cluster holds focus diseases and so is on the Atlas map.",
+            "default": false
           },
           "attrs": {
             "additionalProperties": true,
@@ -12571,7 +12583,7 @@
                 "type": "null"
               }
             ],
-            "description": "The node's cluster, if any."
+            "description": "The node's mechanism group: a disease's cluster of two or more members, or a cluster node itself. Other nodes have none."
           },
           "classification": {
             "anyOf": [

@@ -1882,9 +1882,21 @@ export type ClusterSummary = {
     /**
      * Member Count
      *
-     * Number of member nodes.
+     * Number of member diseases.
      */
     member_count: number;
+    /**
+     * Focus Member Count
+     *
+     * Member diseases in the focus set (the ones drawn on the Atlas map).
+     */
+    focus_member_count?: number;
+    /**
+     * On Map
+     *
+     * True when the cluster holds focus diseases and so is on the Atlas map.
+     */
+    on_map?: boolean;
     /**
      * Attrs
      *
@@ -3767,7 +3779,7 @@ export type NodeDetail = {
      */
     degree?: number;
     /**
-     * The node's cluster, if any.
+     * The node's mechanism group: a disease's cluster of two or more members, or a cluster node itself. Other nodes have none.
      */
     cluster?: ClusterSummary | null;
     /**
