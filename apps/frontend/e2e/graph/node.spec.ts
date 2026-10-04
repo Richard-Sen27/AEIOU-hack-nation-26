@@ -340,6 +340,64 @@ test.describe("node view", () => {
     });
   }
 
+  test("filter: dims non-matches in the graph, shows only hits in the list, survives the view switch", async ({ page }) => {
+    await page.setViewportSize({ width: 1440, height: 900 });
+    const requests: string[] = [];
+    page.on("request", (r) => requests.push(r.url()));
+    await mockApi(page, graphMocks());
+    await page.goto(DRAVET);
+    const graph = page.getByTestId("node-graph");
+    await expect(graph.locator("canvas").first()).toBeVisible({ timeout: 30_000 });
+    const input = page.getByRole("textbox", { name: "Filter these connections" });
+    const before = requests.length;
+    await input.fill("scn1a");
+    const count = page.getByTestId("filter-count");
+    await expect(count).toHaveText(/^\d+ of \d+$/);
+    const [hits, total] = (await count.textContent())!.split(" of ").map(Number);
+    expect(hits).toBeGreaterThan(0);
+    expect(hits).toBeLessThan(total);
+
+    const styles = () =>
+      graph.evaluate((el) => {
+        type N = { id: () => string; hasClass: (c: string) => boolean; style: (k: string) => string; data: (k: string) => unknown };
+        const cy = (el as unknown as { _cyreg: { cy: { nodes: () => { toArray: () => N[] } } } })._cyreg.cy;
+        return cy
+          .nodes()
+          .toArray()
+          .filter((n) => !n.hasClass("caption") && !n.data("center"))
+          .map((n) => ({ id: n.id(), opacity: parseFloat(n.style("opacity")), match: n.hasClass("match") }));
+      });
+    const nodes = await styles();
+    const scn1a = nodes.find((n) => n.id === "HGNC:10585")!;
+    expect(scn1a.match).toBe(true);
+    expect(scn1a.opacity).toBe(1);
+    expect(nodes.filter((n) => !n.match).every((n) => n.opacity < 0.5)).toBe(true);
+
+    await page.getByRole("radio", { name: "List" }).click();
+    const rows = page.getByTestId("node-list-row");
+    await expect(rows).toHaveCount(hits);
+    for (const text of await rows.allTextContents()) expect(text.toLowerCase()).toContain("scn1a");
+    await page.getByRole("radio", { name: "Graph" }).click();
+    await expect(input).toHaveValue("scn1a");
+    await page.getByRole("radio", { name: "List" }).click();
+    await expect(rows).toHaveCount(hits);
+
+    await input.fill("no such thing");
+    await expect(page.getByTestId("filter-empty")).toContainText("No connections match");
+    await page.getByRole("button", { name: "Clear the filter" }).first().click();
+    await expect(input).toHaveValue("");
+    await expect(count).toHaveCount(0);
+    await expect(rows).toHaveCount(total);
+
+    await page.getByRole("radio", { name: "Graph" }).click();
+    await input.fill("scn1a");
+    await input.press("Escape");
+    await expect(input).toHaveValue("");
+    await expect.poll(async () => (await styles()).every((n) => n.opacity === 1 && !n.match)).toBe(true);
+    // Client-side only: typing sent nothing.
+    expect(requests.slice(before).filter((u) => /scn1a|no%20such|no\+such/i.test(u))).toEqual([]);
+  });
+
   test("the map key is collapsed until opened and closes with Escape", async ({ page }) => {
     await mockApi(page, graphMocks());
     await page.goto(DRAVET);

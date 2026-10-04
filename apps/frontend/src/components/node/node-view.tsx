@@ -28,7 +28,7 @@ import { Skeleton } from "@/components/ui/skeleton";
 import { Spinner } from "@/components/ui/spinner";
 import { buildUrl, getNeighborhood, getNode, type ApiError, type Schemas } from "@/lib/api";
 import { announce } from "@/lib/a11y";
-import { nodeTypeMeta } from "@/lib/graph/meta";
+import { nodeTypeMeta, relationLabel } from "@/lib/graph/meta";
 import { useGraphTheme } from "@/lib/graph/use-graph-theme";
 import { EDGE_FAMILIES, isVus, type EdgeFamily, type EdgeStatus } from "@/lib/graph/types";
 import { cn } from "@/lib/utils";
@@ -36,6 +36,7 @@ import { cn } from "@/lib/utils";
 import { EdgePanel } from "./edge-panel";
 import { FamilyChips } from "./family-chips";
 import { FlagDialog } from "./flag-dialog";
+import { NeighbourFilter } from "./neighbour-filter";
 import { resolveHints } from "./lens-hints";
 import type { NodeGraphHandle } from "./node-graph";
 import { NodeList } from "./node-list";
@@ -79,6 +80,8 @@ export function NodeView({ nodeId }: { nodeId: string }) {
   const [statusOverride, setStatusOverride] = useState<Record<string, EdgeStatus>>({});
   const [flagOpen, setFlagOpen] = useState(false);
   const [pathOpen, setPathOpen] = useState(false);
+  /** Filter over the loaded neighbourhood; shared by graph and list, client-side only. */
+  const [query, setQuery] = useState("");
 
   // Node details: once per node.
   useEffect(() => {
@@ -154,6 +157,39 @@ export function NodeView({ nodeId }: { nodeId: string }) {
 
   const center = hoodData?.center ?? detailData?.node ?? null;
   const selectedEdge = edgeId ? edges.find((e) => e.id === edgeId) ?? null : null;
+
+  // Matches: a neighbour's name, id or kind, or the relation wording shown in the list.
+  // The centre itself is left out, or every connection would match its name.
+  const filter = useMemo(() => {
+    const q = query.trim().toLowerCase();
+    if (!q || !hoodData) return null;
+    const centerId = hoodData.center.id;
+    const nodeHit = (id: string) => {
+      if (id === centerId) return false;
+      const n = nodeMap.get(id);
+      if (!n) return false;
+      return `${n.label}\n${n.id}\n${nodeTypeMeta(n.type).label[labelStyle]}`.toLowerCase().includes(q);
+    };
+    const nodes = new Set<string>();
+    const edgeIds = new Set<string>();
+    for (const e of edges) {
+      const s = nodeHit(e.source_id);
+      const t = nodeHit(e.target_id);
+      const rel = relationLabel(e.relation, labelStyle).toLowerCase().includes(q);
+      if (s) nodes.add(e.source_id);
+      if (t) nodes.add(e.target_id);
+      if (s || t || rel) {
+        edgeIds.add(e.id);
+        if (rel) {
+          if (e.source_id !== centerId) nodes.add(e.source_id);
+          if (e.target_id !== centerId) nodes.add(e.target_id);
+        }
+      }
+    }
+    return { nodes, edges: edgeIds };
+  }, [query, hoodData, nodeMap, edges, labelStyle]);
+  const visibleEdges = edges.filter((e) => !hiddenFamilies.has(e.family));
+  const filterMatches = filter ? visibleEdges.filter((e) => filter.edges.has(e.id)).length : visibleEdges.length;
 
   useEffect(() => {
     if (hoodData) {
@@ -344,7 +380,16 @@ export function NodeView({ nodeId }: { nodeId: string }) {
                 }
               />
             )}
-            <ViewToggle value={view} onChange={setView} graphLabel="Graph" className="ml-auto" />
+            <div className="flex w-full items-center gap-2 sm:ml-auto sm:w-auto">
+              <NeighbourFilter
+                value={query}
+                onChange={setQuery}
+                matches={filterMatches}
+                total={visibleEdges.length}
+                className="min-w-0 flex-1 sm:w-56 sm:flex-none"
+              />
+              <ViewToggle value={view} onChange={setView} graphLabel="Graph" className="shrink-0" />
+            </div>
           </div>
           <div
             className={cn(
@@ -377,6 +422,7 @@ export function NodeView({ nodeId }: { nodeId: string }) {
                   labelStyle={labelStyle}
                   theme={theme}
                   hiddenFamilies={hiddenFamilies}
+                  filter={filter}
                   selectedEdgeId={edgeId}
                   onNodeTap={goTo}
                   onEdgeTap={openEdge}
@@ -426,6 +472,9 @@ export function NodeView({ nodeId }: { nodeId: string }) {
                 edges={edges}
                 nodes={nodeMap}
                 hiddenFamilies={hiddenFamilies}
+                matchingEdges={filter?.edges ?? null}
+                query={query.trim()}
+                onClearQuery={() => setQuery("")}
                 selectedEdgeId={edgeId}
                 onEdge={openEdge}
               />

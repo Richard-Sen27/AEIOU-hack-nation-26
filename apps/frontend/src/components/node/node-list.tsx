@@ -38,6 +38,9 @@ export function NodeList({
   edges,
   nodes,
   hiddenFamilies,
+  matchingEdges = null,
+  query = "",
+  onClearQuery,
   selectedEdgeId,
   onEdge,
 }: {
@@ -45,11 +48,15 @@ export function NodeList({
   edges: Schemas.Edge[];
   nodes: Map<string, NodeLite>;
   hiddenFamilies: Set<EdgeFamily>;
+  /** Rows the filter matches; null when no filter is set. */
+  matchingEdges?: Set<string> | null;
+  query?: string;
+  onClearQuery?: () => void;
   selectedEdgeId: string | null;
   onEdge: (id: string) => void;
 }) {
   const { labelStyle } = useLens();
-  const rows = edges.filter((e) => !hiddenFamilies.has(e.family));
+  const rows = edges.filter((e) => !hiddenFamilies.has(e.family) && (!matchingEdges || matchingEdges.has(e.id)));
   return (
     <div className="relative h-full overflow-auto" data-testid="node-list">
       <table className="w-full min-w-[640px] text-sm">
@@ -88,7 +95,21 @@ export function NodeList({
           ))}
         </tbody>
       </table>
-      {rows.length === 0 && <p className="p-6 text-center text-sm text-muted-foreground">No connections of the selected kinds.</p>}
+      {rows.length === 0 &&
+        (matchingEdges ? (
+          <div className="flex flex-col items-center gap-2 p-6 text-center text-sm text-muted-foreground" data-testid="filter-empty">
+            <p>
+              No connections match <span className="font-medium text-foreground">&ldquo;{query}&rdquo;</span>.
+            </p>
+            {onClearQuery && (
+              <button type="button" onClick={onClearQuery} className="rounded px-1.5 py-0.5 text-xs font-medium text-foreground underline underline-offset-2 outline-none focus-visible:ring-2 focus-visible:ring-ring">
+                Clear the filter
+              </button>
+            )}
+          </div>
+        ) : (
+          <p className="p-6 text-center text-sm text-muted-foreground">No connections of the selected kinds.</p>
+        ))}
     </div>
   );
 }

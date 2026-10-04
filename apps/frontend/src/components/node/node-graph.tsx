@@ -10,7 +10,7 @@
  */
 import cytoscape, { type Core, type ElementDefinition, type LayoutOptions } from "cytoscape";
 import fcose from "cytoscape-fcose";
-import { forwardRef, useEffect, useImperativeHandle, useLayoutEffect, useRef } from "react";
+import { forwardRef, useCallback, useEffect, useImperativeHandle, useLayoutEffect, useRef } from "react";
 
 import type { Schemas } from "@/lib/api";
 import { nodeTypeMeta, relationLabel, type LabelStyle } from "@/lib/graph/meta";
@@ -37,6 +37,8 @@ type Props = {
   labelStyle: LabelStyle;
   theme: GraphTheme;
   hiddenFamilies: Set<EdgeFamily>;
+  /** Filter matches: everything else is faded; the camera does not move. */
+  filter?: { nodes: Set<string>; edges: Set<string> } | null;
   selectedEdgeId: string | null;
   onNodeTap: (id: string) => void;
   onEdgeTap: (id: string) => void;
@@ -129,6 +131,7 @@ export const NodeGraph = forwardRef<NodeGraphHandle, Props>(function NodeGraph(p
   const container = useRef<HTMLDivElement>(null);
   const cyRef = useRef<Core | null>(null);
   const propsRef = useRef(props);
+  const scaleLabelsRef = useRef<() => void>(() => {});
   const highlightKey = (hints.highlight_family ?? []).join(",");
   useLayoutEffect(() => {
     propsRef.current = props;
@@ -196,8 +199,11 @@ export const NodeGraph = forwardRef<NodeGraphHandle, Props>(function NodeGraph(p
       const outline = Math.max(2.5, 3 / cy.zoom());
       if (c.nonempty()) c.style({ "font-size": size, "text-outline-width": outline });
       cy.nodes(".caption").style({ "font-size": Math.max(LABEL_SIZE, HOVER_LABEL_PX / cy.zoom()), "text-outline-width": outline });
+      // Filter matches stay readable when zoomed out.
+      cy.nodes(".match").style({ "font-size": Math.max(LABEL_SIZE, LABEL_SIZE / cy.zoom()), "text-outline-width": outline });
     };
     cy.on("zoom", scaleCenterLabel);
+    scaleLabelsRef.current = scaleCenterLabel;
     cy.on("tap", "node", (e) => {
       const id = e.target.id();
       if (id !== propsRef.current.centerId) propsRef.current.onNodeTap(id);
@@ -223,7 +229,7 @@ export const NodeGraph = forwardRef<NodeGraphHandle, Props>(function NodeGraph(p
       e.target.removeClass("hover");
       if (e.target.isNode()) {
         e.target.removeStyle("label font-size text-max-width text-outline-width min-zoomed-font-size z-index");
-        if (e.target.id() === propsRef.current.centerId) scaleCenterLabel();
+        if (e.target.id() === propsRef.current.centerId || e.target.hasClass("match")) scaleCenterLabel();
       }
       el.style.cursor = "";
     });
@@ -364,6 +370,13 @@ export const NodeGraph = forwardRef<NodeGraphHandle, Props>(function NodeGraph(p
       { selector: "edge.flagged", style: { label: "data(label)", "font-size": 9, "text-opacity": 0.85 } },
       { selector: "edge.hover, edge.selected", style: { label: "data(label)", opacity: 1, "z-index": 20, "overlay-opacity": 0.08, "overlay-color": theme.highlight } },
       { selector: "edge.selected", style: { width: 5 } },
+      // Filter: non-matches fade, matches keep full strength and show their names at any zoom.
+      { selector: "node.faded", style: { opacity: 0.15 } },
+      { selector: "edge.faded", style: { opacity: 0.06 } },
+      {
+        selector: "node.match",
+        style: { label: "data(label)", "min-zoomed-font-size": 0, "font-weight": 600, "z-index": 25 },
+      },
       { selector: ".hidden", style: { display: "none" } },
     ]);
   }, [theme, labelStyle, hints, edges, centerId]);
@@ -384,6 +397,35 @@ export const NodeGraph = forwardRef<NodeGraphHandle, Props>(function NodeGraph(p
       syncCaptions(cy);
     });
   }, [props.hiddenFamilies, props.centerId, props.nodes, props.edges]);
+
+  // Neighbourhood filter. Re-applied after a layout, which recreates the captions.
+  const applyFilter = useCallback(() => {
+    const cy = cyRef.current;
+    if (!cy) return;
+    const f = propsRef.current.filter;
+    const centerId = propsRef.current.centerId;
+    cy.batch(() => {
+      cy.nodes(".match").removeStyle("font-size text-outline-width");
+      cy.elements().removeClass("faded match");
+      if (!f) return;
+      cy.nodes(":not(.caption)").forEach((n) => {
+        if (n.id() === centerId) return;
+        const hit = f.nodes.has(n.id());
+        n.toggleClass("match", hit);
+        n.toggleClass("faded", !hit);
+      });
+      cy.edges().forEach((e) => {
+        e.toggleClass("faded", !f.edges.has(e.id()));
+      });
+      cy.nodes(".caption").forEach((c) => {
+        c.toggleClass("faded", !(c.data("members") as string[]).some((id) => f.nodes.has(id)));
+      });
+    });
+    scaleLabelsRef.current();
+  }, []);
+  useEffect(() => {
+    applyFilter();
+  }, [props.filter, props.nodes, props.edges, applyFilter]);
 
   useEffect(() => {
     const cy = cyRef.current;
@@ -438,6 +480,7 @@ export const NodeGraph = forwardRef<NodeGraphHandle, Props>(function NodeGraph(p
         });
       }
       syncCaptions(cy);
+      applyFilter();
       const labelled = mode === "force" ? items.length : labelledCount(placement, items.length);
       cy.nodes(":not(.caption)").data("minLabel", minLabelPx(labelled));
     });
@@ -495,7 +538,7 @@ export const NodeGraph = forwardRef<NodeGraphHandle, Props>(function NodeGraph(p
       cy.off("resize", onResize);
     };
     // The highlighted families by value: a new array with the same families is not a new layout.
-  }, [props.hints.start_layout, highlightKey, props.nodes, props.edges, props.centerId]);
+  }, [props.hints.start_layout, highlightKey, props.nodes, props.edges, props.centerId, applyFilter]);
 
   return (
     <div
