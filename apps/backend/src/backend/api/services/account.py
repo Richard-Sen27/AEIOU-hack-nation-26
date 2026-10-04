@@ -17,6 +17,11 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from backend.api.errors import ApiError
 from backend.api.services.chat import message_from_row as chat_message_from_row
 from backend.api.services.contributions import contribution_from_row, refresh_shared_graph
+from backend.api.services.professional import (
+    PROFESSIONAL_ROLES,
+    clear_professional,
+    export_professional,
+)
 from backend.config import get_settings
 from backend.schemas.account import (
     AccountInfo,
@@ -49,7 +54,11 @@ ProfileItemModel = ProfileDisease | ProfileGene | ProfileVariant | ProfilePhenot
 
 _SESSION_USER_SQL = text(
     """
-    SELECT u.id, u.name, u.email, p.role, p.role_verified, p.language, p.expert_mode,
+    SELECT u.id, u.email, p.role, p.role_verified, p.language, p.expert_mode,
+           CASE WHEN p.role IN ('doctor', 'researcher')
+                 AND (p.first_name IS NOT NULL OR p.last_name IS NOT NULL)
+                THEN concat_ws(' ', p.first_name, p.last_name)
+                ELSE u.name END AS name,
            p.gpc_opt_out, p.age_confirmed_at IS NOT NULL AS age_confirmed,
            COALESCE(
              (SELECT array_agg(DISTINCT c.consent_type ORDER BY c.consent_type) FROM consents c
@@ -101,6 +110,17 @@ async def get_session_info(db: AsyncSession, user: CurrentUser | None, gpc: bool
     )
 
 
+async def on_role_change(db: AsyncSession, user_id: UUID, new_role: Role) -> None:
+    """What happens to the work details when the role changes.
+
+    Decision pending (delete vs. keep hidden). Today: leaving the doctor and researcher roles
+    deletes them. To keep them hidden instead, drop the clear below: the /me/professional routes
+    already answer 403 for patients and the session name only uses them for those two roles.
+    """
+    if new_role not in PROFESSIONAL_ROLES:
+        await clear_professional(db, user_id)
+
+
 async def update_settings(db: AsyncSession, user: CurrentUser, body: SettingsUpdate) -> SessionUser:
     """Update role, language, expert mode or the 16+ confirmation; returns the session user."""
     sets: list[str] = []
@@ -126,6 +146,8 @@ async def update_settings(db: AsyncSession, user: CurrentUser, body: SettingsUpd
         await db.execute(
             text(f"UPDATE profiles SET {', '.join(sets)} WHERE user_id = :uid"), params
         )
+    if body.role is not None and body.role != user.role:
+        await on_role_change(db, user.id, body.role)
     return await session_user(db, user.id)
 
 
@@ -249,7 +271,8 @@ async def revoke_consent(db: AsyncSession, user: CurrentUser, consent_type: Cons
     """Revoke and delete the data held under that consent (Art. 7(3)); 404 if none is active.
 
     health_data: the patient profile, chat sessions and messages, documents, findings and
-    document jobs. The account, settings and the contribute consent with its contributions stay.
+    document jobs. The account, settings, work details and the contribute consent with its
+    contributions stay (work details are not health data and not held under this consent).
     contribute: every contribution, which removes it from the shared graph.
     """
     existing = await _active_consent(db, user.id, consent_type)
@@ -628,6 +651,7 @@ async def export_data(db: AsyncSession, user: CurrentUser) -> DataExport:
             if profile_rows
             else None
         ),
+        professional=await export_professional(db, uid),
         chat_sessions=[
             ChatSessionExport(
                 session=ChatSession.model_validate(dict(s)),

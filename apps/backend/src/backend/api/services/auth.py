@@ -17,6 +17,7 @@ from typing import Annotated, Any
 from urllib.parse import urlencode, urlsplit
 from uuid import UUID
 
+import jwt
 from fastapi import Depends, Request, Response
 from fastapi.responses import RedirectResponse
 from sqlalchemy import text
@@ -335,6 +336,29 @@ async def _load_tokens(db: AsyncSession, uid: UUID, *, for_update: bool = False)
     except TokenCryptoError:
         log.error("stored OpenAI tokens could not be decrypted")
         return None
+
+
+async def stored_name_claims(db: AsyncSession, uid: UUID) -> tuple[str | None, str | None]:
+    """`given_name` and `family_name` from the stored ID token, or (None, None).
+
+    The token was validated at sign-in and is decrypted here in memory only; nothing read from
+    it is stored. Used for the work-details name prefill.
+    """
+    enc = await db.scalar(
+        text("SELECT id_token_enc FROM openai_tokens WHERE user_id = :uid"), {"uid": uid}
+    )
+    if not enc:
+        return None, None
+    try:
+        claims = jwt.decode(_dec(enc) or "", options={"verify_signature": False})
+    except (TokenCryptoError, jwt.PyJWTError, ValueError):
+        return None, None
+
+    def claim(key: str) -> str | None:
+        value = claims.get(key)
+        return (value.strip() or None) if isinstance(value, str) else None
+
+    return claim("given_name"), claim("family_name")
 
 
 # ---- per-user LLM client --------------------------------------------------------------------

@@ -4,8 +4,18 @@ from backend.api.deps import DB, HealthDataConsentUser, SignedInUser, User
 from backend.api.errors import responses
 from backend.api.ratelimit import limiter
 from backend.api.security import clear_session
-from backend.api.services import account
-from backend.schemas.account import Consent, ConsentGrant, DataExport, SessionUser, SettingsUpdate
+from backend.api.services import account, professional
+from backend.schemas.account import (
+    AtlasMatches,
+    AtlasMatchRequest,
+    Consent,
+    ConsentGrant,
+    DataExport,
+    ProfessionalProfile,
+    ProfessionalProfileUpdate,
+    SessionUser,
+    SettingsUpdate,
+)
 from backend.schemas.enums import ConsentType
 from backend.schemas.profile import PatientProfile
 
@@ -13,6 +23,7 @@ router = APIRouter(tags=["account"])
 
 EXPORT_LIMIT = "10/hour"
 DELETE_LIMIT = "10/hour"
+MATCH_LIMIT = "30/hour"
 
 # Onboarding, data-rights and withdrawal routes work before the 16+ confirmation
 # (SignedInUser); feature routes (User) require it.
@@ -104,3 +115,58 @@ async def grant_consent(body: ConsentGrant, db: DB, user: User) -> Consent:
 async def revoke_consent(consent_type: ConsentType, db: DB, user: SignedInUser) -> None:
     """Revoke a consent and delete the data held under it."""
     await account.revoke_consent(db, user, consent_type)
+
+
+# ---- work details (doctor and researcher roles; private, self-declared) ----------------------
+
+
+@router.get(
+    "/me/professional",
+    response_model=ProfessionalProfile,
+    responses=responses(401, 403),
+    operation_id="getProfessionalProfile",
+)
+async def get_professional_profile(db: DB, user: SignedInUser) -> ProfessionalProfile:
+    """The user's private work details, a name suggestion from the ChatGPT account (not stored)
+    and a public summary of the linked atlas entry. 403 unless doctor or researcher."""
+    return await professional.get_professional(db, user)
+
+
+@router.put(
+    "/me/professional",
+    response_model=ProfessionalProfile,
+    responses=responses(401, 403, 422),
+    operation_id="putProfessionalProfile",
+)
+async def put_professional_profile(
+    body: ProfessionalProfileUpdate, db: DB, user: SignedInUser
+) -> ProfessionalProfile:
+    """Replace the work details. Institutions are atlas `institution` nodes or free text;
+    `atlas_node_id` must be a `researcher` or `doctor` node. 403 unless doctor or researcher."""
+    return await professional.put_professional(db, user, body)
+
+
+@router.delete(
+    "/me/professional",
+    status_code=204,
+    responses=responses(401),
+    operation_id="deleteProfessionalProfile",
+)
+async def delete_professional_profile(db: DB, user: SignedInUser) -> None:
+    """Delete every work detail. Open to every role so removal never depends on the role."""
+    await professional.clear_professional(db, user.id)
+
+
+@router.post(
+    "/me/professional/matches",
+    response_model=AtlasMatches,
+    responses=responses(401, 403, 422, 429),
+    operation_id="matchAtlasEntry",
+)
+@limiter.limit(MATCH_LIMIT)
+async def match_atlas_entry(
+    request: Request, body: AtlasMatchRequest, user: SignedInUser
+) -> AtlasMatches:
+    """Up to five researcher or doctor entries that may be the user (exact ORCID iD, then the
+    same name, shared institutions first). Stores nothing. 403 unless doctor or researcher."""
+    return professional.find_matches(user, body)
