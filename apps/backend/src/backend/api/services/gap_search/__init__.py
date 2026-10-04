@@ -30,6 +30,7 @@ from backend.config import get_settings
 from backend.db.models import JobRecord
 from backend.db.session import user_transaction
 from backend.llm import LLMClient, LLMError, Tool
+from backend.llm.client import log_model_error
 from backend.schemas.account import CurrentUser
 from backend.schemas.enums import (
     RELATION_FAMILY,
@@ -293,18 +294,39 @@ async def _run_agents_sdk(llm: LLMClient, terms: PublicTerms, ctx: ToolContext) 
         max_turns=MAX_TURNS,
         hooks=_Budget(),
     )
+    started = time.monotonic()
+
+    def failed(code: str, exc: Exception) -> None:
+        body = getattr(exc, "body", None)
+        err = body.get("error", body) if isinstance(body, dict) else {}
+        err = err if isinstance(err, dict) else {}
+        log_model_error(
+            credential="server_key" if llm.server_key else "chatgpt_plan",
+            model=getattr(model, "model", None),
+            step="gap_search_agents_sdk",
+            duration_ms=(time.monotonic() - started) * 1000,
+            code=code,
+            status=getattr(exc, "status_code", None),
+            upstream_code=str(err.get("code") or err.get("type") or "") or None,
+            param=str(err.get("param") or "") or None,
+        )
+
     try:
         async for _ in result.stream_events():
             pass
     except MaxTurnsExceeded:
         return _Outcome(None, GapStopReason.max_steps, "agents_sdk")
-    except openai.BadRequestError:
+    except openai.BadRequestError as exc:
+        failed("upstream", exc)
         if ctx.steps == 0:
             raise _Fallback from None
         raise LLMError("upstream", "request rejected", status=400) from None
     except openai.APIStatusError as exc:
-        raise _llm_error(exc) from None
-    except (openai.APITimeoutError, openai.APIConnectionError):
+        mapped = _llm_error(exc)
+        failed(mapped.code, exc)
+        raise mapped from None
+    except (openai.APITimeoutError, openai.APIConnectionError) as exc:
+        failed("upstream", exc)
         raise LLMError("upstream", "connection failed") from None
     finally:
         result.cancel()

@@ -99,6 +99,34 @@ def observe_calls(observer: CallObserver) -> Iterator[None]:
         _call_observer.reset(token)
 
 
+def log_model_error(
+    *,
+    credential: str,
+    model: Any,
+    step: str,
+    duration_ms: float,
+    code: str,
+    status: int | None = None,
+    upstream_code: str | None = None,
+    param: str | None = None,
+) -> None:
+    """One line per failed model call: provider, credential (server_key or chatgpt_plan), model,
+    step, HTTP status, our code, OpenAI's error code and parameter name, duration. Never the
+    upstream message, prompts, output or tokens."""
+    log.warning(
+        "model call failed provider=openai credential=%s model=%s step=%s status=%s code=%s"
+        " upstream_code=%s param=%s ms=%d",
+        credential,
+        str(model or "unknown"),
+        step,
+        status if status is not None else "none",
+        code,
+        upstream_code or "none",
+        param or "none",
+        round(duration_ms),
+    )
+
+
 def _notify_call(step: str, model: Any, started: float, error: str | None) -> None:
     observer = _call_observer.get()
     if observer is None:
@@ -340,16 +368,30 @@ class LLMClient:
         return await asyncio.shield(task)
 
     async def _fetch_models(self, token: str, key: tuple[str, str]) -> list[ModelInfo]:
+        started = time.monotonic()
         try:
-            resp = await self._openai.with_options(api_key=token).get(
-                "/models", cast_to=httpx.Response
+            try:
+                resp = await self._openai.with_options(api_key=token).get(
+                    "/models", cast_to=httpx.Response
+                )
+            except openai.APIStatusError as exc:
+                raise _map_status_error(exc) from None
+            except openai.APITimeoutError:
+                raise LLMError("timeout", "model list timed out") from None
+            except openai.APIConnectionError:
+                raise LLMError("upstream", "connection failed") from None
+        except LLMError as exc:
+            log_model_error(
+                credential="server_key" if self.server_key else "chatgpt_plan",
+                model=None,
+                step="list_models",
+                duration_ms=(time.monotonic() - started) * 1000,
+                code=exc.code,
+                status=exc.status,
+                upstream_code=exc.upstream_code,
+                param=getattr(exc, "param", None),
             )
-        except openai.APIStatusError as exc:
-            raise _map_status_error(exc) from None
-        except openai.APITimeoutError:
-            raise LLMError("timeout", "model list timed out") from None
-        except openai.APIConnectionError:
-            raise LLMError("upstream", "connection failed") from None
+            raise
         try:
             body = resp.json()
         except ValueError:
@@ -439,6 +481,16 @@ class LLMClient:
         except LLMError as exc:
             mapped = self._credential_error(exc)
             error = mapped.code
+            log_model_error(
+                credential="server_key" if self.server_key else "chatgpt_plan",
+                model=params.get("model"),
+                step=step,
+                duration_ms=(time.monotonic() - started) * 1000,
+                code=mapped.code,
+                status=exc.status,
+                upstream_code=exc.upstream_code,
+                param=getattr(exc, "param", None),
+            )
             if mapped is not exc:
                 raise mapped from None
             raise
@@ -450,6 +502,13 @@ class LLMClient:
             raise
         finally:
             _notify_call(step, params.get("model"), started, error)
+            if error is None:
+                log.debug(
+                    "model call ok model=%s step=%s ms=%d",
+                    str(params.get("model") or "unknown"),
+                    step,
+                    round((time.monotonic() - started) * 1000),
+                )
 
     async def _stream_events(self, params: dict[str, Any]) -> AsyncIterator[tuple[str, Any]]:
         model = params.get("model")

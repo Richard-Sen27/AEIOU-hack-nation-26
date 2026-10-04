@@ -7,7 +7,6 @@ import asyncio
 import json
 import logging
 import operator
-import sys
 import time
 from collections.abc import Awaitable, Callable
 from dataclasses import dataclass, field
@@ -59,15 +58,9 @@ HISTORY_MESSAGES = 8
 PARTIAL_CLAIMS = 3
 
 # Per-step timing of each turn: step names, model slugs and milliseconds only, never message
-# text, entities, ids or user identifiers. The app configures no log handlers and uvicorn only
-# configures its own loggers, so this logger gets its own stderr handler to show up in the
-# server log.
+# text, entities, ids or user identifiers. Written through the app's stdout handler
+# (backend.observability.logs), with the request id of the turn's POST /chat.
 timing_log = logging.getLogger("backend.chat.timing")
-if not timing_log.handlers:
-    _handler = logging.StreamHandler(sys.stderr)
-    _handler.setFormatter(logging.Formatter("%(levelname)s %(name)s %(message)s"))
-    timing_log.addHandler(_handler)
-    timing_log.setLevel(logging.INFO)
 
 SYSTEM_PROMPT = """You are Dr. Henry Wu, the guide of the Amber rare-disease atlas.
 You help patients, caregivers, researchers and biotech scouts find
