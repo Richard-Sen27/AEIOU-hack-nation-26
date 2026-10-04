@@ -2,6 +2,7 @@
 
 import Link from "next/link";
 
+import { ConnectSettings } from "@/components/messages/connect-settings";
 import { useSession } from "@/components/providers/session-provider";
 import { cn } from "@/lib/utils";
 
@@ -106,11 +107,12 @@ export function ProfilePage() {
         )}
         <Panel id="settings" title="Settings">
           <SettingsSection user={user} />
+          <ConnectSettings />
         </Panel>
         <Panel
           id="consents"
           title="Consents"
-          description="One consent covers your health information (chats, profile, documents). Contributing to the shared atlas needs its own. Withdrawing is one click."
+          description="One consent covers your health information (chats, profile, documents). Contributing to the shared atlas and messages each need their own. Withdrawing is one click."
         >
           <ConsentsSection />
         </Panel>
