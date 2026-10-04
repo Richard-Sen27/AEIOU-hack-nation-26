@@ -58,6 +58,10 @@ class Relation(StrEnum):
     shared_pathway = "shared_pathway"
     similar_symptoms = "similar_symptoms"
     shared_researcher = "shared_researcher"
+    shared_gene = "shared_gene"
+    near_on_chromosome = "near_on_chromosome"
+    candidate_phenotype = "candidate_phenotype"
+    suggested_by_neighbour = "suggested_by_neighbour"
     asserts = "asserts"
     authored = "authored"
     pi_of = "pi_of"
@@ -89,8 +93,12 @@ RELATION_FAMILY: dict[Relation, EdgeFamily] = {
     Relation.same_gene_same_mechanism: EdgeFamily.dna,
     Relation.same_gene_different_mechanism: EdgeFamily.dna,
     Relation.shared_pathway: EdgeFamily.dna,
+    Relation.shared_gene: EdgeFamily.dna,
+    Relation.near_on_chromosome: EdgeFamily.dna,
     Relation.has_phenotype: EdgeFamily.symptoms,
     Relation.similar_symptoms: EdgeFamily.symptoms,
+    Relation.candidate_phenotype: EdgeFamily.symptoms,
+    Relation.suggested_by_neighbour: EdgeFamily.symptoms,
     Relation.asserts: EdgeFamily.research,
     Relation.authored: EdgeFamily.research,
     Relation.pi_of: EdgeFamily.research,
@@ -105,7 +113,8 @@ RELATION_FAMILY: dict[Relation, EdgeFamily] = {
     Relation.member_of: EdgeFamily.community,
 }
 
-# Disease <-> disease relations; their edge IDs sort the two endpoint IDs first.
+# Undirected relations (disease <-> disease, plus gene <-> gene near_on_chromosome); their edge
+# IDs sort the two endpoint IDs first.
 SYMMETRIC_RELATIONS: frozenset[Relation] = frozenset(
     {
         Relation.same_gene_same_mechanism,
@@ -113,6 +122,8 @@ SYMMETRIC_RELATIONS: frozenset[Relation] = frozenset(
         Relation.shared_pathway,
         Relation.similar_symptoms,
         Relation.shared_researcher,
+        Relation.shared_gene,
+        Relation.near_on_chromosome,
     }
 )
 
@@ -144,8 +155,11 @@ class EvidenceTier(StrEnum):
     preprint = "preprint"
     llm_inferred = "llm_inferred"
     patient_reported = "patient_reported"
+    computed = "computed"  # links inferred by the analysis (origin=inferred); a hypothesis
 
 
+# computed: the ceiling for an inferred link's score-based weight (the global inferred cap, so a
+# hypothesis never reaches "High"); each computed row is weighted by its link's own score.
 TIER_WEIGHTS: dict[EvidenceTier, float] = {
     EvidenceTier.curated_db: 0.9,
     EvidenceTier.peer_reviewed: 0.7,
@@ -153,6 +167,7 @@ TIER_WEIGHTS: dict[EvidenceTier, float] = {
     EvidenceTier.preprint: 0.4,
     EvidenceTier.llm_inferred: 0.3,
     EvidenceTier.patient_reported: 0.2,
+    EvidenceTier.computed: 0.79,
 }
 
 
