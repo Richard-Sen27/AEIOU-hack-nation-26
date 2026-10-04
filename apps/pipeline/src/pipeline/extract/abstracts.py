@@ -211,13 +211,17 @@ async def run(scope: Scope, llm: LLMRun) -> dict[str, Any]:
     nodes: list[dict[str, Any]] = []
     rows: list[dict[str, Any]] = []
     rejected: Counter = Counter()
-    attempted = accepted = processed = 0
+    attempted = accepted = processed = dropped_inferred = 0
     for row, cands, result in results:
         if result is None:
             continue
         processed += 1
         pmid, pid = row["pmid"], f"PMID:{row['pmid']}"
         for rel in result.relations:
+            if rel.inferred:
+                # Not stated in the quote itself: kept out of the graph entirely.
+                dropped_inferred += 1
+                continue
             attempted += 1
             s, o, reason = validate(rel, row["abstract"], cands, index)
             if reason:
@@ -287,6 +291,7 @@ async def run(scope: Scope, llm: LLMRun) -> dict[str, Any]:
         "attempted": attempted,
         "accepted": accepted,
         "rejected": dict(rejected),
+        "dropped_inferred": dropped_inferred,
         "pass_rate": round(accepted / attempted, 4) if attempted else None,
         **llm.summary(),
     }

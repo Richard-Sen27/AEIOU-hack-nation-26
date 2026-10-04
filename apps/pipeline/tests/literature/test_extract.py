@@ -168,9 +168,11 @@ async def test_abstract_extraction_verifies_quotes(data_dirs, scope):
     _write_abstracts(data_dirs)
     client = FakeClient({abstracts.AbstractExtraction: RELATIONS})
     report = await abstracts.run(scope, LLMRun.start(client=client, max_calls=5))
-    assert report["attempted"] == 5 and report["accepted"] == 2
+    # the relation marked inferred is dropped before verification and never written
+    assert report["dropped_inferred"] == 1
+    assert report["attempted"] == 4 and report["accepted"] == 1
     assert report["rejected"] == {"quote_not_found": 1, "unresolved_entity": 1, "wrong_types": 1}
-    assert report["pass_rate"] == 0.4
+    assert report["pass_rate"] == 0.25
     sent = json.loads(client.calls[0])
     assert set(sent) == {"entities", "abstract"} and sent["abstract"] == ABSTRACT
     assert "SCN1A (gene)" in sent["entities"] and "dravet syndrome (disease)" in sent["entities"]
@@ -184,18 +186,19 @@ async def test_abstract_extraction_verifies_quotes(data_dirs, scope):
     assert (cause["source_id"], cause["target_id"]) == ("MONDO:0100135", "HGNC:10585")
     assert cause["tier"] == "peer_reviewed" and cause["origin"] == "observed"
     assert cause["source_type"] == "pubmed" and cause["source_ref"] == "123"
-    mech = rows["acts_via"]
-    assert mech["target_id"] == "MECH:loss_of_function"
-    assert mech["tier"] == "llm_inferred" and mech["origin"] == "inferred"
-    assert nodes["type"].to_list() == ["claim", "claim"]
+    assert "acts_via" not in rows  # inferred: no assertion
+    assert (a["origin"] == "inferred").sum() == 0
+    assert nodes["type"].to_list() == ["claim"]  # and no claim node
     asserts = a.filter(pl.col("relation") == "asserts")
     assert set(asserts["source_id"]) == {"PMID:123"} and set(asserts["target_id"]) == set(
         nodes["id"]
     )
     about = a.filter(pl.col("relation") == "about")
     assert set(about["target_id"]) == {"MONDO:0100135", "HGNC:10585"}  # never to a mechanism
+    assert a.height == 4  # asserts + 2 about + the one relation
     saved = json.loads((out / "report.json").read_text())
-    assert saved["accepted"] == 2 and saved["status"] == "completed"
+    assert saved["accepted"] == 1 and saved["status"] == "completed"
+    assert saved["dropped_inferred"] == 1
 
 
 async def test_abstract_extraction_skipped_without_login(data_dirs, scope, monkeypatch):
@@ -288,7 +291,8 @@ async def test_abstracts_against_mock_server(data_dirs, scope, mock_llm):
     _write_abstracts(data_dirs)
     server.enqueue({"json": RELATIONS})
     report = await abstracts.run(scope, LLMRun.start(client=client, max_calls=3))
-    assert report["llm_calls"] == 1 and report["accepted"] == 2, report
+    assert report["llm_calls"] == 1 and report["accepted"] == 1, report
+    assert report["dropped_inferred"] == 1
 
 
 async def test_usage_limit_from_mock_server(data_dirs, scope, mock_llm):
