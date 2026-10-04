@@ -9,10 +9,10 @@ import { buttonVariants } from "@/components/ui/button";
 import { cn } from "@/lib/utils";
 
 const POINTS = [
-  { icon: ListChecks, title: "You stay in control", body: "It shows what it understood as items you confirm, correct or remove. Only confirmed items are saved to your private profile." },
-  { icon: FileSearch, title: "Every claim is cited", body: "Each answer links to its sources, says whether it is data or a hypothesis, and shows contradicting findings." },
-  { icon: MessageCircleQuestion, title: "One question at a time", body: "If it needs more detail, it asks one question you can always skip." },
-  { icon: BadgeCheck, title: "A next step, not a diagnosis", body: "It ends with a concrete shared action, like a registry to join. It never diagnoses or advises on treatment." },
+  { icon: ListChecks, title: "You stay in control", body: "Only what you confirm is saved." },
+  { icon: FileSearch, title: "Every claim is cited", body: "Sources, data or hypothesis, and contradictions." },
+  { icon: MessageCircleQuestion, title: "One question at a time", body: "You can always skip it." },
+  { icon: BadgeCheck, title: "A next step, not a diagnosis", body: "Like a registry to join. Never treatment advice." },
 ];
 
 /** What Dr. Wu does, for guests, with the sign-in affordance. No broken chat. */
@@ -27,14 +27,12 @@ export function ChatGuest({ offline }: { offline?: boolean }) {
         Describe it in your own words, get cited connections back
       </h1>
       <p className="mt-3 text-[15px] leading-relaxed text-pretty text-muted-foreground">
-        Dr. Wu is an AI assistant that turns a diagnosis, a gene or symptoms into connections in the
-        atlas: who shares your disease&apos;s characteristics, what already exists, and what to do
-        together next. It runs on your own ChatGPT plan, so it needs you to sign in.
+        An AI assistant on your own ChatGPT plan. Sign in to start.
       </p>
       <AiDisclosure className="mt-6" />
       {offline && (
         <p className="mt-4 flex items-center gap-2 text-sm text-muted-foreground" role="status">
-          <WifiOff className="size-4" aria-hidden /> Amber&apos;s server can&apos;t be reached right now, so sign-in is unavailable.
+          <WifiOff className="size-4" aria-hidden /> Amber&apos;s server can&apos;t be reached, so sign-in is unavailable.
         </p>
       )}
       <div className="mt-6 flex flex-wrap items-center gap-3">

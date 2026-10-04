@@ -151,11 +151,7 @@ export function ChatView() {
                 <Bot className="size-5" aria-hidden />
               </span>
               <p className="mt-4 text-lg font-medium text-balance">
-                Tell me about the diagnosis, a gene or the symptoms, in your own words.
-              </p>
-              <p className="mt-2 text-sm text-muted-foreground text-pretty">
-                I answer only from cited sources in the atlas. You confirm what I understood before
-                anything is saved, and I never give a diagnosis or treatment advice.
+                Tell me about the diagnosis, a gene or the symptoms.
               </p>
               <ul className="mt-5 flex flex-col gap-2">
                 {STARTERS.map((s) => (

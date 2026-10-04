@@ -161,7 +161,7 @@ export function Actions({ actions, edgeIds, language }: { actions: Action[]; edg
         <div>
           <p className="mb-1.5 flex items-center gap-1.5 text-sm font-medium">
             <CircleCheckBig className="size-4 text-confidence-high" aria-hidden /> Viable leads
-            <span className="font-normal text-muted-foreground">· every link is cited data and active</span>
+            <span className="font-normal text-muted-foreground">· cited, active data</span>
           </p>
           <ul className="space-y-2">
             {viable.map((a, i) => (
@@ -174,7 +174,7 @@ export function Actions({ actions, edgeIds, language }: { actions: Action[]; edg
         <div>
           <p className="mb-1.5 flex items-center gap-1.5 text-sm font-medium">
             <CircleAlert className="size-4 text-status-flag" aria-hidden /> Unsupported leads
-            <span className="font-normal text-muted-foreground">· relies on a hypothesis, an unreviewed or a contradicted link</span>
+            <span className="font-normal text-muted-foreground">· rests on a hypothesis or an unreviewed or contradicted link</span>
           </p>
           <ul className="space-y-2">
             {unsupported.map((a, i) => (
