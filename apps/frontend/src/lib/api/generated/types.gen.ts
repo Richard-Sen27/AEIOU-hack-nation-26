@@ -163,6 +163,10 @@ export type AgentReply = {
      * Unconfirmed age, onset and country extracted from this turn, and whether the message seems to be about a child. Null when nothing was found.
      */
     profile_hints?: ProfileHints | null;
+    /**
+     * Conditions ranked by symptom overlap when match_phenotypes ran this turn (symptoms-only messages), built by the server from the tool result. Null otherwise and on replies stored before this field existed.
+     */
+    symptom_match?: SymptomMatch | null;
 };
 
 /**
@@ -5289,6 +5293,101 @@ export type SummarySection = {
  * SummarySectionKey
  */
 export type SummarySectionKey = 'clusters' | 'diseases' | 'similar_diseases' | 'shared_gene_diseases' | 'genes' | 'variants' | 'mechanisms' | 'pathways' | 'symptoms' | 'researchers' | 'doctors' | 'institutions' | 'papers' | 'trials' | 'grants' | 'patient_orgs' | 'registries' | 'networks' | 'claims';
+
+/**
+ * SymptomMatch
+ *
+ * The symptom-overlap ranking of a turn (match_phenotypes), built in code from the tool
+ * result: an overlap count per condition, never a probability or a diagnosis.
+ */
+export type SymptomMatch = {
+    /**
+     * Items
+     *
+     * Conditions by overlap, best first.
+     */
+    items: Array<SymptomMatchItem>;
+};
+
+/**
+ * SymptomMatchItem
+ *
+ * A condition in the atlas whose recorded symptoms overlap the user's.
+ */
+export type SymptomMatchItem = {
+    /**
+     * Id
+     *
+     * Disease node ID.
+     */
+    id: string;
+    /**
+     * Label
+     */
+    label: string;
+    /**
+     * Overlap
+     *
+     * How many of the user's symptoms are recorded for it.
+     */
+    overlap: number;
+    /**
+     * Of
+     *
+     * How many symptoms the user described (resolved to HPO terms).
+     */
+    of: number;
+    /**
+     * On Map
+     *
+     * Drawn on the Atlas map (the focus set); else a node page.
+     */
+    on_map: boolean;
+    /**
+     * Shared
+     *
+     * The shared symptoms with their edges.
+     */
+    shared: Array<SymptomMatchTerm>;
+    /**
+     * Absent
+     *
+     * Symptoms recorded for it that the user said are absent, with their edges.
+     */
+    absent: Array<SymptomMatchTerm>;
+};
+
+/**
+ * SymptomMatchTerm
+ *
+ * One of the user's symptoms recorded for a condition, with the link that records it.
+ */
+export type SymptomMatchTerm = {
+    /**
+     * User Symptom
+     *
+     * The user's symptom as its HPO term label.
+     */
+    user_symptom: string;
+    /**
+     * Recorded As
+     *
+     * The HPO term recorded for the condition.
+     */
+    recorded_as: string;
+    /**
+     * Match
+     *
+     * How the recorded term relates to the user's symptom.
+     */
+    match: 'same' | 'more_specific' | 'broader';
+    /**
+     * Edge Id
+     *
+     * The has_phenotype edge that records it (cite this).
+     */
+    edge_id: string;
+};
 
 /**
  * ThreadDetail

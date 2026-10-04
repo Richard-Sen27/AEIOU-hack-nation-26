@@ -6011,6 +6011,17 @@
               }
             ],
             "description": "Unconfirmed age, onset and country extracted from this turn, and whether the message seems to be about a child. Null when nothing was found."
+          },
+          "symptom_match": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/SymptomMatch"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "Conditions ranked by symptom overlap when match_phenotypes ran this turn (symptoms-only messages), built by the server from the tool result. Null otherwise and on replies stored before this field existed."
           }
         },
         "type": "object",
@@ -14692,6 +14703,118 @@
           "claims"
         ],
         "title": "SummarySectionKey"
+      },
+      "SymptomMatch": {
+        "properties": {
+          "items": {
+            "items": {
+              "$ref": "#/components/schemas/SymptomMatchItem"
+            },
+            "type": "array",
+            "title": "Items",
+            "description": "Conditions by overlap, best first."
+          }
+        },
+        "type": "object",
+        "required": [
+          "items"
+        ],
+        "title": "SymptomMatch",
+        "description": "The symptom-overlap ranking of a turn (match_phenotypes), built in code from the tool\nresult: an overlap count per condition, never a probability or a diagnosis."
+      },
+      "SymptomMatchItem": {
+        "properties": {
+          "id": {
+            "type": "string",
+            "title": "Id",
+            "description": "Disease node ID."
+          },
+          "label": {
+            "type": "string",
+            "title": "Label"
+          },
+          "overlap": {
+            "type": "integer",
+            "title": "Overlap",
+            "description": "How many of the user's symptoms are recorded for it."
+          },
+          "of": {
+            "type": "integer",
+            "title": "Of",
+            "description": "How many symptoms the user described (resolved to HPO terms)."
+          },
+          "on_map": {
+            "type": "boolean",
+            "title": "On Map",
+            "description": "Drawn on the Atlas map (the focus set); else a node page."
+          },
+          "shared": {
+            "items": {
+              "$ref": "#/components/schemas/SymptomMatchTerm"
+            },
+            "type": "array",
+            "title": "Shared",
+            "description": "The shared symptoms with their edges."
+          },
+          "absent": {
+            "items": {
+              "$ref": "#/components/schemas/SymptomMatchTerm"
+            },
+            "type": "array",
+            "title": "Absent",
+            "description": "Symptoms recorded for it that the user said are absent, with their edges."
+          }
+        },
+        "type": "object",
+        "required": [
+          "id",
+          "label",
+          "overlap",
+          "of",
+          "on_map",
+          "shared",
+          "absent"
+        ],
+        "title": "SymptomMatchItem",
+        "description": "A condition in the atlas whose recorded symptoms overlap the user's."
+      },
+      "SymptomMatchTerm": {
+        "properties": {
+          "user_symptom": {
+            "type": "string",
+            "title": "User Symptom",
+            "description": "The user's symptom as its HPO term label."
+          },
+          "recorded_as": {
+            "type": "string",
+            "title": "Recorded As",
+            "description": "The HPO term recorded for the condition."
+          },
+          "match": {
+            "type": "string",
+            "enum": [
+              "same",
+              "more_specific",
+              "broader"
+            ],
+            "title": "Match",
+            "description": "How the recorded term relates to the user's symptom."
+          },
+          "edge_id": {
+            "type": "string",
+            "title": "Edge Id",
+            "description": "The has_phenotype edge that records it (cite this)."
+          }
+        },
+        "type": "object",
+        "required": [
+          "user_symptom",
+          "recorded_as",
+          "match",
+          "edge_id"
+        ],
+        "title": "SymptomMatchTerm",
+        "description": "One of the user's symptoms recorded for a condition, with the link that records it."
       },
       "ThreadDetail": {
         "properties": {
