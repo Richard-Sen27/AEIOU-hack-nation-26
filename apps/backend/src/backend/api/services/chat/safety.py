@@ -131,6 +131,11 @@ STATED: dict[Category, re.Pattern[str]] = {
         r"(syndrome|disease|disorder|encephalopathy|epilepsy)\b",
         r"\b(the|a|your) diagnosis (is|would be|must be)\b",
         r"\bthis is (likely |probably |definitely |clearly )?(a case of )?\w+ syndrome\b",
+        # a symptom overlap given as a probability, likelihood or percentage
+        r"\b(probability|likelihood|chance|odds)\b[^.]{0,30}\b(of having|that (you|your \w+|he|"
+        r"she|they|it is|this is))\b",
+        r"\b\d{1,3}(?:[.,]\d+)?\s?% (chance|likely|likelihood|probability|match|sure|certain)\b",
+        r"\b(you|your \w+|he|she|they) (are|is) (very |most |more )?likely to (have|has)\b",
         r"\b(ihr|ihre|dein|deine) (kind|tochter|sohn|baby)\b[^.]*\b(hat|leidet an)\b",
         r"\b(die )?diagnose (ist|lautet|wäre)\b",
     ),

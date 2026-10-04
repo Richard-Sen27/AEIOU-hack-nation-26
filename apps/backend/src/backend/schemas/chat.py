@@ -85,6 +85,38 @@ class ProfileHints(ApiModel):
     )
 
 
+class SymptomMatchTerm(ApiModel):
+    """One of the user's symptoms recorded for a condition, with the link that records it."""
+
+    user_symptom: str = Field(description="The user's symptom as its HPO term label.")
+    recorded_as: str = Field(description="The HPO term recorded for the condition.")
+    match: Literal["same", "more_specific", "broader"] = Field(
+        description="How the recorded term relates to the user's symptom."
+    )
+    edge_id: str = Field(description="The has_phenotype edge that records it (cite this).")
+
+
+class SymptomMatchItem(ApiModel):
+    """A condition in the atlas whose recorded symptoms overlap the user's."""
+
+    id: str = Field(description="Disease node ID.")
+    label: str
+    overlap: int = Field(description="How many of the user's symptoms are recorded for it.")
+    of: int = Field(description="How many symptoms the user described (resolved to HPO terms).")
+    on_map: bool = Field(description="Drawn on the Atlas map (the focus set); else a node page.")
+    shared: list[SymptomMatchTerm] = Field(description="The shared symptoms with their edges.")
+    absent: list[SymptomMatchTerm] = Field(
+        description="Symptoms recorded for it that the user said are absent, with their edges."
+    )
+
+
+class SymptomMatch(ApiModel):
+    """The symptom-overlap ranking of a turn (match_phenotypes), built in code from the tool
+    result: an overlap count per condition, never a probability or a diagnosis."""
+
+    items: list[SymptomMatchItem] = Field(description="Conditions by overlap, best first.")
+
+
 ReplyKind = Literal["answer", "emergency", "declined"]
 
 
@@ -120,6 +152,12 @@ class AgentReply(ApiModel):
         None,
         description="Unconfirmed age, onset and country extracted from this turn, and whether "
         "the message seems to be about a child. Null when nothing was found.",
+    )
+    symptom_match: SymptomMatch | None = Field(
+        None,
+        description="Conditions ranked by symptom overlap when match_phenotypes ran this turn "
+        "(symptoms-only messages), built by the server from the tool result. Null otherwise and "
+        "on replies stored before this field existed.",
     )
 
 

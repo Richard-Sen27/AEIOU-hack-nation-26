@@ -194,6 +194,9 @@ class TurnState:
     follow_up: FollowUp | None = None
     vus_in_paths: bool = False  # a find_path with include_vus returned a route through a VUS
     tool_errors: Counter = field(default_factory=Counter)
+    # The latest match_phenotypes ranking with results (its `results` list): the reply's
+    # symptom_match is built from it in code, never from the model's text.
+    symptom_match: list[dict[str, Any]] | None = None
 
     def see_edge(self, edge: Edge) -> None:
         self.edges[edge.id] = edge
@@ -467,6 +470,8 @@ def match_phenotypes(state: TurnState, present: list[str], absent: list[str]) ->
         if disease.cluster_id:
             result["cluster_id"] = disease.cluster_id
         results.append(result)
+    if results:
+        state.symptom_match = results
     return {
         "resolved": resolved,
         "unresolved": unresolved,

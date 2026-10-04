@@ -10,6 +10,7 @@ from dataclasses import dataclass, field
 
 from pydantic import BaseModel, Field
 
+from backend.api.services import atlas_tree
 from backend.api.services import graph as graph_service
 from backend.api.services import search as search_service
 from backend.api.services.chat import safety
@@ -34,6 +35,9 @@ from backend.schemas.chat import (
     FollowUp,
     GraphFocus,
     ProfileHints,
+    SymptomMatch,
+    SymptomMatchItem,
+    SymptomMatchTerm,
 )
 from backend.schemas.enums import (
     CONFIDENCE_THRESHOLD,
@@ -43,6 +47,7 @@ from backend.schemas.enums import (
     EdgeStatus,
     Origin,
     PathStatus,
+    Relation,
     Role,
     confidence_level,
 )
@@ -55,6 +60,7 @@ CHILD_AGE_LIMIT = 16  # accounts are 16+; younger means a parent describes a chi
 CHILD_AGE_RANGES = {AgeRange.under_1, AgeRange.age_1_5, AgeRange.age_6_12, AgeRange.age_13_17}
 _ONSET_HINT = re.compile(r"^(?:HP:\d{7}|[A-Za-z][A-Za-z ,'-]{0,59})$")
 _COUNTRY_HINT = re.compile(r"^[A-Z]{2}$")
+MAX_RANKED = 5  # conditions on the reply's symptom-overlap card
 MAX_SIMPLIFY_ATTEMPTS = 2
 MIN_REWRITE_S = 2.0  # no rewrite starts with less of the turn's deadline left
 
@@ -421,8 +427,59 @@ async def check_reply(
         ai_notice=pick(AI_NOTICES, lang),
         kind="declined" if decline else "answer",
         profile_hints=profile_hints(state),
+        symptom_match=symptom_match(state, edges),
     )
     return reply, report
+
+
+def symptom_match(state: TurnState, edges: dict[str, Edge]) -> SymptomMatch | None:
+    """The reply's symptom-overlap ranking, built in code from this turn's match_phenotypes
+    result (no model text): the top conditions with their overlap count, and every shared or
+    contradicting symptom backed by a has_phenotype edge of that condition that the tool
+    returned. A condition left without a citable shared symptom is dropped."""
+    if not state.symptom_match:
+        return None
+
+    def terms(disease_id: str, views: list[dict]) -> list[SymptomMatchTerm]:
+        out = []
+        for v in views:
+            edge = edges.get(v.get("edge_id", ""))
+            if (
+                edge is None
+                or edge.relation != Relation.has_phenotype
+                or edge.source_id != disease_id
+            ):
+                continue
+            out.append(
+                SymptomMatchTerm(
+                    user_symptom=v["user_symptom"],
+                    recorded_as=v["recorded_as"],
+                    match=v["match"],
+                    edge_id=edge.id,
+                )
+            )
+        return out
+
+    items: list[SymptomMatchItem] = []
+    for r in state.symptom_match:
+        shared = terms(r["id"], r.get("shared", []))
+        if not shared:
+            continue
+        node = state.nodes.get(r["id"]) or graph_service.get_node(r["id"])
+        items.append(
+            SymptomMatchItem(
+                id=r["id"],
+                label=r["label"],
+                overlap=r["overlap"],
+                of=r["of"],
+                on_map=node is not None and atlas_tree.is_focus(node),
+                shared=shared,
+                absent=terms(r["id"], r.get("recorded_but_absent_for_user", [])),
+            )
+        )
+        if len(items) == MAX_RANKED:
+            break
+    return SymptomMatch(items=items) if items else None
 
 
 def profile_hints(state: TurnState) -> ProfileHints | None:
