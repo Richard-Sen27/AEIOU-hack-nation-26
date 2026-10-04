@@ -285,7 +285,7 @@ async def load_graph(db: AsyncSession) -> GraphStore:
         n_terms,
         "hpo_terms" if n_terms else "phenotype nodes stand in",
     )
-    atlas_tree.tree_payload()
+    atlas_tree.tree_payload_gzip()
     log.info(
         "graph store built in %.2fs: %d nodes, %d edges",
         time.perf_counter() - started,

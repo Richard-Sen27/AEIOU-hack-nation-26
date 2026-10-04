@@ -16,6 +16,7 @@ before (searched outward), so crowded branches grow longer instead of overlappin
 Everything is deterministic: jitter is hashed from ids, inputs are sorted.
 """
 
+import gzip
 import hashlib
 import math
 import re
@@ -40,6 +41,7 @@ from backend.schemas.graph import Node
 LAYOUT_VERSION = 6  # 5: Diseases trunk from cluster lineage; 6: that trunk without crossings
 ROOT_ID = "T:root"
 MAX_LEAVES = 30
+TREE_GZIP_LEVEL = 6  # as main.GZIP_LEVEL
 
 CATEGORY_ORDER: tuple[AtlasCategory, ...] = (
     AtlasCategory.researchers,
@@ -2027,6 +2029,7 @@ class TreeCache:
     tree: AtlasTree
     by_id: dict[str, AtlasTreeNode]
     payload: tuple[bytes, str] | None = None
+    gzipped: bytes | None = None
 
 
 def _cached() -> TreeCache:
@@ -2065,3 +2068,13 @@ def tree_payload() -> tuple[bytes, str]:
         version = cached.tree.data_version or "empty"
         cached.payload = (body, f'"{version}.{LAYOUT_VERSION}.{digest}"')
     return cached.payload
+
+
+def tree_payload_gzip() -> tuple[bytes, str]:
+    """The tree JSON gzip-compressed once per store (data version) and layout version, and
+    its ETag. The body is several MB: compressing it on every request took 0.4-0.9 s."""
+    body, etag = tree_payload()
+    cached = _cached()
+    if cached.gzipped is None:
+        cached.gzipped = gzip.compress(body, compresslevel=TREE_GZIP_LEVEL, mtime=0)
+    return cached.gzipped, etag

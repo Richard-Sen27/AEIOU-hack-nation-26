@@ -19,11 +19,16 @@ router = APIRouter(tags=["graph"])
 )
 async def get_atlas_tree(request: Request) -> Response:
     """Category trees around the hub with backend positions (ETag keyed on data and layout)."""
-    body, etag = atlas_tree.tree_payload()
-    headers = {"ETag": etag, "Cache-Control": ATLAS_CACHE_CONTROL}
+    # Served pre-compressed (gzip cached per data and layout version); a response that already
+    # carries Content-Encoding is passed through by the GZip middleware.
+    gzip_ok = "gzip" in request.headers.get("accept-encoding", "").lower()
+    body, etag = atlas_tree.tree_payload_gzip() if gzip_ok else atlas_tree.tree_payload()
+    headers = {"ETag": etag, "Cache-Control": ATLAS_CACHE_CONTROL, "Vary": "Accept-Encoding"}
     match = request.headers.get("if-none-match", "")
     if etag in [t.strip().removeprefix("W/") for t in match.split(",")]:
         return Response(status_code=304, headers=headers)
+    if gzip_ok:
+        headers["Content-Encoding"] = "gzip"
     return Response(body, media_type="application/json", headers=headers)
 
 
