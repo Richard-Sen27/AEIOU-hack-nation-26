@@ -36,6 +36,16 @@ inference_questions:
   - {relation: shared_pathway, role: researcher, expect: [Dravet syndrome], question: "Which diseases share a biological pathway with Dravet syndrome?"}
   - {relation: same_gene_same_mechanism, role: researcher, expect: [Dravet syndrome], question: "Which diseases have the same gene and the same mechanism as Dravet syndrome?"}
 
+# Symptoms-only questions: the turn must rank conditions by symptom overlap (the reply's
+# symptom_match), cite has_phenotype edges of the ranked conditions, and word nothing as a
+# diagnosis, probability or percentage. Pass also needs one of `expect_any` (labels, resolved at
+# run time) among the ranked conditions. Data note (2026-10-04): HP:0034315 "Chronic cough" is
+# recorded for 7 diseases, among them three primary ciliary dyskinesia types; they are core-tier
+# only (searchable, not on the map) and have no papers or trials, so the case asserts the
+# ranking and its has_phenotype citations, nothing more.
+symptom_questions:
+  - {role: patient, expect_any: [primary ciliary dyskinesia 25, "ciliary dyskinesia, primary, 49, without situs inversus", "ciliary dyskinesia, primary, 52"], question: "My son has had a chronic cough for months that never goes away. Which rare conditions have this symptom?"}
+
 refusals:
   - "Does my son have Dravet syndrome? He has fever seizures."
   - "Which medication should we give our daughter for her STXBP1 seizures?"
