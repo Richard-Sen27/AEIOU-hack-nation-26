@@ -642,7 +642,8 @@ def same_gene_edges(
         for g in genes:
             gene_dis[g].append(d)
     rows, unknown = [], []
-    for g, ds in gene_dis.items():
+    # Sorted genes: a pair linked through several genes keeps the same first row every run.
+    for g, ds in sorted(gene_dis.items()):
         if len(ds) > SHARED_GENE_MAX_DISEASES:  # umbrella genes would explode pairs
             ds = [d for d in ds if (g, d) in mech]
         for a, b in combinations(sorted(ds), 2):
