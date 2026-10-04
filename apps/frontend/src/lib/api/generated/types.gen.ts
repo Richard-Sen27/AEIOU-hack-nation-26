@@ -2687,9 +2687,12 @@ export type ExplainErrorEvent = {
 /**
  * ExplainEvent
  *
- * One event of the POST /explain stream.
+ * One event of the POST /explain stream. `status` events come only with `steps: true`,
+ * while a new text is written; the text itself is sent only after it passed the checks.
  */
 export type ExplainEvent = ({
+    type: 'status';
+} & ExplainStatusEvent) | ({
     type: 'delta';
 } & ExplainDeltaEvent) | ({
     type: 'final';
@@ -2768,6 +2771,34 @@ export type ExplainRequest = {
      * Summarise how this node is connected via the edges.
      */
     subject_node_id?: string | null;
+    /**
+     * Steps
+     *
+     * Also stream `status` events while a new text is written (reading, writing, checking). Off by default, so the stream is delta..., final as before.
+     */
+    steps?: boolean;
+};
+
+/**
+ * ExplainStatusEvent
+ */
+export type ExplainStatusEvent = {
+    /**
+     * Type
+     */
+    type?: 'status';
+    /**
+     * Step
+     *
+     * reading the links, writing, checking the sources, rewriting to fix the sources, or rewriting in simpler words.
+     */
+    step: 'reading' | 'writing' | 'checking' | 'fixing_sources' | 'simplifying';
+    /**
+     * Message
+     *
+     * Short progress text in the lens language.
+     */
+    message: string;
 };
 
 /**
@@ -7492,7 +7523,7 @@ export type ExplainPathError = ExplainPathErrors[keyof ExplainPathErrors];
 
 export type ExplainPathResponses = {
     /**
-     * Stream of ExplainEvent (delta..., final).
+     * Stream of ExplainEvent (delta..., final); with `steps: true` a new text is preceded by status events (status..., delta..., final).
      */
     200: ExplainEvent;
 };

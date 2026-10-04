@@ -280,7 +280,8 @@ export const findPath = <ThrowOnError extends boolean = false>(options: Options<
  * Role-specific explanation with citation IDs. Cached: anyone; new: signed in.
  *
  * With `subject_node_id` the edges are that node's connections (the Atlas summary), not an
- * ordered path; it has its own cache key.
+ * ordered path; it has its own cache key. With `steps` a new text streams its progress
+ * (reading, writing, checking) first; the text is sent only after it passed the checks.
  */
 export const explainPath = <ThrowOnError extends boolean = false>(options: Options<ExplainPathData, ThrowOnError, ExplainPathResponse>): Promise<ServerSentEventsResult<ExplainPathResponses>> => (options.client ?? client).sse.post<ExplainPathResponses, ExplainPathErrors, ThrowOnError>({
     url: '/explain',

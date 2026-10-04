@@ -1595,7 +1595,7 @@
           "explain"
         ],
         "summary": "Explain",
-        "description": "Role-specific explanation with citation IDs. Cached: anyone; new: signed in.\n\nWith `subject_node_id` the edges are that node's connections (the Atlas summary), not an\nordered path; it has its own cache key.",
+        "description": "Role-specific explanation with citation IDs. Cached: anyone; new: signed in.\n\nWith `subject_node_id` the edges are that node's connections (the Atlas summary), not an\nordered path; it has its own cache key. With `steps` a new text streams its progress\n(reading, writing, checking) first; the text is sent only after it passed the checks.",
         "operationId": "explainPath",
         "requestBody": {
           "content": {
@@ -1609,7 +1609,7 @@
         },
         "responses": {
           "200": {
-            "description": "Stream of ExplainEvent (delta..., final).",
+            "description": "Stream of ExplainEvent (delta..., final); with `steps: true` a new text is preceded by status events (status..., delta..., final).",
             "content": {
               "text/event-stream": {
                 "schema": {
@@ -10818,6 +10818,9 @@
       "ExplainEvent": {
         "oneOf": [
           {
+            "$ref": "#/components/schemas/ExplainStatusEvent"
+          },
+          {
             "$ref": "#/components/schemas/ExplainDeltaEvent"
           },
           {
@@ -10828,13 +10831,14 @@
           }
         ],
         "title": "ExplainEvent",
-        "description": "One event of the POST /explain stream.",
+        "description": "One event of the POST /explain stream. `status` events come only with `steps: true`,\nwhile a new text is written; the text itself is sent only after it passed the checks.",
         "discriminator": {
           "propertyName": "type",
           "mapping": {
             "delta": "#/components/schemas/ExplainDeltaEvent",
             "error": "#/components/schemas/ExplainErrorEvent",
-            "final": "#/components/schemas/ExplainFinalEvent"
+            "final": "#/components/schemas/ExplainFinalEvent",
+            "status": "#/components/schemas/ExplainStatusEvent"
           }
         }
       },
@@ -10957,6 +10961,12 @@
             ],
             "title": "Subject Node Id",
             "description": "Summarise how this node is connected via the edges."
+          },
+          "steps": {
+            "type": "boolean",
+            "title": "Steps",
+            "description": "Also stream `status` events while a new text is written (reading, writing, checking). Off by default, so the stream is delta..., final as before.",
+            "default": false
           }
         },
         "type": "object",
@@ -10964,6 +10974,39 @@
           "edge_ids"
         ],
         "title": "ExplainRequest"
+      },
+      "ExplainStatusEvent": {
+        "properties": {
+          "type": {
+            "type": "string",
+            "const": "status",
+            "title": "Type",
+            "default": "status"
+          },
+          "step": {
+            "type": "string",
+            "enum": [
+              "reading",
+              "writing",
+              "checking",
+              "fixing_sources",
+              "simplifying"
+            ],
+            "title": "Step",
+            "description": "reading the links, writing, checking the sources, rewriting to fix the sources, or rewriting in simpler words."
+          },
+          "message": {
+            "type": "string",
+            "title": "Message",
+            "description": "Short progress text in the lens language."
+          }
+        },
+        "type": "object",
+        "required": [
+          "step",
+          "message"
+        ],
+        "title": "ExplainStatusEvent"
       },
       "Finding": {
         "properties": {
