@@ -1,13 +1,13 @@
 import {loadFont} from '@remotion/google-fonts/Archivo';
 
-// Same palette as the team intro video (submissions/videos/intro/src/theme.ts),
-// so the two submissions read as one set.
+// The web app's light-mode tokens (apps/frontend/src/app/globals.css, :root),
+// the same palette as the intro and technical videos.
 export const COLORS = {
-  background: '#0c0e13',
-  surface: '#161a22',
-  text: '#f5f3ee',
-  muted: '#9aa3b2',
-  accent: '#f59e0b',
+  background: 'oklch(0.9270 0.0035 247.8604)',
+  surface: 'oklch(1 0 0)',
+  text: 'oklch(0.2676 0.0135 163.7439)',
+  muted: 'oklch(0.5205 0.0163 155.2593)',
+  accent: 'oklch(0.7336 0.1688 61.9983)',
 };
 
 const FONT_FALLBACK =

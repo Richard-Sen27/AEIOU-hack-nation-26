@@ -4,7 +4,7 @@
 // imports and of TypeScript-only runtime syntax (enums, namespaces), so
 // Node can run the voiceover script on it by stripping types.
 
-export type SceneId = 'arrive' | 'graph' | 'dr-wu' | 'gap' | 'people' | 'close';
+export type SceneId = 'arrive' | 'graph' | 'dr-wu' | 'relative' | 'gap' | 'people' | 'close';
 
 export type SceneContent = {
   readonly id: SceneId;
@@ -67,6 +67,21 @@ export const SCENES = {
     caption: 'Dr. Wu · OpenAI models · every citation checked in code',
     recording: 'recordings/03-dr-wu.mp4',
     voiceover: 'voiceover/03-dr-wu.mp3',
+  },
+  // Signed-out stand-in for scene 3, used by the short cut (ProductShort).
+  relative: {
+    id: 'relative',
+    number: 3,
+    name: 'A hidden relative',
+    narration:
+      'The graph surfaces a relative under another name: a psoriasis caused by the same gene. Shared mechanism? Not established.',
+    shots: [
+      'PRP page, connections: "psoriasis 2"',
+      'Open its "Sources"',
+      '"Hypothesis" badge and the explanation',
+    ],
+    recording: 'recordings/03-relative.mp4',
+    voiceover: 'voiceover/03-relative.mp3',
   },
   gap: {
     id: 'gap',

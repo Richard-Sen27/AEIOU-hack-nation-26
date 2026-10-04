@@ -35,7 +35,7 @@ export const RecordingFrame: React.FC<{readonly children: React.ReactNode}> = ({
         overflow: 'hidden',
         backgroundColor: COLORS.surface,
         boxShadow:
-          '0 0 0 1px rgba(245, 243, 238, 0.08), 0 32px 80px rgba(0, 0, 0, 0.5)',
+          '0 0 0 1px rgba(0, 0, 0, 0.1), 0 32px 80px rgba(0, 0, 0, 0.16)',
       }}
     >
       {children}
