@@ -43,9 +43,7 @@ SOURCE_TYPE = "patient_org_site"
 
 
 class BrightDataSettings(BaseSettings):
-    model_config = SettingsConfigDict(
-        env_prefix="BRIGHTDATA_", env_file=ENV_FILE, extra="ignore"
-    )
+    model_config = SettingsConfigDict(env_prefix="BRIGHTDATA_", env_file=ENV_FILE, extra="ignore")
 
     serp_zone: str | None = None
     max_results_per_query: int = 5

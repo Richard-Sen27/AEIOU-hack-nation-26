@@ -50,9 +50,7 @@ PACE = 0.0 if settings.ncbi_api_key else 0.34
 
 
 class PubMedSettings(BaseSettings):
-    model_config = SettingsConfigDict(
-        env_prefix="PUBMED_", env_file=ENV_FILE, extra="ignore"
-    )
+    model_config = SettingsConfigDict(env_prefix="PUBMED_", env_file=ENV_FILE, extra="ignore")
 
     max_per_seed_gene: int = 40
     max_per_gene: int = 5
