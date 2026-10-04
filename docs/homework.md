@@ -24,12 +24,14 @@ Work deliberately left for later. Add an item when you leave something for later
 
 ## Chat (Dr. Wu)
 
-- **Speed:** `extract_entities` could also resolve its own mentions, removing one main-model round per turn, or the extraction could run concurrently with the first round.
-- **Post-check outside the deadline** (`api/services/chat/agent.py`): `check_reply` runs after the 45 s `TURN_DEADLINE_S` and can make up to two more model calls, each bounded only by the 90 s HTTP timeout (`llm/client.py`).
-- **Deadline keeps nothing:** when the deadline fires there is no partial answer.
-- **Stale comment** (`apps/frontend/src/components/chat/use-chat.ts`, line 26): still says the server caps a turn at 30 s.
 - **No log handlers:** the backend configures none, so INFO lines from `backend.*` (for example "chat turn failed") never reach the server log; only the chat timing logger has its own handler.
 - **Ids in chat links:** links from a chat answer to a node page (`/node/<id>`, `components/chat/cards.tsx`, `mini-graph.tsx`) and to `/path?from=…&to=…` (`assistant-turn.tsx`) still carry an id in the URL; the Atlas links were moved to an in-memory handoff. A decision on these is open.
+- **Reasoning effort unverified** (`llm/client.py`, `reasoning`): tool rounds, the extraction and the reading-gate rewrite ask for `low` effort only when the model list advertises `supported_reasoning_levels`; whether the ChatGPT-plan gateway lists or accepts it is unknown until a real turn (the timing log shows the effect; a 400 on `reasoning` switches it off).
+- **No smaller model on the plan:** the user's model list resolves `small` to the main model (`gpt-6-astra`), so the extraction costs a full model call (about 5 s). `OPENAI_MODEL_SMALL` can pin a faster model if the plan offers one.
+- **Reading gate time** (`api/services/chat/postcheck.py`): for patient and guest lenses, a summary above grade 8 costs one or two more small-model calls (about 4 s each), bounded by the turn deadline.
+- **Cold model list:** the first turn per account every 6 h waits for the model listing (about 2 s, partly hidden behind redaction).
+- **Dock has no history:** the Atlas dock starts empty and never loads stored sessions, so a stored failed turn shows on `/chat` only; the dock's live retry does not store the message twice.
+- **Retry of an older failed turn** returns 409 when a later message exists in the session; the UI still offers "Try again" on such turns in a reloaded session.
 - **Real model untested:** answer quality, document extraction, the gap-search agent, written explanations and summaries were covered only by the mock.
 
 ## Data and pipeline
