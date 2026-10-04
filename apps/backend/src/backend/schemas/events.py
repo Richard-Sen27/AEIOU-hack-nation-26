@@ -72,6 +72,15 @@ class ChatFinalEvent(ApiModel):
     message_id: UUID
 
 
+class ChatTurnEvent(ApiModel):
+    type: Literal["turn"] = "turn"
+    session_id: UUID = Field(description="Session of this turn (new or existing).")
+    message_id: UUID = Field(
+        description="The stored user message of this turn: send it as retry_message_id to run "
+        "the turn again without storing the message twice."
+    )
+
+
 class ChatErrorEvent(StreamError):
     type: Literal["error"] = "error"
 
@@ -80,6 +89,7 @@ class ChatEvent(
     RootModel[
         Annotated[
             ChatStatusEvent
+            | ChatTurnEvent
             | ChatUncertaintyEvent
             | ChatSummaryDeltaEvent
             | ChatChipsEvent

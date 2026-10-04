@@ -1,7 +1,7 @@
 """Chat schemas. AgentReply mirrors the output contract in docs/specs/agent.md."""
 
 from datetime import datetime
-from typing import Literal
+from typing import Any, Literal
 from uuid import UUID
 
 from pydantic import Field
@@ -127,6 +127,28 @@ class ChatRequest(ApiModel):
     session_id: UUID | None = Field(None, description="Existing session; omit to start one.")
     message: str = Field(min_length=1, max_length=4000, description="The user's message.")
     expert_mode: bool | None = Field(None, description="Override the profile's expert mode.")
+    retry_message_id: UUID | None = Field(
+        None,
+        description="Run the turn of this stored user message again (needs session_id; it must "
+        "be the session's last user message, without an answer). No new user message is "
+        "stored; the stored failed turn is replaced, and the stored text is used, not message.",
+    )
+
+
+class TurnStep(ApiModel):
+    tool: str | None = Field(None, description="Tool of the status event, if any.")
+    message: str = Field(description="The status text the stream showed.")
+
+
+class TurnFailure(ApiModel):
+    """A turn that ended without an answer, stored as the live stream showed it."""
+
+    code: str = Field(
+        description="The error event's code (an ErrorCode), or `interrupted` when the stream "
+        "was cut before the turn ended."
+    )
+    message: str = Field(description="The error event's message. Never echoes user content.")
+    steps: list[TurnStep] = Field(description="The status events the turn sent, in order.")
 
 
 class ChatMessage(ApiModel):
@@ -135,7 +157,20 @@ class ChatMessage(ApiModel):
     role: ChatRole
     content: str = Field(description="Redacted message text.")
     reply: AgentReply | None = Field(None, description="Structured reply (assistant only).")
+    error: TurnFailure | None = Field(
+        None, description="Set on an assistant message for a turn that failed (reply is null)."
+    )
     created_at: datetime
+
+
+def stored_reply(data: dict[str, Any] | None) -> tuple[AgentReply | None, TurnFailure | None]:
+    """The `chat_messages.reply` column: an AgentReply, or {"error": TurnFailure} for a failed
+    turn. Raises ValidationError when it is neither."""
+    if not data:
+        return None, None
+    if set(data) == {"error"}:
+        return None, TurnFailure.model_validate(data["error"])
+    return AgentReply.model_validate(data), None
 
 
 class ChatSession(ApiModel):

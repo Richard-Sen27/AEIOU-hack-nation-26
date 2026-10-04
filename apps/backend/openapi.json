@@ -1413,7 +1413,7 @@
         },
         "responses": {
           "200": {
-            "description": "Stream of ChatEvent (status, summary_delta, ..., final).",
+            "description": "Stream of ChatEvent (status, turn, summary_delta, ..., final).",
             "content": {
               "text/event-stream": {
                 "schema": {
@@ -1444,6 +1444,16 @@
           },
           "404": {
             "description": "not_found",
+            "content": {
+              "text/event-stream": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "conflict",
             "content": {
               "text/event-stream": {
                 "schema": {
@@ -3819,6 +3829,9 @@
             "$ref": "#/components/schemas/ChatStatusEvent"
           },
           {
+            "$ref": "#/components/schemas/ChatTurnEvent"
+          },
+          {
             "$ref": "#/components/schemas/ChatUncertaintyEvent"
           },
           {
@@ -3860,6 +3873,7 @@
             "follow_up": "#/components/schemas/ChatFollowUpEvent",
             "status": "#/components/schemas/ChatStatusEvent",
             "summary_delta": "#/components/schemas/ChatSummaryDeltaEvent",
+            "turn": "#/components/schemas/ChatTurnEvent",
             "uncertainty": "#/components/schemas/ChatUncertaintyEvent"
           }
         }
@@ -3943,6 +3957,17 @@
             ],
             "description": "Structured reply (assistant only)."
           },
+          "error": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/TurnFailure"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "Set on an assistant message for a turn that failed (reply is null)."
+          },
           "created_at": {
             "type": "string",
             "format": "date-time",
@@ -3992,6 +4017,19 @@
             ],
             "title": "Expert Mode",
             "description": "Override the profile's expert mode."
+          },
+          "retry_message_id": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "uuid"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Retry Message Id",
+            "description": "Run the turn of this stored user message again (needs session_id; it must be the session's last user message, without an answer). No new user message is stored; the stored failed turn is replaced, and the stored text is used, not message."
           }
         },
         "type": "object",
@@ -4150,6 +4188,34 @@
           "text"
         ],
         "title": "ChatSummaryDeltaEvent"
+      },
+      "ChatTurnEvent": {
+        "properties": {
+          "type": {
+            "type": "string",
+            "const": "turn",
+            "title": "Type",
+            "default": "turn"
+          },
+          "session_id": {
+            "type": "string",
+            "format": "uuid",
+            "title": "Session Id",
+            "description": "Session of this turn (new or existing)."
+          },
+          "message_id": {
+            "type": "string",
+            "format": "uuid",
+            "title": "Message Id",
+            "description": "The stored user message of this turn: send it as retry_message_id to run the turn again without storing the message twice."
+          }
+        },
+        "type": "object",
+        "required": [
+          "session_id",
+          "message_id"
+        ],
+        "title": "ChatTurnEvent"
       },
       "ChatUncertaintyEvent": {
         "properties": {
@@ -7964,6 +8030,62 @@
           "kind"
         ],
         "title": "TreePathItem"
+      },
+      "TurnFailure": {
+        "properties": {
+          "code": {
+            "type": "string",
+            "title": "Code",
+            "description": "The error event's code (an ErrorCode), or `interrupted` when the stream was cut before the turn ended."
+          },
+          "message": {
+            "type": "string",
+            "title": "Message",
+            "description": "The error event's message. Never echoes user content."
+          },
+          "steps": {
+            "items": {
+              "$ref": "#/components/schemas/TurnStep"
+            },
+            "type": "array",
+            "title": "Steps",
+            "description": "The status events the turn sent, in order."
+          }
+        },
+        "type": "object",
+        "required": [
+          "code",
+          "message",
+          "steps"
+        ],
+        "title": "TurnFailure",
+        "description": "A turn that ended without an answer, stored as the live stream showed it."
+      },
+      "TurnStep": {
+        "properties": {
+          "tool": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Tool",
+            "description": "Tool of the status event, if any."
+          },
+          "message": {
+            "type": "string",
+            "title": "Message",
+            "description": "The status text the stream showed."
+          }
+        },
+        "type": "object",
+        "required": [
+          "message"
+        ],
+        "title": "TurnStep"
       },
       "ValidationError": {
         "properties": {

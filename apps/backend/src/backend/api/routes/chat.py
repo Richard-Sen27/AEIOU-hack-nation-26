@@ -18,8 +18,8 @@ CHAT_LIMIT = "30/minute;300/day"
     "/chat",
     response_class=EventStream,
     responses={
-        **sse_doc(ChatEvent, "Stream of ChatEvent (status, summary_delta, ..., final)."),
-        **responses(401, 403, 404, 422, 429, 501),
+        **sse_doc(ChatEvent, "Stream of ChatEvent (status, turn, summary_delta, ..., final)."),
+        **responses(401, 403, 404, 409, 422, 429, 501),
     },
     operation_id="chat",
 )

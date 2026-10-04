@@ -15,6 +15,7 @@ from sqlalchemy.exc import IntegrityError
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from backend.api.errors import ApiError
+from backend.api.services.chat import message_from_row as chat_message_from_row
 from backend.api.services.contributions import contribution_from_row, refresh_shared_graph
 from backend.config import get_settings
 from backend.schemas.account import (
@@ -30,7 +31,7 @@ from backend.schemas.account import (
     SessionUser,
     SettingsUpdate,
 )
-from backend.schemas.chat import AgentReply, ChatMessage, ChatSession
+from backend.schemas.chat import ChatMessage, ChatSession
 from backend.schemas.contributions import EdgeFlag
 from backend.schemas.documents import Document, Finding, Job
 from backend.schemas.enums import ConsentType, ErrorCode, JobKind, ProfileSource, Role
@@ -531,16 +532,6 @@ async def _rows(db: AsyncSession, sql: str, user_id: UUID) -> list[Any]:
     return list((await db.execute(text(sql), {"uid": user_id})).mappings())
 
 
-def _reply(data: dict[str, Any] | None) -> AgentReply | None:
-    if data is None:
-        return None
-    try:
-        return AgentReply.model_validate(data)
-    except ValidationError:
-        log.warning("stored chat reply does not match AgentReply; exported without it")
-        return None
-
-
 async def export_data(db: AsyncSession, user: CurrentUser) -> DataExport:
     """All user data as JSON (GDPR Art. 15/20, CCPA right to know). Token values excluded."""
     uid = user.id
@@ -594,16 +585,7 @@ async def export_data(db: AsyncSession, user: CurrentUser) -> DataExport:
     )
     by_session: dict[UUID, list[ChatMessage]] = {}
     for m in messages:
-        by_session.setdefault(m["session_id"], []).append(
-            ChatMessage(
-                id=m["id"],
-                session_id=m["session_id"],
-                role=m["role"],
-                content=m["content"],
-                reply=_reply(m["reply"]),
-                created_at=m["created_at"],
-            )
-        )
+        by_session.setdefault(m["session_id"], []).append(chat_message_from_row(m))
     documents = await _rows(
         db,
         "SELECT id, status, doc_type, page_count, created_at, raw_deleted_at FROM documents"

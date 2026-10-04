@@ -660,6 +660,8 @@ export type ChatErrorEvent = {
 export type ChatEvent = ({
     type: 'status';
 } & ChatStatusEvent) | ({
+    type: 'turn';
+} & ChatTurnEvent) | ({
     type: 'uncertainty';
 } & ChatUncertaintyEvent) | ({
     type: 'summary_delta';
@@ -733,6 +735,10 @@ export type ChatMessage = {
      */
     reply?: AgentReply | null;
     /**
+     * Set on an assistant message for a turn that failed (reply is null).
+     */
+    error?: TurnFailure | null;
+    /**
      * Created At
      */
     created_at: string;
@@ -760,6 +766,12 @@ export type ChatRequest = {
      * Override the profile's expert mode.
      */
     expert_mode?: boolean | null;
+    /**
+     * Retry Message Id
+     *
+     * Run the turn of this stored user message again (needs session_id; it must be the session's last user message, without an answer). No new user message is stored; the stored failed turn is replaced, and the stored text is used, not message.
+     */
+    retry_message_id?: string | null;
 };
 
 /**
@@ -853,6 +865,28 @@ export type ChatSummaryDeltaEvent = {
      * Next chunk of the summary.
      */
     text: string;
+};
+
+/**
+ * ChatTurnEvent
+ */
+export type ChatTurnEvent = {
+    /**
+     * Type
+     */
+    type?: 'turn';
+    /**
+     * Session Id
+     *
+     * Session of this turn (new or existing).
+     */
+    session_id: string;
+    /**
+     * Message Id
+     *
+     * The stored user message of this turn: send it as retry_message_id to run the turn again without storing the message twice.
+     */
+    message_id: string;
 };
 
 /**
@@ -3218,6 +3252,50 @@ export type TreePathItem = {
 };
 
 /**
+ * TurnFailure
+ *
+ * A turn that ended without an answer, stored as the live stream showed it.
+ */
+export type TurnFailure = {
+    /**
+     * Code
+     *
+     * The error event's code (an ErrorCode), or `interrupted` when the stream was cut before the turn ended.
+     */
+    code: string;
+    /**
+     * Message
+     *
+     * The error event's message. Never echoes user content.
+     */
+    message: string;
+    /**
+     * Steps
+     *
+     * The status events the turn sent, in order.
+     */
+    steps: Array<TurnStep>;
+};
+
+/**
+ * TurnStep
+ */
+export type TurnStep = {
+    /**
+     * Tool
+     *
+     * Tool of the status event, if any.
+     */
+    tool?: string | null;
+    /**
+     * Message
+     *
+     * The status text the stream showed.
+     */
+    message: string;
+};
+
+/**
  * ValidationError
  */
 export type ValidationError = {
@@ -4076,6 +4154,10 @@ export type ChatErrors = {
      */
     404: ErrorResponse;
     /**
+     * conflict
+     */
+    409: ErrorResponse;
+    /**
      * validation_error: lists invalid field names only.
      */
     422: ErrorResponse;
@@ -4093,7 +4175,7 @@ export type ChatError = ChatErrors[keyof ChatErrors];
 
 export type ChatResponses = {
     /**
-     * Stream of ChatEvent (status, summary_delta, ..., final).
+     * Stream of ChatEvent (status, turn, summary_delta, ..., final).
      */
     200: ChatEvent;
 };
