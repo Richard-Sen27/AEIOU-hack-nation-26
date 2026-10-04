@@ -15,7 +15,7 @@ import {
   X,
 } from "lucide-react";
 import Link from "next/link";
-import { Fragment, useEffect, useState, useSyncExternalStore } from "react";
+import { Fragment, useEffect, useState } from "react";
 
 import { FollowButton } from "@/components/follows/follow-button";
 import { ConfidenceBadge, OriginBadge, StatusFlag, VusNotice } from "@/components/graph-ui";
@@ -26,6 +26,7 @@ import { useSession } from "@/components/providers/session-provider";
 import { AiDisclosure } from "@/components/shell/ai-disclosure";
 import { Button, buttonVariants } from "@/components/ui/button";
 import { Skeleton } from "@/components/ui/skeleton";
+import { fadeWords, useSmoothReveal } from "@/components/ui/smooth-reveal";
 import { announce } from "@/lib/a11y";
 import { getAtlasSummary, streamSSE, type Schemas } from "@/lib/api";
 import type { ApiError } from "@/lib/api/errors";
@@ -723,7 +724,7 @@ function Headline({ text }: { text: string }) {
 /**
  * `working` holds the server's step lines, the checked text received so far
  * (the API sends text only after the citation check passed) and the final
- * event once it arrived; the text is then revealed a few words at a time.
+ * event once it arrived; the text is then revealed smoothly, word by word (the shared reveal).
  */
 type WriteState =
   | { kind: "idle" }
@@ -758,52 +759,6 @@ function writeError(code: string) {
   }
 }
 
-const REVEAL_WORDS = 3;
-const REVEAL_MS = 45;
-const REDUCED_MOTION = "(prefers-reduced-motion: reduce)";
-
-function useReducedMotion(): boolean {
-  return useSyncExternalStore(
-    (onChange) => {
-      const mq = window.matchMedia(REDUCED_MOTION);
-      mq.addEventListener("change", onChange);
-      return () => mq.removeEventListener("change", onChange);
-    },
-    () => window.matchMedia(REDUCED_MOTION).matches,
-    () => false,
-  );
-}
-
-/**
- * How many characters of `text` to show: grows by a few words per tick until
- * it has caught up with what arrived; everything at once with reduced motion.
- */
-function useReveal(text: string): number {
-  const reduced = useReducedMotion();
-  // The revealed prefix; a text that no longer starts with it (a new attempt) starts over.
-  const [shown, setShown] = useState("");
-  const at = text.startsWith(shown) ? shown.length : 0;
-  useEffect(() => {
-    if (reduced || at >= text.length) return;
-    const id = setTimeout(() => {
-      const word = /\S+\s*/g;
-      word.lastIndex = at;
-      let end = at;
-      for (let i = 0; i < REVEAL_WORDS; i++) {
-        const m = word.exec(text);
-        if (!m) {
-          end = text.length;
-          break;
-        }
-        end = m.index + m[0].length;
-      }
-      setShown(text.slice(0, end));
-    }, REVEAL_MS);
-    return () => clearTimeout(id);
-  }, [text, at, reduced]);
-  return reduced ? text.length : at;
-}
-
 /** Three calm dots while Dr. Wu works; still with reduced motion. */
 function WritingDots() {
   return (
@@ -826,19 +781,23 @@ function CitedSummary({
   text,
   edgeIds,
   streaming,
+  animate = false,
   onShowChain,
 }: {
   text: string;
   edgeIds: string[];
   streaming: boolean;
+  /** Being revealed: words fade in, and the buttons wait out of the tab order until it ends. */
+  animate?: boolean;
   onShowChain: (edgeIds: string[]) => void;
 }) {
   const shown = streaming ? text.replace(/\[[^\]]{0,40}$/, "") : text;
   const order = new Map(edgeIds.map((id, i) => [id, i]));
   const parts: React.ReactNode[] = [];
+  const plain = (from: number, to: number) => (animate ? fadeWords(shown.slice(from, to), from) : shown.slice(from, to));
   let last = 0;
   for (const m of shown.matchAll(CITATION)) {
-    parts.push(shown.slice(last, m.index));
+    parts.push(<Fragment key={`t${last}`}>{plain(last, m.index)}</Fragment>);
     const ids = m[1].split(/\s*[,;]\s*/).filter((id) => order.has(id));
     parts.push(
       <Fragment key={m.index}>
@@ -846,10 +805,11 @@ function CitedSummary({
           <button
             key={id}
             type="button"
+            tabIndex={animate ? -1 : undefined}
             onClick={() => onShowChain([id])}
             data-testid="citation"
             data-edge-id={id}
-            className="mx-0.5 inline-flex h-[18px] min-w-[18px] -translate-y-px items-center justify-center rounded-full border border-primary/60 bg-primary/15 px-1 align-middle font-mono text-[10px] font-semibold text-foreground outline-none transition hover:bg-primary hover:text-primary-foreground focus-visible:ring-2 focus-visible:ring-ring"
+            className={cn(animate && "smooth-word", "mx-0.5 inline-flex h-[18px] min-w-[18px] -translate-y-px items-center justify-center rounded-full border border-primary/60 bg-primary/15 px-1 align-middle font-mono text-[10px] font-semibold text-foreground outline-none transition hover:bg-primary hover:text-primary-foreground focus-visible:ring-2 focus-visible:ring-ring")}
             aria-label={`Source ${order.get(id)! + 1}: show this link on the map`}
           >
             {order.get(id)! + 1}
@@ -859,7 +819,7 @@ function CitedSummary({
     );
     last = (m.index ?? 0) + m[0].length;
   }
-  parts.push(shown.slice(last));
+  parts.push(<Fragment key={`t${last}`}>{plain(last, shown.length)}</Fragment>);
   return <>{parts}</>;
 }
 
@@ -934,7 +894,8 @@ function WrittenSummary({
   }, [attempt, edgeKey, nodeId, role, language, user?.id]);
 
   const text = state.kind === "working" ? state.text : "";
-  const shown = useReveal(text);
+  // Fresh and cached summaries alike: the shared smooth reveal, at the same pace as Dr. Wu's answers.
+  const reveal = useSmoothReveal(text);
 
   if (edgeIds.length === 0) return null;
 
@@ -964,7 +925,7 @@ function WrittenSummary({
   }
 
   const working = state.kind === "working";
-  const done = working && state.final !== null && shown >= text.length;
+  const done = working && state.final !== null && reveal.done;
   const busy = working && !done;
   let progress = "Starting";
   if (working && state.steps.length > 0) progress = text ? "Sources checked" : state.steps[state.steps.length - 1];
@@ -1023,10 +984,11 @@ function WrittenSummary({
           <div className="min-h-[5.75rem]">
             {text ? (
               <p className="text-sm leading-relaxed text-pretty" lang={language} aria-live="off" data-testid="atlas-summary-text">
-                <CitedSummary text={text.slice(0, shown)} edgeIds={edgeIds} streaming={busy} onShowChain={onShowChain} />
-                {busy && (
-                  <span aria-hidden className="ml-0.5 inline-block h-3.5 w-1.5 animate-pulse rounded-sm bg-primary align-middle motion-reduce:animate-none" />
-                )}
+                {/* While words fade in, screen readers get the whole text once; the fading words are hidden from them. */}
+                {reveal.active && <span className="sr-only">{text.replace(CITATION, "")}</span>}
+                <span aria-hidden={reveal.active || undefined} data-smooth-visible={reveal.active ? "" : undefined}>
+                  <CitedSummary text={text.slice(0, reveal.shown)} edgeIds={edgeIds} streaming={busy} animate={reveal.active} onShowChain={onShowChain} />
+                </span>
               </p>
             ) : (
               <div className="space-y-2 pt-1" aria-hidden data-testid="atlas-summary-placeholder">
