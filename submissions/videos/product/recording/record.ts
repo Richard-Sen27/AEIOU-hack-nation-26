@@ -5,11 +5,13 @@
 
 import { SESSION_COOKIE } from "./lib/config.ts";
 import { recordTake, type SceneTake } from "./lib/scene.ts";
+import { arrive } from "./scenes/01-arrive.ts";
 import { graph } from "./scenes/02-graph.ts";
+import { relative } from "./scenes/03-relative.ts";
 import { gap } from "./scenes/04-gap.ts";
 import { close } from "./scenes/06-close.ts";
 
-const TAKES: readonly SceneTake[] = [graph, gap, close];
+const TAKES: readonly SceneTake[] = [arrive, graph, relative, gap, close];
 
 const requested = process.argv.slice(2);
 const unknown = requested.filter((id) => !TAKES.some((t) => t.id === id));

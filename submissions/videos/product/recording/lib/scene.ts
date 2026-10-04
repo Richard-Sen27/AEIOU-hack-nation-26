@@ -15,7 +15,10 @@ export type TakeContext = {
 };
 
 export type SceneTake = {
-  readonly id: SceneId;
+  // A scene id from src/content.ts, or a take of its own (then `recording` is required).
+  readonly id: SceneId | (string & {});
+  // Path inside public/; defaults to the scene's recording in src/content.ts.
+  readonly recording?: string;
   // The scene's slot in src/ProductVideo.tsx; the clip is never shorter.
   readonly frames: number;
   readonly signedIn: boolean;
@@ -27,8 +30,11 @@ export type SceneTake = {
 };
 
 export async function recordTake(take: SceneTake): Promise<string> {
-  const scene = SCENES[take.id];
-  const outFile = path.join(PROJECT_DIR, "public", scene.recording);
+  const recording =
+    take.recording ??
+    (SCENES as Record<string, { recording: string }>)[take.id]?.recording;
+  if (!recording) throw new Error(`${take.id}: no recording path.`);
+  const outFile = path.join(PROJECT_DIR, "public", recording);
   const { browser, page } = await openSession({ signedIn: take.signedIn });
   try {
     const rec = new Recorder(page, take.id);
