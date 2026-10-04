@@ -76,6 +76,8 @@ export function AtlasView() {
   const [view, setView] = useState<ViewMode>("graph");
   const [hiddenFamilies, setHiddenFamilies] = useState<Set<EdgeFamily>>(new Set());
   const [selected, setSelected] = useState<string | null>(focusParam);
+  /** The last id selected inside the view (search, panel, map, Dr. Wu), as opposed to a `?focus=` link. */
+  const [pickedId, setPickedId] = useState<string | null>(null);
   /** Chain drawn from the panel (a summary item's `via`). */
   const [panelChain, setPanelChain] = useState<string[]>([]);
   /** Dr. Wu's finds and the question handed over from search: React state only, never the URL. */
@@ -115,11 +117,16 @@ export function AtlasView() {
         setLoad({ kind: "ready", index });
         announce(`Atlas loaded: ${index.entityCount} items and ${index.connectionCount} connections.`);
         // Dr. Wu's finds handed over from /chat in memory (never the URL): treat them as the dock's finds.
+        // Ids that are not in the tree exist but are not on the map: listed, not ringed.
         const handed = takeAtlasHandoff();
-        const nodeIds = handed?.nodeIds.filter((id, i, all) => all.indexOf(id) === i && index.nodes.get(id)?.kind === "entity") ?? [];
+        const allIds =
+          handed?.nodeIds.filter((id, i, all) => all.indexOf(id) === i && (index.nodes.get(id)?.kind ?? "entity") === "entity") ?? [];
+        const nodeIds = allIds.filter((id) => index.nodes.has(id));
+        if (handed && allIds.length > 0) {
+          setFound({ nodeIds, edgeIds: handed.edgeIds.filter((id) => index.edges.has(id)), allIds });
+          announce(foundMessage(allIds.length, nodeIds.length));
+        }
         if (handed && nodeIds.length > 0) {
-          setFound({ nodeIds, edgeIds: handed.edgeIds.filter((id) => index.edges.has(id)) });
-          announce(`Dr. Wu found ${nodeIds.length} item${nodeIds.length === 1 ? "" : "s"} on the map.`);
           // Frame them once the (lazily loaded) canvas is up. Nothing is selected, so no panel
           // link carries a found id until the user picks one.
           let tries = 0;
@@ -158,9 +165,21 @@ export function AtlasView() {
   const [prevFocus, setPrevFocus] = useState(focusParam);
   if (focusParam !== prevFocus) {
     setPrevFocus(focusParam);
-    if (focusParam) setSelected(focusParam);
+    if (focusParam) {
+      setSelected(focusParam);
+      // A link (back/forward, another page), not the URL the view wrote for its own pick.
+      if (focusParam !== pickedId) setPickedId(null);
+    }
   }
-  const missingFocus = index && selected && !index.nodes.has(selected) ? selected : null;
+  /**
+   * A selected id that is not in the tree: either a node that exists but is not on the map (its
+   * summary opens in the panel) or an id that does not exist at all (the summary says 404).
+   */
+  const [missingIds, setMissingIds] = useState<ReadonlySet<string>>(() => new Set());
+  const offMap = index && selected && !index.nodes.has(selected) ? selected : null;
+  const missingFocus = offMap && missingIds.has(offMap) ? offMap : null;
+  // The reworded notice is for `?focus=` links only, not for a pick from search or Dr. Wu.
+  const offMapNotice = offMap && !missingFocus && offMap === focusParam && offMap !== pickedId ? offMap : null;
   const mounted = useRef(false);
   useEffect(() => {
     // The canvas frames the initial focus/path itself; this handles later URL changes.
@@ -179,6 +198,7 @@ export function AtlasView() {
   const select: AtlasSelect = useCallback(
     (id, { center = false, persist = true } = {}) => {
       setSelected(id);
+      setPickedId(id);
       setSheetExpanded(false);
       if (!id) setPanelChain([]);
       editUrl((p) => {
@@ -198,7 +218,8 @@ export function AtlasView() {
                 : `group of ${n.entity_count} items`;
           announce(`Selected ${n.label}, ${what}.`);
         }
-        if (center) canvas.current?.focusNode(id);
+        // A node that is not on the map has nothing to frame: the camera stays where it is.
+        if (center && n) canvas.current?.focusNode(id);
       } else if (!id) {
         announce("Selection cleared.");
       }
@@ -238,10 +259,9 @@ export function AtlasView() {
   const onFound = useCallback(
     (next: WuFound) => {
       setFound(next);
-      if (next.nodeIds.length > 0) {
-        announce(`Dr. Wu found ${next.nodeIds.length} item${next.nodeIds.length === 1 ? "" : "s"} on the map.`);
-        requestAnimationFrame(() => canvas.current?.frameNodes(next.nodeIds));
-      }
+      const total = next.allIds?.length ?? next.nodeIds.length;
+      if (total > 0) announce(foundMessage(total, next.nodeIds.length));
+      if (next.nodeIds.length > 0) requestAnimationFrame(() => canvas.current?.frameNodes(next.nodeIds));
     },
     [],
   );
@@ -381,7 +401,7 @@ export function AtlasView() {
   } else {
     const idx = load.index;
     const showGraph = view === "graph" && !canvasFailed;
-    const panelOpen = !!selected && idx.nodes.has(selected);
+    const panelOpen = !!selected && (idx.nodes.has(selected) || !missingIds.has(selected));
     const panel = (className: string) => (
       <AtlasPanel
         index={idx}
@@ -389,6 +409,7 @@ export function AtlasView() {
         onSelect={(id) => select(id, { center: true })}
         onShowChain={setPanelChain}
         onClose={() => select(null)}
+        onMissing={(id) => setMissingIds((s) => new Set(s).add(id))}
         className={className}
       />
     );
@@ -526,11 +547,22 @@ export function AtlasView() {
               </Button>
             </div>
           )}
+          {offMapNotice && (
+            <div
+              className="pointer-events-auto w-[min(28rem,100%)] rounded-lg border bg-card px-3 py-2 text-sm shadow-md"
+              role="status"
+              data-testid="atlas-missing-focus"
+              data-reason="off-map"
+            >
+              <span className="font-mono text-xs">{offMapNotice}</span> isn&apos;t on the map yet. Its summary is open.
+            </div>
+          )}
           {missingFocus && (
             <div
               className="pointer-events-auto w-[min(28rem,100%)] rounded-lg border bg-card px-3 py-2 text-sm shadow-md"
               role="status"
               data-testid="atlas-missing-focus"
+              data-reason="unknown"
             >
               <span className="font-mono text-xs">{missingFocus}</span> is not on the map.{" "}
               <Link className="underline underline-offset-2" href={`/node/${encodeURIComponent(missingFocus)}`}>
@@ -580,6 +612,12 @@ export function AtlasView() {
       )}
     </div>
   );
+}
+
+/** "Dr. Wu found 3 items, 2 on the map." */
+function foundMessage(total: number, onMap: number): string {
+  const items = `${total} item${total === 1 ? "" : "s"}`;
+  return onMap === total ? `Dr. Wu found ${items} on the map.` : `Dr. Wu found ${items}, ${onMap} on the map.`;
 }
 
 function StateMessage({

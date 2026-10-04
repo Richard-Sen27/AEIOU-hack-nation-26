@@ -14,6 +14,7 @@ import { isEntityQuery, searchEntities, SEARCH_MAX_CHARS } from "@/lib/search";
 import { cn } from "@/lib/utils";
 
 import { categoryLabel, CATEGORY_META } from "./atlas-categories";
+import { OffMapMark, OFF_MAP_LABEL } from "./atlas-offmap";
 import type { AtlasSearchProps } from "./atlas-props";
 import { ancestorsOf, searchTree, type AtlasTreeNode, type TreeIndex } from "./tree-model";
 
@@ -31,6 +32,8 @@ type Server =
 
 type Option =
   | { key: string; kind: "node"; node: AtlasTreeNode; synonym?: string }
+  /** A server hit that exists in the atlas but is not on the map (no tree node, no breadcrumb). */
+  | { key: string; kind: "offmap"; hit: SearchHit; synonym?: string }
   | { key: string; kind: "ask" };
 
 /** Types people most often look for come first among equally good matches. */
@@ -92,8 +95,10 @@ function NodeIcon({ node }: { node: AtlasTreeNode }) {
  * "Search the map": a combobox centred at the top of the canvas. Matches
  * every tree node locally (groups and categories included) and merges in
  * synonym matches from `GET /search`, but only for short, name-like queries
- * (`isEntityQuery`). Anything that reads like a description is never sent
- * anywhere; it can be handed to Dr. Wu in memory instead.
+ * (`isEntityQuery`). Server hits that are not on the map are listed too,
+ * marked "Not on the map yet"; picking one opens its summary. Anything that
+ * reads like a description is never sent anywhere; it can be handed to
+ * Dr. Wu in memory instead.
  */
 export function AtlasSearch({ index, onPick, onAskWu, className }: AtlasSearchProps) {
   const { labelStyle } = useLens();
@@ -142,12 +147,12 @@ export function AtlasSearch({ index, onPick, onAskWu, className }: AtlasSearchPr
       let added = 0;
       for (const hit of server.hits) {
         if (added >= SERVER_LIMIT) break;
+        if (seen.has(hit.id)) continue;
         const node = index.nodes.get(hit.id);
-        if (!node || seen.has(hit.id)) continue;
         seen.add(hit.id);
         added += 1;
         const synonym = hit.matched_synonym && hit.matched_synonym !== hit.label ? hit.matched_synonym : undefined;
-        out.push({ key: hit.id, kind: "node", node, synonym });
+        out.push(node ? { key: hit.id, kind: "node", node, synonym } : { key: hit.id, kind: "offmap", hit, synonym });
       }
     }
     // Free text (or a name the map does not have) can go to Dr. Wu, in memory only.
@@ -159,7 +164,7 @@ export function AtlasSearch({ index, onPick, onAskWu, className }: AtlasSearchPr
   }, [local, server, q, entityQuery, index]);
 
   const searching = entityQuery && server.kind === "loading";
-  const nodeCount = options.filter((o) => o.kind === "node").length;
+  const nodeCount = options.filter((o) => o.kind !== "ask").length;
 
   // Reset the highlighted option when the query changes; server results
   // arriving later only append, so they keep the highlight in place.
@@ -175,7 +180,7 @@ export function AtlasSearch({ index, onPick, onAskWu, className }: AtlasSearchPr
     const t = setTimeout(() => {
       announce(
         nodeCount > 0
-          ? `${nodeCount} ${nodeCount === 1 ? "result" : "results"} on the map`
+          ? `${nodeCount} ${nodeCount === 1 ? "result" : "results"}`
           : entityQuery || q.length < 2
             ? "Nothing on the map matches"
             : "This reads like a description. You can ask Dr. Wu instead.",
@@ -200,6 +205,9 @@ export function AtlasSearch({ index, onPick, onAskWu, className }: AtlasSearchPr
     if (opt.kind === "ask") {
       onAskWu(q);
       announce("Your question is ready for Dr. Wu.");
+    } else if (opt.kind === "offmap") {
+      onPick(opt.hit.id);
+      announce(`Showing ${opt.hit.label}. ${OFF_MAP_LABEL}.`);
     } else {
       onPick(opt.node.id);
       announce(`Showing ${nodeName(opt.node, labelStyle)} on the map`);
@@ -368,6 +376,45 @@ export function AtlasSearch({ index, onPick, onAskWu, className }: AtlasSearchPr
                     </span>
                   </span>
                   <CornerDownLeft className="mt-1 size-3.5 shrink-0 text-muted-foreground" aria-hidden />
+                </li>
+              );
+            }
+            if (opt.kind === "offmap") {
+              const { hit, synonym } = opt;
+              const meta = nodeTypeMeta(hit.type);
+              const Icon = meta.icon;
+              return (
+                <li
+                  key={opt.key}
+                  {...common}
+                  data-testid="atlas-search-option"
+                  data-node-id={hit.id}
+                  data-offmap="true"
+                  className={cn(
+                    "flex cursor-default items-center gap-3 rounded-lg px-2 py-1.5 text-sm",
+                    selected && "bg-muted text-foreground",
+                  )}
+                >
+                  <span className="flex size-7 shrink-0 items-center justify-center rounded-md border border-dashed bg-background">
+                    <Icon className="size-4" style={{ color: `var(${meta.colorVar})` }} aria-hidden />
+                  </span>
+                  <span className="min-w-0 flex-1">
+                    <span className="flex items-baseline gap-2">
+                      <span className="min-w-0 truncate">
+                        {synonym && (
+                          <>
+                            <span className="text-muted-foreground">{synonym}</span>
+                            <span aria-label=", now called " className="px-1.5 text-muted-foreground">
+                              →
+                            </span>
+                          </>
+                        )}
+                        <span className="font-medium">{hit.label}</span>
+                      </span>
+                      <span className="ml-auto shrink-0 text-[11px] text-muted-foreground">{meta.label[labelStyle]}</span>
+                    </span>
+                    <OffMapMark className="mt-0.5" />
+                  </span>
                 </li>
               );
             }

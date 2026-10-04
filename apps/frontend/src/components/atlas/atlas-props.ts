@@ -20,19 +20,24 @@ export type SelectOptions = {
 /** Select a tree node (entity or group) by id, or clear the selection with `null`. */
 export type AtlasSelect = (id: string | null, options?: SelectOptions) => void;
 
-/** What Dr. Wu found in his last final reply, filtered to ids present in the tree. */
+/** What Dr. Wu found in his last final reply. */
 export type WuFound = {
-  /** Entity ids from `graph_focus.node_ids`, `cards[].node_ids` and chips, deduplicated, in reply order. */
+  /** Entity ids on the map from `graph_focus.node_ids`, `cards[].node_ids` and chips, deduplicated, in reply order (ringed and framed). */
   nodeIds: string[];
   /** Real edge ids from `graph_focus.highlight_path`, in path order (may be empty). */
   edgeIds: string[];
+  /**
+   * Every found id in reply order, on the map or not (nodes that exist but are not in the tree,
+   * e.g. core diseases). The dock lists and counts these. Absent: the same as `nodeIds`.
+   */
+  allIds?: string[];
 };
 
 /** Search combobox centred at the top of the canvas (`data-testid="atlas-search"`). */
 export type AtlasSearchProps = {
   /** Tree index for local matches over all tree nodes (groups included) and breadcrumbs. */
   index: TreeIndex;
-  /** A local or server match was picked; the view selects it and frames it (groups: the subtree). */
+  /** A local or server match was picked; the view selects it and frames it when it is on the map (groups: the subtree). */
   onPick: (id: string) => void;
   /** Free text that is not an entity query was handed to Dr. Wu ("Ask Dr. Wu"); in memory only. */
   onAskWu: (text: string) => void;
@@ -64,13 +69,15 @@ export type AtlasPanelProps = {
   onShowChain: (edgeIds: string[]) => void;
   /** Close the panel; the view clears the selection. */
   onClose: () => void;
+  /** The selected id is not in the tree and the summary says it does not exist (404). */
+  onMissing?: (id: string) => void;
   /** Extra classes for positioning by the view. */
   className?: string;
 };
 
 /** Dr. Wu dock, a floating card bottom-left, a Sheet on mobile (`data-testid="atlas-wu-dock"`). */
 export type AtlasWuDockProps = {
-  /** Tree index, to keep only found ids that are on the map and to label them. */
+  /** Tree index, to tell found ids on the map from those that are not, and to label them. */
   index: TreeIndex;
   /** Question handed over from the search bar, or null; the dock puts it into its composer (it is not sent automatically). */
   pendingQuestion: string | null;

@@ -5,7 +5,9 @@ import {
   ArrowRight,
   Bot,
   ChevronRight,
+  ExternalLink,
   FolderTree,
+  Info,
   RefreshCw,
   Route,
   Sparkles,
@@ -13,7 +15,7 @@ import {
   X,
 } from "lucide-react";
 import Link from "next/link";
-import { Fragment, useEffect, useState } from "react";
+import { Fragment, useEffect, useMemo, useState } from "react";
 
 import { ConfidenceBadge, OriginBadge, StatusFlag, VusNotice } from "@/components/graph-ui";
 import { useGate } from "@/components/providers/gate-provider";
@@ -23,12 +25,15 @@ import { AiDisclosure } from "@/components/shell/ai-disclosure";
 import { Button, buttonVariants } from "@/components/ui/button";
 import { Skeleton } from "@/components/ui/skeleton";
 import { announce } from "@/lib/a11y";
-import { getAtlasSummary, streamSSE, type Schemas } from "@/lib/api";
+import { getAtlasSummary, getNeighborhood, streamSSE, type Schemas } from "@/lib/api";
 import type { ApiError } from "@/lib/api/errors";
 import { nodeTypeMeta, type LabelStyle } from "@/lib/graph/meta";
 import { cn } from "@/lib/utils";
 
+import { loadEdge } from "@/components/chat/graph-data";
+
 import { categoryLabel } from "./atlas-categories";
+import { idLinks, OffMapMark } from "./atlas-offmap";
 import type { AtlasPanelProps } from "./atlas-props";
 import { ancestorsOf, type AtlasTreeNode, type GroupBasis, type TreeIndex } from "./tree-model";
 
@@ -129,6 +134,7 @@ function PanelHeader({
   id,
   icon,
   colorVar,
+  ids,
   index,
   nodeId,
   onSelect,
@@ -137,6 +143,8 @@ function PanelHeader({
   kicker: string;
   title: string;
   id?: string;
+  /** Replaces the plain id line (nodes that are not on the map: linked ids). */
+  ids?: React.ReactNode;
   icon: React.ReactNode;
   colorVar?: string;
   index: TreeIndex;
@@ -157,7 +165,7 @@ function PanelHeader({
         <h2 id="atlas-panel-title" className="text-[15px] leading-snug font-semibold text-balance break-words">
           {title}
         </h2>
-        {id && <p className="font-mono text-[10.5px] break-all text-muted-foreground">{id}</p>}
+        {ids ?? (id && <p className="font-mono text-[10.5px] break-all text-muted-foreground">{id}</p>)}
         <Breadcrumb index={index} nodeId={nodeId} onSelect={onSelect} />
       </div>
       <Button variant="ghost" size="icon-sm" onClick={onClose} aria-label="Close summary">
@@ -168,7 +176,7 @@ function PanelHeader({
 }
 
 /** Summary panel for the node selected on the Atlas: entity summary, local group panel, or an invitation. */
-export function AtlasPanel({ index, nodeId, onSelect, onShowChain, onClose, className }: AtlasPanelProps) {
+export function AtlasPanel({ index, nodeId, onSelect, onShowChain, onClose, onMissing, className }: AtlasPanelProps) {
   // Nothing selected: no card (the view shows the map only).
   if (!nodeId) return null;
   const node = index.nodes.get(nodeId);
@@ -183,6 +191,7 @@ export function AtlasPanel({ index, nodeId, onSelect, onShowChain, onClose, clas
       onSelect={onSelect}
       onShowChain={onShowChain}
       onClose={onClose}
+      onMissing={onMissing}
       className={className}
     />
   );
@@ -331,6 +340,7 @@ function EntityPanel({
   onSelect,
   onShowChain,
   onClose,
+  onMissing,
   className,
 }: {
   index: TreeIndex;
@@ -338,12 +348,15 @@ function EntityPanel({
   onSelect: (id: string) => void;
   onShowChain: (edgeIds: string[]) => void;
   onClose: () => void;
+  onMissing?: (id: string) => void;
   className?: string;
 }) {
   const { labelStyle, role } = useLens();
   const [load, setLoad] = useState<Load>({ kind: "loading" });
   const [attempt, setAttempt] = useState(0);
   const treeNode = index.nodes.get(nodeId);
+  /** Exists in the atlas but is not drawn on the map (no tree node). */
+  const offMap = !treeNode;
 
   useEffect(() => {
     let alive = true;
@@ -361,7 +374,14 @@ function EntityPanel({
     };
   }, [nodeId, role, attempt]);
 
+  // An id that is neither on the map nor in the atlas: the view shows its own notice instead.
+  useEffect(() => {
+    if (offMap && load.kind === "not_found") onMissing?.(nodeId);
+  }, [offMap, load.kind, nodeId, onMissing]);
+
   const data = load.kind === "ready" ? load.data : null;
+  const details = useOffMapDetails(offMap ? data : null);
+  const sections = useMemo(() => (data ? sortByFrequency(data.sections, details) : []), [data, details]);
   const type = data?.node.type ?? treeNode?.entity_type ?? "disease";
   const meta = nodeTypeMeta(type);
   const Icon = meta.icon;
@@ -376,6 +396,7 @@ function EntityPanel({
           kicker={meta.label[labelStyle]}
           title={label}
           id={nodeId}
+          ids={offMap ? <OffMapIds node={data?.node ?? { id: nodeId }} /> : undefined}
           icon={<Icon className="size-4" aria-hidden />}
           colorVar={meta.colorVar}
           index={index}
@@ -433,6 +454,7 @@ function EntityPanel({
           <section aria-label="Overview" className="space-y-2.5 px-4 py-3">
             {data.vus_notice && <VusNotice compact />}
             {data.headline && <Headline text={data.headline} />}
+            {data.coverage === "core" && <CoverageLine count={data.focus_disease_count} disease={data.node.type === "disease"} />}
             {PEOPLE.has(data.node.type) && (
               <p className="text-[11px] text-muted-foreground">
                 Public info only ·{" "}
@@ -452,11 +474,18 @@ function EntityPanel({
             />
           </section>
 
-          {data.sections.length === 0 && (
+          {sections.length === 0 && (
             <p className="px-4 py-3 text-sm text-muted-foreground">No connections yet.</p>
           )}
-          {data.sections.map((s) => (
-            <SummarySectionView key={s.key} section={s} onSelect={onSelect} onShowChain={onShowChain} />
+          {sections.map((s) => (
+            <SummarySectionView
+              key={s.key}
+              section={s}
+              index={index}
+              details={details}
+              onSelect={onSelect}
+              onShowChain={onShowChain}
+            />
           ))}
         </div>
       )}
@@ -466,10 +495,14 @@ function EntityPanel({
 
 function SummarySectionView({
   section,
+  index,
+  details,
   onSelect,
   onShowChain,
 }: {
   section: Schemas.SummarySection;
+  index: TreeIndex;
+  details: Details;
   onSelect: (id: string) => void;
   onShowChain: (edgeIds: string[]) => void;
 }) {
@@ -486,7 +519,15 @@ function SummarySectionView({
       </h3>
       <ul className="space-y-1.5">
         {section.items.map((item) => (
-          <SummaryItemRow key={item.id} item={item} onSelect={onSelect} onShowChain={onShowChain} />
+          <SummaryItemRow
+            key={item.id}
+            item={item}
+            // Only a chain whose links are all on the map can be drawn.
+            drawable={item.via.length > 0 && item.via.every((id) => index.edges.has(id))}
+            detail={item.via.length === 1 ? details.get(item.via[0])?.text : undefined}
+            onSelect={onSelect}
+            onShowChain={onShowChain}
+          />
         ))}
       </ul>
       {(section.total > section.items.length || people) && (
@@ -506,10 +547,16 @@ function SummarySectionView({
 
 function SummaryItemRow({
   item,
+  drawable,
+  detail,
   onSelect,
   onShowChain,
 }: {
   item: SummaryItem;
+  /** Every link of the item's chain is on the map, so "Show the link" has something to draw. */
+  drawable: boolean;
+  /** One short fact about the direct link (a symptom's frequency, a gene's sources). */
+  detail?: string;
   onSelect: (id: string) => void;
   onShowChain: (edgeIds: string[]) => void;
 }) {
@@ -531,7 +578,7 @@ function SummaryItemRow({
           <span className="line-clamp-2">{item.label}</span>
           <span className="sr-only">({meta.label[labelStyle]}). Select on the map</span>
         </button>
-        {!membership && (
+        {!membership && drawable && (
           <button
             type="button"
             onClick={() => onShowChain(item.via)}
@@ -548,6 +595,11 @@ function SummaryItemRow({
         <span className="text-xs text-muted-foreground" data-testid="atlas-summary-via">
           {via}
         </span>
+        {detail && (
+          <span className="text-xs font-medium text-foreground/80" data-testid="atlas-summary-detail">
+            {detail}
+          </span>
+        )}
         {!membership && <ConfidenceBadge confidence={item.best_confidence} showScore={labelStyle === "technical"} />}
         <OriginBadge origin={item.inferred ? "inferred" : "observed"} />
         {item.under_review && <StatusFlag status="under_review" />}
@@ -559,6 +611,128 @@ function SummaryItemRow({
       )}
     </li>
   );
+}
+
+// ---------------------------------------------------------------------------
+// Nodes that are not on the map
+
+/** The node's standard ids, each linked to its public page by id (no names in URLs). */
+function OffMapIds({ node }: { node: { id: string; attrs?: Record<string, unknown> | null } }) {
+  const links = idLinks(node);
+  return (
+    <div className="mt-1 flex flex-wrap items-center gap-x-2 gap-y-1" data-testid="atlas-panel-ids">
+      <OffMapMark />
+      {links.length === 0 && <span className="font-mono text-[10.5px] break-all text-muted-foreground">{node.id}</span>}
+      {links.map((l) => (
+        <a
+          key={l.id}
+          href={l.href}
+          target="_blank"
+          rel="noopener noreferrer"
+          className="inline-flex items-center gap-0.5 font-mono text-[10.5px] text-muted-foreground underline-offset-2 hover:text-foreground hover:underline"
+          data-testid="atlas-panel-id-link"
+        >
+          {l.id}
+          <ExternalLink className="size-2.5" aria-hidden />
+          <span className="sr-only">(opens in a new tab)</span>
+        </a>
+      ))}
+    </div>
+  );
+}
+
+/** Why a core node's panel has no literature, trials or people: one fixed line. */
+function CoverageLine({ count, disease }: { count: number; disease: boolean }) {
+  return (
+    <p className="flex gap-1.5 text-xs text-muted-foreground" data-testid="atlas-coverage">
+      <Info className="mt-px size-3.5 shrink-0" aria-hidden />
+      <span>
+        Literature, trials, researchers and patient groups are collected for {count.toLocaleString("en")} focus diseases;{" "}
+        {disease ? "this one isn't one of them yet." : "this one isn't linked to them yet."}
+      </span>
+    </p>
+  );
+}
+
+/** Per direct edge id: a short fact to show (frequency label, gene sources) and a frequency to sort by. */
+type Details = ReadonlyMap<string, { text?: string; frequency?: number | null }>;
+const NO_DETAILS: Details = new Map();
+
+const SOURCE_NAMES: Record<string, string> = {
+  orphanet: "Orphanet",
+  hpo: "HPO",
+  clinvar: "ClinVar",
+  mondo: "MONDO",
+  clingen: "ClinGen",
+  omim: "OMIM",
+  pubmed: "PubMed",
+  gene2phenotype: "G2P",
+};
+
+/**
+ * The summary items carry no frequency or source, so for a node that is not
+ * on the map they come from the direct edges: symptom frequencies from its
+ * neighbourhood (one request), a gene's sources from that link's evidence
+ * (at most a few requests, cached). Public graph ids only.
+ */
+function useOffMapDetails(data: Summary | null): Details {
+  const [state, setState] = useState<{ key: string; details: Details }>({ key: "", details: NO_DETAILS });
+  const symptomEdges = useMemo(
+    () => data?.sections.find((s) => s.key === "symptoms")?.items.filter((i) => i.via.length === 1).map((i) => i.via[0]) ?? [],
+    [data],
+  );
+  const geneEdges = useMemo(
+    () => data?.sections.find((s) => s.key === "genes")?.items.filter((i) => i.via.length === 1).slice(0, 5).map((i) => i.via[0]) ?? [],
+    [data],
+  );
+  const nodeId = data?.node.id ?? "";
+  const key = `${nodeId}|${symptomEdges.join(",")}|${geneEdges.join(",")}`;
+
+  useEffect(() => {
+    if (!nodeId || (symptomEdges.length === 0 && geneEdges.length === 0)) return;
+    let alive = true;
+    const out = new Map<string, { text?: string; frequency?: number | null }>();
+    const wanted = new Set(symptomEdges);
+    const hood =
+      symptomEdges.length === 0
+        ? Promise.resolve()
+        : getNeighborhood({ path: { node_id: nodeId }, meta: { quiet: true } })
+            .then(({ data: hoodData }) => {
+              for (const e of hoodData?.edges ?? []) {
+                if (!wanted.has(e.id)) continue;
+                const f = e.features as { frequency?: unknown; frequency_label?: unknown } | null;
+                const label = typeof f?.frequency_label === "string" ? f.frequency_label : undefined;
+                const frequency = typeof f?.frequency === "number" ? f.frequency : null;
+                out.set(e.id, { text: label, frequency });
+              }
+            })
+            .catch(() => undefined);
+    const genes = Promise.all(
+      geneEdges.map(async (id) => {
+        const ev = await loadEdge(id);
+        const names = [...new Set((ev?.supporting ?? []).map((x) => SOURCE_NAMES[x.source_type] ?? x.source_type))];
+        if (names.length > 0) out.set(id, { text: names.join(" · ") });
+      }),
+    );
+    void Promise.all([hood, genes]).then(() => {
+      if (alive) setState({ key, details: out });
+    });
+    return () => {
+      alive = false;
+    };
+  }, [key, nodeId, symptomEdges, geneEdges]);
+
+  return state.key === key ? state.details : NO_DETAILS;
+}
+
+/** Symptoms with a known frequency first, most frequent first; the rest keep the summary's order. */
+function sortByFrequency(sections: Schemas.SummarySection[], details: Details): Schemas.SummarySection[] {
+  if (details.size === 0) return sections;
+  return sections.map((s) => {
+    if (s.key !== "symptoms") return s;
+    const freq = (i: SummaryItem) => (i.via.length === 1 ? (details.get(i.via[0])?.frequency ?? -1) : -1);
+    return { ...s, items: s.items.map((item, i) => ({ item, i })).sort((a, b) => freq(b.item) - freq(a.item) || a.i - b.i).map((x) => x.item) };
+  });
 }
 
 /** The headline, clamped to three lines with a toggle for the rest. */
