@@ -11,6 +11,7 @@ import { FamilyChips } from "@/components/node/family-chips";
 import { useReducedMotion } from "@/components/node/use-reduced-motion";
 import { ViewToggle, type ViewMode } from "@/components/node/view-toggle";
 import { useLens } from "@/components/providers/lens-provider";
+import { useSession } from "@/components/providers/session-provider";
 import { AtlasTour } from "@/components/tour/atlas-tour";
 import { Button, buttonVariants } from "@/components/ui/button";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
@@ -64,6 +65,8 @@ export function AtlasView() {
   const tourParam = params.get("tour") === "1";
   const pathParam = params.get("path");
   const { role, labelStyle } = useLens();
+  // A signed-in user's role (the lens default) is known only once the session has loaded.
+  const lensKnown = useSession().status !== "loading";
   const theme = useGraphTheme();
   const reducedMotion = useReducedMotion();
   const canvas = useRef<AtlasCanvasHandle>(null);
@@ -80,7 +83,9 @@ export function AtlasView() {
   const [pendingQuestion, setPendingQuestion] = useState<string | null>(null);
   const [canvasFailed, setCanvasFailed] = useState(false);
   const [tourOpen, setTourOpen] = useState(tourParam);
-  const [startCategory] = useState(() => lensStartCategory(role));
+  // Read by the canvas once, when it mounts (after the tree and the lens are known), so a
+  // later lens switch does not move the camera.
+  const startCategory = lensStartCategory(role);
   // The panel floats over the right of the canvas from lg up; framing keeps clear of it.
   // Read synchronously on the client so the panel mounts in its final place (the loading
   // state rendered during hydration does not depend on it).
@@ -324,7 +329,7 @@ export function AtlasView() {
   );
 
   let body: React.ReactNode;
-  if (load.kind === "loading" || !theme) {
+  if (load.kind === "loading" || !theme || !lensKnown) {
     body = (
       <div className="bg-atlas-grid flex min-h-0 flex-1 items-center justify-center" role="status" data-testid="atlas-loading">
         <span className="flex items-center gap-2 rounded-full border bg-card px-3 py-1.5 text-sm text-muted-foreground shadow-xs">
