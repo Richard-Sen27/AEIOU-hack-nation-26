@@ -1,6 +1,6 @@
 """LLM gateway: every OpenAI call in the backend and pipeline goes through `LLMClient`."""
 
-from backend.llm.client import TOOL_NAMESPACE, LLMClient
+from backend.llm.client import TOOL_NAMESPACE, CallObserver, LLMClient, observe_calls
 from backend.llm.types import (
     LLMError,
     ModelInfo,
@@ -15,6 +15,7 @@ from backend.llm.types import (
 
 __all__ = [
     "TOOL_NAMESPACE",
+    "CallObserver",
     "LLMClient",
     "LLMError",
     "ModelInfo",
@@ -25,4 +26,5 @@ __all__ = [
     "ToolEvent",
     "ToolRunResult",
     "Usage",
+    "observe_calls",
 ]

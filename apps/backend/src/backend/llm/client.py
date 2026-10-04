@@ -5,12 +5,14 @@ plan usage). No prompts, outputs or tokens are ever logged or traced here.
 """
 
 import asyncio
+import contextlib
 import hashlib
 import inspect
 import json
 import logging
 import time
-from collections.abc import AsyncIterator
+from collections.abc import AsyncIterator, Callable, Iterator
+from contextvars import ContextVar
 from dataclasses import dataclass, field
 from typing import Any, Literal
 
@@ -76,6 +78,31 @@ class _Capabilities:
 
 _capabilities: dict[str, _Capabilities] = {}
 _models_cache: dict[tuple[str, str], tuple[float, list[ModelInfo]]] = {}
+
+# (step, model, duration_ms, error code or None): told about every model call, nothing else.
+CallObserver = Callable[[str, str, float, str | None], None]
+_call_observer: ContextVar[CallObserver | None] = ContextVar("llm_call_observer", default=None)
+
+
+@contextlib.contextmanager
+def observe_calls(observer: CallObserver) -> Iterator[None]:
+    """Report the step name, model, duration and error code of each model call made in this
+    context (the current task and tasks it starts). No prompts, outputs or tokens."""
+    token = _call_observer.set(observer)
+    try:
+        yield
+    finally:
+        _call_observer.reset(token)
+
+
+def _notify_call(step: str, model: Any, started: float, error: str | None) -> None:
+    observer = _call_observer.get()
+    if observer is None:
+        return
+    try:
+        observer(step, str(model or ""), (time.monotonic() - started) * 1000, error)
+    except Exception:  # noqa: BLE001 - observing must never break a model call
+        log.warning("LLM call observer failed")
 
 
 class _BadRequest(LLMError):
@@ -305,8 +332,29 @@ class LLMClient:
                 raise LLMError("upstream", "connection failed") from None
         raise LLMError("reauth_required")
 
-    async def _events(self, params: dict[str, Any]) -> AsyncIterator[tuple[str, Any]]:
+    async def _events(
+        self, params: dict[str, Any], step: str = "call"
+    ) -> AsyncIterator[tuple[str, Any]]:
         """Yields ("delta", str) for text deltas and finally ("done", _Result)."""
+        started = time.monotonic()
+        error: str | None = None
+        try:
+            async with contextlib.aclosing(self._stream_events(params)) as events:
+                async for event in events:
+                    yield event
+        except LLMError as exc:
+            error = exc.code
+            raise
+        except asyncio.CancelledError:
+            error = "cancelled"
+            raise
+        except Exception as exc:
+            error = type(exc).__name__
+            raise
+        finally:
+            _notify_call(step, params.get("model"), started, error)
+
+    async def _stream_events(self, params: dict[str, Any]) -> AsyncIterator[tuple[str, Any]]:
         model = params.get("model")
         started = time.monotonic()
         with self.tracer.generation("llm.responses", model=model) as gen:
@@ -355,9 +403,9 @@ class LLMClient:
             )
             yield "done", result
 
-    async def _collect(self, params: dict[str, Any], on_delta=None) -> _Result:
+    async def _collect(self, params: dict[str, Any], on_delta=None, step: str = "call") -> _Result:
         result = _Result()
-        async for kind, value in self._events(params):
+        async for kind, value in self._events(params, step):
             if kind == "delta" and on_delta is not None:
                 await on_delta(value)
             elif kind == "done":
@@ -371,7 +419,7 @@ class LLMClient:
     ) -> AsyncIterator[str]:
         model = await self.resolve_model(kind)
         params = {"model": model, "instructions": instructions, "input": _as_items(input)}
-        async for event, value in self._events(params):
+        async for event, value in self._events(params, "stream_text"):
             if event == "delta":
                 yield value
 
@@ -380,7 +428,7 @@ class LLMClient:
     ) -> str:
         model = await self.resolve_model(kind)
         params = {"model": model, "instructions": instructions, "input": _as_items(input)}
-        return (await self._collect(params)).text
+        return (await self._collect(params, step="complete_text")).text
 
     # ---- structured -----------------------------------------------------------------------
 
@@ -413,7 +461,7 @@ class LLMClient:
             else:
                 params["instructions"] = instructions + json_only_instructions(json_schema)
             try:
-                result = await self._collect(params)
+                result = await self._collect(params, step=f"structured:{schema_name(schema)}")
             except _BadRequest as exc:
                 if use_format and exc.mentions("text", "format", "schema", "json"):
                     if exc.unsupported:
@@ -664,7 +712,7 @@ class _ToolRun:
                 else:
                     instr += json_only_instructions(self.final_json)
             params["instructions"] = instr
-            result = await self.llm._collect(params, on_delta=on_delta)
+            result = await self.llm._collect(params, on_delta=on_delta, step="tool_round")
             self.rounds += 1
             self.usage.add(result.usage)
             calls = [i for i in result.items if i.get("type") == "function_call"]
@@ -720,7 +768,7 @@ class _ToolRun:
         call_no = 0
         while True:
             result = await self.llm._collect(
-                {"model": self.model, "instructions": instr, "input": items}
+                {"model": self.model, "instructions": instr, "input": items}, step="tool_round"
             )
             self.rounds += 1
             self.usage.add(result.usage)
