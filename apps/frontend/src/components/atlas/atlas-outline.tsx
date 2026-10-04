@@ -107,9 +107,11 @@ export function AtlasOutline({ index, selectedId, onSelect, className }: AtlasOu
     }
     const path = new Set<string>();
     for (const id of matches) {
-      for (const a of ancestorsOf(index, id)) {
-        if (path.has(a.id)) break;
-        path.add(a.id);
+      // Walk up from the parent; stop where an earlier match already added the rest.
+      let parent = index.nodes.get(id)?.parent_id;
+      while (parent != null && !path.has(parent)) {
+        path.add(parent);
+        parent = index.nodes.get(parent)?.parent_id;
       }
     }
     return { matches, path, total };
