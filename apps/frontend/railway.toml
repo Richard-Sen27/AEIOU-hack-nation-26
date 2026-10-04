@@ -1,0 +1,14 @@
+# Railway config for the frontend service (docs/deploy-railway.md). Service settings: root
+# directory /apps/frontend, config file /apps/frontend/railway.toml. Build-time variables
+# (Dockerfile ARGs): NEXT_PUBLIC_API_URL, API_PROXY_TARGET, NEXT_PUBLIC_PRIVACY_EMAIL; PORT=3100.
+
+[build]
+builder = "DOCKERFILE"
+dockerfilePath = "Dockerfile"
+watchPatterns = ["/apps/frontend/**"]
+
+[deploy]
+healthcheckPath = "/"
+healthcheckTimeout = 120
+restartPolicyType = "ON_FAILURE"
+restartPolicyMaxRetries = 3

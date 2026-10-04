@@ -1,0 +1,19 @@
+# Railway config for the API service (docs/deploy-railway.md). Service settings: root directory
+# /apps/backend, config file /apps/backend/railway.toml (the config path does not follow the root
+# directory). Variables: see docs/deploy-railway.md; PORT=8000.
+
+[build]
+builder = "DOCKERFILE"
+dockerfilePath = "Dockerfile"
+watchPatterns = ["/apps/backend/**"]
+
+[deploy]
+# Schema first, as atlas_owner (MIGRATION_DATABASE_URL); a failure keeps the old deployment.
+preDeployCommand = ["alembic upgrade head"]
+# "::" also accepts IPv4 and serves Railway's private network (IPv6) for the frontend's proxy.
+startCommand = "uvicorn backend.main:app --host :: --port 8000 --no-access-log"
+# /health answers only after the graph is loaded into memory at start-up.
+healthcheckPath = "/health"
+healthcheckTimeout = 300
+restartPolicyType = "ON_FAILURE"
+restartPolicyMaxRetries = 3
