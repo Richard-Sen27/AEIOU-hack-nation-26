@@ -273,7 +273,8 @@ export function AtlasOutline({ index, selectedId, onSelect, className }: AtlasOu
     }
   };
 
-  const total = index.nodes.size - 1;
+  // Items are the entities, as in the Atlas header; the categories and groups are not counted.
+  const total = index.entityCount;
 
   return (
     <div data-testid="atlas-outline" className={cn("flex h-full min-h-0 flex-col", className)}>
