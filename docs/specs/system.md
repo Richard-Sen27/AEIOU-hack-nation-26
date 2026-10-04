@@ -97,7 +97,7 @@ Every node is visible to every user, and you can follow any connection from anyw
 - **Clinical:** reference network (e.g. European Reference Networks) → hospital / center of expertise → department or team → doctor → clinical studies
 - **Community:** umbrella organization (EURORDIS, NORD) → patient organization → registry / natural history study
 
-**The Atlas enters the graph through a tree.** The Amber logo sits in the middle as a hub, with one tree per category around it, clockwise from the top: researchers, hospitals & universities, literature, community, pathways, genes, diseases, symptoms, doctors. Every node is always visible and appears exactly once; the trees are never collapsed. Only tree lines are drawn by default. Clicking a node draws its real connections and opens its summary. The tree is navigation only: it gives every node a place to be found and does not change how nodes are connected. The chains above are followed along the real connections and through the summary panel, not along the tree.
+**The Atlas enters the graph through a tree.** The Amber logo sits in the middle as a hub, with one tree per category around it, clockwise from the top: researchers, hospitals & universities, literature, community, pathways, genes, diseases, symptoms, doctors. Every node on the map is always visible and appears exactly once; the trees are never collapsed. The map holds the focus tier only (see Stage 0): diseases, genes, symptoms and pathways of the core tier are not drawn and are found through search and Dr. Wu. This is a temporary exception to "every node once". Only tree lines are drawn by default. Clicking a node draws its real connections and opens its summary. The tree is navigation only: it gives every node a place to be found and does not change how nodes are connected. The chains above are followed along the real connections and through the summary panel, not along the tree.
 
 **The role decides where you start and how things are explained, never what you can see:**
 
@@ -111,16 +111,16 @@ In the Atlas, patients and researchers start framed on the Diseases tree, doctor
 ### Atlas view
 
 - **Map:** the hub and the nine trees, with positions from the API (see Graph service). Hovering a node shows its label and its line back to the hub, never its connections. Clicking an entity draws its real connections (dashed when inferred, flagged when under review) and dims the rest; clicking a group highlights its branch; clicking the logo resets the view. Filters choose which connection families are drawn on click and hold the key.
-- **Search bar** over the map ("Search the map", `/` focuses it): matches every tree node, groups included, with the branch it sits in. Text that looks like a name also runs the synonym search (`GET /search`); free text is never sent there and never put into a URL. It is offered to Dr. Wu instead.
+- **Search bar** over the map ("Search the map", `/` focuses it): matches every tree node, groups included, with the branch it sits in. Text that looks like a name also runs the synonym search (`GET /search`); free text is never sent there and never put into a URL. It is offered to Dr. Wu instead. Search hits that are not on the map are marked "Not on the map yet"; picking one opens its summary panel without moving the map.
 - **List:** an outline of the same trees as an ARIA tree (arrow keys, Home/End, Enter, typeahead, a filter box). It is the accessible alternative to the canvas, and here branches can be opened and closed.
-- **Summary panel** on the right (a bottom sheet on mobile): for an entity, its place in the tree, a headline and its connections grouped by type (researchers, doctors, papers, trials, hospitals and universities, patient groups, genes, symptoms, similar conditions, …), each with the chain it is reached by, data vs. hypothesis and review flags. Picking an item selects it on the map and draws that chain. **Write a summary** streams a written summary of these connections from `POST /explain` (cached ones for anyone, new ones signed in). For a group, the panel explains how it was formed and lists its children.
-- **Dr. Wu dock** in the bottom-left corner: guests see the sign-in offer; signed-in users chat with Dr. Wu under the same `health_data` consent as the chat page. The nodes his reply points to are highlighted and framed on the map and listed as "Dr. Wu found N". What the user typed and the found node IDs stay in memory only: never in the URL, never in browser storage.
+- **Summary panel** on the right (a bottom sheet on mobile): for an entity, its place in the tree, a headline and its connections grouped by type (researchers, doctors, papers, trials, hospitals and universities, patient groups, genes, symptoms, similar conditions, …), each with the chain it is reached by, data vs. hypothesis and review flags. Picking an item selects it on the map and draws that chain. **Write a summary** streams a written summary of these connections from `POST /explain` (cached ones for anyone, new ones signed in). For a group, the panel explains how it was formed and lists its children. For a core-tier node the panel says that literature, trials, researchers and patient groups are collected only for the focus diseases (`coverage` and `focus_disease_count` from the summary). A computed item shows its confidence and its one-line explanation, labelled a hypothesis.
+- **Dr. Wu dock** in the bottom-left corner: guests see the sign-in offer; signed-in users chat with Dr. Wu under the same `health_data` consent as the chat page. The nodes his reply points to are highlighted and framed on the map and listed as "Dr. Wu found N"; finds that are not on the map are listed too and open the panel. What the user typed and the found node IDs stay in memory only: never in the URL, never in browser storage.
 
 **How the trees are grouped.** Every level below a category comes from stored data; a node that lacks what a level needs goes into a "… not recorded" group, nothing is dropped, and a group with more than 30 entries is split into alphabetical ranges. Three groupings are choices rather than facts, and the group panel says so:
 
-- **Diseases** are grouped by the computed mechanism clusters (Stage 5), which are inferred.
+- **Diseases** are grouped by the computed clusters (Stage 5), which are inferred. The clusters hang under HPO groups from each cluster's `lineage` (organ system down to the group above the cluster); a group is kept at the top or where it branches, single-child chains are left out, and clusters without a lineage sit directly under the category.
 - **Hospitals & universities** are one tree, split by keywords in the institution's name into hospitals and clinics (checked first, so "University Hospital …" counts as clinical), universities and research institutes, and other organisations, then by country. The data has no hospital or university type.
-- **Symptoms** follow the HPO classification (organ system, then the HPO hierarchy with one parent per term) when phenotype nodes carry `attrs.hpo_lineage`. Without it they fall back to one "Classification not loaded" group in alphabetical ranges; the pipeline does not write `hpo_lineage` yet.
+- **Symptoms** follow the HPO classification (organ system, then the HPO hierarchy with one parent per term) when phenotype nodes carry `attrs.hpo_lineage`. The pipeline writes `hpo_lineage` on every phenotype node; without it the trunk falls back to one "Classification not loaded" group in alphabetical ranges.
 
 ### Handling uncertainty
 
@@ -138,7 +138,7 @@ If a variant is a VUS (variant of uncertain significance), show that clearly: *"
 
 ## Backend
 
-The backend has two halves: an offline pipeline that builds a sourced knowledge graph for one disease cluster, and a FastAPI service that serves that graph, explains it per user role, and handles chat, document uploads and sign-in.
+The backend has two halves: an offline pipeline that builds a sourced knowledge graph (every qualifying rare disease with its genes and symptoms, plus literature, people and communities for a focus set), and a FastAPI service that serves that graph, explains it per user role, and handles chat, document uploads and sign-in.
 
 ### Architecture
 
@@ -172,39 +172,49 @@ Live service · per request                                                     
 
 ## Ingestion pipeline
 
-Eight stages, each a `make` target and a Typer command, idempotent and cached, so the README's "reproduce the dataset" is one command.
+Ten steps, each a `make` target and a Typer command (`atlas-pipeline <stage>`), idempotent and cached, so the README's "reproduce the dataset" is one command. `atlas-pipeline all` runs them in this order: fetch (bulk) → scope → fetch (scoped) → normalize (with linking) → extract → build → analytics → validate → load → snapshot → explain. Between steps the data lives in Parquet files under `apps/pipeline/data`; only `load` writes to Postgres.
 
 ### Stage 0: Scope
 
-`seeds.yaml` lists the seed diseases and genes of the chosen cluster plus expansion rules, for example "include diseases within 2 hops via shared gene, shared pathway, or HPO similarity above a threshold." Scaling up later means editing this file only.
+`seeds.yaml` sets `scope.mode`. In `qualify` mode (the one in use) the scope has two tiers:
+
+- **Core:** every rare disease the open sources describe with a gene and a symptom. Inputs: Orphanet product6 associations whose type starts with "Disease-causing germline" and whose status is Assessed, HPO `genes_to_phenotype` and `phenotype.hpoa`, approved HGNC genes. Diseases map to MONDO through MONDO's exact matches and Orphanet product1; the MONDO term must be live and have at least one approved gene and one phenotype. Excluded: labels with "susceptibility" or "protection against", terms with more than 30 MONDO descendants, OMIM-only entries labelled cancer or carcinoma, and anything not rare (rare = in MONDO's rare subset, or with an ORPHA or OMIM key). OMIM's own files are never read for the scope.
+- **Focus:** the seed expansion (seed genes and diseases plus the expansion rules: up to 2 hops via shared gene, shared pathway or HPO similarity, with caps) plus the diseases listed under `focus_diseases`. Only focus entries get literature, trials, grants, people, patient organisations, variant nodes and GO pathways. Adding a focus disease means adding its name and rerunning the scoped fetch; nothing is fetched on click.
+
+`attrs.tier` (`focus` or `core`) is set on disease, gene, phenotype and pathway nodes; a pathway is focus when a focus gene takes part in it. Nodes of every other type exist only for the focus set. The `expand` mode (the seed expansion alone) is still available.
 
 ### Stage 1: Fetch
 
-Every connector implements `fetch()` and writes to `data/raw/<source>/` with a metadata record: URL, retrieval timestamp, SHA-256, source version. All HTTP goes through `httpx` with the `hishel` cache and an `aiolimiter` rate limit; `tenacity` retries transient failures.
+Every connector implements `fetch()` and writes to `data/raw/<source>/` with a metadata record: URL, retrieval timestamp, SHA-256, source version. All HTTP goes through `httpx` with the `hishel` cache and an `aiolimiter` rate limit; `tenacity` retries transient failures. Bulk connectors need no scope; scoped connectors run after Stage 0 and iterate the focus entries (ClinVar also counts variants for every gene).
 
-| Connector | Pulls | Access |
-| --- | --- | --- |
-| `mondo` | `mondo.json`: disease IDs, synonyms, cross-references | Public download |
-| `hgnc` | Complete gene set: symbols, aliases, previous symbols | Public download |
-| `hpo` | `hp.json`, `phenotype.hpoa`, `genes_to_phenotype.txt` | Public download |
-| `clinvar` | `variant_summary.txt.gz`, filtered to genes in scope | Public FTP |
-| `clingen` | Dosage sensitivity and gene–disease validity CSVs | Public download |
-| `reactome` / `go` | Gene → pathway mappings | Public download |
-| `orphanet` | Open scientific files: gene associations, phenotypes, epidemiology | Public, CC BY 4.0 |
-| `pubmed` | Per gene/disease search → abstracts, authors, affiliations | E-utilities + free NCBI key |
-| `clinicaltrials` | Studies by condition: status, design, eligibility, locations, investigators | REST API v2 |
-| `reporter` | Grants by gene/disease terms: PIs, institutions, abstracts | REST API, ~1 req/s |
-| `patient_orgs` | Bright Data SERP queries → page fetch → `trafilatura` clean text | Bright Data |
-| `omim` (optional) | `genemap2`, `morbidmap` | Needs registered key |
+| Connector | Phase | Pulls | Access |
+| --- | --- | --- | --- |
+| `mondo` | bulk | `mondo.json`: disease IDs, synonyms, cross-references | Public download |
+| `hgnc` | bulk | Complete gene set: symbols, aliases, previous symbols, cytoband | Public download |
+| `hpo` | bulk | `hp.json`, `phenotype.hpoa`, `genes_to_phenotype.txt` | Public download |
+| `mane` | bulk | NCBI MANE summary: gene coordinates on GRCh38 | Public download |
+| `clingen` | bulk | Dosage sensitivity and gene–disease validity CSVs | Public download |
+| `reactome`, `go` | bulk | Gene → pathway mappings | Public download |
+| `orphanet` | bulk | product1 (disorders and cross-references), product4 (phenotypes), product6 (gene associations), product9 (prevalence) | Public, CC BY 4.0 |
+| `curated` | bulk | PubMed summaries of the PMIDs cited in `curated/*.yaml` | E-utilities |
+| `omim` (optional) | bulk | `genemap2`, only with `OMIM_API_KEY`; not used for the scope | Needs registered key |
+| `clinvar` | scoped | `variant_summary.txt.gz`, GRCh38 rows: all rows of focus genes, pathogenic / likely pathogenic rows of every gene, per-gene counts | Public FTP |
+| `pubmed` | scoped | Per gene/disease search → abstracts, authors, affiliations | E-utilities + free NCBI key |
+| `clinicaltrials` | scoped | Studies by condition: status, design, eligibility, locations, investigators | REST API v2 |
+| `reporter` | scoped | Grants by gene/disease terms: PIs, institutions, abstracts | REST API, ~1 req/s |
+| `patient_orgs` | scoped | Curated list, plus Bright Data SERP queries → page fetch → `trafilatura` clean text when configured | Bright Data |
 
 ### Stage 2: Normalize and resolve identities
 
-- Parse everything into Parquet tables with standard IDs: `MONDO:`, `HGNC:`, `HP:`, `PMID:`, `NCT`.
-- Map OMIM and Orphanet IDs to MONDO through MONDO's cross-references; map gene names and aliases to HGNC.
+- Parse everything into Parquet tables with standard IDs: `MONDO:`, `HGNC:`, `HP:`, `CLINVAR:`, `PMID:`, `NCT`.
+- The disease node id is the MONDO id. ORPHA and OMIM ids (from MONDO exact matches and Orphanet product1) are stored as `orpha_ids` and `omim_ids` and added as synonyms, so `ORPHA:337` or `OMIM:135100` finds the disease. Gene names and aliases map to HGNC.
+- Positions: genes get `chromosome`, `cytoband`, `start`, `end`, `strand` and `assembly` (GRCh38) from MANE; genes without MANE coordinates are reported, not dropped. Variants get `vcv`, `chromosome`, `start`, `stop`, `cytoband`, `assembly`, `ref`, `alt` and `position_vcf` from ClinVar.
 - Build one `synonyms` table holding every name variant for every node.
-- **LLM-assisted linking for leftovers:** generate candidates by trigram and embedding similarity, then the model picks one candidate or "none" via Structured Outputs. Accept above a threshold; log every decision.
+- **LLM-assisted linking for leftovers:** generate candidates by trigram and embedding similarity, then the model picks one candidate or "none" via Structured Outputs (a trigram match of 0.95 or more skips the model). Every decision is logged in `data/logs/linking.jsonl`; without a model the leftover stays unlinked.
 
 ### Stage 3: LLM extraction
+
+Runs on the focus set only.
 
 - **From abstracts:** entities and relations from the fixed relation enum, each with `quote` (exact supporting span), `claim_type` (patient observation, experimental, review, hypothesis), `polarity` (supports, contradicts) and `confidence`.
 - **Quote verification:** programmatically check that every `quote` occurs in the source text; reject the edge otherwise.
@@ -212,42 +222,62 @@ Every connector implements `fetch()` and writes to `data/raw/<source>/` with a m
 - **From patient org pages:** organization name, diseases served, country, registry yes/no, natural history study yes/no, contact URL, always with the source URL.
 - Use a small model for bulk extraction with async calls and a concurrency limit. The Batch API is cheaper but can take up to 24 hours, so use it only if extraction starts early.
 
+**Model steps and their limits.** The pipeline calls a model in five places: abstract extraction, patient-organisation pages, linking decisions (Stage 2), cluster labels (Stage 5) and the precomputed explanations (`explain`). They run on the plan of whoever ran `make pipeline-login`; there is no team key. Extraction and cluster labels go through one disk cache (`data/cache/llm/`, keyed by a hash of the model kind, schema, instructions and input; cached results are served without a login) and one budget: `PIPELINE_LLM_MAX_CALLS` (default 300) caps the uncached calls per run, and the run stops calling, but keeps building, when the budget or the plan's usage limit is reached. Linking calls the model directly, without this cache and budget. `PIPELINE_LLM_DISABLED=true` turns every model call off. Without a model the run still finishes: cached results only, leftovers unlinked, template cluster labels, template explanations.
+
 ### Stage 4: Build the graph
 
-Evidence for the same relation merges into one edge with many evidence rows. Each evidence item gets a tier weight: curated database 0.9, peer-reviewed primary 0.7, review 0.5, preprint 0.4, LLM-inferred 0.3, patient-reported 0.2.
+Evidence for the same relation merges into one edge with many evidence rows. Each evidence item gets a tier weight: curated database 0.9, peer-reviewed primary 0.7, review 0.5, preprint 0.4, LLM-inferred 0.3, patient-reported 0.2. A computed link (tier `computed`) counts by its own score, at most 0.79.
 
 $$
 \text{confidence} = 1 - \prod_{i \in \text{supporting}} (1 - w_i) \; - \; p \cdot n_{\text{contradicting}}
 $$
 
-The result is clamped to 0–1 and shown in the UI as High / Medium / Low, with the breakdown on click.
+with $p = 0.1$. The result is clamped to 0–1 and shown in the UI as High (≥ 0.8) / Medium (≥ 0.5) / Low, with the breakdown on click. Computed links are then capped per relation: `near_on_chromosome` 0.45, `candidate_phenotype` and `suggested_by_neighbour` 0.55, every other computed relation 0.79, so no computed link reaches High. When an edge also has observed evidence, its hypothesis features are dropped.
 
 ### Stage 5: Analytics
 
-- **Symptom similarity:** `pyhpo` best-match-average similarity between diseases. Keep the top-k above a threshold as `similar_symptoms` edges, storing the shared HPO terms and their specificity.
-- **Mechanism features per gene:** share of pathogenic ClinVar variants that are truncating vs. missense, ClinGen haploinsufficiency score, pathway memberships. These produce `shared_pathway`, `same_gene_same_mechanism` and `same_gene_different_mechanism` edges, labeled `inferred`, with their features stored.
-- **Research overlap:** shared authors or PIs across diseases produce `shared_researcher` edges.
-- **Clustering:** Leiden (`igraph` + `leidenalg`) on the combined weighted similarity graph. The model writes each cluster's label from members' shared genes and pathways, marked inferred.
-- **Layout and centrality:** precompute ForceAtlas2 positions for the ring views and the old whole-graph Atlas layout, plus centrality scores. The Atlas view no longer draws these positions: its tree layout is computed by the API (see Graph service).
+Every computed link has `origin = inferred`, evidence with tier `computed` and `claim_type = hypothesis`, and the features `explanation` (one line on why the link exists), `method`, `confidence_basis` and `score`.
+
+- **Phenotype data:** each phenotype node gets `hpo_lineage` (organ system down to its primary parent), `ic` (information content over every disease in `phenotype.hpoa`, not only the scope) and `ancestors`. The `hpo_terms` table (every HPO term under "Phenotypic abnormality", with label, synonyms, direct parents and `ic`, including terms that are not nodes) is written here for symptom matching.
+- **Symptom similarity (`similar_symptoms`):** a frequency-weighted, IC-weighted symmetric best-match average (`apps/backend/src/backend/phenotype_similarity.py`, shared with the API so Dr. Wu ranks with the same code; a missing frequency counts as 0.5). Candidates are each disease's top 25 by IC-weighted cosine; a link needs similarity ≥ 0.45 and at least 2 shared specific terms (IC ≥ 2.0); top 8 per disease. The threshold is raised if it sits below the 95th percentile of random disease pairs, which validation checks. Confidence = min(0.30 + 0.55 · similarity, 0.75).
+- **Mechanism per gene** (focus genes): the share of truncating pathogenic ClinVar variants gives inferred `acts_via` gene → mechanism links. Diseases caused by the same gene get `same_gene_same_mechanism` or `same_gene_different_mechanism`; genes with more than 25 diseases keep only pairs with a mechanism record.
+- **`shared_gene`:** two diseases linked to variants in the same gene where no `same_gene_*` link exists; genes with more than 25 diseases are skipped. Confidence = 0.85 × the weaker gene–disease confidence. Its explanation says that a shared mechanism is not established.
+- **`shared_pathway`:** genes of two diseases in the same Reactome or GO pathway (at most 60 genes; diseases with more than 8 genes and pairs that already share a gene are skipped); smaller pathways weigh more; top 5 per disease.
+- **`near_on_chromosome`** (gene ↔ gene): same chromosome, at most 1 Mb apart on MANE coordinates, the 3 nearest per gene; without coordinates, the same cytoband sub-band. Confidence 0.20, or 0.45 when at least 2 pathogenic or likely pathogenic ClinVar copy-number variants of at most 1 Mb span both genes (larger events say nothing about a specific pair). No disease ↔ disease proximity link.
+- **Research overlap:** shared authors or PIs across diseases produce `shared_researcher` links (fixed 0.40).
+- `candidate_phenotype` and `suggested_by_neighbour` (hypotheses for little-studied diseases from their well-studied neighbours) are defined, capped and validated, but not produced yet.
+- **Clustering:** Leiden (`igraph` + `leidenalg`, seed 42) on the weighted disease links (resolution 1, or 10 from 1,000 diseases), with `same_gene_different_mechanism` as a negative layer so such a pair never shares a cluster; `shared_gene` and `near_on_chromosome` are left out. Each cluster stores `members`, `top_genes`, `top_pathways`, `top_phenotypes`, `distinctive_phenotypes`, `mechanisms` and a `lineage`: the HPO groups from organ system down, which the Atlas uses for the Diseases trunk. The label is a template from the most distinctive HPO term plus the top gene; with a model the model writes it (`label_origin`). Clusters are marked inferred.
+- **Layout, centrality, embeddings:** precomputed DrL positions (refined with ForceAtlas2 up to 3,000 nodes), PageRank as `centrality`. The Atlas tree layout is computed by the API (see Graph service). Embeddings are computed locally for every node except core-tier genes and phenotypes.
 
 ### Stage 6: Validate
 
 The build fails unless all checks pass:
 
-- Every edge has at least one evidence row; no orphan nodes.
-- Quote-verification pass rate and rejection counts are reported.
-- A golden set of known facts exists (e.g. SCN1A → Dravet syndrome).
-- A known counterexample holds: SCN2A gain- and loss-of-function diseases do not share a mechanism cluster.
+- Every edge has at least one evidence row and valid endpoints; no orphan nodes; enums and relation families are valid; every disease has a cluster.
+- Every computed link has a one-line explanation, a method and a confidence basis, stays within its relation's cap, carries only `computed` / hypothesis evidence, and no proximity or candidate link reaches the 0.6 of a supported path.
+- Every phenotype has a valid `hpo_lineage`; every cluster has a lineage; every disease, gene, phenotype and pathway has `attrs.tier`; `hpo_terms` covers every phenotype node; at least 7,000 diseases with a gene and a symptom. Missing gene coordinates are reported, not failed.
+- A golden set of known facts holds at confidence ≥ 0.6 (e.g. SCN1A → Dravet syndrome, fibrodysplasia ossificans progressiva → ACVR1, primary ciliary dyskinesia 25 → chronic cough).
+- Known counterexamples hold: SCN2A and SCN1A gain- and loss-of-function diseases do not share a cluster and are linked by `same_gene_different_mechanism`.
+- The quote-verification pass rate and rejection counts are reported.
 
 ### Stage 7: Load and snapshot
 
-Load into Postgres, then export a snapshot (Parquet + manifest with source versions, hashes, counts and `data_version`). Pre-generate explanations for the demo paths in every role and language you will show.
+`load` and `snapshot` refuse to run unless validation passed for the same data version. `load` copies the tables into the `staging` schema with `psql \copy` and promotes them in one transaction: it records `graph_changes` (compared with the live tables), deletes cached explanations of other versions, replaces `nodes`, `node_synonyms`, `edges`, `evidence`, `clusters` and `hpo_terms`, and records the run in `ingestion_runs`. `snapshot` exports the same tables as Parquet plus a manifest with source versions, hashes, counts, thresholds and `data_version`. `explain` pre-generates explanations for the demo paths in every role, in English and German.
 
 ## Graph data model
 
 A fixed set of node types and relation types, shared as enums between pipeline, API and frontend.
 
-**Node types:** disease, gene, variant, mechanism, pathway, phenotype, paper, claim, researcher, doctor, institution, network, grant, trial/study, patient organization, registry, cluster. Individual patients are never nodes.
+**Node types:** disease, gene, variant, mechanism, pathway, phenotype, paper, claim, researcher, doctor, institution, network, grant, trial/study, patient organization, registry, cluster. Individual patients are never nodes. Positions on the genome are attributes, not nodes.
+
+**Node attributes** (in `attrs`, the ones the pipeline and API rely on):
+
+- All disease, gene, phenotype and pathway nodes: `tier` (`focus` or `core`, see Stage 0).
+- Disease: `orpha_ids`, `omim_ids` (also searchable as synonyms), `xrefs`, `rare`, `excluded_phenotypes` (terms a source records as absent, with their sources; used by symptom ranking, not drawn as edges), `orphanet_prevalence`.
+- Gene: `chromosome`, `cytoband`, `start`, `end`, `strand`, `assembly` (GRCh38, from MANE), ClinGen scores, `clinvar_plp`, `clinvar_vus`, `clinvar_truncating_share`.
+- Variant (focus genes only): `vcv`, HGVS, classification, review status, consequence, `chromosome`, `start`, `stop`, `cytoband`, `assembly`, `ref`, `alt`.
+- Phenotype: `hpo_lineage`, `ic`, `ancestors`.
+- Cluster: see Stage 5 (`lineage`, `distinctive_phenotypes`, `top_genes`, …).
 
 **Relation types**
 
@@ -256,12 +286,16 @@ A fixed set of node types and relation types, shared as enums between pipeline, 
 | Biology | `caused_by_variant_in` | disease → gene |
 | Biology | `acts_via` | gene → mechanism (loss of function, gain of function, dominant-negative) |
 | Biology | `participates_in` | gene → pathway |
-| Biology | `has_phenotype` | disease → phenotype, with frequency |
+| Biology | `has_phenotype` | disease → phenotype, with `frequency` (0–1, the highest source wins), `frequency_label`, `frequency_by_source` (HPO, Orphanet) and `onset` when recorded |
 | Disease–disease (DNA) | `same_gene_same_mechanism` | disease ↔ disease |
 | Disease–disease (DNA) | `same_gene_different_mechanism` | disease ↔ disease (the counterexample case, e.g. SCN2A, SCN1A) |
 | Disease–disease (DNA) | `shared_pathway` | disease ↔ disease |
 | Disease–disease (symptoms) | `similar_symptoms` | disease ↔ disease, with shared HPO terms; labeled "similar experience, possibly different cause" |
 | Disease–disease (research) | `shared_researcher` | disease ↔ disease |
+| Disease–disease (DNA) | `shared_gene` | disease ↔ disease, computed: linked to the same gene, mechanism not established |
+| Gene–gene (DNA) | `near_on_chromosome` | gene ↔ gene, computed: at most 1 Mb apart |
+| Symptoms | `candidate_phenotype` | disease → phenotype, computed hypothesis from similar diseases (defined, not produced yet) |
+| Symptoms | `suggested_by_neighbour` | disease → disease, computed hypothesis (defined, not produced yet) |
 | Research | `asserts` | paper → claim |
 | Research | `authored` | researcher → paper |
 | Research | `pi_of` | researcher → grant |
@@ -272,9 +306,11 @@ A fixed set of node types and relation types, shared as enums between pipeline, 
 | Community and clinical | `investigator_of` | doctor → trial |
 | Community and clinical | `affiliated_with` | person → institution |
 
-**Edge attributes:** `id`, `source_id`, `target_id`, `relation`, `family` (dna / symptoms / research / community), `confidence`, `origin` (observed / inferred / patient_reported / user_contributed), `status` (active / pending_review / under_review), `features` (JSON, for inferred edges), `data_version`.
+Further structural relations: `variant_of`, `observed_in`, `about` and `member_of`. Every relation from `same_gene_same_mechanism` to `suggested_by_neighbour` above, plus the inferred `acts_via` links, is computed by the pipeline (Stage 5): `origin = inferred`, a one-line `explanation`, a confidence capped below High, always drawn dashed and labelled a hypothesis, never presented as fact.
 
-**Evidence tiers:** `curated_db`, `peer_reviewed`, `review`, `preprint`, `llm_inferred`, `patient_reported`, with the weights from Stage 4.
+**Edge attributes:** `id`, `source_id`, `target_id`, `relation`, `family` (dna / symptoms / research / community), `confidence`, `origin` (observed / inferred / patient_reported / user_contributed), `status` (active / pending_review / under_review), `features` (JSON; for computed edges `explanation`, `method`, `confidence_basis`, `score`; the API exposes `explanation` on edges, path steps and summary items), `data_version`.
+
+**Evidence tiers:** `curated_db`, `peer_reviewed`, `review`, `preprint`, `llm_inferred`, `patient_reported`, `computed` (links the atlas works out itself; weight = the link's score, at most 0.79), with the weights from Stage 4.
 
 **Privacy rule for people nodes:** researchers and doctors appear only with public professional information (papers, grants, institution pages, trial listings), and every profile can be claimed or removed.
 
@@ -285,7 +321,7 @@ One database: Postgres (with pgvector) holds the pipeline's staging schema, the 
 - **Local development:** the `pgvector/pgvector:pg18` container from `deploy/compose/docker-compose.yml`.
 - **Deployed:** the Zalando-operated Postgres 18 (Spilo, pgvector available) on the ionvo Kubernetes cluster, with a dedicated database for the atlas.
 
-**Pipeline staging (psql).** Raw dumps are bulk-loaded with `psql \copy` into a separate staging schema; joins, cleaning and graph building run as SQL there, and `make load` promotes the result into the graph tables. User data never touches the staging schema.
+**Pipeline staging (psql).** The pipeline builds the graph in Parquet files; `make load` bulk-loads the final tables with `psql \copy` into a separate staging schema and promotes them into the graph tables in one transaction. User data never touches the staging schema.
 
 **Extensions:** `pgvector` (HNSW index on embeddings, for entity linking and semantic search), `pg_trgm` (GIN index on synonyms, for typo-tolerant search), `unaccent` ("Ménière" matches "Meniere").
 
@@ -293,11 +329,13 @@ One database: Postgres (with pgvector) holds the pipeline's staging schema, the 
 
 | Table | Key columns |
 | --- | --- |
-| `nodes` | `id` (`MONDO:…`, `HGNC:…`), `type`, `label`, `description`, `cluster_id`, `x`, `y`, `centrality`, `embedding` |
+| `nodes` | `id` (`MONDO:…`, `HGNC:…`), `type`, `label`, `description`, `url`, `attrs` (JSON, see Graph data model), `cluster_id`, `x`, `y`, `centrality`, `embedding` |
 | `node_synonyms` | `node_id`, `synonym`, `source` |
 | `edges` | see edge attributes in Graph data model |
 | `evidence` | `edge_id`, `tier`, `source_type`, `source_id` (PMID, NCT…), `url`, `quote`, `retrieved_at`, `polarity` |
-| `clusters` | `id`, `label`, `mechanism_summary`, `member_count` |
+| `clusters` | `id`, `label`, `mechanism_summary`, `member_count`, `attrs` (lineage, distinctive phenotypes, top genes) |
+| `hpo_terms` | `id`, `label`, `synonyms`, `parents` (direct is_a), `ic`: every HPO term under "Phenotypic abnormality", including terms that are not nodes; read into memory for symptom matching |
+| `graph_changes` | `data_version`, `previous_version`, `disease_id`, `node_id`, `node_type`, `change` (`added`, `now_recruiting`), `edge_id`: written at load time by comparing the new tables with the live ones, for diseases that already existed (new trials, patient organisations, grants and recent papers, trials that started recruiting); at most 20 per disease, the last 10 versions kept |
 | `explanations_cache` | `path_id`, `role`, `language`, `text`, `citations`, `data_version` |
 | `ingestion_runs` | `data_version`, pipeline commit, source versions, counts, `created_at` |
 
@@ -327,7 +365,7 @@ One database: Postgres (with pgvector) holds the pipeline's staging schema, the 
 - **Auth bridge exception:** sign-in must look up a user by `chatgpt_sub` before `app.user_id` is known. This one query runs through a narrow `SECURITY DEFINER` function (`auth_find_or_create_user(sub, email, name)`) instead of bypassing RLS for the whole connection.
 - `ON DELETE CASCADE` from `users`, so account deletion removes everything.
 - Access from FastAPI via `asyncpg` through SQLAlchemy 2.0 async; migrations are managed with Alembic in `apps/backend/migrations` (autogenerate from the SQLAlchemy models; extensions, roles, RLS policies and other raw SQL go in via `op.execute`).
-- At startup the API loads `nodes` and `edges` into memory; Postgres serves search, evidence lookups and all writes.
+- At startup the API loads `nodes`, `edges` and `hpo_terms` into memory; Postgres serves search, evidence lookups and all writes. A new load is picked up only when the API restarts.
 
 ## Sign-in
 
@@ -383,14 +421,17 @@ Ten services, each a module under `/api/services`; the `PatientProfile` schema i
 
 - Combines trigram matches on `node_synonyms`, vector matches on `nodes.embedding`, and a ranking boost by node type and centrality.
 - Returns typed results (disease, gene, symptom, group, mechanism) with the synonym that matched, so the UI can show "Ohtahara syndrome → STXBP1 encephalopathy."
+- Ids match directly: `MONDO:` and `HP:` ids (also without zero padding), and `ORPHA:` and `OMIM:` ids through the disease's `orpha_ids` / `omim_ids`.
+- Search covers both tiers, so it also returns nodes that are not on the Atlas map.
 
 ### Graph
 
 - Loads nodes and edges into memory at startup (NetworkX for queries, positions precomputed).
-- `neighborhood(node, role)` returns the same full neighborhood for every role; the role only adds presentation hints (starting layout, label style, which edge family is highlighted first).
+- `neighborhood(node, role)` returns the same neighborhood for every role; the role only adds presentation hints (starting layout, label style, which edge family is highlighted first). Hub nodes are capped at 300 neighbours (cluster members first, then by the best direct edge: active first, higher confidence); a cut response carries the headers `X-Neighborhood-Total` (the full count) and `X-Neighborhood-Truncated: true`, and the node page says so.
 - `clusters()` serves cluster metadata.
-- **Atlas tree** (`GET /atlas/tree.json`): built from the in-memory graph on the first request after startup and cached, with its layout, until the graph changes (shared contributions or flags are reloaded). Each category gets its own angular sector and its tree grows outward without overlaps; the layout is deterministic. The payload carries every tree node with its position, the category sectors and label positions, and all real edges, which the frontend draws only for a clicked node. Its ETag is keyed on the data version and the layout version. The old whole-graph layout (`GET /atlas.json`, pipeline positions) is still served but no longer used by the frontend.
-- **Atlas summary** (`GET /atlas/summary/{id}`): what a node is connected to, deterministic and without a model, read from the in-memory graph on every click. Direct links plus fixed chains of up to three hops per node type (for example a disease's researchers via its papers). Items are grouped into sections by type and ranked by the number of chains that reach them, then by the weakest link of the best chain; each section keeps its top 10. Each item carries the edge IDs of its best chain and a short "via …" label; membership of a computed cluster is marked as grouped by the atlas, not a direct link. The response also lists up to 20 edge IDs for "Write a summary".
+- **Atlas tree** (`GET /atlas/tree.json`, `api/services/atlas_tree.py`): one tree per category. Only focus-tier diseases, genes, phenotypes and pathways are placed (other node types are always focus), clusters only when they have a focus member, and `edges` only between placed nodes. The Diseases trunk hangs the clusters under HPO groups from the clusters' `lineage`; the Symptoms trunk follows `hpo_lineage`; genes are grouped by chromosome. Built from the in-memory graph at startup and cached, with its layout, until the graph changes (shared contributions or flags are reloaded). Each category gets its own angular sector and its tree grows outward without overlaps; the layout is deterministic. The payload carries every tree node with its position, the category sectors and label positions, and all real edges, which the frontend draws only for a clicked node. Its ETag is keyed on the data version and `LAYOUT_VERSION` (bumped on every layout change). The old whole-graph layout (`GET /atlas.json`, pipeline positions) is still served, built on first request only, and no longer used by the frontend.
+- **Atlas summary** (`GET /atlas/summary/{id}`): what a node is connected to, deterministic and without a model, read from the in-memory graph on every click. Direct links plus fixed chains of up to three hops per node type (for example a disease's researchers via its papers). Items are grouped into sections by type and ranked by the number of chains that reach them, then by the weakest link of the best chain; each section keeps its top 10. Each item carries the edge IDs of its best chain and a short "via …" label; membership of a computed cluster is marked as grouped by the atlas, not a direct link. The response also lists up to 20 edge IDs for "Write a summary". A node that is not on the map is summarised the same way, with an empty place in the tree. `coverage` is `focus` or `core`, and `focus_disease_count` gives the number of focus diseases for the panel's coverage line. An item reached by a single computed edge carries that edge's `explanation`.
+- **Stats** (`GET /stats`): headline counts of the loaded graph (diseases, genes, symptoms, cited and computed links) with the `data_version`, computed once per data version, ETag on it. Docs and pages that show counts read them here instead of fixing numbers.
 
 ### Path
 
@@ -410,7 +451,8 @@ Ten services, each a module under `/api/services`; the `PatientProfile` schema i
 
 Detailed design in [`agent.md`](agent.md).
 
-- SSE chat with tools: `extract_entities`, `resolve_to_ids`, `search_graph`, `get_neighborhood`, `find_path`, `ask_followup`.
+- SSE chat with tools: `extract_entities`, `resolve_to_ids`, `search_graph`, `get_neighborhood`, `find_path`, `match_phenotypes`, `ask_followup`.
+- `match_phenotypes(present, absent)` ranks the atlas's diseases (both tiers) by how well their recorded symptoms overlap the user's, with the same similarity code as the pipeline; symptoms-only messages run it in code before the first round. Results are an overlap ranking with cited `has_phenotype` edges, never a probability or a diagnosis (details in [`agent.md`](agent.md)).
 - Live entity extraction for chips: diseases → MONDO, genes → HGNC, variants (HGVS) → ClinVar, symptoms → HPO, with negation ("no feeding problems" = excluded), age, onset and country.
 - Maintains the `PatientProfile`; chips are confirmed, corrected or removed by the user before they count.
 - `ask_followup` asks at most one question at a time, chosen by which answer best separates the remaining candidate clusters, with quick-reply options, always skippable.
@@ -458,10 +500,11 @@ Detailed design in [`agent.md`](agent.md).
 | POST | `/auth/logout` | Signed in | Session cleared |
 | GET | `/search?q=` | Anyone | Typed matches with matched synonym |
 | GET | `/node/{id}` | Anyone | Node details + summary for the side panel |
-| GET | `/neighborhood/{id}` | Anyone | Full neighborhood with positions + role presentation hints |
+| GET | `/neighborhood/{id}` | Anyone | Neighborhood with positions + role presentation hints; at most 300 neighbours, a cut is reported in `X-Neighborhood-Total` / `X-Neighborhood-Truncated` |
 | GET | `/clusters` | Anyone | Cluster IDs, labels, sizes |
-| GET | `/atlas/tree.json` | Anyone | Atlas hub and category trees with positions, all edges, clusters (ETag) |
-| GET | `/atlas/summary/{id}?role=` | Anyone | A node's place in the tree, headline, ranked connections by section, edge IDs for a written summary |
+| GET | `/atlas/tree.json` | Anyone | Atlas hub and category trees (focus tier) with positions, the edges between them, clusters (ETag) |
+| GET | `/atlas/summary/{id}?role=` | Anyone | A node's place in the tree, headline, ranked connections by section, edge IDs for a written summary, `coverage` and `focus_disease_count` |
+| GET | `/stats` | Anyone | Counts of diseases, genes, symptoms, cited and computed links, with the data version (ETag) |
 | GET | `/path?from=&to=&family=` | Anyone | Ordered path steps, or `no_supported_route` + coverage report |
 | GET | `/edge/{id}/evidence` | Anyone | Sources, quotes, tiers, contradictions |
 | POST | `/explain` (SSE) | Anyone for cached explanations; signed in to generate new ones | Streamed role-specific explanation of a path with citation IDs; with `subject_node_id`, a summary of that node's connections |
