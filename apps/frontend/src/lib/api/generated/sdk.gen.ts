@@ -2,7 +2,7 @@
 
 import { type Client, type ClientMeta, formDataBodySerializer, type Options as Options2, type RequestResult, type ServerSentEventsResult, type TDataShape } from './client';
 import { client } from './client.gen';
-import type { AuthCallbackData, AuthLoopbackCallbackData, AuthStartData, AuthStartErrors, ChatData, ChatErrors, ChatResponse, ChatResponses, ConfirmFindingData, ConfirmFindingErrors, ConfirmFindingResponses, CreateContributionData, CreateContributionErrors, CreateContributionResponses, CreateProposalData, CreateProposalErrors, CreateProposalResponses, DeleteChatSessionData, DeleteChatSessionErrors, DeleteChatSessionResponses, DeleteContributionData, DeleteContributionErrors, DeleteContributionResponses, DeleteDocumentData, DeleteDocumentErrors, DeleteDocumentResponses, DeleteMeData, DeleteMeErrors, DeleteMeResponses, DeleteProfessionalProfileData, DeleteProfessionalProfileErrors, DeleteProfessionalProfileResponses, ExplainPathData, ExplainPathErrors, ExplainPathResponse, ExplainPathResponses, ExportGraphData, ExportGraphErrors, ExportGraphResponses, ExportMyDataData, ExportMyDataErrors, ExportMyDataResponses, FindPathData, FindPathErrors, FindPathResponses, FlagEdgeData, FlagEdgeErrors, FlagEdgeResponses, GapSearchData, GapSearchErrors, GapSearchResponse, GapSearchResponses, GetAtlasData, GetAtlasErrors, GetAtlasResponses, GetAtlasSummaryData, GetAtlasSummaryErrors, GetAtlasSummaryResponses, GetAtlasTreeData, GetAtlasTreeErrors, GetAtlasTreeResponses, GetChatSessionData, GetChatSessionErrors, GetChatSessionResponses, GetEdgeEvidenceData, GetEdgeEvidenceErrors, GetEdgeEvidenceResponses, GetNeighborhoodData, GetNeighborhoodErrors, GetNeighborhoodResponses, GetNodeData, GetNodeErrors, GetNodeResponses, GetProfessionalProfileData, GetProfessionalProfileErrors, GetProfessionalProfileResponses, GetProfileData, GetProfileErrors, GetProfileResponses, GetSessionData, GetSessionResponses, GetStatsData, GetStatsResponses, GrantConsentData, GrantConsentErrors, GrantConsentResponses, HealthData, HealthResponses, ListChatSessionsData, ListChatSessionsErrors, ListChatSessionsResponses, ListClustersData, ListClustersErrors, ListClustersResponses, ListConsentsData, ListConsentsErrors, ListConsentsResponses, ListContributionsData, ListContributionsErrors, ListContributionsResponses, ListDocumentsData, ListDocumentsErrors, ListDocumentsResponses, ListFindingsData, ListFindingsErrors, ListFindingsResponses, LogoutData, LogoutResponses, MatchAtlasEntryData, MatchAtlasEntryErrors, MatchAtlasEntryResponses, PutProfessionalProfileData, PutProfessionalProfileErrors, PutProfessionalProfileResponses, PutProfileData, PutProfileErrors, PutProfileResponses, RejectFindingData, RejectFindingErrors, RejectFindingResponses, RevokeConsentData, RevokeConsentErrors, RevokeConsentResponses, SearchData, SearchErrors, SearchResponses, StreamJobData, StreamJobErrors, StreamJobResponse, StreamJobResponses, UpdateSettingsData, UpdateSettingsErrors, UpdateSettingsResponses, UploadDocumentData, UploadDocumentErrors, UploadDocumentResponses } from './types.gen';
+import type { AuthCallbackData, AuthLoopbackCallbackData, AuthStartData, AuthStartErrors, ChatData, ChatErrors, ChatResponse, ChatResponses, ConfirmFindingData, ConfirmFindingErrors, ConfirmFindingResponses, CreateContributionData, CreateContributionErrors, CreateContributionResponses, CreateProposalData, CreateProposalErrors, CreateProposalResponses, DeleteChatSessionData, DeleteChatSessionErrors, DeleteChatSessionResponses, DeleteContributionData, DeleteContributionErrors, DeleteContributionResponses, DeleteDocumentData, DeleteDocumentErrors, DeleteDocumentResponses, DeleteMeData, DeleteMeErrors, DeleteMeResponses, DeleteProfessionalProfileData, DeleteProfessionalProfileErrors, DeleteProfessionalProfileResponses, ExplainPathData, ExplainPathErrors, ExplainPathResponse, ExplainPathResponses, ExportGraphData, ExportGraphErrors, ExportGraphResponses, ExportMyDataData, ExportMyDataErrors, ExportMyDataResponses, FindPathData, FindPathErrors, FindPathResponses, FlagEdgeData, FlagEdgeErrors, FlagEdgeResponses, FollowDiseaseData, FollowDiseaseErrors, FollowDiseaseResponses, FollowProfileDiseasesData, FollowProfileDiseasesErrors, FollowProfileDiseasesResponses, GapSearchData, GapSearchErrors, GapSearchResponse, GapSearchResponses, GetAtlasData, GetAtlasErrors, GetAtlasResponses, GetAtlasSummaryData, GetAtlasSummaryErrors, GetAtlasSummaryResponses, GetAtlasTreeData, GetAtlasTreeErrors, GetAtlasTreeResponses, GetChatSessionData, GetChatSessionErrors, GetChatSessionResponses, GetEdgeEvidenceData, GetEdgeEvidenceErrors, GetEdgeEvidenceResponses, GetNeighborhoodData, GetNeighborhoodErrors, GetNeighborhoodResponses, GetNodeData, GetNodeErrors, GetNodeResponses, GetProfessionalProfileData, GetProfessionalProfileErrors, GetProfessionalProfileResponses, GetProfileData, GetProfileErrors, GetProfileResponses, GetSessionData, GetSessionResponses, GetStatsData, GetStatsResponses, GetUnreadNotificationCountData, GetUnreadNotificationCountErrors, GetUnreadNotificationCountResponses, GrantConsentData, GrantConsentErrors, GrantConsentResponses, HealthData, HealthResponses, ListChatSessionsData, ListChatSessionsErrors, ListChatSessionsResponses, ListClustersData, ListClustersErrors, ListClustersResponses, ListConsentsData, ListConsentsErrors, ListConsentsResponses, ListContributionsData, ListContributionsErrors, ListContributionsResponses, ListDocumentsData, ListDocumentsErrors, ListDocumentsResponses, ListFindingsData, ListFindingsErrors, ListFindingsResponses, ListFollowsData, ListFollowsErrors, ListFollowsResponses, ListNotificationsData, ListNotificationsErrors, ListNotificationsResponses, LogoutData, LogoutResponses, MarkNotificationsReadData, MarkNotificationsReadErrors, MarkNotificationsReadResponses, MatchAtlasEntryData, MatchAtlasEntryErrors, MatchAtlasEntryResponses, PutProfessionalProfileData, PutProfessionalProfileErrors, PutProfessionalProfileResponses, PutProfileData, PutProfileErrors, PutProfileResponses, RejectFindingData, RejectFindingErrors, RejectFindingResponses, RevokeConsentData, RevokeConsentErrors, RevokeConsentResponses, SearchData, SearchErrors, SearchResponses, StreamJobData, StreamJobErrors, StreamJobResponse, StreamJobResponses, UnfollowDiseaseData, UnfollowDiseaseErrors, UnfollowDiseaseResponses, UpdateSettingsData, UpdateSettingsErrors, UpdateSettingsResponses, UploadDocumentData, UploadDocumentErrors, UploadDocumentResponses } from './types.gen';
 
 export type Options<TData extends TDataShape = TDataShape, ThrowOnError extends boolean = boolean, TResponse = unknown> = Options2<TData, ThrowOnError, TResponse> & {
     /**
@@ -434,6 +434,81 @@ export const flagEdge = <ThrowOnError extends boolean = false>(options: Options<
  */
 export const createProposal = <ThrowOnError extends boolean = false>(options: Options<CreateProposalData, ThrowOnError>): RequestResult<CreateProposalResponses, CreateProposalErrors, ThrowOnError> => (options.client ?? client).post<CreateProposalResponses, CreateProposalErrors, ThrowOnError>({
     url: '/proposal',
+    ...options,
+    headers: {
+        'Content-Type': 'application/json',
+        ...options.headers
+    }
+});
+
+/**
+ * Unfollow Disease
+ *
+ * Stop following a disease (idempotent) and delete its notifications.
+ */
+export const unfollowDisease = <ThrowOnError extends boolean = false>(options: Options<UnfollowDiseaseData, ThrowOnError>): RequestResult<UnfollowDiseaseResponses, UnfollowDiseaseErrors, ThrowOnError> => (options.client ?? client).delete<UnfollowDiseaseResponses, UnfollowDiseaseErrors, ThrowOnError>({
+    url: '/me/follows',
+    ...options,
+    headers: {
+        'Content-Type': 'application/json',
+        ...options.headers
+    }
+});
+
+/**
+ * List Follows
+ *
+ * The diseases the user follows, each saying whether updates can exist for it.
+ */
+export const listFollows = <ThrowOnError extends boolean = false>(options?: Options<ListFollowsData, ThrowOnError>): RequestResult<ListFollowsResponses, ListFollowsErrors, ThrowOnError> => (options?.client ?? client).get<ListFollowsResponses, ListFollowsErrors, ThrowOnError>({ url: '/me/follows', ...options });
+
+/**
+ * Follow Disease
+ *
+ * Follow a disease of the atlas (idempotent; needs the health_data consent). 404 unless the
+ * ID is a disease in the atlas, 409 when 50 diseases are already followed.
+ */
+export const followDisease = <ThrowOnError extends boolean = false>(options: Options<FollowDiseaseData, ThrowOnError>): RequestResult<FollowDiseaseResponses, FollowDiseaseErrors, ThrowOnError> => (options.client ?? client).put<FollowDiseaseResponses, FollowDiseaseErrors, ThrowOnError>({
+    url: '/me/follows',
+    ...options,
+    headers: {
+        'Content-Type': 'application/json',
+        ...options.headers
+    }
+});
+
+/**
+ * Follow Profile Diseases
+ *
+ * Follow the confirmed diagnoses of the health profile that are diseases in the atlas
+ * (needs the health_data consent). Returns what was added.
+ */
+export const followProfileDiseases = <ThrowOnError extends boolean = false>(options?: Options<FollowProfileDiseasesData, ThrowOnError>): RequestResult<FollowProfileDiseasesResponses, FollowProfileDiseasesErrors, ThrowOnError> => (options?.client ?? client).post<FollowProfileDiseasesResponses, FollowProfileDiseasesErrors, ThrowOnError>({ url: '/me/follows/from-profile', ...options });
+
+/**
+ * List Notifications
+ *
+ * The user's notifications, newest first, with labels resolved from the current atlas.
+ * Picks up new atlas changes for followed diseases; notifications older than 90 days are
+ * deleted.
+ */
+export const listNotifications = <ThrowOnError extends boolean = false>(options?: Options<ListNotificationsData, ThrowOnError>): RequestResult<ListNotificationsResponses, ListNotificationsErrors, ThrowOnError> => (options?.client ?? client).get<ListNotificationsResponses, ListNotificationsErrors, ThrowOnError>({ url: '/notifications', ...options });
+
+/**
+ * Get Unread Notification Count
+ *
+ * Unread notifications. Cheap enough to poll once a minute: new atlas changes are checked
+ * at most once per data load.
+ */
+export const getUnreadNotificationCount = <ThrowOnError extends boolean = false>(options?: Options<GetUnreadNotificationCountData, ThrowOnError>): RequestResult<GetUnreadNotificationCountResponses, GetUnreadNotificationCountErrors, ThrowOnError> => (options?.client ?? client).get<GetUnreadNotificationCountResponses, GetUnreadNotificationCountErrors, ThrowOnError>({ url: '/notifications/unread-count', ...options });
+
+/**
+ * Mark Notifications Read
+ *
+ * Mark the given notifications (or all with `all: true`) as read; returns the new count.
+ */
+export const markNotificationsRead = <ThrowOnError extends boolean = false>(options: Options<MarkNotificationsReadData, ThrowOnError>): RequestResult<MarkNotificationsReadResponses, MarkNotificationsReadErrors, ThrowOnError> => (options.client ?? client).post<MarkNotificationsReadResponses, MarkNotificationsReadErrors, ThrowOnError>({
+    url: '/notifications/read',
     ...options,
     headers: {
         'Content-Type': 'application/json',

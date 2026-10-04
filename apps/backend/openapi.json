@@ -2854,6 +2854,383 @@
           }
         }
       }
+    },
+    "/me/follows": {
+      "get": {
+        "tags": [
+          "follows"
+        ],
+        "summary": "List Follows",
+        "description": "The diseases the user follows, each saying whether updates can exist for it.",
+        "operationId": "listFollows",
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/FollowList"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "sign_in_required: guest, or the session expired.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "consent_required (no active consent of the needed type) or forbidden.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          }
+        }
+      },
+      "put": {
+        "tags": [
+          "follows"
+        ],
+        "summary": "Follow Disease",
+        "description": "Follow a disease of the atlas (idempotent; needs the health_data consent). 404 unless the\nID is a disease in the atlas, 409 when 50 diseases are already followed.",
+        "operationId": "followDisease",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/FollowRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Follow"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "sign_in_required: guest, or the session expired.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "consent_required (no active consent of the needed type) or forbidden.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "not_found",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "conflict",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "validation_error: lists invalid field names only.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          }
+        }
+      },
+      "delete": {
+        "tags": [
+          "follows"
+        ],
+        "summary": "Unfollow Disease",
+        "description": "Stop following a disease (idempotent) and delete its notifications.",
+        "operationId": "unfollowDisease",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/FollowRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "204": {
+            "description": "Successful Response"
+          },
+          "401": {
+            "description": "sign_in_required: guest, or the session expired.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "validation_error: lists invalid field names only.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/me/follows/from-profile": {
+      "post": {
+        "tags": [
+          "follows"
+        ],
+        "summary": "Follow Profile Diseases",
+        "description": "Follow the confirmed diagnoses of the health profile that are diseases in the atlas\n(needs the health_data consent). Returns what was added.",
+        "operationId": "followProfileDiseases",
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/FollowFromProfileResult"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "sign_in_required: guest, or the session expired.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "consent_required (no active consent of the needed type) or forbidden.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/notifications": {
+      "get": {
+        "tags": [
+          "notifications"
+        ],
+        "summary": "List Notifications",
+        "description": "The user's notifications, newest first, with labels resolved from the current atlas.\nPicks up new atlas changes for followed diseases; notifications older than 90 days are\ndeleted.",
+        "operationId": "listNotifications",
+        "parameters": [
+          {
+            "name": "limit",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "integer",
+              "maximum": 200,
+              "minimum": 1,
+              "default": 50,
+              "title": "Limit"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/NotificationList"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "sign_in_required: guest, or the session expired.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "consent_required (no active consent of the needed type) or forbidden.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "validation_error: lists invalid field names only.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/notifications/unread-count": {
+      "get": {
+        "tags": [
+          "notifications"
+        ],
+        "summary": "Get Unread Notification Count",
+        "description": "Unread notifications. Cheap enough to poll once a minute: new atlas changes are checked\nat most once per data load.",
+        "operationId": "getUnreadNotificationCount",
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/UnreadCount"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "sign_in_required: guest, or the session expired.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "consent_required (no active consent of the needed type) or forbidden.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/notifications/read": {
+      "post": {
+        "tags": [
+          "notifications"
+        ],
+        "summary": "Mark Notifications Read",
+        "description": "Mark the given notifications (or all with `all: true`) as read; returns the new count.",
+        "operationId": "markNotificationsRead",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/MarkRead"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/UnreadCount"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "sign_in_required: guest, or the session expired.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "consent_required (no active consent of the needed type) or forbidden.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "validation_error: lists invalid field names only.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          }
+        }
+      }
     }
   },
   "components": {
@@ -5295,6 +5672,22 @@
             },
             "type": "array",
             "title": "Jobs"
+          },
+          "follows": {
+            "items": {
+              "$ref": "#/components/schemas/FollowExport"
+            },
+            "type": "array",
+            "title": "Follows",
+            "description": "Followed diseases."
+          },
+          "notifications": {
+            "items": {
+              "$ref": "#/components/schemas/NotificationExport"
+            },
+            "type": "array",
+            "title": "Notifications",
+            "description": "In-app notifications (no stored text)."
           }
         },
         "type": "object",
@@ -5310,7 +5703,9 @@
           "findings",
           "contributions",
           "edge_flags",
-          "jobs"
+          "jobs",
+          "follows",
+          "notifications"
         ],
         "title": "DataExport",
         "description": "Everything stored about the user (GDPR Art. 15/20, CCPA right to know)."
@@ -6143,6 +6538,175 @@
         ],
         "title": "FlagStatus"
       },
+      "Follow": {
+        "properties": {
+          "node_id": {
+            "type": "string",
+            "title": "Node Id",
+            "description": "The followed disease (MONDO ID)."
+          },
+          "label": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Label",
+            "description": "Disease label; null if no longer in the atlas."
+          },
+          "in_atlas": {
+            "type": "boolean",
+            "title": "In Atlas",
+            "description": "The disease is in the current atlas."
+          },
+          "updates_available": {
+            "type": "boolean",
+            "title": "Updates Available",
+            "description": "Papers, trials, grants and patient groups (and so updates) exist only for the atlas's focus diseases. False for core diseases and for diseases no longer in the atlas: following still works, but no notifications are expected."
+          },
+          "created_at": {
+            "type": "string",
+            "format": "date-time",
+            "title": "Created At"
+          },
+          "since_version": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Since Version",
+            "description": "Atlas data version live when the follow started; changes from later loads produce notifications."
+          }
+        },
+        "type": "object",
+        "required": [
+          "node_id",
+          "label",
+          "in_atlas",
+          "updates_available",
+          "created_at",
+          "since_version"
+        ],
+        "title": "Follow"
+      },
+      "FollowExport": {
+        "properties": {
+          "node_id": {
+            "type": "string",
+            "title": "Node Id"
+          },
+          "created_at": {
+            "type": "string",
+            "format": "date-time",
+            "title": "Created At"
+          },
+          "since_version": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Since Version"
+          }
+        },
+        "type": "object",
+        "required": [
+          "node_id",
+          "created_at"
+        ],
+        "title": "FollowExport"
+      },
+      "FollowFromProfileResult": {
+        "properties": {
+          "added": {
+            "items": {
+              "$ref": "#/components/schemas/Follow"
+            },
+            "type": "array",
+            "title": "Added",
+            "description": "Follows created by this call (newest first)."
+          },
+          "already_following": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array",
+            "title": "Already Following",
+            "description": "Profile diseases that were already followed."
+          },
+          "not_in_atlas": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array",
+            "title": "Not In Atlas",
+            "description": "Confirmed profile diagnoses that are not diseases in the atlas (IDs)."
+          },
+          "limit_reached": {
+            "type": "boolean",
+            "title": "Limit Reached",
+            "description": "Some diseases were not followed because the limit of 50 was reached."
+          }
+        },
+        "type": "object",
+        "required": [
+          "added",
+          "already_following",
+          "not_in_atlas",
+          "limit_reached"
+        ],
+        "title": "FollowFromProfileResult"
+      },
+      "FollowList": {
+        "properties": {
+          "items": {
+            "items": {
+              "$ref": "#/components/schemas/Follow"
+            },
+            "type": "array",
+            "title": "Items",
+            "description": "Newest first."
+          },
+          "limit": {
+            "type": "integer",
+            "title": "Limit",
+            "description": "Maximum number of follows per account."
+          }
+        },
+        "type": "object",
+        "required": [
+          "items",
+          "limit"
+        ],
+        "title": "FollowList"
+      },
+      "FollowRequest": {
+        "properties": {
+          "node_id": {
+            "type": "string",
+            "pattern": "^MONDO:\\d{7}$",
+            "title": "Node Id",
+            "description": "Atlas disease ID (MONDO:0000000)."
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "required": [
+          "node_id"
+        ],
+        "title": "FollowRequest",
+        "description": "The disease to follow or unfollow. In the body, not the URL: which diseases a user follows\nis health data and must not appear in URLs or access logs."
+      },
       "FollowUp": {
         "properties": {
           "question": {
@@ -6805,6 +7369,29 @@
         "title": "LayoutHints",
         "description": "Role presentation hints. They never hide anything."
       },
+      "MarkRead": {
+        "properties": {
+          "ids": {
+            "items": {
+              "type": "string",
+              "format": "uuid"
+            },
+            "type": "array",
+            "maxItems": 200,
+            "title": "Ids"
+          },
+          "all": {
+            "type": "boolean",
+            "title": "All",
+            "description": "Mark every notification as read.",
+            "default": false
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "title": "MarkRead",
+        "description": "Either `ids` or `all: true`."
+      },
       "MatchKind": {
         "type": "string",
         "enum": [
@@ -7100,6 +7687,241 @@
           "cluster"
         ],
         "title": "NodeType"
+      },
+      "Notification": {
+        "properties": {
+          "id": {
+            "type": "string",
+            "format": "uuid",
+            "title": "Id"
+          },
+          "kind": {
+            "$ref": "#/components/schemas/NotificationKind",
+            "description": "added: a paper, trial, grant or patient group newly linked to the disease in the atlas; now_recruiting: a trial whose status changed to recruiting."
+          },
+          "disease_id": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Disease Id",
+            "description": "The followed disease."
+          },
+          "disease_label": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Disease Label",
+            "description": "Null if no longer in the atlas."
+          },
+          "item_id": {
+            "type": "string",
+            "title": "Item Id",
+            "description": "Node ID of the new item; link to its node page."
+          },
+          "item_type": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/NodeType"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "paper, trial, grant or patient_org; null if no longer in the atlas."
+          },
+          "item_label": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Item Label",
+            "description": "Null if no longer in the atlas."
+          },
+          "registry_id": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Registry Id",
+            "description": "Trials: the registry ID (NCT...)."
+          },
+          "year": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Year",
+            "description": "Papers: publication year. Say 'added to the atlas (2025)', not 'published'."
+          },
+          "gone": {
+            "type": "boolean",
+            "title": "Gone",
+            "description": "The item or the disease has left the atlas since; render without a link."
+          },
+          "data_version": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Data Version",
+            "description": "Atlas data version that added it."
+          },
+          "created_at": {
+            "type": "string",
+            "format": "date-time",
+            "title": "Created At"
+          },
+          "read_at": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "date-time"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Read At"
+          }
+        },
+        "type": "object",
+        "required": [
+          "id",
+          "kind",
+          "disease_id",
+          "disease_label",
+          "item_id",
+          "item_type",
+          "item_label",
+          "registry_id",
+          "year",
+          "gone",
+          "data_version",
+          "created_at",
+          "read_at"
+        ],
+        "title": "Notification",
+        "description": "One update about a followed disease. Render papers as \"added to the atlas\" with their\nyear, never as \"just published\"."
+      },
+      "NotificationExport": {
+        "properties": {
+          "id": {
+            "type": "string",
+            "format": "uuid",
+            "title": "Id"
+          },
+          "kind": {
+            "type": "string",
+            "title": "Kind"
+          },
+          "ref_id": {
+            "type": "string",
+            "title": "Ref Id"
+          },
+          "subject_node_id": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Subject Node Id"
+          },
+          "data_version": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Data Version"
+          },
+          "created_at": {
+            "type": "string",
+            "format": "date-time",
+            "title": "Created At"
+          },
+          "read_at": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "date-time"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Read At"
+          }
+        },
+        "type": "object",
+        "required": [
+          "id",
+          "kind",
+          "ref_id",
+          "created_at"
+        ],
+        "title": "NotificationExport"
+      },
+      "NotificationKind": {
+        "type": "string",
+        "enum": [
+          "added",
+          "now_recruiting"
+        ],
+        "title": "NotificationKind"
+      },
+      "NotificationList": {
+        "properties": {
+          "items": {
+            "items": {
+              "$ref": "#/components/schemas/Notification"
+            },
+            "type": "array",
+            "title": "Items",
+            "description": "Newest first."
+          },
+          "unread_count": {
+            "type": "integer",
+            "title": "Unread Count"
+          }
+        },
+        "type": "object",
+        "required": [
+          "items",
+          "unread_count"
+        ],
+        "title": "NotificationList"
       },
       "OpenAIConnection": {
         "properties": {
@@ -8882,6 +9704,20 @@
           "message"
         ],
         "title": "TurnStep"
+      },
+      "UnreadCount": {
+        "properties": {
+          "count": {
+            "type": "integer",
+            "title": "Count",
+            "description": "Unread notifications."
+          }
+        },
+        "type": "object",
+        "required": [
+          "count"
+        ],
+        "title": "UnreadCount"
       },
       "ValidationError": {
         "properties": {

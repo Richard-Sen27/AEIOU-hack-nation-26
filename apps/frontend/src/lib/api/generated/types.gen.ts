@@ -1484,6 +1484,18 @@ export type DataExport = {
      * Jobs
      */
     jobs: Array<Job>;
+    /**
+     * Follows
+     *
+     * Followed diseases.
+     */
+    follows: Array<FollowExport>;
+    /**
+     * Notifications
+     *
+     * In-app notifications (no stored text).
+     */
+    notifications: Array<NotificationExport>;
 };
 
 /**
@@ -2007,6 +2019,127 @@ export type FlagResult = {
 export type FlagStatus = 'open' | 'resolved' | 'dismissed';
 
 /**
+ * Follow
+ */
+export type Follow = {
+    /**
+     * Node Id
+     *
+     * The followed disease (MONDO ID).
+     */
+    node_id: string;
+    /**
+     * Label
+     *
+     * Disease label; null if no longer in the atlas.
+     */
+    label: string | null;
+    /**
+     * In Atlas
+     *
+     * The disease is in the current atlas.
+     */
+    in_atlas: boolean;
+    /**
+     * Updates Available
+     *
+     * Papers, trials, grants and patient groups (and so updates) exist only for the atlas's focus diseases. False for core diseases and for diseases no longer in the atlas: following still works, but no notifications are expected.
+     */
+    updates_available: boolean;
+    /**
+     * Created At
+     */
+    created_at: string;
+    /**
+     * Since Version
+     *
+     * Atlas data version live when the follow started; changes from later loads produce notifications.
+     */
+    since_version: string | null;
+};
+
+/**
+ * FollowExport
+ */
+export type FollowExport = {
+    /**
+     * Node Id
+     */
+    node_id: string;
+    /**
+     * Created At
+     */
+    created_at: string;
+    /**
+     * Since Version
+     */
+    since_version?: string | null;
+};
+
+/**
+ * FollowFromProfileResult
+ */
+export type FollowFromProfileResult = {
+    /**
+     * Added
+     *
+     * Follows created by this call (newest first).
+     */
+    added: Array<Follow>;
+    /**
+     * Already Following
+     *
+     * Profile diseases that were already followed.
+     */
+    already_following: Array<string>;
+    /**
+     * Not In Atlas
+     *
+     * Confirmed profile diagnoses that are not diseases in the atlas (IDs).
+     */
+    not_in_atlas: Array<string>;
+    /**
+     * Limit Reached
+     *
+     * Some diseases were not followed because the limit of 50 was reached.
+     */
+    limit_reached: boolean;
+};
+
+/**
+ * FollowList
+ */
+export type FollowList = {
+    /**
+     * Items
+     *
+     * Newest first.
+     */
+    items: Array<Follow>;
+    /**
+     * Limit
+     *
+     * Maximum number of follows per account.
+     */
+    limit: number;
+};
+
+/**
+ * FollowRequest
+ *
+ * The disease to follow or unfollow. In the body, not the URL: which diseases a user follows
+ * is health data and must not appear in URLs or access logs.
+ */
+export type FollowRequest = {
+    /**
+     * Node Id
+     *
+     * Atlas disease ID (MONDO:0000000).
+     */
+    node_id: string;
+};
+
+/**
  * FollowUp
  */
 export type FollowUp = {
@@ -2427,6 +2560,24 @@ export type LayoutHints = {
 };
 
 /**
+ * MarkRead
+ *
+ * Either `ids` or `all: true`.
+ */
+export type MarkRead = {
+    /**
+     * Ids
+     */
+    ids?: Array<string>;
+    /**
+     * All
+     *
+     * Mark every notification as read.
+     */
+    all?: boolean;
+};
+
+/**
  * MatchKind
  */
 export type MatchKind = 'exact' | 'trigram' | 'vector';
@@ -2596,6 +2747,138 @@ export type NodeDetail = {
  * NodeType
  */
 export type NodeType = 'disease' | 'gene' | 'variant' | 'mechanism' | 'pathway' | 'phenotype' | 'paper' | 'claim' | 'researcher' | 'doctor' | 'institution' | 'network' | 'grant' | 'trial' | 'patient_org' | 'registry' | 'cluster';
+
+/**
+ * Notification
+ *
+ * One update about a followed disease. Render papers as "added to the atlas" with their
+ * year, never as "just published".
+ */
+export type Notification = {
+    /**
+     * Id
+     */
+    id: string;
+    /**
+     * added: a paper, trial, grant or patient group newly linked to the disease in the atlas; now_recruiting: a trial whose status changed to recruiting.
+     */
+    kind: NotificationKind;
+    /**
+     * Disease Id
+     *
+     * The followed disease.
+     */
+    disease_id: string | null;
+    /**
+     * Disease Label
+     *
+     * Null if no longer in the atlas.
+     */
+    disease_label: string | null;
+    /**
+     * Item Id
+     *
+     * Node ID of the new item; link to its node page.
+     */
+    item_id: string;
+    /**
+     * paper, trial, grant or patient_org; null if no longer in the atlas.
+     */
+    item_type: NodeType | null;
+    /**
+     * Item Label
+     *
+     * Null if no longer in the atlas.
+     */
+    item_label: string | null;
+    /**
+     * Registry Id
+     *
+     * Trials: the registry ID (NCT...).
+     */
+    registry_id: string | null;
+    /**
+     * Year
+     *
+     * Papers: publication year. Say 'added to the atlas (2025)', not 'published'.
+     */
+    year: number | null;
+    /**
+     * Gone
+     *
+     * The item or the disease has left the atlas since; render without a link.
+     */
+    gone: boolean;
+    /**
+     * Data Version
+     *
+     * Atlas data version that added it.
+     */
+    data_version: string | null;
+    /**
+     * Created At
+     */
+    created_at: string;
+    /**
+     * Read At
+     */
+    read_at: string | null;
+};
+
+/**
+ * NotificationExport
+ */
+export type NotificationExport = {
+    /**
+     * Id
+     */
+    id: string;
+    /**
+     * Kind
+     */
+    kind: string;
+    /**
+     * Ref Id
+     */
+    ref_id: string;
+    /**
+     * Subject Node Id
+     */
+    subject_node_id?: string | null;
+    /**
+     * Data Version
+     */
+    data_version?: string | null;
+    /**
+     * Created At
+     */
+    created_at: string;
+    /**
+     * Read At
+     */
+    read_at?: string | null;
+};
+
+/**
+ * NotificationKind
+ */
+export type NotificationKind = 'added' | 'now_recruiting';
+
+/**
+ * NotificationList
+ */
+export type NotificationList = {
+    /**
+     * Items
+     *
+     * Newest first.
+     */
+    items: Array<Notification>;
+    /**
+     * Unread Count
+     */
+    unread_count: number;
+};
 
 /**
  * OpenAIConnection
@@ -3638,6 +3921,18 @@ export type TurnStep = {
      * The status text the stream showed.
      */
     message: string;
+};
+
+/**
+ * UnreadCount
+ */
+export type UnreadCount = {
+    /**
+     * Count
+     *
+     * Unread notifications.
+     */
+    count: number;
 };
 
 /**
@@ -5311,3 +5606,231 @@ export type CreateProposalResponses = {
 };
 
 export type CreateProposalResponse = CreateProposalResponses[keyof CreateProposalResponses];
+
+export type UnfollowDiseaseData = {
+    body: FollowRequest;
+    path?: never;
+    query?: never;
+    url: '/me/follows';
+};
+
+export type UnfollowDiseaseErrors = {
+    /**
+     * sign_in_required: guest, or the session expired.
+     */
+    401: ErrorResponse;
+    /**
+     * validation_error: lists invalid field names only.
+     */
+    422: ErrorResponse;
+};
+
+export type UnfollowDiseaseError = UnfollowDiseaseErrors[keyof UnfollowDiseaseErrors];
+
+export type UnfollowDiseaseResponses = {
+    /**
+     * Successful Response
+     */
+    204: void;
+};
+
+export type UnfollowDiseaseResponse = UnfollowDiseaseResponses[keyof UnfollowDiseaseResponses];
+
+export type ListFollowsData = {
+    body?: never;
+    path?: never;
+    query?: never;
+    url: '/me/follows';
+};
+
+export type ListFollowsErrors = {
+    /**
+     * sign_in_required: guest, or the session expired.
+     */
+    401: ErrorResponse;
+    /**
+     * consent_required (no active consent of the needed type) or forbidden.
+     */
+    403: ErrorResponse;
+};
+
+export type ListFollowsError = ListFollowsErrors[keyof ListFollowsErrors];
+
+export type ListFollowsResponses = {
+    /**
+     * Successful Response
+     */
+    200: FollowList;
+};
+
+export type ListFollowsResponse = ListFollowsResponses[keyof ListFollowsResponses];
+
+export type FollowDiseaseData = {
+    body: FollowRequest;
+    path?: never;
+    query?: never;
+    url: '/me/follows';
+};
+
+export type FollowDiseaseErrors = {
+    /**
+     * sign_in_required: guest, or the session expired.
+     */
+    401: ErrorResponse;
+    /**
+     * consent_required (no active consent of the needed type) or forbidden.
+     */
+    403: ErrorResponse;
+    /**
+     * not_found
+     */
+    404: ErrorResponse;
+    /**
+     * conflict
+     */
+    409: ErrorResponse;
+    /**
+     * validation_error: lists invalid field names only.
+     */
+    422: ErrorResponse;
+};
+
+export type FollowDiseaseError = FollowDiseaseErrors[keyof FollowDiseaseErrors];
+
+export type FollowDiseaseResponses = {
+    /**
+     * Successful Response
+     */
+    200: Follow;
+};
+
+export type FollowDiseaseResponse = FollowDiseaseResponses[keyof FollowDiseaseResponses];
+
+export type FollowProfileDiseasesData = {
+    body?: never;
+    path?: never;
+    query?: never;
+    url: '/me/follows/from-profile';
+};
+
+export type FollowProfileDiseasesErrors = {
+    /**
+     * sign_in_required: guest, or the session expired.
+     */
+    401: ErrorResponse;
+    /**
+     * consent_required (no active consent of the needed type) or forbidden.
+     */
+    403: ErrorResponse;
+};
+
+export type FollowProfileDiseasesError = FollowProfileDiseasesErrors[keyof FollowProfileDiseasesErrors];
+
+export type FollowProfileDiseasesResponses = {
+    /**
+     * Successful Response
+     */
+    200: FollowFromProfileResult;
+};
+
+export type FollowProfileDiseasesResponse = FollowProfileDiseasesResponses[keyof FollowProfileDiseasesResponses];
+
+export type ListNotificationsData = {
+    body?: never;
+    path?: never;
+    query?: {
+        /**
+         * Limit
+         */
+        limit?: number;
+    };
+    url: '/notifications';
+};
+
+export type ListNotificationsErrors = {
+    /**
+     * sign_in_required: guest, or the session expired.
+     */
+    401: ErrorResponse;
+    /**
+     * consent_required (no active consent of the needed type) or forbidden.
+     */
+    403: ErrorResponse;
+    /**
+     * validation_error: lists invalid field names only.
+     */
+    422: ErrorResponse;
+};
+
+export type ListNotificationsError = ListNotificationsErrors[keyof ListNotificationsErrors];
+
+export type ListNotificationsResponses = {
+    /**
+     * Successful Response
+     */
+    200: NotificationList;
+};
+
+export type ListNotificationsResponse = ListNotificationsResponses[keyof ListNotificationsResponses];
+
+export type GetUnreadNotificationCountData = {
+    body?: never;
+    path?: never;
+    query?: never;
+    url: '/notifications/unread-count';
+};
+
+export type GetUnreadNotificationCountErrors = {
+    /**
+     * sign_in_required: guest, or the session expired.
+     */
+    401: ErrorResponse;
+    /**
+     * consent_required (no active consent of the needed type) or forbidden.
+     */
+    403: ErrorResponse;
+};
+
+export type GetUnreadNotificationCountError = GetUnreadNotificationCountErrors[keyof GetUnreadNotificationCountErrors];
+
+export type GetUnreadNotificationCountResponses = {
+    /**
+     * Successful Response
+     */
+    200: UnreadCount;
+};
+
+export type GetUnreadNotificationCountResponse = GetUnreadNotificationCountResponses[keyof GetUnreadNotificationCountResponses];
+
+export type MarkNotificationsReadData = {
+    body: MarkRead;
+    path?: never;
+    query?: never;
+    url: '/notifications/read';
+};
+
+export type MarkNotificationsReadErrors = {
+    /**
+     * sign_in_required: guest, or the session expired.
+     */
+    401: ErrorResponse;
+    /**
+     * consent_required (no active consent of the needed type) or forbidden.
+     */
+    403: ErrorResponse;
+    /**
+     * validation_error: lists invalid field names only.
+     */
+    422: ErrorResponse;
+};
+
+export type MarkNotificationsReadError = MarkNotificationsReadErrors[keyof MarkNotificationsReadErrors];
+
+export type MarkNotificationsReadResponses = {
+    /**
+     * Successful Response
+     */
+    200: UnreadCount;
+};
+
+export type MarkNotificationsReadResponse = MarkNotificationsReadResponses[keyof MarkNotificationsReadResponses];
