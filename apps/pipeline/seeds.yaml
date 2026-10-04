@@ -58,7 +58,7 @@ expansion:
   max_new_per_hop: [120, 60]
   max_diseases: 220
   max_genes: 150
-  phenotypes_per_disease: 25
+  phenotypes_per_disease: 60
 
 validation:
   # Facts that must exist as supported edges (confidence >= 0.6) after the build.
