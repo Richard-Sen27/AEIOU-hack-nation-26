@@ -14,12 +14,18 @@ export function NeighbourFilter({
   onChange,
   matches,
   total,
+  label = "Filter these connections",
+  testId = "neighbour-filter",
   className,
 }: {
   value: string;
   onChange: (v: string) => void;
   matches: number;
   total: number;
+  /** Accessible name; each copy on the page needs its own. */
+  label?: string;
+  /** Test id of the box; the count is `<testId>-count` unless it is the default. */
+  testId?: string;
   className?: string;
 }) {
   const active = value.trim().length > 0;
@@ -29,7 +35,7 @@ export function NeighbourFilter({
         "flex h-8 items-center gap-1.5 rounded-lg border border-input bg-transparent pr-1 pl-2.5 transition-colors focus-within:border-ring focus-within:ring-3 focus-within:ring-ring/50 dark:bg-input/30",
         className,
       )}
-      data-testid="neighbour-filter"
+      data-testid={testId}
     >
       <Search className="size-3.5 shrink-0 text-muted-foreground" aria-hidden />
       <input
@@ -44,14 +50,14 @@ export function NeighbourFilter({
           }
         }}
         placeholder="Filter connections"
-        aria-label="Filter these connections"
+        aria-label={label}
         autoComplete="off"
         spellCheck={false}
         className="h-full min-w-0 flex-1 bg-transparent text-base outline-none placeholder:text-muted-foreground sm:text-sm"
       />
       {active && (
         <>
-          <span className="shrink-0 text-xs text-muted-foreground tabular-nums" aria-live="polite" data-testid="filter-count">
+          <span className="shrink-0 text-xs text-muted-foreground tabular-nums" aria-live="polite" data-testid={testId === "neighbour-filter" ? "filter-count" : `${testId}-count`}>
             {matches} of {total}
           </span>
           <button

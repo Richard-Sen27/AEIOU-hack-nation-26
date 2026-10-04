@@ -12,6 +12,8 @@ import { EDGE_FAMILY_META, nodeTypeMeta, relationLabel } from "@/lib/graph/meta"
 import { EDGE_FAMILIES, isVus, type EdgeFamily } from "@/lib/graph/types";
 import { cn } from "@/lib/utils";
 
+import { NeighbourFilter } from "./neighbour-filter";
+
 type NodeLite = Pick<Schemas.Node, "id" | "type" | "label">;
 
 /** Human labels for the type-specific attributes that make a node actionable. */
@@ -99,6 +101,10 @@ export function NodePanel({
   highlightFamilies,
   hiddenFamilies,
   onEdge,
+  query = "",
+  onQueryChange,
+  matchingEdges = null,
+  truncatedNote = null,
 }: {
   detail: Schemas.NodeDetail | null;
   center: Schemas.Node;
@@ -107,6 +113,13 @@ export function NodePanel({
   highlightFamilies: EdgeFamily[];
   hiddenFamilies: Set<EdgeFamily>;
   onEdge: (id: string) => void;
+  /** The page-wide connection filter (same state as the graph toolbar's). */
+  query?: string;
+  onQueryChange?: (q: string) => void;
+  /** Connections the filter matches; null when no filter is set. */
+  matchingEdges?: Set<string> | null;
+  /** Shown while filtering a capped neighbourhood. */
+  truncatedNote?: string | null;
 }) {
   const { labelStyle } = useLens();
   const node = detail?.node ?? center;
@@ -142,6 +155,11 @@ export function NodePanel({
       .map((g) => ({ ...g, items: g.items.sort((a, b) => b.confidence - a.confidence) }))
       .sort((a, b) => rank(a.family) - rank(b.family) || b.items.length - a.items.length);
   }, [edges, center.id, highlightFamilies]);
+  const total = groups.reduce((n, g) => n + g.items.length, 0);
+  const shown = matchingEdges
+    ? groups.map((g) => ({ ...g, items: g.items.filter((e) => matchingEdges.has(e.id)) })).filter((g) => g.items.length > 0)
+    : groups;
+  const matches = shown.reduce((n, g) => n + g.items.length, 0);
 
   return (
     <div className="flex flex-col" data-testid="node-panel">
@@ -270,13 +288,44 @@ export function NodePanel({
         <h2 id="node-connections-title" className="mb-3 text-sm font-semibold">
           Connections
         </h2>
+        {groups.length > 0 && onQueryChange && (
+          <div className="mb-3 space-y-1">
+            <NeighbourFilter
+              value={query}
+              onChange={onQueryChange}
+              matches={matches}
+              total={total}
+              label="Filter the connections list"
+              testId="panel-filter"
+            />
+            {matchingEdges && truncatedNote && (
+              <p className="text-[11px] text-muted-foreground" data-testid="panel-filter-capped">
+                {truncatedNote}
+              </p>
+            )}
+          </div>
+        )}
+        {matchingEdges && groups.length > 0 && shown.length === 0 && (
+          <div className="flex flex-col items-center gap-2 py-4 text-center text-sm text-muted-foreground" data-testid="panel-filter-empty">
+            <p>
+              No connections match <span className="font-medium text-foreground">&ldquo;{query.trim()}&rdquo;</span>.
+            </p>
+            <button
+              type="button"
+              onClick={() => onQueryChange?.("")}
+              className="rounded px-1.5 py-0.5 text-xs font-medium text-foreground underline underline-offset-2 outline-none focus-visible:ring-2 focus-visible:ring-ring"
+            >
+              Clear the filter
+            </button>
+          </div>
+        )}
         {groups.length === 0 && (
           <p className="text-sm text-muted-foreground">
             {node.type === "cluster" ? "A group has members rather than sourced connections of its own." : "No direct connections recorded yet."}
           </p>
         )}
         <div className="space-y-4">
-          {groups.map((g) => {
+          {shown.map((g) => {
             const fam = EDGE_FAMILY_META[g.family];
             const hidden = hiddenFamilies.has(g.family);
             const heading = g.outgoing

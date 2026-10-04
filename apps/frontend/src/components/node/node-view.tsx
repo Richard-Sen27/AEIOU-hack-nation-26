@@ -30,7 +30,7 @@ import { Skeleton } from "@/components/ui/skeleton";
 import { Spinner } from "@/components/ui/spinner";
 import { buildUrl, getNeighborhood, getNode, type ApiError, type Schemas } from "@/lib/api";
 import { announce } from "@/lib/a11y";
-import { nodeTypeMeta, relationLabel } from "@/lib/graph/meta";
+import { CONFIDENCE_LABEL, confidenceLevel, EDGE_FAMILY_META, nodeTypeMeta, ORIGIN_META, relationLabel } from "@/lib/graph/meta";
 import { useGraphTheme } from "@/lib/graph/use-graph-theme";
 import { EDGE_FAMILIES, isVus, type EdgeFamily, type EdgeStatus } from "@/lib/graph/types";
 import { cn } from "@/lib/utils";
@@ -82,7 +82,7 @@ export function NodeView({ nodeId }: { nodeId: string }) {
   const [statusOverride, setStatusOverride] = useState<Record<string, EdgeStatus>>({});
   const [flagOpen, setFlagOpen] = useState(false);
   const [pathOpen, setPathOpen] = useState(false);
-  /** Filter over the loaded neighbourhood; shared by graph and list, client-side only. */
+  /** Filter over the loaded neighbourhood; shared by graph, list and the side card's connections, client-side only. */
   const [query, setQuery] = useState("");
 
   // Node details: once per node.
@@ -160,7 +160,8 @@ export function NodeView({ nodeId }: { nodeId: string }) {
   const center = hoodData?.center ?? detailData?.node ?? null;
   const selectedEdge = edgeId ? edges.find((e) => e.id === edgeId) ?? null : null;
 
-  // Matches: a neighbour's name, id or kind, or the relation wording shown in the list.
+  // Matches: a neighbour's name, id or kind, or what a connection row shows as text
+  // (relation, kind of link, confidence, origin, review status).
   // The centre itself is left out, or every connection would match its name.
   const filter = useMemo(() => {
     const q = query.trim().toLowerCase();
@@ -177,7 +178,16 @@ export function NodeView({ nodeId }: { nodeId: string }) {
     for (const e of edges) {
       const s = nodeHit(e.source_id);
       const t = nodeHit(e.target_id);
-      const rel = relationLabel(e.relation, labelStyle).toLowerCase().includes(q);
+      const rel = [
+        relationLabel(e.relation, labelStyle),
+        EDGE_FAMILY_META[e.family]?.label[labelStyle],
+        CONFIDENCE_LABEL[confidenceLevel(e.confidence)],
+        (ORIGIN_META[e.origin] ?? ORIGIN_META.observed).label.plain,
+        e.status === "active" ? "" : e.status.replace(/_/g, " "),
+      ]
+        .join("\n")
+        .toLowerCase()
+        .includes(q);
       if (s) nodes.add(e.source_id);
       if (t) nodes.add(e.target_id);
       if (s || t || rel) {
@@ -521,6 +531,14 @@ export function NodeView({ nodeId }: { nodeId: string }) {
               highlightFamilies={hints.highlight_family ?? []}
               hiddenFamilies={hiddenFamilies}
               onEdge={openEdge}
+              query={query}
+              onQueryChange={setQuery}
+              matchingEdges={filter?.edges ?? null}
+              truncatedNote={
+                hoodData && hoodTotal != null && hoodTotal > hoodData.nodes.length - 1 && center.type !== "cluster"
+                  ? `Searches the ${(hoodData.nodes.length - 1).toLocaleString("en")} strongest of ${hoodTotal.toLocaleString("en")} links.`
+                  : null
+              }
             />
           )}
         </aside>
