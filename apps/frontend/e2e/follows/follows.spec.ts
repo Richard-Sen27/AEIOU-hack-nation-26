@@ -37,6 +37,13 @@ const note = (id: string, extra: Record<string, unknown>) => ({
   ...extra,
 });
 
+const CALL_ID = "11111111-2222-4333-8444-555555555555";
+const CLOSED_CALL_ID = "11111111-2222-4333-8444-666666666666";
+const CALL_NOTES = [
+  note("c1", { kind: "call_published", item_id: CALL_ID, call_id: CALL_ID, item_type: null, item_label: "Sleep in Dravet syndrome", data_version: null, created_at: "2026-10-04T09:00:00Z" }),
+  note("c2", { kind: "call_published", item_id: CLOSED_CALL_ID, call_id: CLOSED_CALL_ID, item_type: null, item_label: null, gone: true, data_version: null, created_at: "2026-10-04T08:00:00Z" }),
+];
+
 const NOTES = [
   note("n1", { kind: "now_recruiting", item_id: DRAVET, item_type: "trial", registry_id: "NCT01234567", created_at: "2026-10-04T09:00:00Z" }),
   note("n2", { item_type: "paper", year: 2025, created_at: "2026-10-04T08:30:00Z" }),
@@ -154,10 +161,10 @@ test.describe("follow a disease", () => {
     await expect(panel.getByTestId("follow-error")).toHaveText("Not a disease in the atlas.");
   });
 
-  test("a core disease says no updates are tracked", async ({ page }) => {
+  test("a core disease says only new studies notify", async ({ page }) => {
     const { mocks } = followMocks();
     await openAtlas(page, mocks, summaryMock({ [STXBP1]: { json: { ...stxbp1Summary(), coverage: "core" } } }));
-    await expect(page.getByTestId("atlas-panel").getByTestId("follow-no-updates")).toHaveText("No updates tracked for this one");
+    await expect(page.getByTestId("atlas-panel").getByTestId("follow-no-updates")).toHaveText("Notifies you about new studies only.");
   });
 
   test("node page: shows Following for a followed disease and unfollows", async ({ page }) => {
@@ -212,6 +219,24 @@ test.describe("notifications", () => {
     expect(of(calls, "POST", "/notifications/read").at(-1)!.body).toEqual({ all: true });
     await expect(page.getByTestId("notifications-mark-all")).toBeDisabled();
     expect(errors()).toEqual([]);
+  });
+
+  test("a call published for a followed disease: wording, link to the call, closed", async ({ page }) => {
+    const { mocks, calls } = followMocks({ notes: CALL_NOTES });
+    await mockApi(page, graphMocks(mocks));
+    await page.goto("/clusters");
+    const bell = page.getByTestId("notifications-bell");
+    await expect(bell.getByTestId("notifications-count")).toHaveText("2");
+    await bell.click();
+    const items = page.getByTestId("notification");
+    await expect(items).toHaveText([
+      "New study · Dravet syndrome · Sleep in Dravet syndrome(unread)",
+      "New study · Dravet syndrome · a call(unread)Closed",
+    ]);
+    await expect(items.nth(1).getByRole("link")).toHaveCount(0);
+    await items.nth(0).getByRole("link").click();
+    await expect(page).toHaveURL(new RegExp(`/calls/${CALL_ID}$`));
+    expect(of(calls, "POST", "/notifications/read")[0].body).toEqual({ ids: ["c1"] });
   });
 
   test("empty state", async ({ page }) => {
@@ -290,7 +315,7 @@ test("profile: list, unfollow, follow the profile's diseases", async ({ page }) 
   await mockApi(page, { ...mocks, "GET /profile": {}, "GET /consents": [], "GET /contributions": [] });
   await page.goto("/profile");
   const section = page.getByTestId("following-section");
-  await expect(section.getByTestId("following-item")).toHaveText([/STXBP1 encephalopathy\s*No updates tracked\s*Unfollow/]);
+  await expect(section.getByTestId("following-item")).toHaveText([/STXBP1 encephalopathy\s*New studies only\s*Unfollow/]);
   await section.getByTestId("following-from-profile").click();
   await expect(section.getByTestId("following-result")).toHaveText("Added: Dravet syndrome. 1 not in the atlas.");
   await expect(section.getByTestId("following-item")).toHaveCount(2);
@@ -316,6 +341,20 @@ test("phone menu: unread dot and a Notifications entry with the list @mobile", a
   await menu.getByTestId("notification").first().getByRole("link").click();
   await expect(page).toHaveURL(new RegExp(`/node/${encodeURIComponent(DRAVET)}$`));
   await expect(menu).toBeHidden();
+});
+
+test("phone menu counts a published-call notification and opens the call @mobile", async ({ page }) => {
+  const { mocks } = followMocks({ notes: CALL_NOTES.slice(0, 1) });
+  await mockApi(page, graphMocks(mocks));
+  await page.goto("/clusters");
+  await page.getByRole("button", { name: "Open menu, 1 unread" }).click();
+  const menu = page.getByRole("dialog", { name: "Menu" });
+  const entry = menu.getByTestId("menu-notifications");
+  await expect(entry.getByTestId("notifications-count")).toHaveText("1");
+  await entry.click();
+  await expect(menu.getByTestId("notification")).toHaveText(["New study · Dravet syndrome · Sleep in Dravet syndrome(unread)"]);
+  await menu.getByTestId("notification").first().getByRole("link").click();
+  await expect(page).toHaveURL(new RegExp(`/calls/${CALL_ID}$`));
 });
 
 test("screenshots", async ({ page }) => {

@@ -26,7 +26,7 @@ export function FollowButton({
 }: {
   nodeId: string;
   label: string;
-  /** False when no papers, trials or groups are collected for this disease (so no updates). */
+  /** False when no papers, trials or groups are collected for this disease (only new studies notify). */
   updatesAvailable?: boolean;
   className?: string;
 }) {
@@ -85,7 +85,7 @@ export function FollowButton({
         </Button>
         {noUpdates && (
           <span className="text-xs text-muted-foreground" data-testid="follow-no-updates">
-            No updates tracked for this one
+            Notifies you about new studies only.
           </span>
         )}
       </div>

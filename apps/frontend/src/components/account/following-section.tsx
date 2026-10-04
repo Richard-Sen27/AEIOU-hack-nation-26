@@ -83,7 +83,7 @@ export function FollowingSection() {
                   )}
                   {(!f.in_atlas || !f.updates_available) && (
                     <span className="ml-2 text-xs text-muted-foreground">
-                      {!f.in_atlas ? "No longer in the atlas" : "No updates tracked"}
+                      {!f.in_atlas ? "No longer in the atlas" : "New studies only"}
                     </span>
                   )}
                 </div>
