@@ -528,7 +528,7 @@ function SummaryItemRow({
           className="flex min-w-0 flex-1 items-start gap-1.5 rounded text-left text-[13px] font-medium outline-none hover:underline focus-visible:ring-2 focus-visible:ring-ring"
         >
           <Icon className="mt-0.5 size-3.5 shrink-0" style={{ color: `var(${meta.colorVar})` }} aria-hidden />
-          <span className="line-clamp-1" title={item.label}>{item.label}</span>
+          <span className="line-clamp-2">{item.label}</span>
           <span className="sr-only">({meta.label[labelStyle]}). Select on the map</span>
         </button>
         {!membership && (
