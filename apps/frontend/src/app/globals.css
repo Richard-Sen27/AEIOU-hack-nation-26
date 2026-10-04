@@ -266,6 +266,37 @@
   .tabular {
     font-variant-numeric: tabular-nums;
   }
+  /* Streamed text (components/ui/smooth-reveal.tsx): each word fades in softly. */
+  .smooth-word {
+    animation: smooth-word 180ms ease-out both;
+  }
+  /* A part of a live reply after the text: fade and slide, one step after the other. */
+  .smooth-rise {
+    animation: smooth-rise 360ms cubic-bezier(0.2, 0.7, 0.2, 1) both;
+    animation-delay: calc(var(--rise-i, 0) * 120ms);
+  }
+}
+
+@keyframes smooth-word {
+  from {
+    opacity: 0;
+    filter: blur(2px);
+  }
+  to {
+    opacity: 1;
+    filter: blur(0);
+  }
+}
+
+@keyframes smooth-rise {
+  from {
+    opacity: 0;
+    transform: translateY(6px);
+  }
+  to {
+    opacity: 1;
+    transform: none;
+  }
 }
 
 @media (prefers-reduced-motion: reduce) {
