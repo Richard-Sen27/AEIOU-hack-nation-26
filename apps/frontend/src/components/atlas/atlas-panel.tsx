@@ -15,7 +15,7 @@ import {
   X,
 } from "lucide-react";
 import Link from "next/link";
-import { Fragment, useEffect, useState } from "react";
+import { Fragment, useEffect, useState, useSyncExternalStore } from "react";
 
 import { FollowButton } from "@/components/follows/follow-button";
 import { ConfidenceBadge, OriginBadge, StatusFlag, VusNotice } from "@/components/graph-ui";
@@ -720,14 +720,22 @@ function Headline({ text }: { text: string }) {
 // ---------------------------------------------------------------------------
 // "Write a summary" (POST /explain with subject_node_id)
 
+/**
+ * `working` holds the server's step lines, the checked text received so far
+ * (the API sends text only after the citation check passed) and the final
+ * event once it arrived; the text is then revealed a few words at a time.
+ */
 type WriteState =
   | { kind: "idle" }
-  | { kind: "loading" }
-  | { kind: "streaming"; text: string }
-  | { kind: "done"; final: ExplainFinal }
+  | { kind: "working"; steps: string[]; text: string; final: ExplainFinal | null }
   | { kind: "sign_in" }
   | { kind: "unavailable" }
   | { kind: "error"; message: string };
+
+const WORKING: WriteState = { kind: "working", steps: [], text: "", final: null };
+
+/** No event for this long: the request is given up as timed out. */
+const WRITE_IDLE_TIMEOUT_MS = 100_000;
 
 function writeError(code: string) {
   switch (code) {
@@ -737,11 +745,78 @@ function writeError(code: string) {
       return "Usage limit reached.";
     case "upstream_error":
       return "The AI service did not respond.";
+    case "timeout":
+      return "Dr. Wu took too long.";
+    case "age_confirmation_required":
+      return "Confirm your age first.";
+    case "consent_required":
+      return "Consent needed first.";
     case "not_found":
       return "No longer in the atlas.";
     default:
       return "Couldn't write the summary.";
   }
+}
+
+const REVEAL_WORDS = 3;
+const REVEAL_MS = 45;
+const REDUCED_MOTION = "(prefers-reduced-motion: reduce)";
+
+function useReducedMotion(): boolean {
+  return useSyncExternalStore(
+    (onChange) => {
+      const mq = window.matchMedia(REDUCED_MOTION);
+      mq.addEventListener("change", onChange);
+      return () => mq.removeEventListener("change", onChange);
+    },
+    () => window.matchMedia(REDUCED_MOTION).matches,
+    () => false,
+  );
+}
+
+/**
+ * How many characters of `text` to show: grows by a few words per tick until
+ * it has caught up with what arrived; everything at once with reduced motion.
+ */
+function useReveal(text: string): number {
+  const reduced = useReducedMotion();
+  // The revealed prefix; a text that no longer starts with it (a new attempt) starts over.
+  const [shown, setShown] = useState("");
+  const at = text.startsWith(shown) ? shown.length : 0;
+  useEffect(() => {
+    if (reduced || at >= text.length) return;
+    const id = setTimeout(() => {
+      const word = /\S+\s*/g;
+      word.lastIndex = at;
+      let end = at;
+      for (let i = 0; i < REVEAL_WORDS; i++) {
+        const m = word.exec(text);
+        if (!m) {
+          end = text.length;
+          break;
+        }
+        end = m.index + m[0].length;
+      }
+      setShown(text.slice(0, end));
+    }, REVEAL_MS);
+    return () => clearTimeout(id);
+  }, [text, at, reduced]);
+  return reduced ? text.length : at;
+}
+
+/** Three calm dots while Dr. Wu works; still with reduced motion. */
+function WritingDots() {
+  return (
+    <span aria-hidden className="inline-flex items-center gap-0.5">
+      {[0, 150, 300].map((delay) => (
+        <span
+          key={delay}
+          className="size-1 animate-pulse rounded-full bg-primary motion-reduce:animate-none"
+          style={{ animationDelay: `${delay}ms` }}
+        />
+      ))}
+    </span>
+  );
 }
 
 const CITATION = /\[(e_[0-9a-zA-Z]+(?:\s*[,;]\s*e_[0-9a-zA-Z]+)*)\]/g;
@@ -808,40 +883,72 @@ function WrittenSummary({
   useEffect(() => {
     if (attempt === 0) return;
     const ctrl = new AbortController();
-    let text = "";
-    // eslint-disable-next-line react-hooks/set-state-in-effect -- new request
-    setState({ kind: "loading" });
-    const fail = (code: string) => {
+    let watchdog: ReturnType<typeof setTimeout> | undefined;
+    const fail = (code: string, message?: string) => {
+      clearTimeout(watchdog);
       if (code === "sign_in_required" || code === "reauth_required") setState({ kind: "sign_in" });
       else if (code === "not_implemented") setState({ kind: "unavailable" });
-      else setState({ kind: "error", message: writeError(code) });
+      else setState({ kind: "error", message: message || writeError(code) });
     };
-    // Graph ids only: no user content reaches this request.
+    const arm = () => {
+      clearTimeout(watchdog);
+      watchdog = setTimeout(() => {
+        fail("timeout");
+        ctrl.abort("timeout");
+      }, WRITE_IDLE_TIMEOUT_MS);
+    };
+    const working = (update: (s: Extract<WriteState, { kind: "working" }>) => WriteState) =>
+      setState((s) => (s.kind === "working" ? update(s) : s));
+    // eslint-disable-next-line react-hooks/set-state-in-effect -- new request
+    setState(WORKING);
+    arm();
+    // Graph ids only: no user content reaches this request. `steps` adds the server's
+    // progress lines; the text itself arrives only after it passed the citation check.
     streamSSE<ExplainEvent>("/explain", {
-      json: { edge_ids: edgeKey.split(","), subject_node_id: nodeId, role, language },
+      json: { edge_ids: edgeKey.split(","), subject_node_id: nodeId, role, language, steps: true },
       signal: ctrl.signal,
       quiet: true,
       onEvent: (e) => {
-        if (e.type === "delta") {
-          text += e.text;
-          setState({ kind: "streaming", text });
+        arm();
+        if (e.type === "status") {
+          working((s) => ({ ...s, steps: [...s.steps, e.message] }));
+        } else if (e.type === "delta") {
+          working((s) => ({ ...s, text: s.text + e.text }));
         } else if (e.type === "final") {
-          setState({ kind: "done", final: e });
+          clearTimeout(watchdog);
+          working((s) => ({ ...s, text: e.text, final: e }));
           announce(e.cached ? "Summary loaded." : "Summary finished.");
         } else if (e.type === "error") {
-          fail(e.code);
+          // The server's own short line tells a time-out from an unavailable model.
+          fail(e.code, e.code === "upstream_error" ? e.message : undefined);
         }
       },
     }).catch((err: ApiError) => {
       if (ctrl.signal.aborted || err.code === "aborted") return;
       fail(err.code);
     });
-    return () => ctrl.abort();
+    return () => {
+      clearTimeout(watchdog);
+      ctrl.abort();
+    };
   }, [attempt, edgeKey, nodeId, role, language, user?.id]);
+
+  const text = state.kind === "working" ? state.text : "";
+  const shown = useReveal(text);
 
   if (edgeIds.length === 0) return null;
 
-  const write = () => setAttempt((a) => a + 1);
+  // The block replaces the button in the same render, so a second click has nothing to hit.
+  const write = () => {
+    setState(WORKING);
+    setAttempt((a) => a + 1);
+  };
+  // Closing the stream stops the model call on the server.
+  const cancel = () => {
+    setAttempt(0);
+    setState({ kind: "idle" });
+    announce("Summary cancelled.");
+  };
   const signIn = () => {
     const here = typeof window !== "undefined" ? `${window.location.pathname}${window.location.search}` : "/atlas";
     void requireSignIn("Writing a new summary uses Dr. Wu.", here);
@@ -856,51 +963,80 @@ function WrittenSummary({
     );
   }
 
+  const working = state.kind === "working";
+  const done = working && state.final !== null && shown >= text.length;
+  const busy = working && !done;
+  let progress = "Starting";
+  if (working && state.steps.length > 0) progress = text ? "Sources checked" : state.steps[state.steps.length - 1];
+  else if (working && text) progress = "Prepared summary";
+
   return (
-    <div className="rounded-lg border bg-background/60 p-2.5" data-testid="atlas-summary-written" aria-live="off">
-      <div className="mb-1.5 flex flex-wrap items-center justify-between gap-2">
+    <div
+      className="rounded-lg border bg-background/60 p-2.5"
+      data-testid="atlas-summary-written"
+      data-state={busy ? "writing" : state.kind === "working" ? "done" : state.kind}
+      aria-busy={busy}
+    >
+      <div className="mb-1.5 flex min-h-6 flex-wrap items-center justify-between gap-2">
         <h3 className="flex items-center gap-1.5 text-xs font-semibold">
-          <Bot className="size-3.5 text-primary" aria-hidden />
+          <Bot className={cn("size-3.5 text-primary", busy && "animate-pulse motion-reduce:animate-none")} aria-hidden />
           Summary
         </h3>
-        {(state.kind === "streaming" || state.kind === "done") && <AiDisclosure variant="inline" />}
+        {working && <AiDisclosure variant="inline" />}
       </div>
 
-      {state.kind === "loading" && (
-        <div className="space-y-1.5" role="status" aria-label="Writing the summary">
-          <Skeleton className="h-3 w-full" />
-          <Skeleton className="h-3 w-11/12" />
-          <Skeleton className="h-3 w-3/5" />
-        </div>
-      )}
-
-      {(state.kind === "streaming" || state.kind === "done") && (
+      {working && (
         <>
-          <p className="text-sm leading-relaxed text-pretty" lang={language} data-testid="atlas-summary-text">
-            <CitedSummary
-              text={state.kind === "done" ? state.final.text : state.text}
-              edgeIds={edgeIds}
-              streaming={state.kind === "streaming"}
-              onShowChain={onShowChain}
-            />
-            {state.kind === "streaming" && (
-              <span aria-hidden className="ml-0.5 inline-block h-3.5 w-1.5 animate-pulse rounded-sm bg-primary align-middle motion-reduce:animate-none" />
-            )}
-          </p>
-          {state.kind === "done" && (
-            <p className="mt-2 flex flex-wrap items-center gap-x-3 gap-y-1 text-[11px] text-muted-foreground">
-              {state.final.cached ? (
-                <span className="inline-flex items-center gap-1" data-testid="atlas-summary-cached">
-                  <Archive className="size-3" aria-hidden /> Cached
-                </span>
+          {/* One line that changes in place: the steps while writing, then the result's facts. */}
+          <div className="mb-1.5 flex h-6 items-center justify-between gap-2">
+            <p className="flex min-w-0 items-center gap-1.5 truncate text-[11px] text-muted-foreground" role="status" data-testid="atlas-summary-status">
+              {busy ? (
+                <>
+                  <WritingDots />
+                  <span>Dr. Wu is writing</span>
+                  <span aria-hidden>·</span>
+                  <span className="truncate" data-testid="atlas-summary-step">{progress}</span>
+                </>
+              ) : state.final!.cached ? (
+                <>
+                  <span className="inline-flex items-center gap-1" data-testid="atlas-summary-cached">
+                    <Archive className="size-3" aria-hidden /> Cached
+                  </span>
+                  <span>· Not medical advice.</span>
+                </>
               ) : (
-                <span className="inline-flex items-center gap-1" data-testid="atlas-summary-fresh">
-                  <Sparkles className="size-3" aria-hidden /> New
-                </span>
+                <>
+                  <span className="inline-flex items-center gap-1" data-testid="atlas-summary-fresh">
+                    <Sparkles className="size-3" aria-hidden /> New
+                  </span>
+                  <span>· Not medical advice.</span>
+                </>
               )}
-              <span>Not medical advice.</span>
             </p>
-          )}
+            {busy && (
+              <Button variant="ghost" size="xs" className="shrink-0" onClick={cancel} data-testid="atlas-summary-cancel">
+                <X aria-hidden /> Cancel
+              </Button>
+            )}
+          </div>
+          {/* Space for about four lines is kept from the click, so the text never makes the panel jump. */}
+          <div className="min-h-[5.75rem]">
+            {text ? (
+              <p className="text-sm leading-relaxed text-pretty" lang={language} aria-live="off" data-testid="atlas-summary-text">
+                <CitedSummary text={text.slice(0, shown)} edgeIds={edgeIds} streaming={busy} onShowChain={onShowChain} />
+                {busy && (
+                  <span aria-hidden className="ml-0.5 inline-block h-3.5 w-1.5 animate-pulse rounded-sm bg-primary align-middle motion-reduce:animate-none" />
+                )}
+              </p>
+            ) : (
+              <div className="space-y-2 pt-1" aria-hidden data-testid="atlas-summary-placeholder">
+                <Skeleton className="h-3 w-full bg-foreground/10 motion-reduce:animate-none" />
+                <Skeleton className="h-3 w-11/12 bg-foreground/10 motion-reduce:animate-none" />
+                <Skeleton className="h-3 w-4/5 bg-foreground/10 motion-reduce:animate-none" />
+                <Skeleton className="h-3 w-3/5 bg-foreground/10 motion-reduce:animate-none" />
+              </div>
+            )}
+          </div>
         </>
       )}
 
