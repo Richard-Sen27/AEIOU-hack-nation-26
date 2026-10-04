@@ -21,7 +21,7 @@ export default function RouteError({
       </span>
       <h1 className="text-xl font-semibold tracking-tight">This view could not be shown</h1>
       <p className="text-sm text-muted-foreground">
-        Something went wrong while loading it. Trying again usually helps. The rest of Amber still works.
+        The rest of Amber still works.
       </p>
       {error.digest && <p className="font-mono text-xs text-muted-foreground">Reference {error.digest}</p>}
       <div className="flex gap-2">

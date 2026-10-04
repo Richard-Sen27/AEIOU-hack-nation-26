@@ -13,7 +13,7 @@ export default function NotFound() {
       <p className="font-mono text-xs uppercase tracking-[0.16em] text-muted-foreground">404</p>
       <h1 className="text-xl font-semibold tracking-tight">This page is not on the map</h1>
       <p className="text-sm text-muted-foreground">
-        The address may be mistyped, or the item may have been renamed in a newer version of the atlas.
+        Mistyped, or renamed in a newer version of the atlas.
       </p>
       <div className="flex gap-2">
         <Link href="/atlas" className={cn(buttonVariants())}>

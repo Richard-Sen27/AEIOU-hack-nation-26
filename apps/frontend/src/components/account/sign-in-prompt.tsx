@@ -31,8 +31,7 @@ export function SignInPrompt({
       </div>
       {status === "offline" ? (
         <p className="text-sm text-muted-foreground">
-          Amber&apos;s server is not reachable right now, so signing in is unavailable. Please try again
-          later.
+          Amber&apos;s server can&apos;t be reached, so sign-in is unavailable for now.
         </p>
       ) : (
         <ContinueWithChatGPT returnTo={returnTo} />
