@@ -59,6 +59,8 @@ export type AssistantTurn = {
   hintState?: Partial<Record<HintKey, HintDecision>>;
   /** The "is this about a child?" offer was answered or dismissed. */
   childOfferDone?: boolean;
+  /** Arrived live in this tab (sent, retried or attached to a running run): its text is revealed smoothly. A stored reply shows at once. */
+  live?: boolean;
 };
 
 /** Profile hints from a reply (age, onset, country), confirmed or dismissed one by one. */

@@ -22,13 +22,14 @@ import { useGate } from "@/components/providers/gate-provider";
 import { Button, buttonVariants } from "@/components/ui/button";
 import { Spinner } from "@/components/ui/spinner";
 import type { SearchHit } from "@/lib/api/types";
+import { GrowSmoothly, RevealText, riseClass, riseStyle, useSmoothReveal } from "@/components/ui/smooth-reveal";
 import { cn } from "@/lib/utils";
 
 import { Actions } from "./actions";
 import { Cards } from "./cards";
 import { Chips } from "./chips";
 import { ChildOffer, ProfileHints } from "./profile-hints";
-import { Claims } from "./claims";
+import { Claims, claimSteps } from "./claims";
 import { FollowUpQuestion } from "./follow-up";
 import { SymptomMatchCard } from "./symptom-match";
 import { isEmergencyReply, rankedIds, replyNames, type AssistantTurn as Turn, type HintKey, type TurnError } from "./types";
@@ -179,6 +180,15 @@ function TurnErrorNotice({ error, onRetry }: { error: TurnError; onRetry: () => 
   );
 }
 
+/** One part of a live reply after its text, with a soft entrance (`index` steps after the first). */
+function Part({ animate, index, children }: { animate: boolean; index: number; children: React.ReactNode }) {
+  return (
+    <div className={cn("space-y-3.5 empty:hidden", riseClass(animate))} style={riseStyle(animate, index)}>
+      {children}
+    </div>
+  );
+}
+
 function EmergencyReply({ summary, language }: { summary: string; language?: string }) {
   return (
     <div role="alert" className="rounded-xl border-2 border-destructive bg-destructive/10 p-4 sm:p-5" data-testid="emergency">
@@ -239,6 +249,17 @@ export function AssistantTurnView({
   const handoffIds = [...new Set([...(focus?.node_ids ?? []), ...rankedIds(r)])];
   const focusHref = handoffIds.length ? "/atlas" : null;
   const gap = r.gap_search;
+  // Live text is revealed smoothly; a stored reply (and an emergency reply) shows at once.
+  const reveal = useSmoothReveal(r.summary, { animate: !!turn.live && !emergency, key: turn.userMessageId });
+  // The parts after the text come in one after another, unless they were already there when this view appeared.
+  const [animateParts] = useState(() => !!turn.live && !emergency && !(reveal.done && r.summary !== ""));
+  let order = 0;
+  const step = () => order++;
+  const steps = (n: number) => {
+    const first = order;
+    order += n;
+    return first;
+  };
 
   return (
     <article
@@ -265,7 +286,11 @@ export function AssistantTurnView({
         ) : (
           <>
             {r.uncertainty && (
-              <p className="flex items-start gap-2 rounded-lg border border-status-flag/60 bg-status-flag/10 px-3 py-2 text-sm" data-testid="uncertainty" dir="auto">
+              <p
+                className={cn("flex items-start gap-2 rounded-lg border border-status-flag/60 bg-status-flag/10 px-3 py-2 text-sm", riseClass(animateParts))}
+                data-testid="uncertainty"
+                dir="auto"
+              >
                 <TriangleAlert className="mt-0.5 size-4 shrink-0 text-status-flag" aria-hidden />
                 <span>
                   <span className="sr-only">Uncertain: </span>
@@ -275,57 +300,81 @@ export function AssistantTurnView({
             )}
 
             {r.summary && (
-              <p className="text-[16px] leading-relaxed text-pretty" dir="auto" lang={language} data-testid="summary">
-                {r.summary}
-                {streaming && <span className="ml-0.5 inline-block h-4 w-1.5 animate-pulse bg-primary align-middle motion-reduce:animate-none" aria-hidden />}
-              </p>
+              <GrowSmoothly active={reveal.active}>
+                <p className="text-[16px] leading-relaxed text-pretty" dir="auto" lang={language} data-testid="summary" data-revealing={reveal.active || undefined}>
+                  <RevealText text={r.summary} reveal={reveal} />
+                </p>
+              </GrowSmoothly>
             )}
 
-            <Chips chips={r.chips} onConfirm={onConfirmChip} onRemove={onRemoveChip} onUndo={onUndoChip} onCorrect={onCorrectChip} />
-            {turn.final && (
+            {/* The structured parts follow the text in reading order, each with its own soft entrance. */}
+            {reveal.done && (
               <>
-                <ProfileHints hints={r.profile_hints} state={turn.hintState} onConfirm={onConfirmHint} onDismiss={onDismissHint} />
-                {showChildOffer && r.profile_hints?.about_child_suspected && !turn.childOfferDone && (
-                  <ChildOffer onConfirm={onConfirmChild} onDismiss={onDismissChild} />
+                {r.chips.length > 0 && (
+                  <Part animate={animateParts} index={step()}>
+                    <Chips chips={r.chips} onConfirm={onConfirmChip} onRemove={onRemoveChip} onUndo={onUndoChip} onCorrect={onCorrectChip} />
+                  </Part>
+                )}
+                {turn.final && r.profile_hints && (
+                  <Part animate={animateParts} index={step()}>
+                    <ProfileHints hints={r.profile_hints} state={turn.hintState} onConfirm={onConfirmHint} onDismiss={onDismissHint} />
+                    {showChildOffer && r.profile_hints?.about_child_suspected && !turn.childOfferDone && (
+                      <ChildOffer onConfirm={onConfirmChild} onDismiss={onDismissChild} />
+                    )}
+                  </Part>
+                )}
+                {r.symptom_match && (
+                  <Part animate={animateParts} index={step()}>
+                    <SymptomMatchCard match={r.symptom_match} />
+                  </Part>
+                )}
+                <Claims reply={r} rise={animateParts ? steps(claimSteps(r)) : undefined} />
+                {r.cards.length > 0 && (
+                  <Part animate={animateParts} index={step()}>
+                    <Cards cards={r.cards} />
+                  </Part>
+                )}
+                {r.actions.length > 0 && (
+                  <Part animate={animateParts} index={step()}>
+                    <Actions actions={r.actions} edgeIds={focus?.highlight_path ?? []} language={language} />
+                  </Part>
+                )}
+
+                {(focusHref || gap) && (
+                  <div className={cn("flex flex-wrap gap-2", riseClass(animateParts))} style={riseStyle(animateParts, step())}>
+                    {focusHref && (
+                      <Link
+                        href={focusHref}
+                        onClick={atlasHandoffClick({ nodeIds: handoffIds, edgeIds: focus?.highlight_path ?? [], names: replyNames(r) })}
+                        className={cn(buttonVariants({ variant: "outline", size: "sm" }))}
+                        data-testid="show-in-graph"
+                      >
+                        <MapIcon aria-hidden /> Show in graph
+                      </Link>
+                    )}
+                    {gap && (
+                      <Link
+                        href={`/path?from=${encodeURIComponent(gap.from_id)}&to=${encodeURIComponent(gap.to_id)}`}
+                        className={cn(buttonVariants({ variant: "outline", size: "sm" }))}
+                        data-testid="gap-search-link"
+                      >
+                        <Route aria-hidden /> Search for the missing evidence
+                      </Link>
+                    )}
+                  </div>
+                )}
+
+                {r.follow_up && (
+                  <Part animate={animateParts} index={step()}>
+                    <FollowUpQuestion
+                      followUp={r.follow_up}
+                      active={isLatest && !turn.followUpDone && !streaming}
+                      onReply={onSend}
+                      onSkip={onSkipFollowUp}
+                    />
+                  </Part>
                 )}
               </>
-            )}
-            {r.symptom_match && <SymptomMatchCard match={r.symptom_match} />}
-            <Claims reply={r} />
-            <Cards cards={r.cards} />
-            <Actions actions={r.actions} edgeIds={focus?.highlight_path ?? []} language={language} />
-
-            {(focusHref || gap) && (
-              <div className="flex flex-wrap gap-2">
-                {focusHref && (
-                  <Link
-                    href={focusHref}
-                    onClick={atlasHandoffClick({ nodeIds: handoffIds, edgeIds: focus?.highlight_path ?? [], names: replyNames(r) })}
-                    className={cn(buttonVariants({ variant: "outline", size: "sm" }))}
-                    data-testid="show-in-graph"
-                  >
-                    <MapIcon aria-hidden /> Show in graph
-                  </Link>
-                )}
-                {gap && (
-                  <Link
-                    href={`/path?from=${encodeURIComponent(gap.from_id)}&to=${encodeURIComponent(gap.to_id)}`}
-                    className={cn(buttonVariants({ variant: "outline", size: "sm" }))}
-                    data-testid="gap-search-link"
-                  >
-                    <Route aria-hidden /> Search for the missing evidence
-                  </Link>
-                )}
-              </div>
-            )}
-
-            {r.follow_up && (
-              <FollowUpQuestion
-                followUp={r.follow_up}
-                active={isLatest && !turn.followUpDone && !streaming}
-                onReply={onSend}
-                onSkip={onSkipFollowUp}
-              />
             )}
           </>
         )}

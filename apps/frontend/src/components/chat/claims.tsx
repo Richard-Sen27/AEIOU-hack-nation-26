@@ -3,6 +3,7 @@
 import { CircleHelp, CircleSlash, Lightbulb } from "lucide-react";
 import { useMemo } from "react";
 
+import { riseClass, riseStyle } from "@/components/ui/smooth-reveal";
 import { CONFIDENCE_LABEL, ORIGIN_META } from "@/lib/graph/meta";
 import { cn } from "@/lib/utils";
 
@@ -70,15 +71,18 @@ function ClaimItem({
   index,
   contradictions,
   compact,
+  rise,
 }: {
   claim: Claim;
   index: number;
   contradictions: PartialReply["contradictions"];
   compact?: boolean;
+  rise?: number;
 }) {
   const weak = claim.confidence === "low";
+  const animate = rise !== undefined;
   return (
-    <li className="flex items-start gap-2" data-testid="claim" data-origin={claim.origin}>
+    <li className={cn("flex items-start gap-2", riseClass(animate))} style={riseStyle(animate, rise ?? 0)} data-testid="claim" data-origin={claim.origin}>
       <span className="mt-[3px] w-4 shrink-0 text-right font-mono text-[11px] text-muted-foreground tabular-nums" aria-hidden>
         {index + 1}
       </span>
@@ -106,13 +110,19 @@ function ClaimItem({
   );
 }
 
+/** How many entrance steps `Claims` takes for this reply (its heading, each statement, the sources line, the gaps). */
+export function claimSteps(reply: PartialReply, compact = false): number {
+  const claims = reply.claims.length ? reply.claims.length + 2 : 0;
+  return claims + (reply.missing_evidence.length && !compact ? 1 : 0);
+}
+
 /**
  * The cited statements in plain words, numbered: hypotheses marked with their reason,
  * contradictions right under their statement. Their sources sit behind one short
  * "Sources · N" line, collapsed by default; every statement keeps its sources there.
  * Missing evidence is listed as what is not known.
  */
-export function Claims({ reply, compact = false }: { reply: PartialReply; compact?: boolean }) {
+export function Claims({ reply, compact = false, rise }: { reply: PartialReply; compact?: boolean; rise?: number }) {
   const groups = useMemo(
     () =>
       reply.claims.map((c, i) => ({
@@ -122,11 +132,17 @@ export function Claims({ reply, compact = false }: { reply: PartialReply; compac
     [reply.claims, reply.contradictions],
   );
   if (reply.claims.length === 0 && reply.missing_evidence.length === 0) return null;
+  // In a live reply each part comes in one step after the other, from step `rise` on.
+  const animate = rise !== undefined;
+  const at = (i: number) => riseStyle(animate, (rise ?? 0) + i);
+  const n = reply.claims.length;
   return (
     <section aria-label="What the sources say" className={compact ? "space-y-2" : "space-y-3"} data-testid="claims">
       {reply.claims.length > 0 && (
         <div>
-          <h3 className="mb-1.5 text-xs font-medium text-muted-foreground">What the sources say</h3>
+          <h3 className={cn("mb-1.5 text-xs font-medium text-muted-foreground", riseClass(animate))} style={at(0)}>
+            What the sources say
+          </h3>
           <ol className="space-y-1.5">
             {reply.claims.map((claim, i) => (
               <ClaimItem
@@ -134,17 +150,18 @@ export function Claims({ reply, compact = false }: { reply: PartialReply; compac
                 claim={claim}
                 index={i}
                 compact={compact}
+                rise={animate ? (rise ?? 0) + 1 + i : undefined}
                 contradictions={reply.contradictions.filter((c) => c.claim_index === i)}
               />
             ))}
           </ol>
-          <div className="mt-1 -ml-1.5">
+          <div className={cn("mt-1 -ml-1.5", riseClass(animate))} style={at(n + 1)}>
             <SourcesToggle groups={groups} />
           </div>
         </div>
       )}
       {reply.missing_evidence.length > 0 && !compact && (
-        <div className="rounded-lg border border-dashed px-3.5 py-3" data-testid="missing-evidence">
+        <div className={cn("rounded-lg border border-dashed px-3.5 py-3", riseClass(animate))} style={at(n ? n + 2 : 0)} data-testid="missing-evidence">
           <h3 className="text-sm font-medium">What is not known yet</h3>
           <ul className="mt-1.5 space-y-1">
             {reply.missing_evidence.map((m, i) => (

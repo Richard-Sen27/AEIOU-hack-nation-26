@@ -17,6 +17,7 @@ import { useSession } from "@/components/providers/session-provider";
 import { AiDisclosure } from "@/components/shell/ai-disclosure";
 import { Button } from "@/components/ui/button";
 import { Sheet, SheetContent, SheetDescription, SheetHeader, SheetTitle } from "@/components/ui/sheet";
+import { GrowSmoothly, RevealText, riseClass, riseStyle, useSmoothReveal } from "@/components/ui/smooth-reveal";
 import { Spinner } from "@/components/ui/spinner";
 import { nodeTypeMeta } from "@/lib/graph/meta";
 import { cn } from "@/lib/utils";
@@ -443,6 +444,7 @@ function SignedInDock({
                 </p>
               )}
               <CompactTurn
+                key={lastAssistant.id}
                 turn={lastAssistant}
                 language={language}
                 foundCount={lastCount}
@@ -549,6 +551,9 @@ function CompactTurn({
   const streaming = turn.phase === "streaming";
   const emergency = isEmergencyReply(turn);
   const lastStatus = turn.statuses[turn.statuses.length - 1];
+  // Same reveal as the chat page; the same live turn continues where the other view was.
+  const reveal = useSmoothReveal(r.summary, { animate: !!turn.live && !emergency, key: turn.userMessageId });
+  const [animateParts] = useState(() => !!turn.live && !emergency && !(reveal.done && r.summary !== ""));
 
   return (
     <article className="space-y-2.5" aria-label="Dr. Wu's reply" aria-busy={streaming} data-testid="atlas-wu-turn" data-phase={turn.phase}>
@@ -574,20 +579,26 @@ function CompactTurn({
       ) : (
         <>
           {r.uncertainty && (
-            <p className="rounded-lg border border-status-flag/60 bg-status-flag/10 px-2.5 py-1.5 text-xs" dir="auto" data-testid="uncertainty">
+            <p className={cn("rounded-lg border border-status-flag/60 bg-status-flag/10 px-2.5 py-1.5 text-xs", riseClass(animateParts))} dir="auto" data-testid="uncertainty">
               <span className="sr-only">Uncertain: </span>
               {r.uncertainty}
             </p>
           )}
           {r.summary && (
-            <p className="text-sm leading-relaxed text-pretty" dir="auto" lang={language} data-testid="summary">
-              {r.summary}
-              {streaming && <span className="ml-0.5 inline-block h-3.5 w-1.5 animate-pulse bg-primary align-middle motion-reduce:animate-none" aria-hidden />}
-            </p>
+            <GrowSmoothly active={reveal.active}>
+              <p className="text-sm leading-relaxed text-pretty" dir="auto" lang={language} data-testid="summary" data-revealing={reveal.active || undefined}>
+                <RevealText text={r.summary} reveal={reveal} />
+              </p>
+            </GrowSmoothly>
           )}
-          {turn.final && r.symptom_match && <SymptomMatchCard match={r.symptom_match} isOnMap={isOnMap} onSelect={onSelectNode} />}
-          {turn.final && <Claims reply={r} compact />}
-          {turn.final && foundCount === 0 && (
+          {/* After the text, in reading order, each with a soft entrance. */}
+          {turn.final && reveal.done && r.symptom_match && (
+            <div className={riseClass(animateParts)} style={riseStyle(animateParts, 0)}>
+              <SymptomMatchCard match={r.symptom_match} isOnMap={isOnMap} onSelect={onSelectNode} />
+            </div>
+          )}
+          {turn.final && reveal.done && <Claims reply={r} compact rise={animateParts ? (r.symptom_match ? 1 : 0) : undefined} />}
+          {turn.final && reveal.done && foundCount === 0 && (
             <p className="text-xs text-muted-foreground" data-testid="atlas-wu-none">
               Nothing found.
             </p>

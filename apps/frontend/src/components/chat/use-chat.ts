@@ -5,6 +5,7 @@ import { toast } from "sonner";
 
 import { useGate } from "@/components/providers/gate-provider";
 import { useSession } from "@/components/providers/session-provider";
+import { hasRevealProgress } from "@/components/ui/smooth-reveal";
 import { announce } from "@/lib/a11y";
 import { ApiError, reportApiError } from "@/lib/api/errors";
 import {
@@ -153,6 +154,8 @@ function turnsFromHistory(messages: Schemas.ChatMessage[]): Turn[] {
       };
     }
     const reply = m.reply;
+    // A reply this tab was still revealing (the dock, then the full page) continues; any other stored reply shows at once.
+    const askedId = messages[i - 1]?.role === "user" ? messages[i - 1].id : undefined;
     return {
       id: m.id,
       kind: "assistant",
@@ -160,6 +163,8 @@ function turnsFromHistory(messages: Schemas.ChatMessage[]): Turn[] {
       statuses: [],
       final: true,
       followUpDone: true,
+      userMessageId: askedId,
+      live: hasRevealProgress(askedId),
       reply: reply
         ? { ...reply, chips: toTurnChips(reply.chips) }
         : { ...emptyReply(), summary: m.content },
@@ -426,7 +431,7 @@ export function useChat({ expertMode }: { expertMode: boolean }) {
       setTurns((all) => [
         ...all.map((t) => (t.kind === "assistant" ? { ...t, followUpDone: true } : t)),
         { id: nextId("u"), kind: "user", text },
-        { id: assistantId, kind: "assistant", phase: "streaming", statuses: [], reply: emptyReply(), final: false, request: text },
+        { id: assistantId, kind: "assistant", phase: "streaming", statuses: [], reply: emptyReply(), final: false, request: text, live: true },
       ]);
       touched.current = true;
       recoveries.current = 0;
@@ -439,7 +444,7 @@ export function useChat({ expertMode }: { expertMode: boolean }) {
     (turnId: string) => {
       const turn = turns.find((t) => t.id === turnId);
       if (!turn || turn.kind !== "assistant" || !turn.request) return;
-      updateTurn(turnId, (t) => ({ ...t, phase: "streaming", statuses: [], reply: emptyReply(), final: false, error: undefined }));
+      updateTurn(turnId, (t) => ({ ...t, phase: "streaming", statuses: [], reply: emptyReply(), final: false, error: undefined, live: true }));
       recoveries.current = 0;
       void follow(turnId, { kind: "send", text: turn.request, retryOf: turn.userMessageId });
     },
@@ -500,6 +505,7 @@ export function useChat({ expertMode }: { expertMode: boolean }) {
             final: false,
             request: asked?.content,
             userMessageId: run.message_id,
+            live: true,
           });
           attach = { turnId, runId: run.id };
         }

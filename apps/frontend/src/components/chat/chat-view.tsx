@@ -70,6 +70,19 @@ export function ChatView() {
     if (!el) return;
     if (el.scrollHeight - el.scrollTop - el.clientHeight < 240) el.scrollTop = el.scrollHeight;
   }, [lastTurn]);
+  // The reply's text and parts come in after its events (the smooth reveal): follow them while near the bottom.
+  useEffect(() => {
+    const el = logRef.current;
+    if (!el || typeof ResizeObserver === "undefined") return;
+    let height = el.scrollHeight;
+    const ro = new ResizeObserver(() => {
+      const grew = el.scrollHeight - height;
+      height = el.scrollHeight;
+      if (grew > 0 && el.scrollHeight - el.scrollTop - el.clientHeight - grew < 240) el.scrollTop = el.scrollHeight;
+    });
+    for (const child of Array.from(el.children)) ro.observe(child);
+    return () => ro.disconnect();
+  }, [chat.turns.length, chat.loadingSession]);
 
   async function handleFiles(list: FileList | null) {
     const files = list ? Array.from(list) : [];
