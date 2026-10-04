@@ -135,7 +135,12 @@ test.describe("shell", () => {
   test("header nav items stay on one line from 1024 px up, signed out and in", async ({ page }) => {
     for (const session of [guestSession, signedInSession({ role: "patient" })]) {
       await page.unrouteAll({ behavior: "ignoreErrors" });
-      await mockApi(page, { "GET /auth/session": session });
+      // Signed in, the bell and the messages icon show counts (their widest form).
+      await mockApi(page, {
+        "GET /auth/session": session,
+        "GET /notifications/unread-count": { count: 12 },
+        "GET /me/threads/unread-count": { count: 3, requests_waiting: 1 },
+      });
       for (const width of [1024, 1100, 1280, 1440]) {
         await page.setViewportSize({ width, height: 800 });
         await page.goto("/atlas");
@@ -144,7 +149,16 @@ test.describe("shell", () => {
           session.user ? header.getByTestId("user-menu") : header.getByRole("button", { name: "Continue with ChatGPT" }),
         ).toBeVisible();
         const links = header.getByRole("navigation", { name: "Primary" }).getByRole("link");
-        await expect(links).toHaveCount(4);
+        await expect(links).toHaveText(["Atlas", "Clusters", "Ask Dr. Wu", "Studies", "Documents"]);
+        if (session.user) {
+          await expect(header.getByTestId("notifications-bell")).toBeVisible();
+          await expect(header.getByTestId("messages-link")).toBeVisible();
+        }
+        // Nothing overlaps: the nav ends before the search box starts.
+        const navRight = await links.last().evaluate((el) => el.getBoundingClientRect().right);
+        const searchLeft = await header.getByTestId("search-trigger").evaluate((el) => el.getBoundingClientRect().left);
+        expect(navRight, `nav vs search at ${width}px`).toBeLessThanOrEqual(searchLeft);
+        expect(await header.locator(":scope > div").first().evaluate((el) => el.scrollWidth - el.clientWidth), `header row at ${width}px`).toBeLessThanOrEqual(0);
         // One line: every item is one line tall, and the page does not scroll sideways.
         const heights = await links.evaluateAll((els) => els.map((el) => el.getBoundingClientRect().height));
         expect(Math.max(...heights) - Math.min(...heights), `nav items at ${width}px`).toBeLessThan(1);
