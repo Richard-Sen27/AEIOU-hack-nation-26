@@ -464,10 +464,12 @@ export const AtlasCanvas = forwardRef<AtlasCanvasHandle, Props>(function AtlasCa
       };
       graph.forEachNode((_, a) => add(a.x, a.y));
       for (const c of index.categories.values()) add(c.label_x, c.label_y);
-      const pad = Math.max(maxX - minX, maxY - minY) * 0.1;
-      // Square and centred on the hub so the logo sits in the middle of the map.
-      const half = Math.max(Math.abs(minX), Math.abs(maxX), Math.abs(minY), Math.abs(maxY)) + pad;
-      if (Number.isFinite(half)) sigma.setCustomBBox({ x: [-half, half], y: [-half, half] });
+      // Centred on the hub so the logo sits in the middle; a thin margin keeps the rotated
+      // category names inside, and Sigma fits the box to the canvas's aspect, so the map fills it.
+      const pad = Math.max(maxX - minX, maxY - minY) * 0.04;
+      const halfX = Math.max(Math.abs(minX), Math.abs(maxX)) + pad;
+      const halfY = Math.max(Math.abs(minY), Math.abs(maxY)) + pad;
+      if (Number.isFinite(halfX) && Number.isFinite(halfY)) sigma.setCustomBBox({ x: [-halfX, halfX], y: [-halfY, halfY] });
     }
 
     const frame = (ids: string[], close = false) => {
