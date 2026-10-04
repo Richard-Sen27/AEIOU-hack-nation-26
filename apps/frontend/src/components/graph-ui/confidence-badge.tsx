@@ -12,6 +12,7 @@ const TIER_LABEL: Record<EvidenceTier, string> = {
   preprint: "Preprint",
   llm_inferred: "AI-extracted (unverified)",
   patient_reported: "Patient-reported",
+  computed: "Computed by the analysis (hypothesis)",
 };
 
 const LEVEL_CLASS: Record<ConfidenceLevel, string> = {
@@ -58,6 +59,9 @@ export function ConfidenceBadge({
   const contradicting = evidence?.filter((e) => e.polarity === "contradicts") ?? [];
   const byTier = new Map<EvidenceTier, number>();
   supporting.forEach((e) => byTier.set(e.tier, (byTier.get(e.tier) ?? 0) + 1));
+  // Computed rows are weighted by their link's own score, not a fixed tier weight.
+  const tierWeight = (tier: EvidenceTier) =>
+    tier === "computed" ? (supporting.find((e) => e.tier === tier)?.tier_weight ?? TIER_WEIGHTS[tier]) : TIER_WEIGHTS[tier];
 
   return (
     <Popover>
@@ -97,12 +101,12 @@ export function ConfidenceBadge({
         {evidence && (
           <dl className="space-y-1 text-xs">
             {[...byTier.entries()]
-              .sort(([a], [b]) => TIER_WEIGHTS[b] - TIER_WEIGHTS[a])
+              .sort(([a], [b]) => tierWeight(b) - tierWeight(a))
               .map(([tier, n]) => (
                 <div key={tier} className="flex items-center justify-between gap-3">
                   <dt className="text-muted-foreground">{TIER_LABEL[tier]}</dt>
                   <dd className="font-mono tabular">
-                    {n} × {TIER_WEIGHTS[tier].toFixed(1)}
+                    {n} × {tierWeight(tier).toFixed(tier === "computed" ? 2 : 1)}
                   </dd>
                 </div>
               ))}

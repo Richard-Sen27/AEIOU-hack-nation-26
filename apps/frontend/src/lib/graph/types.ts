@@ -38,6 +38,10 @@ export const RELATIONS = [
   "shared_pathway",
   "similar_symptoms",
   "shared_researcher",
+  "shared_gene",
+  "near_on_chromosome",
+  "candidate_phenotype",
+  "suggested_by_neighbour",
   "asserts",
   "authored",
   "pi_of",
@@ -72,6 +76,7 @@ export const EVIDENCE_TIERS = [
   "preprint",
   "llm_inferred",
   "patient_reported",
+  "computed",
 ] as const;
 export type EvidenceTier = (typeof EVIDENCE_TIERS)[number];
 
@@ -83,6 +88,8 @@ export const TIER_WEIGHTS: Record<EvidenceTier, number> = {
   preprint: 0.4,
   llm_inferred: 0.3,
   patient_reported: 0.2,
+  /** Ceiling only: each computed row is weighted by its link's own score (tier_weight). */
+  computed: 0.79,
 };
 
 export type Polarity = "supports" | "contradicts";

@@ -10,6 +10,7 @@ export const TIER_SHORT: Record<EvidenceTier, string> = {
   preprint: "Preprint",
   llm_inferred: "AI-extracted",
   patient_reported: "Patient-reported",
+  computed: "Computed (hypothesis)",
 };
 
 function formatDate(iso?: string | null) {
