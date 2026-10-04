@@ -4,6 +4,7 @@ import { SearchX, TriangleAlert, WifiOff } from "lucide-react";
 import Link from "next/link";
 
 import { needsOnboarding } from "@/components/account/onboarding";
+import { PersonCalls } from "@/components/calls/person-calls";
 import { SessionLoading, SignInPrompt } from "@/components/account/sign-in-prompt";
 import { useSession } from "@/components/providers/session-provider";
 import { buttonVariants } from "@/components/ui/button";
@@ -63,7 +64,8 @@ export function PersonCardPage({ cardId }: { cardId: string }) {
   }
   return (
     <PublicCardView card={card.data} heading="h1">
-      {/* Stage 3 adds the expert's published calls here; stage 5 passes a "Message" action. */}
+      {/* Stage 5 passes a "Message" action. */}
+      <PersonCalls cardId={card.data.card_id} className="mt-4 border-t pt-4" />
     </PublicCardView>
   );
 }

@@ -19,6 +19,7 @@ import { Fragment, useEffect, useState } from "react";
 
 import { FollowButton } from "@/components/follows/follow-button";
 import { ConfidenceBadge, OriginBadge, StatusFlag, VusNotice } from "@/components/graph-ui";
+import { InAmberChip } from "@/components/people/in-amber-chip";
 import { useGate } from "@/components/providers/gate-provider";
 import { useLens } from "@/components/providers/lens-provider";
 import { useSession } from "@/components/providers/session-provider";
@@ -616,6 +617,7 @@ function SummaryItemRow({
         {!membership && <ConfidenceBadge confidence={item.best_confidence} showScore={labelStyle === "technical"} />}
         <OriginBadge origin={item.inferred ? "inferred" : "observed"} />
         {item.under_review && <StatusFlag status="under_review" />}
+        {item.card_id && (item.type === "researcher" || item.type === "doctor") && <InAmberChip cardId={item.card_id} name={item.label} />}
       </div>
       {item.inferred && item.explanation && (
         <p className="mt-1 pl-5 text-xs" data-testid="atlas-summary-explanation">

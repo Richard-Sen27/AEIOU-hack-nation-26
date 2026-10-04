@@ -20,6 +20,7 @@ import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { toast } from "sonner";
 
 import { FollowButton } from "@/components/follows/follow-button";
+import { ReachableInAmber } from "@/components/people/reachable-in-amber";
 import { GraphLegend, VusNotice } from "@/components/graph-ui";
 import { useGate } from "@/components/providers/gate-provider";
 import { useLens } from "@/components/providers/lens-provider";
@@ -367,6 +368,8 @@ export function NodeView({ nodeId }: { nodeId: string }) {
       </header>
 
       {isVus(classification) && <VusNotice className="mb-4" />}
+
+      {center.type === "disease" && <ReachableInAmber diseaseId={center.id} className="mb-4" />}
 
       <div className="grid gap-4 lg:min-h-0 lg:flex-1 lg:grid-cols-[minmax(0,1fr)_400px] lg:grid-rows-[minmax(0,1fr)]">
         {/* Graph / list */}
