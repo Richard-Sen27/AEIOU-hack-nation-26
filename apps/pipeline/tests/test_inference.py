@@ -202,12 +202,21 @@ def test_near_on_chromosome_cytoband_fallback_and_copy_number_boost():
     boosted = _near([cnv, dict(cnv, start=1_020_000)])
     f = boosted[("HGNC:1", "HGNC:2")]["features"]
     assert f["score"] == analytics.NEAR_CNV_CONFIDENCE
+    assert f["n_spanning_cnv"] == 2
     assert (
-        f["n_spanning_cnv"] == 2
-        and "copy-number changes in ClinVar span both" in (f["explanation"])
+        "2 pathogenic or likely pathogenic copy-number changes of at most 1 Mb in ClinVar "
+        in (f["explanation"])
     )
+    assert "of at most 1 Mb span both genes" in f["confidence_basis"]
     one = _near([cnv])[("HGNC:1", "HGNC:2")]["features"]
     assert one["score"] == analytics.NEAR_CONFIDENCE  # a single CNV is not enough
+    # Large events span every neighbouring pair: they never count towards the boost.
+    big = dict(cnv, start=1, stop=1 + analytics.NEAR_CNV_MAX_BP)
+    wide = _near([big, dict(big, stop=big["stop"] + 5_000_000)])[("HGNC:1", "HGNC:2")]
+    assert wide["features"]["score"] == analytics.NEAR_CONFIDENCE
+    assert wide["features"]["n_spanning_cnv"] == 0
+    mixed = _near([cnv, big])[("HGNC:1", "HGNC:2")]["features"]
+    assert mixed["n_spanning_cnv"] == 1 and mixed["score"] == analytics.NEAR_CONFIDENCE
 
 
 # ---------------------------------------------------------------- shared gene precedence

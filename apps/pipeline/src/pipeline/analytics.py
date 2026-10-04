@@ -88,6 +88,9 @@ NEAR_TOP_K = 3
 NEAR_CONFIDENCE = 0.20
 NEAR_CNV_CONFIDENCE = 0.45
 NEAR_MIN_CNV = 2
+# Only focal copy-number variants count for the boost: larger (multi-megabase, whole-arm)
+# events span nearly every pair of neighbouring genes and say nothing about a specific pair.
+NEAR_CNV_MAX_BP = 1_000_000
 # Research overlap
 RESEARCH_TOP_K = 6
 RESEARCH_SCORE = 0.4
@@ -900,11 +903,19 @@ def _cytoband_subband(band: str | None) -> bool:
     return bool(band) and "." in band
 
 
-def near_edges(genes: dict[str, dict], cnvs: list[dict] | None = None) -> list[dict]:
+def _megabases(bp: int) -> str:
+    mb = bp / 1_000_000
+    return f"{mb:g} Mb" if mb >= 1 else f"{round(bp / 1000):,} kb"
+
+
+def near_edges(
+    genes: dict[str, dict], cnvs: list[dict] | None = None, cnv_max_bp: int = NEAR_CNV_MAX_BP
+) -> list[dict]:
     """`near_on_chromosome` between genes: same chromosome, at most 1 Mb between the MANE spans,
     the 3 nearest per gene. Genes without coordinates fall back to the same cytoband sub-band.
-    Confidence 0.20, or 0.45 when at least 2 pathogenic / likely pathogenic ClinVar copy-number
-    variants (or deletions / duplications of 1 kb or more) span both genes.
+    Confidence 0.20, or 0.45 when at least 2 focal pathogenic / likely pathogenic ClinVar
+    copy-number variants (or deletions / duplications of 1 kb up to ``cnv_max_bp``) span both
+    genes.
 
     ``genes``: HGNC id -> attrs (symbol, chromosome, start, end, cytoband).
     """
@@ -952,6 +963,8 @@ def near_edges(genes: dict[str, dict], cnvs: list[dict] | None = None) -> list[d
         if not idx or v.get("start") is None:
             continue
         stop = v.get("stop") or v["start"]
+        if stop - v["start"] + 1 > cnv_max_bp:
+            continue
         lo = bisect.bisect_left(idx, (v["start"] - longest, ""))
         hi = bisect.bisect_right(idx, (stop, "~"))
         nearby = {g: placed[g] for _, g in idx[lo:hi]}
@@ -980,8 +993,8 @@ def near_edges(genes: dict[str, dict], cnvs: list[dict] | None = None) -> list[d
         else:
             where = f"lie {round(gap / 1000):,} kb apart on chromosome {chrom} ({band})"
         cnv = (
-            f", and {n_cnv} pathogenic or likely pathogenic copy-number changes in ClinVar span "
-            "both"
+            f", and {n_cnv} pathogenic or likely pathogenic copy-number changes of at most "
+            f"{_megabases(cnv_max_bp)} in ClinVar span both"
             if boosted
             else ""
         )
@@ -1004,7 +1017,7 @@ def near_edges(genes: dict[str, dict], cnvs: list[dict] | None = None) -> list[d
                 ),
                 confidence_basis=(
                     f"0.45: {n_cnv} pathogenic / likely pathogenic ClinVar copy-number variants "
-                    "span both genes"
+                    f"of at most {_megabases(cnv_max_bp)} span both genes"
                     if boosted
                     else "fixed 0.20 for proximity alone"
                 ),
