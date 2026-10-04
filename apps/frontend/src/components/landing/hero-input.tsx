@@ -206,8 +206,9 @@ export function HeroInput({ ref }: { ref?: React.Ref<HeroInputHandle> }) {
           aria-describedby={`${hintId}-hint`}
           autoComplete="off"
           spellCheck
-          // Browser extensions (writing and autofill helpers) inject a caret-color
-          // style into text fields before hydration; that is not our markup.
+          // Screenshot tooling and browser extensions (Playwright, Chrome automation)
+          // set an inline caret-color on fields that can land before hydration
+          // finishes; that is not our markup, so React must not report it.
           suppressHydrationWarning
           className="field-sizing-content block max-h-64 min-h-[5.5rem] w-full resize-none rounded-2xl bg-transparent px-5 pt-4 pb-2 text-base leading-relaxed text-foreground outline-none placeholder:text-muted-foreground sm:text-[17px]"
         />
@@ -229,6 +230,8 @@ export function HeroInput({ ref }: { ref?: React.Ref<HeroInputHandle> }) {
             tabIndex={-1}
             aria-hidden
             data-testid="hero-file-input"
+            // See the textarea: tooling sets caret-color on every field.
+            suppressHydrationWarning
             onChange={(e) => {
               void handleFiles(e.target.files);
               e.target.value = "";
