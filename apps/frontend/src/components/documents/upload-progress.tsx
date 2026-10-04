@@ -5,6 +5,7 @@ import Link from "next/link";
 
 import { buttonVariants } from "@/components/ui/button";
 import { Button } from "@/components/ui/button";
+import { LimitContact } from "@/components/ui/limit-notice";
 import { cn } from "@/lib/utils";
 
 import type { UploadItem } from "./use-uploads";
@@ -103,7 +104,10 @@ export function UploadProgress({ item, onDismiss }: { item: UploadItem; onDismis
       {failed && item.error && (
         <p role="alert" className="flex items-start gap-2 text-sm text-destructive" data-testid="upload-error" data-code={item.error.code}>
           <CircleAlert className="mt-0.5 size-4 shrink-0" aria-hidden />
-          {item.error.message}
+          <span>
+            {item.error.message}
+            <LimitContact info={item.error.limit} />
+          </span>
         </p>
       )}
 

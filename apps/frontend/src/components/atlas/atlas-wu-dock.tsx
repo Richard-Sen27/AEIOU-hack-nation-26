@@ -16,6 +16,7 @@ import { useLens } from "@/components/providers/lens-provider";
 import { useSession } from "@/components/providers/session-provider";
 import { AiDisclosure } from "@/components/shell/ai-disclosure";
 import { Button } from "@/components/ui/button";
+import { LimitContact, useLimitMessage } from "@/components/ui/limit-notice";
 import { Sheet, SheetContent, SheetDescription, SheetHeader, SheetTitle } from "@/components/ui/sheet";
 import { GrowSmoothly, RevealText, riseClass, riseStyle, useSmoothReveal } from "@/components/ui/smooth-reveal";
 import { Spinner } from "@/components/ui/spinner";
@@ -623,10 +624,15 @@ function ErrorNotice({ error, onRetry, onSignIn }: { error: TurnError; onRetry: 
   const copy = errorCopy(error);
   const Icon = copy.icon;
   const signIn = error.code === "reauth_required" || error.code === "sign_in_required";
+  const limited = error.code === "rate_limited" && !!error.limit;
+  const limitText = useLimitMessage(error.limit, "Dr. Wu");
   return (
     <div role="alert" className="flex items-center gap-2 rounded-lg border border-destructive/40 bg-destructive/5 px-2.5 py-2 text-sm" data-testid="turn-error" data-code={error.code}>
       <Icon className="size-4 shrink-0 text-destructive" aria-hidden />
-      <p className="min-w-0 flex-1 font-medium">{copy.title}</p>
+      <div className="min-w-0 flex-1">
+        <p className="font-medium">{limited ? limitText : copy.title}</p>
+        {limited && <LimitContact info={error.limit} />}
+      </div>
       {signIn ? (
         <Button size="xs" onClick={onSignIn}>
           Sign in

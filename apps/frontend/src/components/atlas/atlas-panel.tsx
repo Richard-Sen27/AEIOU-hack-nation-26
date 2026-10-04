@@ -25,11 +25,13 @@ import { useLens } from "@/components/providers/lens-provider";
 import { useSession } from "@/components/providers/session-provider";
 import { AiDisclosure } from "@/components/shell/ai-disclosure";
 import { Button, buttonVariants } from "@/components/ui/button";
+import { LimitContact, LimitText } from "@/components/ui/limit-notice";
 import { Skeleton } from "@/components/ui/skeleton";
 import { fadeWords, useSmoothReveal } from "@/components/ui/smooth-reveal";
 import { announce } from "@/lib/a11y";
 import { getAtlasSummary, streamSSE, type Schemas } from "@/lib/api";
 import type { ApiError } from "@/lib/api/errors";
+import { limitInfo, type LimitInfo } from "@/lib/api/limits";
 import { nodeTypeMeta, type LabelStyle } from "@/lib/graph/meta";
 import { cn } from "@/lib/utils";
 
@@ -731,7 +733,7 @@ type WriteState =
   | { kind: "working"; steps: string[]; text: string; final: ExplainFinal | null }
   | { kind: "sign_in" }
   | { kind: "unavailable" }
-  | { kind: "error"; message: string };
+  | { kind: "error"; message: string; limit?: LimitInfo };
 
 const WORKING: WriteState = { kind: "working", steps: [], text: "", final: null };
 
@@ -846,11 +848,11 @@ function WrittenSummary({
     if (attempt === 0) return;
     const ctrl = new AbortController();
     let watchdog: ReturnType<typeof setTimeout> | undefined;
-    const fail = (code: string, message?: string) => {
+    const fail = (code: string, message?: string, limit?: LimitInfo) => {
       clearTimeout(watchdog);
       if (code === "sign_in_required" || code === "reauth_required") setState({ kind: "sign_in" });
       else if (code === "not_implemented") setState({ kind: "unavailable" });
-      else setState({ kind: "error", message: message || writeError(code) });
+      else setState({ kind: "error", message: message || writeError(code), limit });
     };
     const arm = () => {
       clearTimeout(watchdog);
@@ -887,7 +889,7 @@ function WrittenSummary({
       },
     }).catch((err: ApiError) => {
       if (ctrl.signal.aborted || err.code === "aborted") return;
-      fail(err.code);
+      fail(err.code, undefined, err.code === "rate_limited" ? limitInfo(err) : undefined);
     });
     return () => {
       clearTimeout(watchdog);
@@ -1023,7 +1025,10 @@ function WrittenSummary({
       {state.kind === "error" && (
         <div className="flex items-center gap-2 text-sm" role="alert" data-testid="atlas-summary-write-error">
           <TriangleAlert className="size-4 shrink-0 text-status-flag" aria-hidden />
-          <p className="flex-1">{state.message}</p>
+          <p className="min-w-0 flex-1">
+            {state.limit ? <LimitText info={state.limit} subject="summaries" /> : state.message}
+            <LimitContact info={state.limit} />
+          </p>
           <Button variant="ghost" size="xs" onClick={write}>
             <RefreshCw aria-hidden /> Retry
           </Button>

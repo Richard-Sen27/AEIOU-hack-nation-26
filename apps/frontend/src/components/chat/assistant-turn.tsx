@@ -20,6 +20,7 @@ import { useState } from "react";
 import { atlasHandoffClick } from "@/components/atlas/atlas-handoff";
 import { useGate } from "@/components/providers/gate-provider";
 import { Button, buttonVariants } from "@/components/ui/button";
+import { LimitContact, useLimitMessage } from "@/components/ui/limit-notice";
 import { Spinner } from "@/components/ui/spinner";
 import type { SearchHit } from "@/lib/api/types";
 import { GrowSmoothly, RevealText, riseClass, riseStyle, useSmoothReveal } from "@/components/ui/smooth-reveal";
@@ -156,15 +157,20 @@ function TurnErrorNotice({ error, onRetry }: { error: TurnError; onRetry: () => 
   const copy = errorCopy(error);
   const Icon = copy.icon;
   const signIn = error.code === "reauth_required" || error.code === "sign_in_required";
+  // A 429 with the server's reason and wait: when to come back, in the shared wording.
+  const limited = error.code === "rate_limited" && !!error.limit;
+  const limitText = useLimitMessage(error.limit, "Dr. Wu");
   return (
     <div role="alert" className="flex flex-col gap-2 rounded-lg border border-destructive/40 bg-destructive/5 px-3.5 py-3 sm:flex-row sm:items-center" data-testid="turn-error" data-code={error.code}>
       <Icon className="size-4 shrink-0 text-destructive" aria-hidden />
       <div className="flex-1 text-sm">
-        <p className="font-medium">{copy.title}</p>
-        {(() => {
-          const detail = [serverDetail(error, copy), copy.hint].filter(Boolean).join(" ");
-          return detail ? <p className="text-muted-foreground">{detail}</p> : null;
-        })()}
+        <p className="font-medium">{limited ? limitText : copy.title}</p>
+        {!limited &&
+          (() => {
+            const detail = [serverDetail(error, copy), copy.hint].filter(Boolean).join(" ");
+            return detail ? <p className="text-muted-foreground">{detail}</p> : null;
+          })()}
+        {limited && <LimitContact info={error.limit} className="mt-0.5" />}
       </div>
       {signIn ? (
         <Button size="sm" onClick={() => openSignIn("Sign in again to continue the conversation with Dr. Wu.")}>

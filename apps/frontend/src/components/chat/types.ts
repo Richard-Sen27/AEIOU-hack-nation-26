@@ -1,4 +1,5 @@
 import type { Schemas } from "@/lib/api";
+import type { LimitInfo } from "@/lib/api/limits";
 
 export type { Schemas };
 
@@ -32,7 +33,8 @@ export type TurnErrorCode =
   | "not_implemented"
   | (string & {});
 
-export type TurnError = { code: TurnErrorCode; message: string };
+/** `limit`: a 429's reason and wait (lib/api/limits). */
+export type TurnError = { code: TurnErrorCode; message: string; limit?: LimitInfo };
 
 export type TurnPhase = "streaming" | "done" | "stopped" | "error";
 

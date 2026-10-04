@@ -12,6 +12,7 @@ import { Button } from "@/components/ui/button";
 import { Skeleton } from "@/components/ui/skeleton";
 import { announce } from "@/lib/a11y";
 import type { ApiError } from "@/lib/api/errors";
+import { limitInfo, limitMessage } from "@/lib/api/limits";
 import { CONFIDENCE_LABEL } from "@/lib/graph/meta";
 import type { EdgeFamily } from "@/lib/graph/types";
 import { cn } from "@/lib/utils";
@@ -63,7 +64,7 @@ function errorView(e: ApiError): { icon: typeof WifiOff; title: string; body: st
     case "network_error":
       return { icon: WifiOff, title: "Amber's server can't be reached", body: "Routes can't be loaded right now. Try again in a moment.", retry: true };
     case "rate_limited":
-      return { icon: TriangleAlert, title: "Please wait a moment", body: "Too many requests in a short time.", retry: true };
+      return { icon: TriangleAlert, title: "Please wait a moment", body: e.status === 429 && limitInfo(e) ? limitMessage(limitInfo(e), "routes") : "Too many requests in a short time.", retry: true };
     default:
       return { icon: TriangleAlert, title: "The route could not be loaded", body: "Something went wrong on our side. Please try again.", retry: true };
   }

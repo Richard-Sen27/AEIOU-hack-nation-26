@@ -8,6 +8,7 @@ import { useSession } from "@/components/providers/session-provider";
 import { hasRevealProgress } from "@/components/ui/smooth-reveal";
 import { announce } from "@/lib/a11y";
 import { ApiError, reportApiError } from "@/lib/api/errors";
+import { limitInfo } from "@/lib/api/limits";
 import {
   cancelChatRun,
   deleteChatSession,
@@ -173,7 +174,7 @@ function turnsFromHistory(messages: Schemas.ChatMessage[]): Turn[] {
 }
 
 function errorFrom(e: unknown): TurnError {
-  if (e instanceof ApiError) return { code: e.code, message: e.message };
+  if (e instanceof ApiError) return { code: e.code, message: e.message, limit: limitInfo(e) };
   return { code: "network_error", message: "The connection was interrupted." };
 }
 

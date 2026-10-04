@@ -20,10 +20,12 @@ import { useLens } from "@/components/providers/lens-provider";
 import { useSession } from "@/components/providers/session-provider";
 import { AiDisclosure } from "@/components/shell/ai-disclosure";
 import { Button } from "@/components/ui/button";
+import { LimitContact, LimitText } from "@/components/ui/limit-notice";
 import { Spinner } from "@/components/ui/spinner";
 import { announce } from "@/lib/a11y";
 import { createContribution, streamSSE } from "@/lib/api";
 import type { ApiError } from "@/lib/api/errors";
+import { limitInfo, type LimitInfo } from "@/lib/api/limits";
 import { relationLabel } from "@/lib/graph/meta";
 import { cn } from "@/lib/utils";
 
@@ -40,7 +42,7 @@ type Progress = { step: number; tool?: string | null; message: string; elapsed?:
 
 type Ending =
   | { kind: "final"; reason: GapStopReason; count: number }
-  | { kind: "error"; code: string; message: string }
+  | { kind: "error"; code: string; message: string; limit?: LimitInfo }
   | { kind: "stopped" };
 
 type Phase = "idle" | "running" | "ended";
@@ -240,7 +242,8 @@ export function GapSearchPanel({
           message: "Gap search needs a working ChatGPT connection. Please sign in with ChatGPT again.",
         });
       } else {
-        setEnding({ kind: "error", code: e.code, message: errorEnding(e.code) });
+        const limit = e.code === "rate_limited" ? limitInfo(e) : undefined;
+        setEnding({ kind: "error", code: e.code, message: errorEnding(e.code), limit });
       }
     } finally {
       if (ctrl.current === c) setPhase("ended");
@@ -369,7 +372,9 @@ export function GapSearchPanel({
             {ending.kind === "final"
               ? `${ENDING_COPY[ending.reason]} ${ending.count === 0 ? "Nothing found in the sources searched." : `${ending.count} candidate link${ending.count === 1 ? "" : "s"} found.`}`
               : ending.kind === "error"
-                ? ending.message
+                ? ending.limit
+                  ? <><LimitText info={ending.limit} subject="gap search" /><LimitContact info={ending.limit} /></>
+                  : ending.message
                 : `Stopped. ${candidates.length} candidate${candidates.length === 1 ? "" : "s"} found so far.`}
           </span>
           {ending.kind === "error" && ending.code === "reauth_required" && (

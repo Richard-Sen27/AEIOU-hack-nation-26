@@ -4,6 +4,7 @@ import { useCallback, useEffect, useRef, useState } from "react";
 
 import { announce } from "@/lib/a11y";
 import { ApiError, reportApiError } from "@/lib/api/errors";
+import { limitInfo, type LimitInfo } from "@/lib/api/limits";
 import { apiFetch } from "@/lib/api/fetch";
 import type { JobAccepted, JobStage } from "@/lib/api/generated/types.gen";
 import { streamSSE } from "@/lib/api/sse";
@@ -22,7 +23,7 @@ export type UploadItem = {
   percent: number;
   documentId?: string;
   findingCount?: number;
-  error?: { code: string; message: string };
+  error?: { code: string; message: string; limit?: LimitInfo };
 };
 
 type JobEvt =
@@ -56,9 +57,9 @@ export function useUploads({ onDone }: { onDone?: (done: UploadDone) => void } =
   }, []);
 
   const fail = useCallback(
-    (key: string, code: string, message?: string) => {
-      const msg = uploadErrorMessage(code, message);
-      patch(key, { status: "failed", error: { code, message: msg } });
+    (key: string, code: string, message?: string, limit?: LimitInfo) => {
+      const msg = uploadErrorMessage(code, message, limit);
+      patch(key, { status: "failed", error: { code, message: msg, limit } });
       announce(`Upload failed. ${msg}`, "assertive");
     },
     [patch],
@@ -77,7 +78,7 @@ export function useUploads({ onDone }: { onDone?: (done: UploadDone) => void } =
       } catch (e) {
         const err = e instanceof ApiError ? e : new ApiError("network_error", "", 0);
         if (GLOBAL.has(err.code)) reportApiError(err);
-        return fail(key, err.code, err.message);
+        return fail(key, err.code, err.message, limitInfo(err));
       }
       patch(key, { status: "processing", stage: "queued", percent: 5, documentId: job.document_id });
       announce("Upload received. Reading the document.");
@@ -119,7 +120,7 @@ export function useUploads({ onDone }: { onDone?: (done: UploadDone) => void } =
       } catch (e) {
         const err = e instanceof ApiError ? e : new ApiError("network_error", "", 0);
         if (GLOBAL.has(err.code)) reportApiError(err);
-        if (!finished) fail(key, err.code, err.message);
+        if (!finished) fail(key, err.code, err.message, limitInfo(err));
       } finally {
         ctrls.current.delete(ctrl);
       }

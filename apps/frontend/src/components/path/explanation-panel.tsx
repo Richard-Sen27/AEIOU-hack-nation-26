@@ -8,10 +8,12 @@ import { ROLE_LABELS, useLens } from "@/components/providers/lens-provider";
 import { useSession } from "@/components/providers/session-provider";
 import { AiDisclosure } from "@/components/shell/ai-disclosure";
 import { Button } from "@/components/ui/button";
+import { LimitContact, LimitText } from "@/components/ui/limit-notice";
 import { Skeleton } from "@/components/ui/skeleton";
 import { announce } from "@/lib/a11y";
 import { streamSSE } from "@/lib/api";
 import type { ApiError } from "@/lib/api/errors";
+import { limitInfo, type LimitInfo } from "@/lib/api/limits";
 import { relationLabel } from "@/lib/graph/meta";
 
 import type { ExplainEvent, ExplainFinal, PathT } from "./types";
@@ -22,7 +24,7 @@ type State =
   | { kind: "done"; final: ExplainFinal }
   | { kind: "sign_in" }
   | { kind: "unavailable" }
-  | { kind: "error"; message: string };
+  | { kind: "error"; message: string; limit?: LimitInfo };
 
 const CITATION = /\[(e_[0-9a-zA-Z]+(?:\s*[,;]\s*e_[0-9a-zA-Z]+)*)\]/g;
 
@@ -134,7 +136,7 @@ export function ExplanationPanel({ path, onCite }: { path: PathT; onCite: (edgeI
       if (ctrl.signal.aborted || err.code === "aborted") return;
       if (err.code === "sign_in_required" || err.code === "reauth_required") setState({ kind: "sign_in" });
       else if (err.code === "not_implemented") setState({ kind: "unavailable" });
-      else setState({ kind: "error", message: errorMessage(err.code) });
+      else setState({ kind: "error", message: errorMessage(err.code), limit: err.code === "rate_limited" ? limitInfo(err) : undefined });
     });
     return () => ctrl.abort();
   }, [edgeKey, role, language, user?.id, attempt]);
@@ -218,7 +220,10 @@ export function ExplanationPanel({ path, onCite }: { path: PathT; onCite: (edgeI
         <div className="flex items-start gap-3 text-sm" role="alert" data-testid="explain-error">
           <TriangleAlert className="mt-0.5 size-4 shrink-0 text-status-flag" aria-hidden />
           <div className="space-y-2">
-            <p>{state.message}</p>
+            <p>
+              {state.limit ? <LimitText info={state.limit} subject="explanations" /> : state.message}
+              <LimitContact info={state.limit} />
+            </p>
             <Button variant="ghost" size="sm" onClick={() => setAttempt((a) => a + 1)}>
               <RefreshCw aria-hidden /> Try again
             </Button>

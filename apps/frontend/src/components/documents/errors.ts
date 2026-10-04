@@ -1,3 +1,5 @@
+import { isDaily, limitMessage, remaining, waitPhrase, type LimitInfo } from "@/lib/api/limits";
+
 /** Upload limits from the system spec (Backend services → Documents). */
 export const MAX_BYTES = 20 * 1024 * 1024;
 export const MAX_PAGES = 30;
@@ -32,7 +34,7 @@ export function anonymousName(file: File): string {
 }
 
 /** Plain-language message per stable error code. Never echoes content. */
-export function uploadErrorMessage(code: string, serverMessage?: string): string {
+export function uploadErrorMessage(code: string, serverMessage?: string, limit?: LimitInfo): string {
   // The API's messages for these codes are specific ("more than 30 pages",
   // "password-protected") and never echo content; add what to do next.
   const specific = serverMessage && !/^Request failed/.test(serverMessage) ? `${serverMessage} ` : "";
@@ -46,9 +48,15 @@ export function uploadErrorMessage(code: string, serverMessage?: string): string
     case "empty_file":
       return "This file is empty.";
     case "rate_limited":
-      // The daily AI limit and the general request limit have their own short messages.
-      if (/usage limit|short time/i.test(serverMessage ?? "")) return serverMessage!;
-      return `You have uploaded ${UPLOADS_PER_HOUR} documents in the last hour, which is the limit. Please try again later.`;
+    case "busy": {
+      // The upload limit is hourly; a shorter wait is the general limit, a longer one a daily limit.
+      const left = limit ? remaining(limit) : undefined;
+      if (limit && (isDaily(limit) || limit.reason === "busy" || (left !== undefined && left <= 60))) {
+        return limitMessage(limit, "uploads");
+      }
+      const when = left ? waitPhrase(left) : "later";
+      return `You have uploaded ${UPLOADS_PER_HOUR} documents in the last hour, which is the limit. Try again ${when}.`;
+    }
     case "consent_required":
       return "Uploading needs your consent. Nothing was uploaded.";
     case "sign_in_required":

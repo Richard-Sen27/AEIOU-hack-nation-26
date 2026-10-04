@@ -6,6 +6,7 @@ import { toast } from "sonner";
 import { ConsentDialog } from "@/components/gates/consent-dialog";
 import { SignInDialog } from "@/components/gates/sign-in-dialog";
 import { setApiErrorHandler, type ApiError } from "@/lib/api/errors";
+import { isDaily, limitInfo, limitMessage } from "@/lib/api/limits";
 import { hasConsent, type ConsentType } from "@/lib/api/types";
 
 import { useSession } from "./session-provider";
@@ -113,12 +114,14 @@ export function GateProvider({ children }: { children: React.ReactNode }) {
               description: "This part of Amber is still being built.",
             });
             return;
-          case "rate_limited":
-            toast("Please wait a moment", {
+          case "rate_limited": {
+            const limit = limitInfo(error);
+            toast(isDaily(limit) ? "Daily limit reached" : "Please wait a moment", {
               id: "rate-limited",
-              description: "Too many requests in a short time. Try again shortly.",
+              description: limit ? limitMessage(limit, "this feature") : "Too many requests. Try again shortly.",
             });
             return;
+          }
           case "busy":
             toast("Amber is busy", { id: "busy", description: "Try again in a moment." });
             return;
