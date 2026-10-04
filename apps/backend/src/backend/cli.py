@@ -3,6 +3,8 @@
     uv run python -m backend.cli precompute-explanations [--language en ...] [--limit N]
     uv run python -m backend.cli eval [--mock] [--only golden,refusal,...]
     uv run python -m backend.cli demo-graph-changes MONDO:0100135 [--clear]
+    uv run python -m backend.cli verification-requests
+    uv run python -m backend.cli verify-professional <user id> --reason "..." [--reject|--revoke]
 
 precompute-explanations fills explanations_cache for the demo paths in every role and the
 requested languages. With a CLI ChatGPT login (`python -m backend.openai_auth.cli login`) the
@@ -21,6 +23,16 @@ disease, as if a new load had linked its existing papers, trials, grants and pat
 followers get notifications before a real second load produces changes. The rows use the data
 version `demo-<UTC time>`; `--clear` deletes every demo row. Refuses to run unless API_URL and
 the pipeline database are loopback addresses.
+
+verification-requests and verify-professional are the operator's manual review of doctors and
+researchers who asked for it in the app (institutional e-mail and a public profile page). They
+connect as atlas_owner (MIGRATION_DATABASE_URL): the list comes from the definer function
+pending_verification_requests(), which the API role cannot call, and a decision updates only that
+user's row (app.user_id set to them). Every decision needs a reason, which is stored on the row
+(`verification_reason`, part of that user's export) and printed. Approving drops the e-mail and
+link, sets `role_verified` with the method `institutional_email` and the reviewed name (the work
+details name unless --name is given); rejecting drops them too and keeps a "rejected" stub;
+--revoke ends any verification and hides the card (the API's card cache catches up within 60 s).
 """
 
 import argparse
@@ -296,6 +308,109 @@ def demo_graph_changes(disease_id: str, *, clear: bool = False, out=sys.stdout) 
     return rows
 
 
+VERIFY_METHODS = ("institutional_email",)
+
+
+def _owner_connect():
+    import psycopg
+    from psycopg.rows import dict_row
+
+    from backend.config import get_settings
+
+    url = get_settings().migration_database_url.replace("postgresql+psycopg://", "postgresql://")
+    return psycopg.connect(url, row_factory=dict_row)
+
+
+def verification_requests(out=sys.stdout) -> list[dict]:
+    """Print the pending manual verification requests (operator only)."""
+    with _owner_connect() as conn:
+        rows = conn.execute("SELECT * FROM pending_verification_requests()").fetchall()
+    print(f"pending verification requests: {len(rows)}", file=out)
+    for r in rows:
+        req = r["request"] or {}
+        name = " ".join(p for p in (r["first_name"], r["last_name"]) if p) or "(no name)"
+        inst = "; ".join(i.get("label", "") for i in (r["institutions"] or []))
+        print(
+            f"  {r['user_id']}  {r['role']}  {name}  [{inst}]  orcid={r['orcid_id'] or '-'}\n"
+            f"      e-mail={req.get('institutional_email')}  page={req.get('profile_url')}"
+            f"  requested={req.get('requested_at')}",
+            file=out,
+        )
+    return rows
+
+
+def verify_professional(
+    user_id: str,
+    *,
+    reason: str,
+    method: str = "institutional_email",
+    name: str | None = None,
+    reject: bool = False,
+    revoke: bool = False,
+    out=sys.stdout,
+) -> str:
+    """Approve, reject or revoke a doctor's or researcher's verification; returns the decision."""
+    import json
+    import uuid
+
+    reason = " ".join((reason or "").split())
+    if not reason or len(reason) > 500:
+        raise SystemExit("a reason (1-500 characters) is required")
+    if method not in VERIFY_METHODS:
+        raise SystemExit(f"unknown method; use one of {', '.join(VERIFY_METHODS)}")
+    try:
+        uid = str(uuid.UUID(user_id))
+    except ValueError:
+        raise SystemExit("not a user id") from None
+    name = " ".join(name.split())[:200] if name else None
+    now = datetime.now(UTC).isoformat()
+    with _owner_connect() as conn, conn.transaction():
+        conn.execute("SELECT set_config('app.user_id', %s, true)", (uid,))
+        row = conn.execute(
+            "SELECT role, verification_request FROM profiles WHERE user_id = %s FOR UPDATE",
+            (uid,),
+        ).fetchone()
+        if row is None or row["role"] not in ("doctor", "researcher"):
+            raise SystemExit("no doctor or researcher with this id")
+        pending = (row["verification_request"] or {}).get("status") == "pending"
+        if revoke:
+            decision = "revoked"
+            conn.execute(
+                "UPDATE profiles SET role_verified = false, orcid_verified_at = NULL,"
+                " verified_name = NULL, verification_method = NULL, verified_at = NULL,"
+                " atlas_link_verified = false, card_visible = false, card_visible_since = NULL,"
+                " verification_request = NULL, verification_reason = %s, updated_at = now()"
+                " WHERE user_id = %s",
+                (reason, uid),
+            )
+        elif not pending:
+            raise SystemExit("this user has no pending verification request")
+        elif reject:
+            decision = "rejected"
+            stub = {
+                "status": "rejected",
+                "requested_at": row["verification_request"].get("requested_at"),
+                "decided_at": now,
+            }
+            conn.execute(
+                "UPDATE profiles SET verification_request = %s::jsonb, verification_reason = %s,"
+                " updated_at = now() WHERE user_id = %s",
+                (json.dumps(stub), reason, uid),
+            )
+        else:
+            decision = "approved"
+            conn.execute(
+                "UPDATE profiles SET role_verified = true, verification_method = %s,"
+                " verified_at = now(), verification_reason = %s, verification_request = NULL,"
+                " verified_name = COALESCE(%s, NULLIF(concat_ws(' ', first_name, last_name), '')),"
+                " updated_at = now() WHERE user_id = %s",
+                (method, reason, name, uid),
+            )
+    print(f"verification {decision}: user {uid} method={method} at {now}", file=out)
+    print(f"  reason: {reason}", file=out)
+    return decision
+
+
 def _run(coro):
     from backend.db.session import configure_engine, dispose_engine
 
@@ -342,7 +457,36 @@ def main(argv: list[str] | None = None) -> int:
     demo.add_argument("disease_id", nargs="?", help="Disease ID, e.g. MONDO:0100135")
     demo.add_argument("--clear", action="store_true", help="Delete every demo row instead")
 
+    sub.add_parser(
+        "verification-requests",
+        help="Operator: list pending manual verification requests of doctors and researchers",
+    )
+    ver = sub.add_parser(
+        "verify-professional",
+        help="Operator: approve, reject or revoke a manual verification (reason required)",
+    )
+    ver.add_argument("user_id", help="User id from verification-requests")
+    ver.add_argument("--reason", required=True, help="Why (stored on the user's row, printed)")
+    ver.add_argument("--method", default="institutional_email", choices=VERIFY_METHODS)
+    ver.add_argument("--name", help="Reviewed name (default: the work details name)")
+    decision = ver.add_mutually_exclusive_group()
+    decision.add_argument("--reject", action="store_true", help="Reject the pending request")
+    decision.add_argument("--revoke", action="store_true", help="End any verification")
+
     args = parser.parse_args(argv)
+    if args.command == "verification-requests":
+        verification_requests()
+        return 0
+    if args.command == "verify-professional":
+        verify_professional(
+            args.user_id,
+            reason=args.reason,
+            method=args.method,
+            name=args.name,
+            reject=args.reject,
+            revoke=args.revoke,
+        )
+        return 0
     if args.command == "demo-graph-changes":
         if not args.clear and not args.disease_id:
             parser.error("disease_id is required unless --clear is given")
