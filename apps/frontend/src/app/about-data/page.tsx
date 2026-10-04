@@ -7,12 +7,15 @@ import { PrivacyEmail } from "@/components/privacy/privacy-contact";
 import { PageContainer, PageHeader } from "@/components/shell/page-placeholder";
 import { PRIVACY_EMAIL } from "@/lib/api/config";
 
+import { ScopeCounts } from "./scope-counts";
+
 export const metadata: Metadata = {
   title: "About this data",
   description: "Where the atlas comes from, how confidence works, and how researchers and doctors can claim or remove their entry.",
 };
 
 const TOC = [
+  { id: "scope", title: "What is included" },
   { id: "sources", title: "Sources and licences" },
   { id: "trust", title: "Confidence and labels" },
   { id: "version", title: "Data version" },
@@ -51,6 +54,21 @@ export default async function AboutDataPage(props: PageProps<"/about-data">) {
       />
       <div className="mt-10">
         <NoticeLayout toc={TOC}>
+          <NoticeSection id="scope" title="What is included">
+            <ScopeCounts />
+            <p>
+              Focus diseases also have papers, trials, grants, researchers, doctors, patient groups and registries, and
+              are the ones drawn on the map. The others have genes, symptoms and computed links, and are found through
+              search and Dr. Wu.
+            </p>
+            <List
+              items={[
+                "Counts of ClinVar variants per gene; individual variants only for focus genes.",
+                "Pathways come from Reactome; Gene Ontology pathways only for focus genes.",
+              ]}
+            />
+          </NoticeSection>
+
           <NoticeSection id="sources" title="Sources and licences">
             <p>
               Every link in the atlas records its source, the date it was retrieved and a confidence level. We thank the
@@ -63,7 +81,7 @@ export default async function AboutDataPage(props: PageProps<"/about-data">) {
                 [<Src key="m" href="https://mondo.monarchinitiative.org/">MONDO</Src>, "Disease identifiers, names and synonyms", "CC BY 4.0, Monarch Initiative"],
                 [<Src key="h" href="https://www.genenames.org/">HGNC</Src>, "Approved gene symbols and aliases", "Freely available under the HGNC terms of use"],
                 [<Src key="hp" href="https://hpo.jax.org/">Human Phenotype Ontology (HPO)</Src>, "Symptom terms and disease–symptom links", "HPO licence, free to use with attribution; this atlas uses the HPO (hpo.jax.org)"],
-                [<Src key="c" href="https://www.ncbi.nlm.nih.gov/clinvar/">ClinVar</Src>, "Variant classifications for genes in scope", "Public domain (NCBI, U.S. National Library of Medicine)"],
+                [<Src key="c" href="https://www.ncbi.nlm.nih.gov/clinvar/">ClinVar</Src>, "Variant counts per gene; individual variants for focus genes", "Public domain (NCBI, U.S. National Library of Medicine)"],
                 [<Src key="mane" href="https://www.ncbi.nlm.nih.gov/refseq/MANE/">NCBI MANE</Src>, "Where each gene sits on the genome (chromosome, start, end; GRCh38)", "Public data, NCBI and EMBL-EBI"],
                 ["OMIM numbers", "Disease identifiers", "Taken from HPO annotations, MONDO cross-references and ClinVar; OMIM's own files are not used"],
                 [<Src key="cg" href="https://clinicalgenome.org/">ClinGen</Src>, "Gene–disease validity and dosage sensitivity", "Freely available under the ClinGen terms of use"],
