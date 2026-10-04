@@ -242,6 +242,8 @@ test.describe("Dr. Wu AI notice", () => {
     await expect(notice).toContainText("Dr. Wu is an AI, not a doctor.");
     await expect(notice).toBeInViewport();
     await ask(page, page.locator("body"));
+    // The composer does not send while an answer is still streaming.
+    await expect(page.getByTestId("assistant-turn")).toHaveAttribute("data-phase", "done");
     await ask(page, page.locator("body"), "And the registry?");
     await expect(page.getByTestId("assistant-turn")).toHaveCount(2);
     await expect(page.getByTestId("assistant-turn").last()).toHaveAttribute("data-phase", "done");
