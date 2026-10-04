@@ -17,6 +17,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from backend.api.errors import ApiError
 from backend.api.services import follows as follows_service
 from backend.api.services.chat import message_from_row as chat_message_from_row
+from backend.api.services.chat import runs as chat_runs
 from backend.api.services.contributions import contribution_from_row, refresh_shared_graph
 from backend.api.services.professional import (
     PROFESSIONAL_ROLES,
@@ -285,6 +286,7 @@ async def revoke_consent(db: AsyncSession, user: CurrentUser, consent_type: Cons
     )
     params = {"uid": user.id}
     if consent_type == ConsentType.health_data:
+        await chat_runs.discard_user(user.id)  # running turns stop and store nothing
         # Gap-search jobs use public graph terms only and are not held under this consent.
         await db.execute(
             text("DELETE FROM jobs WHERE user_id = :uid AND kind = :kind"),
@@ -663,6 +665,7 @@ async def export_data(db: AsyncSession, user: CurrentUser) -> DataExport:
             )
             for s in sessions
         ],
+        chat_runs=await chat_runs.export(db, uid),
         documents=[Document.model_validate(dict(d)) for d in documents],
         findings=[Finding.model_validate(dict(f)) for f in findings],
         contributions=[contribution_from_row(c) for c in contributions],
@@ -696,6 +699,7 @@ async def delete_account(db: AsyncSession, user: CurrentUser) -> None:
     Revokes the OpenAI tokens first (best effort) and refreshes the shared-graph overlays so the
     user's contributions and flags disappear for everyone. The route clears the session cookie.
     """
+    await chat_runs.discard_user(user.id)  # running turns stop and store nothing
     await _revoke_openai_tokens(db, user)
     deleted = await db.scalar(
         text("DELETE FROM users WHERE id = :uid RETURNING id"), {"uid": user.id}

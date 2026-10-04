@@ -79,6 +79,11 @@ class ChatTurnEvent(ApiModel):
         description="The stored user message of this turn: send it as retry_message_id to run "
         "the turn again without storing the message twice."
     )
+    run_id: UUID | None = Field(
+        None,
+        description="The server-side run of this turn: follow it again with streamChatRun "
+        "(after a reload or from another view) or stop it with cancelChatRun.",
+    )
 
 
 class ChatErrorEvent(StreamError):

@@ -6,7 +6,7 @@ from uuid import UUID
 
 from pydantic import ConfigDict, Field, ValidationInfo, field_validator, model_validator
 
-from backend.schemas.chat import ChatMessage, ChatSession
+from backend.schemas.chat import ChatMessage, ChatRunExport, ChatSession
 from backend.schemas.common import LANGUAGE_PATTERN, ApiModel
 from backend.schemas.contributions import Contribution, EdgeFlag
 from backend.schemas.documents import Document, Finding, Job
@@ -350,6 +350,9 @@ class DataExport(ApiModel):
         None, description="Work details (doctor and researcher roles); null if none are stored."
     )
     chat_sessions: list[ChatSessionExport]
+    chat_runs: list[ChatRunExport] = Field(
+        default_factory=list, description="Dr. Wu turns still running, with their saved state."
+    )
     documents: list[Document]
     findings: list[Finding]
     contributions: list[Contribution]

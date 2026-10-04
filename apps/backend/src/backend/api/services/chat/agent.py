@@ -1,15 +1,20 @@
-"""One orchestrating agent ("Dr. Wu"): system prompt, tool loop, post-checks.
+"""One orchestrating agent ("Dr. Wu"): system prompt, the turn graph (LangGraph), post-checks.
 
-`run_agent` is the turn without persistence (used by run_turn and by the eval harness)."""
+`run_graph` runs one turn as a graph; a chat run adds persistence and checkpoints, `run_agent`
+is the same turn without them (eval harness, tests)."""
 
 import asyncio
 import json
 import logging
+import operator
 import sys
 import time
-from collections.abc import Callable
+from collections.abc import Awaitable, Callable
 from dataclasses import dataclass, field
-from typing import Any
+from typing import Annotated, Any, TypedDict
+
+from langgraph.graph import END, START, StateGraph
+from langgraph.runtime import Runtime
 
 from backend.api.services import graph as graph_service
 from backend.api.services.chat import safety
@@ -348,101 +353,303 @@ def emergency_result(message: str, lens: Lens) -> TurnResult:
     return TurnResult(reply=reply, emergency=True)
 
 
-async def run_agent(
-    llm: LLMClient,
+# ---- the turn as a LangGraph graph ---------------------------------------------------------
+#
+# Nodes are plain functions around the code above. Graph state holds JSON values only and only
+# redacted content (it is what a checkpoint stores); everything that must never be stored (the
+# LLM client with the user's credentials, the profile and its redacted text, the history, the
+# tool cache, the clock) lives in the run's TurnContext, passed as LangGraph runtime context,
+# which is never checkpointed. Redaction and emergency detection run before the graph, on the
+# raw text, so raw text never enters the graph.
+
+
+class TurnGraphState(TypedDict, total=False):
+    message: str  # redacted
+    emergency: bool  # set before the graph (emergency detection needs the raw text too)
+    asked: list[str]  # boundary categories the message asks for
+    steps: Annotated[list[dict[str, Any]], operator.add]  # status steps shown so far
+    context: list[str]  # extract/resolve results handed to the first round
+    partial: str | None  # error code when the answer is built from what tools gathered
+    draft: dict[str, Any] | None  # the model's answer before the post-check
+    reply: dict[str, Any] | None  # the checked reply
+    message_id: str | None  # the stored assistant message
+
+
+@dataclass
+class TurnContext:
+    """Per-run objects that are never checkpointed."""
+
+    llm: LLMClient | None
+    lens: Lens
+    profile: PatientProfile
+    profile_text: str  # redacted
+    history: list[dict[str, str]]
+    on_status: Callable[[str | None, str], Any] | None = None
+    tracer: Tracer | None = None
+    persist: Callable[[AgentReply], Awaitable[Any]] | None = None
+    started: float = field(default_factory=time.monotonic)
+    deadline: float = 0.0
+    state: TurnState | None = None
+    clock: _TurnClock | None = None
+    asked: set = field(default_factory=set)
+    instructions: str = ""
+    tools: list = field(default_factory=list)
+    result: Any = None  # ToolRunResult of the agent node
+    draft: AgentDraft | None = None
+    reply: AgentReply | None = None
+    report: CheckReport | None = None
+    pending_steps: list[dict[str, Any]] = field(default_factory=list)
+
+    async def status(self, tool: str | None, key: str) -> None:
+        assert self.state is not None
+        message = self.state.status_text(key)
+        self.pending_steps.append({"tool": tool, "message": message})
+        if self.on_status is not None:
+            res = self.on_status(tool, message)
+            if hasattr(res, "__await__"):
+                await res
+
+    def take_steps(self) -> list[dict[str, Any]]:
+        steps, self.pending_steps = self.pending_steps, []
+        return steps
+
+
+def _ctx(runtime: Runtime[TurnContext]) -> TurnContext:
+    return runtime.context
+
+
+def _gathered(ctx: TurnContext, exc: LLMError) -> str:
+    """A deadline or bad output after tools found something: answer from what was gathered
+    (built in code, post-checked, no model call). Any other error ends the turn."""
+    assert ctx.state is not None and ctx.clock is not None
+    ctx.clock.cut_open_tools()
+    if exc.code not in ("timeout", "bad_output") or not (ctx.state.chips or ctx.state.edges):
+        raise exc
+    return exc.code
+
+
+async def _node_safety(state: TurnGraphState, runtime: Runtime[TurnContext]) -> dict:
+    ctx = _ctx(runtime)
+    ctx.asked = safety.asked_categories(state["message"])
+    return {"asked": sorted(c.value for c in ctx.asked)}
+
+
+def _after_safety(state: TurnGraphState) -> str:
+    return "emergency" if state.get("emergency") else "entities"
+
+
+async def _node_emergency(state: TurnGraphState, runtime: Runtime[TurnContext]) -> dict:
+    ctx = _ctx(runtime)
+    ctx.reply = emergency_result(state["message"], ctx.lens).reply
+    return {"reply": ctx.reply.model_dump(mode="json")}
+
+
+async def _node_entities(state: TurnGraphState, runtime: Runtime[TurnContext]) -> dict:
+    ctx = _ctx(runtime)
+    assert ctx.llm is not None and ctx.state is not None and ctx.clock is not None
+    try:
+        try:
+            async with asyncio.timeout(max(0.0, ctx.deadline - time.monotonic())):
+                await _warm_models(ctx.llm, ctx.clock)
+                context = await _entities_first(ctx.llm, ctx.state, ctx.clock, ctx.status)
+        except TimeoutError:
+            raise LLMError("timeout", "turn exceeded its deadline") from None
+    except LLMError as exc:
+        return {"partial": _gathered(ctx, exc), "steps": ctx.take_steps()}
+    return {"context": context, "partial": None, "steps": ctx.take_steps()}
+
+
+def _after_entities(state: TurnGraphState) -> str:
+    return "partial" if state.get("partial") else "agent"
+
+
+async def _node_agent(state: TurnGraphState, runtime: Runtime[TurnContext]) -> dict:
+    """The model/tool rounds and the final answer (the round with tools disabled), inside the
+    gateway's run_tools, which enforces the round, call and time budgets."""
+    ctx = _ctx(runtime)
+    assert ctx.llm is not None and ctx.clock is not None
+    items: list[dict[str, str]] = [*ctx.history[-HISTORY_MESSAGES:]]
+    items.append({"role": "user", "content": state["message"]})
+    items += [{"role": "developer", "content": c} for c in state.get("context") or []]
+
+    async def on_event(event: ToolEvent) -> None:
+        ctx.clock.tool_event(event)
+        if event.type == "tool_start" and event.name:
+            await ctx.status(event.name, event.name)
+        elif event.type == "final_round":
+            ctx.clock.step("budget", event.name or "unknown", 0)
+            await ctx.status(None, "answer")
+
+    elapsed = time.monotonic() - ctx.started
+    try:
+        ctx.result = await ctx.llm.run_tools(
+            instructions=ctx.instructions,
+            input=items,
+            tools=ctx.tools,
+            final_schema=AgentDraft,
+            kind="main",
+            max_tool_calls=MAX_TOOL_CALLS,
+            deadline_s=max(0.0, ctx.deadline - time.monotonic()),
+            on_event=on_event,
+            max_rounds=MAX_TOOL_ROUNDS,
+            tools_for_s=max(0.0, TOOL_PHASE_S - elapsed),
+            final_note=FINAL_NOTE,
+            tool_effort="low",
+        )
+    except LLMError as exc:
+        return {"partial": _gathered(ctx, exc), "steps": ctx.take_steps()}
+    if ctx.result.output is None:
+        return {"partial": None, "steps": ctx.take_steps()}
+    ctx.draft = ctx.result.output
+    return {
+        "partial": None,
+        "draft": ctx.draft.model_dump(mode="json"),
+        "steps": ctx.take_steps(),
+    }
+
+
+def _after_agent(state: TurnGraphState) -> str:
+    return "postcheck" if state.get("draft") else "partial"
+
+
+async def _node_partial(state: TurnGraphState, runtime: Runtime[TurnContext]) -> dict:
+    """The answer built in code from what the tools gathered (deadline or bad output)."""
+    ctx = _ctx(runtime)
+    assert ctx.state is not None
+    ctx.draft = partial_draft(ctx.state)
+    return {"draft": ctx.draft.model_dump(mode="json")}
+
+
+async def _node_postcheck(state: TurnGraphState, runtime: Runtime[TurnContext]) -> dict:
+    ctx = _ctx(runtime)
+    assert ctx.state is not None and ctx.clock is not None and ctx.draft is not None
+    partial = state.get("partial")
+    await ctx.status(None, "checks")
+    checks_started = time.monotonic()
+    ctx.reply, ctx.report = await check_reply(
+        ctx.draft,
+        ctx.state,
+        None if partial else ctx.llm,
+        asked=ctx.asked,
+        deadline=ctx.deadline,
+    )
+    ctx.clock.step("check", "postcheck", (time.monotonic() - checks_started) * 1000)
+    ctx.clock.finish("partial" if partial else "answered", partial)
+    if ctx.tracer is not None:
+        with ctx.tracer.span("chat.postcheck", metadata=ctx.report.as_metadata()):
+            pass
+    return {"reply": ctx.reply.model_dump(mode="json"), "steps": ctx.take_steps()}
+
+
+async def _node_persist(state: TurnGraphState, runtime: Runtime[TurnContext]) -> dict:
+    """Store the reply (and end the run) in one transaction."""
+    ctx = _ctx(runtime)
+    assert ctx.persist is not None and ctx.reply is not None
+    message_id = await ctx.persist(ctx.reply)
+    return {"message_id": str(message_id)}
+
+
+def build_turn_graph(*, persist: bool) -> StateGraph:
+    """safety -> (emergency | entities -> agent -> [partial] -> postcheck) -> [persist].
+
+    New steps (a pause for the user's confirmation, a multi-step plan) go between agent and
+    postcheck; see docs/homework.md."""
+    graph = StateGraph(TurnGraphState, context_schema=TurnContext)
+    graph.add_node("safety", _node_safety)
+    graph.add_node("emergency", _node_emergency)
+    graph.add_node("entities", _node_entities)
+    graph.add_node("agent", _node_agent)
+    graph.add_node("partial", _node_partial)
+    graph.add_node("postcheck", _node_postcheck)
+    graph.add_edge(START, "safety")
+    graph.add_conditional_edges("safety", _after_safety, ["emergency", "entities"])
+    graph.add_conditional_edges("entities", _after_entities, ["agent", "partial"])
+    graph.add_conditional_edges("agent", _after_agent, ["postcheck", "partial"])
+    graph.add_edge("partial", "postcheck")
+    if persist:
+        graph.add_node("persist", _node_persist)
+        graph.add_edge("emergency", "persist")
+        graph.add_edge("postcheck", "persist")
+        graph.add_edge("persist", END)
+    else:
+        graph.add_edge("emergency", END)
+        graph.add_edge("postcheck", END)
+    return graph
+
+
+_compiled: dict[tuple[bool, int], Any] = {}
+
+
+def _turn_graph(persist: bool, checkpointer: Any = None):
+    key = (persist, id(checkpointer))
+    if key not in _compiled:
+        _compiled[key] = build_turn_graph(persist=persist).compile(checkpointer=checkpointer)
+    return _compiled[key]
+
+
+async def run_graph(
+    llm: LLMClient | None,
     *,
     message: str,
     lens: Lens,
     profile: PatientProfile,
     profile_text: str,
     history: list[dict[str, str]] | None = None,
+    emergency: bool = False,
     on_status: Callable[[str | None, str], Any] | None = None,
     tracer: Tracer | None = None,
+    persist: Callable[[AgentReply], Awaitable[Any]] | None = None,
+    checkpointer: Any = None,
+    config: dict[str, Any] | None = None,
+    steps: list[dict[str, Any]] | None = None,
 ) -> TurnResult:
-    """One turn on an already redacted message. Emergency handling happens before this."""
-    started = time.monotonic()
-    deadline = started + TURN_DEADLINE_S
+    """One turn on an already redacted message, as a graph run. With `persist` the graph ends
+    by storing the reply; with `checkpointer` + `config` its state is checkpointed per node."""
+    ctx = TurnContext(
+        llm=llm,
+        lens=lens,
+        profile=profile,
+        profile_text=profile_text,
+        history=list(history or []),
+        on_status=on_status,
+        tracer=tracer,
+        persist=persist,
+    )
+    ctx.deadline = ctx.started + TURN_DEADLINE_S
     language = reply_language(message, lens)
-    state = TurnState(lens=lens, message=message, profile=profile, reply_language=language)
-    asked = safety.asked_categories(message)
+    ctx.state = TurnState(lens=lens, message=message, profile=profile, reply_language=language)
     instructions = system_prompt(lens, profile_text, language)
+    asked = safety.asked_categories(message)
     if asked - {safety.Category.prognosis}:
         what = ", ".join(sorted(c.value for c in asked - {safety.Category.prognosis}))
         instructions += "\n\n" + safety.SYSTEM_PROMPT_HINT.format(what=what)
-    items: list[dict[str, str]] = [*(history or [])[-HISTORY_MESSAGES:]]
-    items.append({"role": "user", "content": message})
-
-    tools = build_tools(state, llm)
-    clock = _TurnClock({t.name for t in tools} | {"extract_entities"})
-
-    async def status(tool: str | None, key: str) -> None:
-        if on_status is not None:
-            res = on_status(tool, state.status_text(key))
-            if hasattr(res, "__await__"):
-                await res
-
-    async def on_event(event: ToolEvent) -> None:
-        clock.tool_event(event)
-        if event.type == "tool_start" and event.name:
-            await status(event.name, event.name)
-        elif event.type == "final_round":
-            clock.step("budget", event.name or "unknown", 0)
-            await status(None, "answer")
-
-    result = None
-    partial: str | None = None
-    with observe_calls(clock.model_call):
+    ctx.instructions = instructions
+    if llm is not None:
+        ctx.tools = build_tools(ctx.state, llm)
+    ctx.clock = _TurnClock({t.name for t in ctx.tools} | {"extract_entities"})
+    graph = _turn_graph(persist is not None, checkpointer)
+    initial: TurnGraphState = {"message": message, "emergency": emergency, "steps": steps or []}
+    with observe_calls(ctx.clock.model_call):
         try:
-            try:
-                async with asyncio.timeout(TURN_DEADLINE_S):
-                    await _warm_models(llm, clock)
-                    context = await _entities_first(llm, state, clock, status)
-            except TimeoutError:
-                raise LLMError("timeout", "turn exceeded its deadline") from None
-            items += [{"role": "developer", "content": c} for c in context]
-            elapsed = time.monotonic() - started
-            result = await llm.run_tools(
-                instructions=instructions,
-                input=items,
-                tools=tools,
-                final_schema=AgentDraft,
-                kind="main",
-                max_tool_calls=MAX_TOOL_CALLS,
-                deadline_s=max(0.0, deadline - time.monotonic()),
-                on_event=on_event,
-                max_rounds=MAX_TOOL_ROUNDS,
-                tools_for_s=max(0.0, TOOL_PHASE_S - elapsed),
-                final_note=FINAL_NOTE,
-                tool_effort="low",
-            )
+            await graph.ainvoke(initial, config or {}, context=ctx)
         except LLMError as exc:
-            clock.cut_open_tools()
-            if exc.code not in ("timeout", "bad_output") or not (state.chips or state.edges):
-                clock.finish("deadline" if exc.code == "timeout" else "error", exc.code)
-                raise
-            partial = exc.code  # answer from what was gathered (post-checked, no model call)
+            ctx.clock.cut_open_tools()
+            ctx.clock.finish("deadline" if exc.code == "timeout" else "error", exc.code)
+            raise
         except asyncio.CancelledError:
-            clock.cut_open_tools()
-            clock.finish("cancelled")
+            ctx.clock.cut_open_tools()
+            ctx.clock.finish("cancelled")
             raise
         except Exception as exc:
-            clock.cut_open_tools()
-            clock.finish("error", type(exc).__name__)
+            ctx.clock.cut_open_tools()
+            ctx.clock.finish("error", type(exc).__name__)
             raise
-
-        await status(None, "checks")
-        draft = partial_draft(state) if result is None or result.output is None else result.output
-        checks_started = time.monotonic()
-        reply, report = await check_reply(
-            draft, state, None if partial else llm, asked=asked, deadline=deadline
-        )
-        clock.step("check", "postcheck", (time.monotonic() - checks_started) * 1000)
-    clock.finish("partial" if partial else "answered", partial)
-    if tracer is not None:
-        with tracer.span("chat.postcheck", metadata=report.as_metadata()):
-            pass
+    assert ctx.reply is not None
+    if emergency:
+        return TurnResult(reply=ctx.reply, emergency=True)
+    result = ctx.result
     return TurnResult(
-        reply=reply,
+        reply=ctx.reply,
         tool_calls=[
             {
                 "name": c.name,
@@ -454,9 +661,34 @@ async def run_agent(
         usage=result.usage if result else Usage(),
         model=result.model if result else None,
         tool_mode=result.tool_mode if result else None,
-        latency_ms=round((time.monotonic() - started) * 1000),
-        checks=report,
+        latency_ms=round((time.monotonic() - ctx.started) * 1000),
+        checks=ctx.report,
         asked=sorted(c.value for c in asked),
+    )
+
+
+async def run_agent(
+    llm: LLMClient,
+    *,
+    message: str,
+    lens: Lens,
+    profile: PatientProfile,
+    profile_text: str,
+    history: list[dict[str, str]] | None = None,
+    on_status: Callable[[str | None, str], Any] | None = None,
+    tracer: Tracer | None = None,
+) -> TurnResult:
+    """One turn on an already redacted message, without persistence (eval harness, tests).
+    Emergency handling happens before this. Same graph as a chat run, minus its last node."""
+    return await run_graph(
+        llm,
+        message=message,
+        lens=lens,
+        profile=profile,
+        profile_text=profile_text,
+        history=history,
+        on_status=on_status,
+        tracer=tracer,
     )
 
 

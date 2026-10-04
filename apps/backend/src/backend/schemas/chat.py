@@ -180,6 +180,35 @@ class ChatSession(ApiModel):
     updated_at: datetime
 
 
+class ChatRun(ApiModel):
+    """A Dr. Wu turn still running on the server (it keeps running without a client)."""
+
+    id: UUID
+    session_id: UUID
+    message_id: UUID = Field(description="The stored user message this run answers.")
+    created_at: datetime
+
+
+class ChatRunExport(ApiModel):
+    """A turn that was still running at export time, with its latest checkpoint."""
+
+    id: UUID
+    session_id: UUID
+    message_id: UUID
+    created_at: datetime
+    updated_at: datetime
+    state: dict[str, Any] | None = Field(
+        None,
+        description="The turn's last saved state (redacted message, steps so far, draft or "
+        "checked reply); null before the first step.",
+    )
+
+
 class ChatSessionDetail(ApiModel):
     session: ChatSession
     messages: list[ChatMessage]
+    run: ChatRun | None = Field(
+        None,
+        description="The session's running turn, if any: follow it with streamChatRun (its "
+        "events replay from the start, so the turn shows as far as it got).",
+    )

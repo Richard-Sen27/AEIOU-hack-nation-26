@@ -25,19 +25,25 @@ def sse_doc(event_model: type[BaseModel], description: str) -> dict[int | str, d
     return {200: {"model": event_model, "description": description}}
 
 
-def _encode(event: BaseModel) -> dict[str, str]:
+def _encode(event: BaseModel, seq: int | None = None) -> dict[str, str]:
     if isinstance(event, RootModel):
         event = event.root
-    return {"event": event.type, "data": event.model_dump_json()}  # type: ignore[attr-defined]
+    frame = {"event": event.type, "data": event.model_dump_json()}  # type: ignore[attr-defined]
+    if seq is not None:
+        frame["id"] = str(seq)
+    return frame
 
 
-def sse_response(events: AsyncIterator[BaseModel], **kwargs: Any) -> EventStream:
-    """Stream pydantic events; a failure mid-stream becomes a final `error` event."""
+def sse_response(
+    events: AsyncIterator[BaseModel] | AsyncIterator[tuple[int, BaseModel]], **kwargs: Any
+) -> EventStream:
+    """Stream pydantic events; a failure mid-stream becomes a final `error` event. Items given
+    as (seq, event) carry their sequence number as the SSE `id`."""
 
     async def _gen() -> AsyncIterator[dict[str, str]]:
         try:
-            async for event in events:
-                yield _encode(event)
+            async for item in events:
+                yield _encode(item[1], item[0]) if isinstance(item, tuple) else _encode(item)
         except ApiError as exc:
             yield _error(exc.code, exc.message)
         except NotImplementedError:

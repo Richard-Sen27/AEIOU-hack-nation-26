@@ -95,7 +95,9 @@ async def test_retry_replaces_the_failed_turn_without_a_second_user_message(doct
         },
     )
     assert status == 200 and events[-1]["type"] == "final", events
-    assert turn_event(events) == started | {"type": "turn"}
+    again = turn_event(events)
+    assert again["run_id"] != started["run_id"]
+    assert again | {"run_id": None} == started | {"type": "turn", "run_id": None}
     detail = (await doctor.client.get(f"/chat/sessions/{started['session_id']}")).json()
     assert [m["role"] for m in detail["messages"]] == ["user", "assistant"]
     assert detail["messages"][0]["content"] == MESSAGE
@@ -150,28 +152,25 @@ async def test_deadline_without_findings_is_stored_as_failed(doctor, user_llm, m
     assert "too long" in detail["messages"][1]["error"]["message"]
 
 
-async def test_cut_stream_is_stored_as_interrupted(doctor, user_llm):
-    user_llm.enqueue({"kind": "structured", "json": {}, "delay_s": 30.0})
+async def test_cut_stream_does_not_stop_the_turn(doctor, user_llm):
+    """The client going away mid-turn ends only its stream: the run answers and stores it."""
+    user_llm.enqueue(draft("Answered without a client."))
     user = CurrentUser(id=doctor.id, role=Role.doctor, age_confirmed=True)
     stream = await chat.start_turn(ChatRequest(message=MESSAGE), user, build_lens(user))
     seen = []
-    async for event in stream:
+    async for _, event in stream:
         seen.append(event.root)
-        if event.root.type == "status" and event.root.tool == "extract_entities":
+        if event.root.type == "turn":
             break
     await stream.aclose()  # the client went away mid-turn
     sid = next(e for e in seen if e.type == "turn").session_id
-    for _ in range(50):
+    for _ in range(100):
         detail = (await doctor.client.get(f"/chat/sessions/{sid}")).json()
         if len(detail["messages"]) == 2:
             break
         await asyncio.sleep(0.05)
-    failed = detail["messages"][1]
-    assert failed["error"]["code"] == "interrupted"
-    assert [s["message"] for s in failed["error"]["steps"]] == [
-        "Checking your message",
-        "Reading your message",
-    ]
+    assert detail["messages"][1]["reply"]["summary"] == "Answered without a client."
+    assert detail["run"] is None
 
 
 async def test_export_and_deletion_cover_failed_turns(doctor, user_llm, connect_as):
