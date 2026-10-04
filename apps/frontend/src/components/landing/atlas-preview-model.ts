@@ -16,6 +16,8 @@ export type PreviewPoint = {
   y: number;
   label: string;
   category: AtlasCategory | null;
+  /** Node type of an entity (null for the root, categories and groups). */
+  type: string | null;
 };
 
 export type PreviewLink = {
@@ -58,6 +60,8 @@ export type AtlasPreviewModel = {
   topCommunityId: string | null;
   /** The disease with the most links, the hero fallback. */
   topDiseaseId: string | null;
+  /** The best-linked entity of each category (fallback for the hero cycle). */
+  topByCategory: Map<AtlasCategory, string>;
 };
 
 const r = Math.round;
@@ -77,7 +81,7 @@ export function buildAtlasPreview(tree: AtlasTree): AtlasPreviewModel {
   for (const c of ATLAS_CATEGORIES) parts.set(c, { links: [], groups: [], dots: [] });
 
   for (const n of tree.nodes) {
-    points.set(n.id, { id: n.id, x: r(n.x), y: r(-n.y), label: n.label, category: n.category });
+    points.set(n.id, { id: n.id, x: r(n.x), y: r(-n.y), label: n.label, category: n.category, type: n.entity_type });
   }
 
   let minX = 0;
@@ -136,9 +140,15 @@ export function buildAtlasPreview(tree: AtlasTree): AtlasPreviewModel {
   let topDiseaseId: string | null = null;
   let bestCommunity = 0;
   let bestDisease = 0;
+  const topByCategory = new Map<AtlasCategory, string>();
+  const bestByCategory = new Map<AtlasCategory, number>();
   for (const n of tree.nodes) {
     if (n.kind !== "entity") continue;
     const d = degree.get(n.id) ?? 0;
+    if (n.category && d > (bestByCategory.get(n.category) ?? 0)) {
+      bestByCategory.set(n.category, d);
+      topByCategory.set(n.category, n.id);
+    }
     if (n.category === "community" && d > bestCommunity) [bestCommunity, topCommunityId] = [d, n.id];
     if (n.entity_type === "disease" && d > bestDisease) [bestDisease, topDiseaseId] = [d, n.id];
   }
@@ -172,6 +182,7 @@ export function buildAtlasPreview(tree: AtlasTree): AtlasPreviewModel {
     linksOf,
     topCommunityId,
     topDiseaseId,
+    topByCategory,
   };
 }
 
@@ -206,4 +217,28 @@ export function focusBounds(model: AtlasPreviewModel, id: string, limit = 24): B
     .sort((a, b) => a - b);
   const reach = Math.max(dists[Math.floor(dists.length * 0.6)] ?? 0, 400);
   return { minX: p.x - reach, minY: p.y - reach, maxX: p.x + reach, maxY: p.y + reach };
+}
+
+/**
+ * The hero cycle: the curated ids that exist in the payload (each category at most once),
+ * filled up from the best-linked entity per category when fewer than `min` remain.
+ */
+export function cycleIds(model: AtlasPreviewModel, curated: readonly string[], size = 5, min = 3): string[] {
+  const out: string[] = [];
+  const used = new Set<AtlasCategory | null>();
+  for (const id of curated) {
+    const p = model.points.get(id);
+    if (!p || model.linksOf(id).length === 0 || out.includes(id)) continue;
+    out.push(id);
+    used.add(p.category);
+    if (out.length === size) return out;
+  }
+  if (out.length >= min) return out;
+  for (const [category, id] of model.topByCategory) {
+    if (out.length === size) break;
+    if (used.has(category) || out.includes(id)) continue;
+    out.push(id);
+    used.add(category);
+  }
+  return out;
 }

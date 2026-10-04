@@ -1,13 +1,10 @@
 "use client";
 
-import { ArrowRight } from "lucide-react";
-import Link from "next/link";
 import { useSyncExternalStore } from "react";
 
-import { AtlasPreview } from "./atlas-preview";
 import { HeroInput } from "./hero-input";
-import { HERO_FOCUS_ID } from "./landing-config";
-import { useAtlasPreview, useLandingStats } from "./use-atlas-preview";
+import { HeroMap } from "./hero-map";
+import { useLandingStats } from "./use-atlas-preview";
 
 const noopSubscribe = () => () => {};
 
@@ -25,38 +22,6 @@ function CountsLine() {
         </span>
       )}
     </p>
-  );
-}
-
-/** The live map as a wide strip under the hero; the whole strip is one link to the Atlas. */
-function HeroMap() {
-  const preview = useAtlasPreview();
-  const model = preview.status === "ready" ? preview.data : null;
-  const focusId = model ? (model.points.has(HERO_FOCUS_ID) ? HERO_FOCUS_ID : model.topDiseaseId) : null;
-  return (
-    <section className="mx-auto w-full max-w-5xl px-4 pb-8 sm:px-6">
-      <Link
-        href="/atlas"
-        aria-label="Open the Atlas"
-        data-testid="atlas-preview"
-        data-state={preview.status}
-        className="group relative block rounded-2xl outline-none focus-visible:ring-3 focus-visible:ring-ring/50"
-      >
-        <div className="relative aspect-[4/3] w-full overflow-hidden rounded-2xl border bg-card/70 shadow-lg shadow-primary/5 transition-colors group-hover:border-primary/40 sm:aspect-[16/10]">
-          {model ? (
-            <AtlasPreview model={model} focusId={focusId} />
-          ) : (
-            preview.status === "loading" && (
-              <div aria-hidden className="absolute inset-0 m-auto size-1/2 animate-pulse rounded-full bg-muted/60 motion-reduce:animate-none" />
-            )
-          )}
-        </div>
-        <span className="mx-auto mt-4 flex h-10 w-fit items-center gap-1.5 rounded-full bg-primary px-5 text-sm font-medium text-primary-foreground shadow-md transition-colors group-hover:bg-primary/85">
-          Open the Atlas
-          <ArrowRight className="size-4 transition-transform group-hover:translate-x-0.5 motion-reduce:transition-none" aria-hidden />
-        </span>
-      </Link>
-    </section>
   );
 }
 

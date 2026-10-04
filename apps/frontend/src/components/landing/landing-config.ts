@@ -22,6 +22,26 @@ export const CONNECT_HREF: Partial<Record<ConnectItem, string>> = {};
 /** The demo family's condition: developmental and epileptic encephalopathy 4 (STXBP1). */
 export const HERO_FOCUS_ID = "MONDO:0012812";
 
+/**
+ * The hero map cycles through these nodes, one kind each, so the map shows that
+ * everything is connected, not only diseases. Missing ids are skipped; with fewer
+ * than three left, the best-linked node per category fills up (atlas-preview-model).
+ * The first is also the static view under reduced motion.
+ */
+export const HERO_CYCLE_IDS = [
+  HERO_FOCUS_ID, // condition: the demo family's (STXBP1) disease
+  "HGNC:11444", // gene: STXBP1
+  "HP:0001263", // symptom: global developmental delay
+  "PMID:26865513", // paper: STXBP1 encephalopathy cohort study, linking researchers, gene and diseases
+  "REG:nct01793168", // patient registry: CoRDS, linking diseases and an institution
+] as const;
+
+/** At most this many links (the strongest) are drawn per cycle node, so a hub never becomes a solid fan. */
+export const HERO_MAX_LINKS = 80;
+
+/** One node's cycle in milliseconds: about 1 s drawing, 3.6 s holding, 0.6 s fading. */
+export const HERO_CYCLE_MS = 5200;
+
 /** SCN1A, the second focus chip of the graph section (hidden if not in the tree). */
 export const GENE_FOCUS_ID = "HGNC:10585";
 
