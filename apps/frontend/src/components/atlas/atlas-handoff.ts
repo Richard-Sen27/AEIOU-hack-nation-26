@@ -12,7 +12,7 @@ let pending: WuFound | null = null;
 
 /** Hand Dr. Wu's finds to the next Atlas mount (replaces any earlier handoff). */
 export function setAtlasHandoff(found: WuFound): void {
-  pending = { nodeIds: [...found.nodeIds], edgeIds: [...found.edgeIds] };
+  pending = { nodeIds: [...found.nodeIds], edgeIds: [...found.edgeIds], names: found.names ? { ...found.names } : undefined };
 }
 
 /** Take the pending finds once; returns null when there are none. */

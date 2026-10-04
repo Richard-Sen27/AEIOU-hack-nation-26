@@ -6,7 +6,8 @@ import { useCallback, useEffect, useId, useMemo, useRef, useState, useSyncExtern
 import { toast } from "sonner";
 
 import { useNodes } from "@/components/chat/graph-data";
-import { isEmergencyReply, type AssistantTurn, type PartialReply, type TurnError } from "@/components/chat/types";
+import { SymptomMatchCard } from "@/components/chat/symptom-match";
+import { isEmergencyReply, rankedIds, replyNames, type AssistantTurn, type PartialReply, type TurnError } from "@/components/chat/types";
 import { useChat } from "@/components/chat/use-chat";
 import { SignInButtons } from "@/components/gates/sign-in-buttons";
 import { useGate } from "@/components/providers/gate-provider";
@@ -62,33 +63,37 @@ function collectFound(reply: PartialReply, index: TreeIndex): WuFound {
   };
   reply.graph_focus?.node_ids.forEach(add);
   reply.cards.forEach((c) => c.node_ids.forEach(add));
+  rankedIds(reply).forEach(add);
   // Negated chips ("no feeding problems") are not something to find.
   reply.chips.forEach((c) => !c.negated && c.state !== "removed" && add(c.id));
   const edgeIds = (reply.graph_focus?.highlight_path ?? []).filter((id) => index.edges.has(id));
-  return { nodeIds, edgeIds, allIds };
+  return { nodeIds, edgeIds, allIds, names: replyNames(reply) };
 }
 
 type FoundItem = { id: string; label: string; type: string; onMap: boolean };
 
 /**
- * The finds to list: on-map ones labelled from the tree, the others from `GET /node/{id}`
- * (public graph ids, cached). An id that cannot be loaded is left out; one still loading
- * shows its id.
+ * The finds to list: on-map ones labelled from the tree, the others with the name the reply
+ * carries (chips, the symptom ranking), else from `GET /node/{id}` (public graph ids, cached).
+ * An id that cannot be loaded is left out; one still loading shows its id.
  */
 function useFoundItems(found: WuFound | null, index: TreeIndex): FoundItem[] {
   const all = useMemo(() => found?.allIds ?? found?.nodeIds ?? [], [found]);
-  const offMapIds = useMemo(() => all.filter((id) => !index.nodes.has(id)), [all, index]);
-  const loaded = useNodes(offMapIds);
+  const names = found?.names;
+  const toLoad = useMemo(() => all.filter((id) => !index.nodes.has(id) && !names?.[id]), [all, index, names]);
+  const loaded = useNodes(toLoad);
   return useMemo(
     () =>
       all.flatMap((id): FoundItem[] => {
         const n = index.nodes.get(id);
         if (n) return [{ id, label: n.label, type: n.entity_type ?? "disease", onMap: true }];
+        const named = names?.[id];
+        if (named) return [{ id, label: named.label, type: named.type, onMap: false }];
         const d = loaded[id];
         if (d === null) return [];
         return [{ id, label: d?.node.label ?? id, type: d?.node.type ?? "disease", onMap: false }];
       }),
-    [all, index, loaded],
+    [all, index, names, loaded],
   );
 }
 
@@ -416,6 +421,8 @@ function SignedInDock({
                 language={language}
                 foundCount={lastCount}
                 onRetry={() => chat.retry(lastAssistant.id)}
+                isOnMap={(id) => index.nodes.has(id)}
+                onSelectNode={(id) => onSelect(id, { center: true, persist: false })}
               />
             </>
           )}
@@ -501,11 +508,15 @@ function CompactTurn({
   language,
   foundCount,
   onRetry,
+  isOnMap,
+  onSelectNode,
 }: {
   turn: AssistantTurn;
   language?: string;
   foundCount: number | null;
   onRetry: () => void;
+  isOnMap: (id: string) => boolean;
+  onSelectNode: (id: string) => void;
 }) {
   const { openSignIn } = useGate();
   const r = turn.reply;
@@ -548,6 +559,7 @@ function CompactTurn({
               {streaming && <span className="ml-0.5 inline-block h-3.5 w-1.5 animate-pulse bg-primary align-middle motion-reduce:animate-none" aria-hidden />}
             </p>
           )}
+          {turn.final && r.symptom_match && <SymptomMatchCard match={r.symptom_match} isOnMap={isOnMap} onSelect={onSelectNode} />}
           {turn.final && foundCount === 0 && (
             <p className="text-xs text-muted-foreground" data-testid="atlas-wu-none">
               Nothing found.

@@ -123,7 +123,7 @@ export function AtlasView() {
           handed?.nodeIds.filter((id, i, all) => all.indexOf(id) === i && (index.nodes.get(id)?.kind ?? "entity") === "entity") ?? [];
         const nodeIds = allIds.filter((id) => index.nodes.has(id));
         if (handed && allIds.length > 0) {
-          setFound({ nodeIds, edgeIds: handed.edgeIds.filter((id) => index.edges.has(id)), allIds });
+          setFound({ nodeIds, edgeIds: handed.edgeIds.filter((id) => index.edges.has(id)), allIds, names: handed.names });
           announce(foundMessage(allIds.length, nodeIds.length));
         }
         if (handed && nodeIds.length > 0) {

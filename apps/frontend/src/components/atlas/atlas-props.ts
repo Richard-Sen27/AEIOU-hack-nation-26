@@ -31,6 +31,11 @@ export type WuFound = {
    * e.g. core diseases). The dock lists and counts these. Absent: the same as `nodeIds`.
    */
   allIds?: string[];
+  /**
+   * Names and node types the reply itself carries for some ids (chips, the symptom-overlap
+   * ranking): ids that are not on the map are listed with these instead of a request each.
+   */
+  names?: Record<string, { label: string; type: string }>;
 };
 
 /** Search combobox centred at the top of the canvas (`data-testid="atlas-search"`). */

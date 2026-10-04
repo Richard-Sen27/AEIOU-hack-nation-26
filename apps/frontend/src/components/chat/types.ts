@@ -82,6 +82,32 @@ export function emptyReply(): PartialReply {
   };
 }
 
+const CHIP_NODE_TYPE: Record<Chip["type"], string> = {
+  disease: "disease",
+  gene: "gene",
+  variant: "variant",
+  symptom: "phenotype",
+};
+
+/** A name and node type for an id, as the reply itself carries it. */
+export type ReplyName = { label: string; type: string };
+
+/**
+ * Names the reply already carries for its ids (resolved chips and the symptom-overlap
+ * ranking), so lists of its finds need no request per id.
+ */
+export function replyNames(reply: Pick<PartialReply, "chips" | "symptom_match">): Record<string, ReplyName> {
+  const out: Record<string, ReplyName> = {};
+  for (const c of reply.chips) if (c.id && !out[c.id]) out[c.id] = { label: c.label, type: CHIP_NODE_TYPE[c.type] ?? "disease" };
+  for (const i of reply.symptom_match?.items ?? []) out[i.id] = { label: i.label, type: "disease" };
+  return out;
+}
+
+/** Ids of the symptom-overlap ranking, best first (empty when the reply has none). */
+export function rankedIds(reply: Pick<PartialReply, "symptom_match">): string[] {
+  return reply.symptom_match?.items.map((i) => i.id) ?? [];
+}
+
 export function toTurnChips(chips: Chip[], previous: TurnChip[] = []): TurnChip[] {
   return chips.map((c, i) => {
     const prev = previous[i];

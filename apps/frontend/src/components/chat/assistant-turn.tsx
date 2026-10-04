@@ -31,7 +31,8 @@ import { Chips } from "./chips";
 import { ChildOffer, ProfileHints } from "./profile-hints";
 import { Claims } from "./claims";
 import { FollowUpQuestion } from "./follow-up";
-import { isEmergencyReply, type AssistantTurn as Turn, type HintKey, type TurnError } from "./types";
+import { SymptomMatchCard } from "./symptom-match";
+import { isEmergencyReply, rankedIds, replyNames, type AssistantTurn as Turn, type HintKey, type TurnError } from "./types";
 
 function StatusLines({ turn }: { turn: Turn }) {
   const [open, setOpen] = useState(false);
@@ -235,7 +236,9 @@ export function AssistantTurnView({
   const emergency = isEmergencyReply(turn);
   const focus = r.graph_focus;
   // Ids from a health conversation stay out of the URL: plain `/atlas` plus an in-memory handoff.
-  const focusHref = focus?.node_ids.length ? "/atlas" : null;
+  // The symptom ranking's conditions are finds too; names the reply carries travel along.
+  const handoffIds = [...new Set([...(focus?.node_ids ?? []), ...rankedIds(r)])];
+  const focusHref = handoffIds.length ? "/atlas" : null;
   const gap = r.gap_search;
 
   return (
@@ -288,6 +291,7 @@ export function AssistantTurnView({
                 )}
               </>
             )}
+            {r.symptom_match && <SymptomMatchCard match={r.symptom_match} />}
             <Claims reply={r} />
             <Cards cards={r.cards} />
             <Actions actions={r.actions} edgeIds={focus?.highlight_path ?? []} language={language} />
@@ -297,7 +301,7 @@ export function AssistantTurnView({
                 {focusHref && (
                   <Link
                     href={focusHref}
-                    onClick={atlasHandoffClick({ nodeIds: focus!.node_ids, edgeIds: focus!.highlight_path })}
+                    onClick={atlasHandoffClick({ nodeIds: handoffIds, edgeIds: focus?.highlight_path ?? [], names: replyNames(r) })}
                     className={cn(buttonVariants({ variant: "outline", size: "sm" }))}
                     data-testid="show-in-graph"
                   >
