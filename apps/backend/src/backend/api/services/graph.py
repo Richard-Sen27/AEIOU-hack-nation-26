@@ -12,6 +12,7 @@ never written to the graph tables:
 Use ``get_node`` / ``get_edge`` for overlay-aware, effective lookups.
 """
 
+import gc
 import hashlib
 import logging
 import math
@@ -292,7 +293,26 @@ async def load_graph(db: AsyncSession) -> GraphStore:
         len(store.edges),
     )
     search.warm_up()
+    freeze_heap()
     return store
+
+
+def freeze_heap() -> None:
+    """Move the loaded store out of the cyclic garbage collector's reach (gc.freeze).
+
+    The wide graph is several million long-lived objects; without this, every full collection
+    (triggered by ordinary request allocations) walks all of them and stalls that request for
+    seconds (a hub's summary panel: 2.5-3 s, of which about 0.2 s is real work). The previous
+    store is unfrozen and collected first, so a reload does not keep it alive."""
+    started = time.perf_counter()
+    gc.unfreeze()
+    gc.collect()
+    gc.freeze()
+    log.info(
+        "heap frozen in %.2fs: %d objects outside the collector",
+        time.perf_counter() - started,
+        gc.get_freeze_count(),
+    )
 
 
 def build_store(

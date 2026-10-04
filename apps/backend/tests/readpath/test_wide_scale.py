@@ -7,7 +7,7 @@ import time
 
 import pytest
 
-from backend.api.services import atlas_tree, phenotype_match
+from backend.api.services import atlas_summary, atlas_tree, phenotype_match
 from backend.api.services import graph as graph_service
 from backend.api.services import path as path_service
 from backend.phenotype_similarity import phenotype_similarity
@@ -137,3 +137,15 @@ def test_tree_keeps_the_focus_set(installed):
     assert all(e.source in entities and e.target in entities for e in tree.edges)
     focus_clusters = {store.nodes[d].cluster_id for d in installed.focus}
     assert {c.id for c in tree.clusters} == focus_clusters
+
+
+def test_hub_summary_answers_quickly(installed):
+    graph_service.freeze_heap()  # as load_graph does after loading
+    atlas_tree.get_tree()  # built at startup in the API
+    lens = Lens(role=Role.patient)
+    for hub in installed.hubs[:3]:
+        started = time.perf_counter()
+        summary = atlas_summary.atlas_summary(hub, lens)
+        assert time.perf_counter() - started < 1.0
+        diseases = next(s for s in summary.sections if s.key == "diseases")
+        assert diseases.total == installed.store.degree[hub] and len(diseases.items) == 10

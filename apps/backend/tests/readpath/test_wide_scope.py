@@ -113,6 +113,9 @@ async def test_atlas_json_not_built_at_startup(restore_graph):
     async with user_transaction(None) as db:
         store = await graph_service.load_graph(db)
     assert store.atlas_cache is None and store.tree_cache is not None
+    import gc
+
+    assert gc.get_freeze_count() > 0  # the store is outside the cyclic collector
 
 
 # --- findable: search, summary ----------------------------------------------------------------
