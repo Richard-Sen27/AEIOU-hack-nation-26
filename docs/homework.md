@@ -73,3 +73,14 @@ Work deliberately left for later. Add an item when you leave something for later
 - **Dev-only error** "Router action dispatched before initialization" has made specs fail and pass on rerun.
 - **GPU:** the Atlas needs a real GPU; software rendering is too slow for e2e.
 - **Auto-reload** (`make backend`, `--reload`): the dev API restarts on every saved backend file and cuts open chat streams.
+
+## Agent architecture
+
+Decided: not now, evaluate later. The question: should a Dr. Wu turn run on LangGraph, or on what the app already has, so that it can work like an actual agent with durable, resumable, multi-step runs?
+
+- **Today:** chat is a custom tool loop (`api/services/chat/`) over the model gateway (`llm/client.py`) on the user's own ChatGPT plan, one `POST /chat` request per turn with a streamed reply. Gap search runs on the OpenAI Agents SDK (`api/services/gap_search/`, `llm/agents_sdk.py`). Documents and gap search already run as jobs (`jobs` table, `GET /jobs/{job_id}` stream). A turn's working state (steps, tool results) lives in memory only; `chat_sessions` and `chat_messages` keep the user's redacted message and the finished reply.
+- **What LangGraph would give:** state saved after every step (Postgres checkpointer), resume after a failure, pauses for the user's confirmation, long-running background runs, streaming of intermediate state.
+- **What it would not give:** faster model calls. Turns failed because of up to seven sequential model round-trips of 3.5–10 s each against the 45 s deadline; that is being fixed in the existing loop.
+- **What it would cost here:** its checkpoint tables would hold health conversations outside the per-user row-level security, export, deletion and retention the chat tables have ([`compliance.md`](compliance.md), [`retention.md`](retention.md)), so all of that would have to be built around it. The post-check and citation rules of [`specs/agent.md`](specs/agent.md) would have to be ported. And it would be a third orchestration approach next to the custom loop and the Agents SDK, unless one of them is retired.
+- **Compare it with:** running a chat turn as a job on the existing `jobs` table and stream, persisting each step, with the current loop or the Agents SDK.
+- **The evaluation should produce:** a recommendation, the migration steps, and the data-protection design for stored agent state.
