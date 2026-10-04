@@ -379,7 +379,7 @@ export function AtlasView() {
               chainEdgeIds={chainEdgeIds}
               found={found}
               startCategory={startCategory}
-              insetRight={wide ? 376 : 0}
+              insetRight={wide && panelOpen ? 376 : 0}
               insetBottomShare={!wide && selected && idx.nodes.has(selected) ? 0.62 : 0}
               onSelect={(id) => {
                 setPanelChain([]);
@@ -389,7 +389,7 @@ export function AtlasView() {
               reducedMotion={reducedMotion}
               labelledBy="atlas-canvas-label"
             />
-            <div className="absolute top-3 left-3 z-10 flex flex-col overflow-hidden rounded-lg border bg-card/90 shadow-xs backdrop-blur">
+            <div className="absolute top-3 left-3 z-10 flex flex-col max-sm:top-16 overflow-hidden rounded-lg border bg-card/90 shadow-xs backdrop-blur">
               <Button variant="ghost" size="icon-sm" className="rounded-none" aria-label="Zoom in" onClick={() => canvas.current?.zoomIn()}>
                 <Plus aria-hidden />
               </Button>
@@ -414,7 +414,7 @@ export function AtlasView() {
             </div>
           </div>
         ) : (
-          <div className="flex min-h-0 min-w-0 flex-1 flex-col lg:pr-[23.5rem]">
+          <div className={cn("flex min-h-0 min-w-0 flex-1 flex-col", panelOpen && "lg:pr-[23.5rem]")}>
             {canvasFailed && view === "graph" && (
               <p className="shrink-0 border-b bg-status-flag/10 px-4 py-2 text-sm" role="status">
                 The map can&apos;t be drawn on this device, so the outline is shown instead.
@@ -429,8 +429,9 @@ export function AtlasView() {
           </div>
         )}
 
-        {/* Over the canvas: search centred at the top, notices below it. */}
-        <div className="pointer-events-none absolute inset-x-3 top-3 z-20 flex flex-col items-center gap-2 pl-12 lg:right-[23.5rem] lg:pl-0">
+        {/* Over the canvas: search centred on the page, notices below it. With the panel open it
+            narrows symmetrically so it stays centred and clear of the panel. */}
+        <div className="pointer-events-none absolute inset-x-3 top-3 z-20 flex flex-col items-center gap-2">
           {showGraph && (
             <AtlasSearch
               index={idx}
@@ -439,7 +440,7 @@ export function AtlasView() {
                 select(id, { center: true });
               }}
               onAskWu={(text) => setPendingQuestion(text)}
-              className="pointer-events-auto"
+              className={cn("pointer-events-auto", panelOpen && "lg:max-w-[min(28rem,calc(100%-46.5rem))]")}
             />
           )}
           {pathEdgeIds.length > 0 && panelChain.length === 0 && showGraph && (
@@ -491,17 +492,17 @@ export function AtlasView() {
           )}
         />
 
-        <AtlasPanel
-          index={idx}
-          nodeId={panelOpen ? selected : null}
-          onSelect={(id) => select(id, { center: true })}
-          onShowChain={setPanelChain}
-          onClose={() => select(null)}
-          className={cn(
-            "absolute z-30 max-lg:inset-x-2 max-lg:bottom-2 max-lg:max-h-[62%] lg:top-3 lg:right-3 lg:bottom-3 lg:w-[22rem]",
-            !panelOpen && "max-lg:hidden",
-          )}
-        />
+        {/* The panel exists only while something is selected: no card, no reserved space otherwise. */}
+        {panelOpen && (
+          <AtlasPanel
+            index={idx}
+            nodeId={selected}
+            onSelect={(id) => select(id, { center: true })}
+            onShowChain={setPanelChain}
+            onClose={() => select(null)}
+            className="absolute z-30 max-lg:inset-x-2 max-lg:bottom-2 max-lg:max-h-[62%] lg:top-3 lg:right-3 lg:bottom-3 lg:w-[22rem]"
+          />
+        )}
       </div>
     );
   }
