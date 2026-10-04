@@ -51,6 +51,43 @@ npm run voiceover -- gap    # only some scenes (ids: arrive graph dr-wu gap peop
 Each run costs ElevenLabs credits. Each clip plays from the start of its scene,
 so it has to fit the slot (check in the preview).
 
+## Record the screen takes
+
+`recording/` drives the Playwright-managed Chromium (the version cached for
+`apps/frontend`, no second download) through a scripted flow per scene and
+writes the finished clip to `public/recordings/`: 1920×1080 H.264, 30 fps, no
+audio, light theme, with a drawn cursor and human-paced typing. Page loads and
+network waits are cut out, and each clip is at least as long as its slot.
+
+```console
+npm run record              # every take that can run now
+npm run record -- graph     # one or more scene ids: graph gap close
+```
+
+Takes today: `graph` (scene 2), `gap` (scene 4, guest half only) and `close`
+(scene 6), all as a guest. Each scene is one file in `recording/scenes/`,
+built from the helpers in `recording/lib/`; the beats are timed against the
+narration (the console prints where each beat lands).
+
+Settings, from the environment (nothing is written to disk):
+
+| Variable | Default | Meaning |
+| --- | --- | --- |
+| `AMBER_BASE_URL` | the hosted site | the app to record, e.g. `http://127.0.0.1:3100` |
+| `AMBER_SESSION` | – | value of the `amber_session` cookie, for signed-in takes |
+| `RECORD_HEADED` | – | `1` shows the browser window |
+| `RECORD_KEEP_FRAMES` | – | `1` keeps the raw frames in `out/recording/<scene>/` |
+
+A signed-in take (scenes 1, 3, 5 and the rest of 4, once they exist) runs
+with the session of a demo account copied from a signed-in browser:
+
+```console
+AMBER_SESSION='<cookie value>' npm run record -- dr-wu
+```
+
+Without `AMBER_SESSION`, `npm run record` skips signed-in takes. Needs
+`ffmpeg` (`/opt/homebrew/bin/ffmpeg`, or set `FFMPEG`).
+
 ## Adjust timing
 
 - **Where a take starts and how fast it plays:** in `src/scenes/<Scene>.tsx`,
