@@ -8,7 +8,11 @@ import pytest
 
 from backend.db.models import GRAPH_TABLES, USER_TABLES
 
-OWNER_COLUMN = {t: ("id" if t == "users" else "user_id") for t in USER_TABLES}
+OWNER_COLUMN = {t: {"users": "id", "calls": "publisher_id"}.get(t, "user_id") for t in USER_TABLES}
+CALL_SQL = (
+    "INSERT INTO calls (publisher_id, kind, title, summary, participation, disease_ids)"
+    " VALUES ($1, 'survey', 't', 's', 'p', ARRAY['MONDO:0100135'])"
+)
 
 
 async def as_user(conn: asyncpg.Connection, uid: uuid.UUID | None):
@@ -80,6 +84,7 @@ async def seed_rows(conn: asyncpg.Connection, uid: uuid.UUID) -> dict[str, uuid.
             " VALUES ($1, 'added', 'NCT99000001', 'MONDO:0100135', 'k')",
             uid,
         )
+        await conn.execute(CALL_SQL, uid)
     return ids
 
 
@@ -173,6 +178,7 @@ async def test_user_cannot_write_other_users_rows(two_users):
             " VALUES ($1, 'added', 'PMID:FX0001', 'other')",
             (b,),
         ),
+        "calls": (CALL_SQL, (b,)),
         "users": (
             "INSERT INTO users (id, auth_provider, auth_subject) VALUES ($1, 'openai', 'spoof')",
             (b,),

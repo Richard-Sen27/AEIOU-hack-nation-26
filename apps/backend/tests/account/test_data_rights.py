@@ -7,7 +7,7 @@ from account_helpers import ASSET, assert_error
 from backend.api.security import COOKIE_NAME
 from backend.db.models import USER_TABLES
 
-OWNER_COLUMN = {t: ("id" if t == "users" else "user_id") for t in USER_TABLES}
+OWNER_COLUMN = {t: {"users": "id", "calls": "publisher_id"}.get(t, "user_id") for t in USER_TABLES}
 
 
 async def seed_everything(connect_as, user, edge_id: str) -> None:
