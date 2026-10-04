@@ -1,6 +1,6 @@
 "use client";
 
-import { LogOut, ShieldCheck, UserRound } from "lucide-react";
+import { Database, LogOut, ShieldCheck, UserRound } from "lucide-react";
 import Link from "next/link";
 
 import { ROLE_LABELS } from "@/components/providers/lens-provider";
@@ -62,6 +62,9 @@ export function UserMenu() {
         </DropdownMenuItem>
         <DropdownMenuItem render={<Link href="/privacy" />}>
           <ShieldCheck aria-hidden /> Privacy and data
+        </DropdownMenuItem>
+        <DropdownMenuItem render={<Link href="/about-data" />}>
+          <Database aria-hidden /> About this data
         </DropdownMenuItem>
         <DropdownMenuSeparator />
         <DropdownMenuItem onClick={() => void signOut()}>

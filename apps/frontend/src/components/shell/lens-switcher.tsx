@@ -1,6 +1,7 @@
 "use client";
 
-import { ChevronDown, Glasses } from "lucide-react";
+import { ChevronDown, Database, Glasses, ShieldCheck } from "lucide-react";
+import Link from "next/link";
 
 import { ROLE_LABELS, useLens } from "@/components/providers/lens-provider";
 import { useSession } from "@/components/providers/session-provider";
@@ -72,6 +73,17 @@ export function LensSwitcher({ className, compact }: { className?: string; compa
             </DropdownMenuRadioItem>
           ))}
         </DropdownMenuRadioGroup>
+        {!user && (
+          <>
+            <DropdownMenuSeparator />
+            <DropdownMenuItem render={<Link href="/privacy" />}>
+              <ShieldCheck aria-hidden /> Privacy
+            </DropdownMenuItem>
+            <DropdownMenuItem render={<Link href="/about-data" />}>
+              <Database aria-hidden /> About this data
+            </DropdownMenuItem>
+          </>
+        )}
         {user?.role && overridden && (
           <>
             <DropdownMenuSeparator />

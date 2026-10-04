@@ -1,6 +1,18 @@
+"use client";
+
 import Link from "next/link";
+import { usePathname } from "next/navigation";
+
+/** Application views get the full height; Privacy and About this data stay in the header menus there. */
+const APP_ROUTES = ["/atlas", "/chat", "/node", "/path", "/clusters", "/documents", "/profile", "/welcome"];
+
+function isAppRoute(pathname: string) {
+  return APP_ROUTES.some((r) => pathname === r || pathname.startsWith(`${r}/`));
+}
 
 export function SiteFooter() {
+  const pathname = usePathname() ?? "/";
+  if (isAppRoute(pathname)) return null;
   return (
     <footer className="border-t bg-background">
       <div className="mx-auto flex w-full max-w-[1440px] flex-col gap-3 px-4 py-6 text-xs text-muted-foreground sm:flex-row sm:items-center sm:justify-between sm:px-6">

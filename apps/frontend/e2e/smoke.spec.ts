@@ -33,7 +33,12 @@ test.describe("shell", () => {
       await page.goto(route);
       await expect(page.getByRole("heading", { level: 1 })).toBeVisible();
       await expect(page.getByRole("link", { name: /Amber/ }).first()).toBeVisible();
-      await expect(page.getByRole("contentinfo")).toContainText("information, not medical advice");
+      if (["/", "/privacy", "/about-data"].includes(route)) {
+        await expect(page.getByRole("contentinfo")).toContainText("information, not medical advice");
+      } else {
+        // Application views drop the footer; Privacy and About this data stay in the header menus.
+        await expect(page.getByRole("contentinfo")).toHaveCount(0);
+      }
       expect(errors()).toEqual([]);
     });
   }
@@ -95,6 +100,22 @@ test.describe("shell", () => {
     await page.goto("/atlas");
     await expect(page.getByTestId("user-menu")).toBeVisible();
     await expect(page.getByTestId("lens-switcher")).toContainText("Researcher");
+  });
+
+  test("privacy and about this data stay reachable from the header without a footer", async ({ page }) => {
+    await mockApi(page, { "GET /auth/session": guestSession });
+    await page.goto("/chat");
+    await page.getByTestId("lens-switcher").click();
+    await expect(page.getByRole("menuitem", { name: "Privacy" })).toHaveAttribute("href", "/privacy");
+    await expect(page.getByRole("menuitem", { name: "About this data" })).toHaveAttribute("href", "/about-data");
+    await page.keyboard.press("Escape");
+
+    await page.unrouteAll({ behavior: "ignoreErrors" });
+    await mockApi(page, { "GET /auth/session": signedInSession({ role: "patient" }) });
+    await page.goto("/documents");
+    await page.getByTestId("user-menu").click();
+    await expect(page.getByRole("menuitem", { name: "Privacy and data" })).toHaveAttribute("href", "/privacy");
+    await expect(page.getByRole("menuitem", { name: "About this data" })).toHaveAttribute("href", "/about-data");
   });
 
   test("screenshots: light and dark", async ({ page }) => {
