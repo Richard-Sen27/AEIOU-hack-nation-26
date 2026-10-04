@@ -98,7 +98,7 @@ export function DocumentList({
   if (!documents.length) {
     return (
       <p className="rounded-lg border border-dashed px-4 py-3 text-sm text-muted-foreground">
-        No documents yet. Uploaded files are never kept; only the findings you review are listed here.
+        No documents yet. Files are never kept, only findings.
       </p>
     );
   }

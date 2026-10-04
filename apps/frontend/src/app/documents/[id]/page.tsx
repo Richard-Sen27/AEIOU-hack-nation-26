@@ -19,7 +19,7 @@ export default async function DocumentPage(props: PageProps<"/documents/[id]">) 
       <PageHeader
         eyebrow="Findings review"
         title="Review what was found"
-        description="Confirm or reject each finding. Only confirmed findings go into your profile."
+        description="Only confirmed findings go into your profile."
       />
       <div className="mt-8">
         <FindingsReview documentId={id} />

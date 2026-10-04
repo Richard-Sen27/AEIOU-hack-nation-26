@@ -19,10 +19,10 @@ import { UploadProgress } from "./upload-progress";
 import { useUploads } from "./use-uploads";
 
 const STEPS = [
-  ["Upload", "Your file goes to Amber's own server, never to a third party."],
-  ["Personal details removed", "Names, birth dates, addresses and patient IDs are redacted before any AI model sees the text."],
-  ["Original deleted", "The file itself is deleted right after its text is extracted."],
-  ["You review", "Each finding is shown next to the sentence it came from. Only what you confirm goes into your profile."],
+  ["Upload", "To Amber's own server only."],
+  ["Personal details removed", "Names, birth dates, addresses and IDs, before any AI sees the text."],
+  ["Original deleted", "Right after the text is read."],
+  ["You review", "Only what you confirm goes into your profile."],
 ] as const;
 
 export function DocumentsPage() {
@@ -82,7 +82,7 @@ export function DocumentsPage() {
     return (
       <SignInPrompt
         title="Sign in to upload a report"
-        description="Reading documents uses AI that runs on your own ChatGPT plan, so it needs an account. Exploring the atlas stays open to everyone."
+        description="Reading reports uses AI on your own ChatGPT plan. The atlas stays open to everyone."
         returnTo="/documents"
       />
     );
@@ -137,7 +137,7 @@ export function DocumentsPage() {
             Your documents
           </h2>
           <p className="text-sm text-muted-foreground">
-            Only the extracted findings are kept, never the file. Deleting a document deletes its findings.
+            Findings only, never the file. Deleting a document deletes its findings.
           </p>
         </div>
         <DocumentList documents={documents} error={listError} onChanged={() => void loadDocuments()} />

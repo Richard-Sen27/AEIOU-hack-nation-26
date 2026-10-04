@@ -73,8 +73,7 @@ export function DropZone({ onFiles, disabled }: { onFiles: (files: File[]) => vo
       </label>
       <p className="flex max-w-md items-start gap-1.5 text-xs leading-relaxed text-muted-foreground">
         <ShieldCheck className="mt-px size-3.5 shrink-0 text-secondary" aria-hidden />
-        Names, birth dates, addresses and patient IDs are removed before any AI model sees the text, and the original
-        file is deleted right after extraction.
+        Personal details removed before any AI sees it. File deleted after reading.
       </p>
     </div>
   );

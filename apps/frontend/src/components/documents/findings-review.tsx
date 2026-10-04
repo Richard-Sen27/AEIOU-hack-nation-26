@@ -199,9 +199,9 @@ function FindingCard({
         <Details f={f} />
         {f.type === "candidate_edge" && (
           <p className="text-xs text-muted-foreground" data-testid="candidate-edge-note">
-            Confirming does not change your profile. If you have agreed to contribute and the paper has a DOI or PMID, the link is
-            suggested to the shared atlas as pending review and never used as evidence until checked; otherwise it stays a
-            private finding. Rejecting it, or deleting this document, withdraws the suggestion.
+            Confirming does not change your profile. With contribute consent and a DOI or PMID, the link is suggested to the
+            shared atlas as pending review, never used as evidence until checked; otherwise it stays private. Rejecting it or
+            deleting this document withdraws it.
           </p>
         )}
         {isVus(f) && <VusNotice />}
@@ -433,20 +433,17 @@ export function FindingsReview({ documentId }: { documentId: string }) {
       <div className="space-y-3 rounded-xl border border-primary/40 bg-primary/10 p-4 text-sm" data-testid="review-notice">
         <p className="font-semibold">Nothing is used until you confirm it.</p>
         <p className="text-muted-foreground">
-          Check each finding against the sentence it came from. Confirmed findings go into your private profile; rejected ones
-          are never used. The snippets come from the redacted text: personal details were removed and the original file is
-          already deleted.
+          Check each finding against its sentence. Snippets come from the redacted text; the file is already deleted.
         </p>
         <p className="flex flex-wrap items-center gap-2 text-muted-foreground">
           <AiDisclosure variant="inline" />
-          These findings were extracted by an AI model and can be wrong. This is not a diagnosis.
+          Extracted by AI and can be wrong. Not a diagnosis.
         </p>
       </div>
 
       {reviewable === 0 ? (
         <p className="rounded-xl border border-dashed p-6 text-sm text-muted-foreground">
-          No findings to review. Nothing in this document could be matched to diagnoses, genes, variants or symptoms in the
-          atlas, so nothing will be added. You can delete it, or add details to your profile by hand.
+          No findings matched the atlas, so nothing will be added. Delete it, or add details to your profile by hand.
         </p>
       ) : (
         <>
@@ -481,7 +478,7 @@ export function FindingsReview({ documentId }: { documentId: string }) {
               {confirmed
                 ? `${confirmed} ${confirmed === 1 ? "finding is" : "findings are"} now in your profile.`
                 : "Nothing was added to your profile."}{" "}
-              Dr. Wu can use your updated profile to look for related diseases, patient communities and research.
+              Dr. Wu can now use it.
             </p>
           </div>
           <div className="flex flex-wrap gap-2">
