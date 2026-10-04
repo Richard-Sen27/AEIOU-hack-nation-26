@@ -78,7 +78,7 @@ export const TechnicalVideo: React.FC = () => {
           <Series.Sequence name="5 Checked agent" durationInFrames={347} premountFor={fps}>
             <AgentScene />
           </Series.Sequence>
-          <Series.Sequence name="6 Atlas" durationInFrames={259} premountFor={fps}>
+          <Series.Sequence name="6 Atlas" durationInFrames={277} premountFor={fps}>
             <AtlasScene />
           </Series.Sequence>
         </Series>

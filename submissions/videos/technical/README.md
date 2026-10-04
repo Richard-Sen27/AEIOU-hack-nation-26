@@ -1,6 +1,6 @@
 # Amber technical video
 
-The 59-second technical video (1920×1080, 30 fps, 1,770 frames) for the
+The 60-second technical video (1920×1080, 30 fps, 1,788 frames, 59.6 s) for the
 Hack-Nation 7 submission: how Amber is built, shown as animated diagrams in
 the web app's light colour scheme, with two Atlas screenshots and an
 ElevenLabs voiceover (voice "Alice"). The product video next door covers the
@@ -19,7 +19,7 @@ says which, per block.
 | 3 | Confidence | 323 | The confidence formula, the 40 evidence rows of Dravet syndrome → SCN1A, a computed link stopped at the 0.79 cap |
 | 4 | Clusters by mechanism | 277 | SCN1A with Dravet syndrome (loss of function) and familial hemiplegic migraine 3 (gain of function) pushed into CLUSTER:4 and CLUSTER:55 |
 | 5 | Checked agent | 347 | Presidio → LangGraph turn (safety, entities, agent with 6 tools, postcheck) → one draft claim removed at the gate |
-| 6 | Atlas | 259 | Atlas screenshots, server-to-WebGL chain, line style per origin, logo |
+| 6 | Atlas | 277 | Atlas screenshots, server-to-WebGL chain, line style per origin, logo |
 
 On-screen text is limited to labels (names, ids, numbers, the formula); it
 never repeats the narration.
