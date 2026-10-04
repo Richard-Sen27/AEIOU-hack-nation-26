@@ -132,18 +132,24 @@ async function atlas(page: Page, scripts: Script[], session: unknown = signedInS
 
 const panel = (page: Page) => page.getByTestId("atlas-panel");
 const calls = (page: Page) => page.evaluate(() => (window as unknown as { __explain: { calls: unknown[] } }).__explain.calls);
-/** Start collecting each distinct length of the summary text as the page renders it. */
+/**
+ * Start collecting each distinct visible text of the summary as the page renders it: while the
+ * words fade in, only the visible words (not the screen-reader copy of the whole text).
+ */
 async function recordTextLengths(page: Page) {
   await page.evaluate(() => {
-    const w = window as unknown as { __lengths: number[] };
-    w.__lengths = [];
+    const w = window as unknown as { __texts: string[] };
+    w.__texts = [];
     new MutationObserver(() => {
-      const n = document.querySelector('[data-testid="atlas-summary-text"]')?.textContent?.length;
-      if (n !== undefined && n !== w.__lengths[w.__lengths.length - 1]) w.__lengths.push(n);
+      const el = document.querySelector('[data-testid="atlas-summary-text"]');
+      if (!el) return;
+      const t = (el.querySelector("[data-smooth-visible]") ?? el).textContent ?? "";
+      if (t !== w.__texts[w.__texts.length - 1]) w.__texts.push(t);
     }).observe(document.body, { subtree: true, childList: true, characterData: true });
   });
 }
-const textLengths = (page: Page) => page.evaluate(() => (window as unknown as { __lengths: number[] }).__lengths);
+const shownTexts = (page: Page) => page.evaluate(() => (window as unknown as { __texts: string[] }).__texts);
+const textLengths = async (page: Page) => (await shownTexts(page)).map((t) => t.length);
 // The machine may be busy; gates, not timings, decide what the page shows.
 test.describe.configure({ timeout: 120_000 });
 const expect = baseExpect.configure({ timeout: 30_000 });
@@ -187,6 +193,11 @@ test.describe("atlas write a summary, streamed", () => {
     expect(lengths.length).toBeGreaterThanOrEqual(5);
     expect(lengths).toEqual([...lengths].sort((a, b) => a - b));
     await expect(box).toHaveAttribute("data-state", "done");
+    // Every step showed a beginning of the final text (citations as their numbers).
+    const finalText = (await p.getByTestId("atlas-summary-text").textContent()) ?? "";
+    const texts = await shownTexts(page);
+    for (const t of texts) expect(finalText.startsWith(t.trimEnd())).toBe(true);
+    expect(texts[texts.length - 1]).toBe(finalText);
     await expect(p.getByTestId("atlas-summary-cancel")).toHaveCount(0);
     await expect(p.getByTestId("citation")).toHaveCount(3);
     const after = (await box.boundingBox())!.height;
@@ -296,13 +307,33 @@ test.describe("atlas write a summary, streamed", () => {
   });
 
   test("a cached summary uses the same reveal", async ({ page }) => {
-    await atlas(page, [{ frames: [[50, { type: "delta", text: TEXT }], ["gate", final(TEXT, true)]] }], guestSession);
+    await atlas(page, [{ frames: [["gate", { type: "delta", text: TEXT }], ["gate", final(TEXT, true)]] }], guestSession);
     const p = panel(page);
     await p.getByTestId("atlas-summary-write").click();
+    await recordTextLengths(page);
+    await release(page);
     await expect(p.getByTestId("atlas-summary-step")).toHaveText("Prepared summary");
     await release(page);
     await expect(p.getByTestId("atlas-summary-cached")).toBeVisible();
     await expect(p.getByTestId("atlas-summary-text")).toContainText("strongest links first");
+    // One chunk, still revealed in steps: at least two partial texts before the whole.
+    const full = ((await p.getByTestId("atlas-summary-text").textContent()) ?? "").length;
+    expect(new Set((await textLengths(page)).filter((n) => n > 0 && n < full)).size).toBeGreaterThanOrEqual(2);
+  });
+
+  test("screen readers get the whole summary once, not word by word", async ({ page }) => {
+    await atlas(page, [{ frames: [["gate", { type: "delta", text: `${TEXT} ${TEXT} ${TEXT}` }], ["gate", final(`${TEXT} ${TEXT} ${TEXT}`, false)]] }]);
+    const p = panel(page);
+    await p.getByTestId("atlas-summary-write").click();
+    await release(page);
+    const text = p.getByTestId("atlas-summary-text");
+    await expect(text.locator("[data-smooth-visible]")).toHaveAttribute("aria-hidden", "true");
+    await expect(text.locator(".sr-only")).toContainText("strongest links first");
+    await expect(text.locator(".sr-only")).not.toContainText("[e_");
+    await release(page);
+    await expect(p.getByTestId("atlas-summary-fresh")).toBeVisible();
+    await expect(text.locator(".sr-only")).toHaveCount(0);
+    await expect(p.getByTestId("citation")).toHaveCount(9);
   });
 
   for (const theme of ["light", "dark"] as const) {

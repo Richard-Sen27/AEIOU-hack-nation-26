@@ -1,6 +1,6 @@
 import { expect, test, type Page } from "@playwright/test";
 
-import { mockApi, signedInSession } from "../helpers";
+import { mockApi, recordReveal, revealSamples, signedInSession } from "../helpers";
 import { atlasTreePayload, summaryMock } from "../graph/fixtures";
 import { fullTurnEvents, graphMocks, reply, SESSION_ID, STORY } from "./fixtures";
 
@@ -18,11 +18,11 @@ const userMessage = { id: MESSAGE_ID, session_id: SESSION_ID, role: "user", cont
 const answer = { id: "55555555-5555-4555-8555-555555555555", session_id: SESSION_ID, role: "assistant", content: reply.summary, reply, error: null, created_at: "2026-10-04T08:00:30Z" };
 
 /** The run's events as the server replays them: SSE frames with their sequence numbers. */
-function replayBody() {
+function replayBody(r: Record<string, unknown> = reply) {
   const events = [
     { type: "status", tool: null, message: "Checking your message" },
     { type: "turn", session_id: SESSION_ID, message_id: MESSAGE_ID, run_id: RUN_ID },
-    ...fullTurnEvents(),
+    ...fullTurnEvents(r),
   ];
   return {
     contentType: "text/event-stream",
@@ -105,6 +105,38 @@ test.describe("chat runs", () => {
     await page.getByTestId("atlas-wu-open").click();
     await expect(page.getByTestId("atlas-wu-dock").getByTestId("summary")).toHaveText(reply.summary);
     expect(seen.posts).toBe(1);
+  });
+
+  test("switching from the dock to the full page mid-reveal continues the text, no restart", async ({ page }) => {
+    // A long answer: the dock is still revealing it when the full page opens.
+    const long = { ...reply, summary: Array.from({ length: 12 }, () => reply.summary).join(" ") };
+    await recordReveal(page, '[data-testid="summary"]');
+    await server(page, {
+      "GET /chat/runs": [],
+      "POST /chat": () => replayBody(long),
+      "GET /chat/sessions/*": { session, messages: [userMessage, { ...answer, content: long.summary, reply: long }], run: null },
+    });
+    await page.goto("/atlas");
+    const dock = page.getByTestId("atlas-wu-dock");
+    await dock.getByTestId("atlas-wu-open").click();
+    const box = dock.getByRole("textbox", { name: "Message Dr. Wu" });
+    await box.fill(STORY);
+    await box.press("Enter");
+    await expect(dock.getByTestId("summary")).toHaveAttribute("data-revealing", "true");
+    await expect.poll(async () => (await revealSamples(page)).filter((x) => x.text.length > 0).length).toBeGreaterThanOrEqual(2);
+    await dock.getByTestId("atlas-wu-full").click();
+    await expect(page).toHaveURL(/\/chat$/);
+    const turn = page.getByTestId("assistant-turn").last();
+    await expect(turn.getByTestId("summary")).toHaveText(long.summary, { timeout: 20_000 });
+
+    const samples = await revealSamples(page);
+    const inDock = samples.filter((x) => x.path === "/atlas" && x.text);
+    const onPage = samples.filter((x) => x.path === "/chat" && x.text);
+    const lastDock = inDock[inDock.length - 1].text;
+    // The page starts where the dock had got to (or further), never from the first words.
+    expect(onPage[0].text.length).toBeGreaterThanOrEqual(lastDock.length);
+    for (const x of [...inDock, ...onPage]) expect(long.summary.startsWith(x.text.trimEnd())).toBe(true);
+    expect(onPage[onPage.length - 1].text).toBe(long.summary);
   });
 
   test("stop cancels the run on the server", async ({ page }) => {

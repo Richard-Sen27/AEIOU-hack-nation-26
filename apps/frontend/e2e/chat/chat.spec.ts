@@ -1,6 +1,6 @@
 import { expect, test, type Page } from "@playwright/test";
 
-import { errorEnvelope, guestSession, mockApi, setTheme, shot, signedInSession, sseBody, trackConsoleErrors } from "../helpers";
+import { errorEnvelope, guestSession, mockApi, recordReveal, revealSamples, setTheme, shot, signedInSession, sseBody, trackConsoleErrors } from "../helpers";
 import { atlasTreePayload, summaryMock } from "../graph/fixtures";
 import { emptyReply, graphMocks, reply, SESSION_ID, STORY, turnBody } from "./fixtures";
 
@@ -689,5 +689,83 @@ test.describe("chat", () => {
     await ask(page, "She is not breathing");
     await expect(turn(page).getByTestId("emergency")).toBeVisible();
     await shot(page, "chat-emergency");
+  });
+});
+
+/*
+ * The smooth reveal: a live answer's text arrives in two chunks and is revealed word by word;
+ * its parts follow. Timing-free: the samples are every distinct visible text the page showed.
+ */
+test.describe("chat smooth reveal", () => {
+  const SUMMARY = '[data-testid="assistant-turn"] [data-testid="summary"]';
+
+  test("a live answer grows word by word, then its parts come in and work", async ({ page }) => {
+    await recordReveal(page, SUMMARY);
+    await signedIn(page, { "POST /chat": turnBody() });
+    await page.goto("/chat");
+    await ask(page);
+    const t = turn(page);
+    await expect(t.getByTestId("summary")).toHaveText(reply.summary);
+    await expect(t.getByTestId("summary")).not.toHaveAttribute("data-revealing");
+    const texts = (await revealSamples(page)).map((x) => x.text).filter(Boolean);
+    const partial = texts.filter((x) => x.length < reply.summary.length);
+    // At least two points in time with a growing, partial text, each a prefix of the reply.
+    expect(new Set(partial).size).toBeGreaterThanOrEqual(2);
+    for (const x of texts) expect(reply.summary.startsWith(x.trimEnd())).toBe(true);
+    expect(texts.map((x) => x.length)).toEqual(texts.map((x) => x.length).sort((a, b) => a - b));
+    expect(texts[texts.length - 1]).toBe(reply.summary);
+    // The parts after the text, and the sources line opens.
+    await expect(t.getByTestId("claim")).toHaveCount(3);
+    const toggle = t.getByTestId("sources").getByRole("button");
+    await toggle.click();
+    await expect(toggle).toHaveAttribute("aria-expanded", "true");
+    await expect(t.getByTestId("follow-up")).toBeVisible();
+  });
+
+  test("screen readers get the whole text while it is revealed", async ({ page }) => {
+    // A long answer, so the reveal is still running when it is checked.
+    const long = { ...reply, summary: Array.from({ length: 12 }, () => reply.summary).join(" ") };
+    await signedIn(page, { "POST /chat": turnBody(long) });
+    await page.goto("/chat");
+    await ask(page);
+    const summary = turn(page).getByTestId("summary");
+    await expect(summary).toHaveAttribute("data-revealing", "true");
+    await expect(summary.locator(".sr-only")).toHaveText(long.summary);
+    await expect(summary.locator("[data-smooth-visible]")).toHaveAttribute("aria-hidden", "true");
+    await expect(summary).toHaveText(long.summary, { timeout: 20_000 });
+    await expect(summary.locator(".sr-only")).toHaveCount(0);
+  });
+
+  test("a stored reply shows at once", async ({ page }) => {
+    await recordReveal(page, SUMMARY);
+    await signedIn(page, {
+      "GET /chat/sessions": [sessions[0]],
+      "GET /chat/sessions/*": {
+        session: sessions[0],
+        messages: [
+          { id: "m1", session_id: SESSION_ID, role: "user", content: STORY, created_at: "2026-10-03T10:00:00Z" },
+          { id: "m2", session_id: SESSION_ID, role: "assistant", content: reply.summary, reply, created_at: "2026-10-03T10:00:05Z" },
+        ],
+      },
+    });
+    await page.goto("/chat");
+    await page.getByTestId("session-list").first().getByRole("button", { name: /^STXBP1 and related communities/ }).click();
+    await expect(turn(page).getByTestId("summary")).toHaveText(reply.summary);
+    await expect(turn(page).getByTestId("claim")).toHaveCount(3);
+    expect((await revealSamples(page)).map((x) => x.text).filter(Boolean)).toEqual([reply.summary]);
+  });
+
+  test("reduced motion shows the answer at once", async ({ page }) => {
+    await page.emulateMedia({ reducedMotion: "reduce" });
+    await recordReveal(page, SUMMARY);
+    await signedIn(page, { "POST /chat": turnBody() });
+    await page.goto("/chat");
+    await ask(page);
+    await expect(turn(page).getByTestId("summary")).toHaveText(reply.summary);
+    // Each chunk shows as it arrives (the reply comes in two), never word by word.
+    const texts = (await revealSamples(page)).map((x) => x.text).filter(Boolean);
+    expect(texts.length).toBeLessThanOrEqual(2);
+    expect(texts[texts.length - 1]).toBe(reply.summary);
+    await expect(turn(page).getByTestId("claim")).toHaveCount(3);
   });
 });

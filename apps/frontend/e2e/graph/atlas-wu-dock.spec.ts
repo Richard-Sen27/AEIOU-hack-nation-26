@@ -1,6 +1,6 @@
 import { expect, test, type Page } from "@playwright/test";
 
-import { guestSession, mockApi, setTheme, signedInSession, sseBody, trackConsoleErrors } from "../helpers";
+import { guestSession, mockApi, recordReveal, revealSamples, setTheme, signedInSession, sseBody, trackConsoleErrors } from "../helpers";
 import { atlasTreePayload, summaryMock } from "./fixtures";
 
 const STORY = "My daughter has seizures since birth and I think it is a channel disorder.";
@@ -120,6 +120,36 @@ test.describe("atlas Dr. Wu dock", () => {
     await dock(page).getByTestId("atlas-wu-clear").click();
     await expect(dock(page).getByTestId("atlas-wu-found")).toHaveCount(0);
     expect(errors()).toEqual([]);
+  });
+
+  test("the reply's text is revealed smoothly, then its statements come in", async ({ page }) => {
+    const summary = Array.from({ length: 4 }, (_, i) => `Part ${i + 1}: ${reply.summary}`).join(" ");
+    const claims = [{ text: "STXBP1 encephalopathy is caused by changes in STXBP1.", edge_ids: ["e_e5f778ac8a21"], confidence: "high", origin: "observed" }];
+    const r = { ...reply, summary, claims };
+    await recordReveal(page, '[data-testid="atlas-wu-dock"] [data-testid="summary"]');
+    await atlas(
+      page,
+      {
+        "POST /chat": sseBody([
+          { type: "status", tool: "resolve_to_ids", message: "Matching it to the atlas" },
+          { type: "summary_delta", text: summary },
+          { type: "claims", claims, contradictions: [] },
+          { type: "final", reply: r, session_id: "11111111-1111-4111-8111-111111111111", message_id: "22222222-2222-4222-8222-222222222222" },
+        ]),
+      },
+      signedInSession({ consents: ["health_data"] }),
+    );
+    await page.goto("/atlas");
+    await ask(page);
+    await expect(dock(page).getByTestId("summary")).toHaveText(summary);
+    const texts = (await revealSamples(page)).map((x) => x.text).filter(Boolean);
+    expect(new Set(texts.filter((x) => x.length < summary.length)).size).toBeGreaterThanOrEqual(2);
+    for (const x of texts) expect(summary.startsWith(x.trimEnd())).toBe(true);
+    expect(texts[texts.length - 1]).toBe(summary);
+    await expect(dock(page).getByTestId("claim")).toHaveCount(1);
+    const toggle = dock(page).getByTestId("sources").getByRole("button");
+    await toggle.click();
+    await expect(toggle).toHaveAttribute("aria-expanded", "true");
   });
 
   test("errors show as the chat shows them", async ({ page }) => {

@@ -171,3 +171,35 @@ export async function shot(page: Page, name: string, { fullPage = false } = {}) 
   await page.screenshot({ path, fullPage, animations: "disabled" });
   return path;
 }
+
+/** One sample of a smoothly revealed text: the page it was on and the words visible then. */
+export type RevealSample = { path: string; text: string };
+
+/**
+ * Record, from the next page load on, every distinct visible text of the elements matching
+ * `selector` (the last match), as the smooth reveal shows it: while it animates, the fading
+ * words (`[data-smooth-visible]`, without the screen-reader copy); afterwards the plain text.
+ * Read the samples with `revealSamples(page)`. Timing-free: tests poll, never assert milliseconds.
+ */
+export async function recordReveal(page: Page, selector: string) {
+  await page.addInitScript((selector: string) => {
+    const w = window as unknown as { __reveal: RevealSample[] };
+    w.__reveal = [];
+    const sample = () => {
+      const all = document.querySelectorAll(selector);
+      const el = all[all.length - 1];
+      if (!el) return;
+      const visible = el.querySelector("[data-smooth-visible]") ?? el;
+      const text = visible.textContent ?? "";
+      const last = w.__reveal[w.__reveal.length - 1];
+      if (!last || last.text !== text || last.path !== location.pathname) w.__reveal.push({ path: location.pathname, text });
+    };
+    const start = () => new MutationObserver(sample).observe(document.documentElement, { subtree: true, childList: true, characterData: true });
+    if (document.documentElement) start();
+    else document.addEventListener("DOMContentLoaded", start);
+  }, selector);
+}
+
+export function revealSamples(page: Page): Promise<RevealSample[]> {
+  return page.evaluate(() => (window as unknown as { __reveal: RevealSample[] }).__reveal ?? []);
+}
