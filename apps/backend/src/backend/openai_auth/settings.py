@@ -23,6 +23,12 @@ class OpenAISettings(BaseSettings):
     openai_model_small: str = ""
     openai_scope: str = ""
     token_encryption_key: str = ""
+    # Server OpenAI API key (the operator's account): model calls of users without their own
+    # ChatGPT sign-in (Google accounts) run on it. Empty = off. Models for this path only; the
+    # ChatGPT-plan model list and OPENAI_MODEL_MAIN/SMALL do not apply to it.
+    openai_api_key: str = ""
+    openai_api_model_main: str = "gpt-5"
+    openai_api_model_small: str = "gpt-5-mini"
 
     @property
     def issuer(self) -> str:

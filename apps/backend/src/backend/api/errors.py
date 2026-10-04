@@ -19,7 +19,7 @@ log = logging.getLogger(__name__)
 
 DEFAULT_MESSAGES: dict[ErrorCode, str] = {
     ErrorCode.bad_request: "The request could not be processed.",
-    ErrorCode.sign_in_required: "Sign in with ChatGPT to use this feature.",
+    ErrorCode.sign_in_required: "Sign in to use this feature.",
     ErrorCode.consent_required: "This feature needs your consent first.",
     ErrorCode.forbidden: "You do not have access to this resource.",
     ErrorCode.not_found: "Not found.",
@@ -31,6 +31,7 @@ DEFAULT_MESSAGES: dict[ErrorCode, str] = {
     ErrorCode.not_implemented: "This feature is not available yet.",
     ErrorCode.upstream_error: "An upstream service failed. Please try again.",
     ErrorCode.reauth_required: "Please sign in with ChatGPT again.",
+    ErrorCode.assistant_unavailable: "Dr. Wu is not available for this sign-in.",
     ErrorCode.internal_error: "Something went wrong.",
 }
 
@@ -84,6 +85,7 @@ RESPONSE_DESCRIPTIONS: dict[int, str] = {
     429: "rate_limited",
     501: "not_implemented",
     502: "upstream_error",
+    503: "assistant_unavailable: no model access for this sign-in (the rest works).",
 }
 
 

@@ -10,7 +10,7 @@ from backend.schemas.chat import ChatMessage, ChatRunExport, ChatSession
 from backend.schemas.common import LANGUAGE_PATTERN, ApiModel
 from backend.schemas.contributions import Contribution, EdgeFlag
 from backend.schemas.documents import Document, Finding, Job
-from backend.schemas.enums import ConsentType, NodeType, Role
+from backend.schemas.enums import AuthProvider, ConsentType, NodeType, Role
 from backend.schemas.follows import FollowExport, NotificationExport
 from backend.schemas.profile import PatientProfile
 
@@ -79,6 +79,9 @@ class SessionUser(ApiModel):
     id: UUID
     name: str | None = None
     email: str | None = None
+    auth_provider: AuthProvider = Field(
+        AuthProvider.openai, description="How this account signs in."
+    )
     role: Role | None = Field(None, description="Null until the user picks a role.")
     role_verified: bool = False
     language: str = "en"
@@ -95,6 +98,10 @@ class SessionInfo(ApiModel):
     gpc: bool = Field(False, description="Global Privacy Control signal seen on this request.")
     demo_mode: bool = False
     data_version: str | None = Field(None, description="Graph data version served.")
+    sign_in_methods: list[AuthProvider] = Field(
+        default_factory=lambda: [AuthProvider.openai],
+        description="Sign-in methods this server offers (google only when enabled).",
+    )
 
 
 class SettingsUpdate(ApiModel):
@@ -132,6 +139,8 @@ class AccountInfo(ApiModel):
     id: UUID
     email: str | None = None
     name: str | None = None
+    auth_provider: AuthProvider = AuthProvider.openai
+    auth_subject: str | None = Field(None, description="The account ID at the sign-in provider.")
     created_at: datetime
     last_login_at: datetime | None = None
 
@@ -274,11 +283,11 @@ class AtlasMatchRequest(_WorkDetailsInput):
 
 
 class SuggestedName(ApiModel):
-    """Prefill from the ChatGPT account, computed on request and never stored."""
+    """Prefill from the sign-in account, computed on request and never stored."""
 
     first_name: str | None = None
     last_name: str | None = None
-    source: Literal["chatgpt"] = "chatgpt"
+    source: Literal["chatgpt", "google"] = "chatgpt"
 
 
 class AtlasEntry(ApiModel):
@@ -321,7 +330,7 @@ class ProfessionalProfile(ApiModel):
     )
     updated_at: datetime | None = Field(None, description="Last save; null if never saved.")
     suggested: SuggestedName | None = Field(
-        None, description="Name prefill from the ChatGPT account; null if it has no name."
+        None, description="Name prefill from the sign-in account; null if it has no name."
     )
 
 

@@ -62,7 +62,7 @@ async def test_require_user(client):
     assert r.json() == {
         "error": {
             "code": "sign_in_required",
-            "message": "Sign in with ChatGPT to use this feature.",
+            "message": "Sign in to use this feature.",
         }
     }
 

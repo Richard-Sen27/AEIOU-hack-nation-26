@@ -140,12 +140,18 @@ def split_name(name: str | None) -> tuple[str | None, str | None]:
 async def suggested_name(db: AsyncSession, user_id: UUID) -> SuggestedName | None:
     """From the ID token's given/family name, otherwise from `users.name`; never stored."""
     given, family = await auth_service.stored_name_claims(db, user_id)
-    name = await db.scalar(text("SELECT name FROM users WHERE id = :uid"), {"uid": user_id})
+    row = (
+        await db.execute(
+            text("SELECT name, auth_provider FROM users WHERE id = :uid"), {"uid": user_id}
+        )
+    ).first()
+    name, provider = (row[0], row[1]) if row else (None, None)
     split_first, split_last = split_name(name)
     first, last = given or split_first, family or split_last
     if first is None and last is None:
         return None
-    return SuggestedName(first_name=first, last_name=last)
+    source = "google" if provider == "google" else "chatgpt"
+    return SuggestedName(first_name=first, last_name=last, source=source)
 
 
 # ---- atlas lookups -------------------------------------------------------------------------

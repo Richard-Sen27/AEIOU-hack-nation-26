@@ -19,6 +19,7 @@ from backend.api.services import follows as follows_service
 from backend.api.services.chat import message_from_row as chat_message_from_row
 from backend.api.services.chat import runs as chat_runs
 from backend.api.services.contributions import contribution_from_row, refresh_shared_graph
+from backend.api.services.google_auth import sign_in_methods
 from backend.api.services.people import refresh_cards
 from backend.api.services.professional import (
     PROFESSIONAL_ROLES,
@@ -58,7 +59,7 @@ ProfileItemModel = ProfileDisease | ProfileGene | ProfileVariant | ProfilePhenot
 
 _SESSION_USER_SQL = text(
     """
-    SELECT u.id, u.email, p.role, p.role_verified, p.language, p.expert_mode,
+    SELECT u.id, u.email, u.auth_provider, p.role, p.role_verified, p.language, p.expert_mode,
            CASE WHEN p.role IN ('doctor', 'researcher')
                  AND (p.first_name IS NOT NULL OR p.last_name IS NOT NULL)
                 THEN concat_ws(' ', p.first_name, p.last_name)
@@ -94,6 +95,7 @@ async def session_user(db: AsyncSession, user_id: UUID) -> SessionUser:
         id=row["id"],
         name=row["name"],
         email=row["email"],
+        auth_provider=row["auth_provider"],
         role=Role(row["role"]) if row["role"] else None,
         role_verified=row["role_verified"],
         language=row["language"] or "en",
@@ -111,6 +113,7 @@ async def get_session_info(db: AsyncSession, user: CurrentUser | None, gpc: bool
         gpc=gpc,
         demo_mode=get_settings().demo_mode,
         data_version=await current_data_version(db),
+        sign_in_methods=sign_in_methods(),
     )
 
 
@@ -571,7 +574,10 @@ async def export_data(db: AsyncSession, user: CurrentUser) -> DataExport:
     uid = user.id
     account = (
         await _rows(
-            db, "SELECT id, email, name, created_at, last_login_at FROM users WHERE id = :uid", uid
+            db,
+            "SELECT id, email, name, auth_provider, auth_subject, created_at, last_login_at"
+            " FROM users WHERE id = :uid",
+            uid,
         )
     )[0]
     settings = (

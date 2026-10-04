@@ -190,6 +190,14 @@ class Role(StrEnum):
     researcher = "researcher"
 
 
+class AuthProvider(StrEnum):
+    """How an account signs in: openai (Sign in with ChatGPT) or google. One account per
+    provider identity; accounts are never merged by e-mail."""
+
+    openai = "openai"
+    google = "google"
+
+
 class ConsentType(StrEnum):
     """health_data: one consent to process the user's own health and genetic data (chat,
     profile, documents); contribute: share data with the atlas, a separate purpose."""
@@ -384,6 +392,7 @@ class ErrorCode(StrEnum):
     not_implemented = "not_implemented"
     upstream_error = "upstream_error"
     reauth_required = "reauth_required"
+    assistant_unavailable = "assistant_unavailable"
     internal_error = "internal_error"
 
 

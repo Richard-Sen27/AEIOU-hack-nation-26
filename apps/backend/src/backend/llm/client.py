@@ -235,6 +235,22 @@ async def _emit(on_event: OnEvent | None, event: ToolEvent) -> None:
         await res
 
 
+class ServerKeyProvider:
+    """The operator's OpenAI API key (`OPENAI_API_KEY`): billed to the server's API account, not
+    to a user's ChatGPT plan. Used for users without their own ChatGPT sign-in."""
+
+    credential = "server_key"
+
+    def __init__(self, api_key: str):
+        self._key = api_key
+
+    async def get_token(self) -> str:
+        return self._key
+
+    def __repr__(self) -> str:
+        return "ServerKeyProvider(***)"
+
+
 class LLMClient:
     def __init__(
         self,
@@ -252,7 +268,15 @@ class LLMClient:
         self.token_provider = token_provider
         self.base_url = (base_url or settings.api_base_url).rstrip("/")
         self.tracer = tracer or NOOP_TRACER
-        overrides = {"main": settings.openai_model_main, "small": settings.openai_model_small}
+        # The server key is the public API: fixed models from settings, no plan model list.
+        self.server_key = getattr(token_provider, "credential", None) == "server_key"
+        if self.server_key:
+            overrides = {
+                "main": settings.openai_api_model_main,
+                "small": settings.openai_api_model_small,
+            }
+        else:
+            overrides = {"main": settings.openai_model_main, "small": settings.openai_model_small}
         overrides.update(model_overrides or {})
         self._overrides = {k: v for k, v in overrides.items() if v}
         self._resolved: dict[str, str] = {}
@@ -263,10 +287,20 @@ class LLMClient:
             timeout=timeout,
             http_client=http_client,
         )
-        self._caps = _capabilities.setdefault(self.base_url, _Capabilities())
+        # Learned per upstream and credential: the API may accept what the plan rejects.
+        caps_key = self.base_url + ("#server_key" if self.server_key else "")
+        self._caps = _capabilities.setdefault(caps_key, _Capabilities())
 
     def __repr__(self) -> str:
         return f"LLMClient(base_url={self.base_url!r})"
+
+    def _credential_error(self, exc: LLMError) -> LLMError:
+        """A rejected server key is the operator's problem, not the user's: never ask the user
+        to sign in again for it."""
+        if self.server_key and exc.code == "reauth_required":
+            log.error("the server OpenAI API key was rejected")
+            return LLMError("upstream", "server key rejected", status=exc.status)
+        return exc
 
     async def bearer(self) -> str:
         return await self.token_provider.get_token()
@@ -355,6 +389,8 @@ class LLMClient:
         model's default effort)."""
         if effort is None or not self._caps.reasoning_effort:
             return None
+        if self.server_key:
+            return {"effort": effort}  # a 400 switches it off (`_effort_rejected`)
         try:
             models = await self.list_models()
         except LLMError:
@@ -401,7 +437,10 @@ class LLMClient:
                 async for event in events:
                     yield event
         except LLMError as exc:
-            error = exc.code
+            mapped = self._credential_error(exc)
+            error = mapped.code
+            if mapped is not exc:
+                raise mapped from None
             raise
         except asyncio.CancelledError:
             error = "cancelled"

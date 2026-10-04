@@ -78,15 +78,19 @@ JOB_ERRORS: dict[str, tuple[ErrorCode, str]] = {
     "no_text_found": (ErrorCode.bad_request, "No readable text was found in the document."),
     "ocr_unavailable": (ErrorCode.internal_error, "Text recognition is not available."),
     "ocr_failed": (ErrorCode.internal_error, "Text recognition failed."),
-    "sign_in_required": (ErrorCode.sign_in_required, "Sign in with ChatGPT to use this feature."),
+    "sign_in_required": (ErrorCode.sign_in_required, "Sign in to use this feature."),
+    "assistant_unavailable": (
+        ErrorCode.assistant_unavailable,
+        "Reading documents is not available for this sign-in.",
+    ),
     "llm_reauth_required": (ErrorCode.sign_in_required, "Please sign in with ChatGPT again."),
     "llm_usage_limit_exceeded": (
         ErrorCode.rate_limited,
-        "Your ChatGPT plan's usage limit was reached. Please try again later.",
+        "The AI usage limit was reached. Please try again later.",
     ),
     "llm_usage_unavailable": (
         ErrorCode.upstream_error,
-        "Your ChatGPT plan cannot be used for this right now.",
+        "The AI service cannot be used for this right now.",
     ),
     "llm_timeout": (ErrorCode.upstream_error, "The model took too long to respond."),
     "llm_bad_output": (ErrorCode.upstream_error, "The model returned an unusable answer."),
@@ -211,7 +215,8 @@ async def process_document(job_id: UUID, document_id: UUID, user_id: UUID, data:
     except ExtractionError as exc:
         error = exc.code if exc.code in JOB_ERRORS else "unreadable_document"
     except ApiError as exc:
-        error = "sign_in_required" if exc.code is ErrorCode.sign_in_required else "internal_error"
+        known = (ErrorCode.sign_in_required, ErrorCode.assistant_unavailable)
+        error = exc.code.value if exc.code in known else "internal_error"
     except LLMError as exc:
         error = f"llm_{exc.code}"
     except TimeoutError:

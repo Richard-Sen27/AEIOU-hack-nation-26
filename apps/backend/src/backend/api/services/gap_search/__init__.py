@@ -438,11 +438,11 @@ _ERRORS: dict[str, tuple[ErrorCode, str]] = {
     "reauth_required": (ErrorCode.sign_in_required, "Please sign in with ChatGPT again."),
     "usage_limit_exceeded": (
         ErrorCode.rate_limited,
-        "Your ChatGPT plan's usage limit was reached. Please try again later.",
+        "The AI usage limit was reached. Please try again later.",
     ),
     "usage_unavailable": (
         ErrorCode.upstream_error,
-        "Your ChatGPT plan cannot be used for this right now.",
+        "The AI service cannot be used for this right now.",
     ),
 }
 

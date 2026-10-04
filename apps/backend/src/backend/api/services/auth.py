@@ -1,5 +1,6 @@
 """Sign in with ChatGPT for the web app (OIDC + PKCE, dynamic registration or partner client),
-OpenAI token storage, and the per-user LLM client.
+OpenAI token storage, and the per-user LLM client (own ChatGPT plan, or the server key for
+accounts from another sign-in; see `llm_for_user`).
 
 Tokens are stored Fernet-encrypted in `openai_tokens` under RLS and never leave the server; they
 never appear in logs, URLs or error messages. Failures redirect to the frontend with only a short
@@ -28,7 +29,7 @@ from backend.api.errors import ApiError
 from backend.api.security import clear_session, issue_session
 from backend.config import get_settings
 from backend.db.session import set_user, user_transaction
-from backend.llm import LLMClient, LLMError
+from backend.llm import LLMClient, LLMError, ServerKeyProvider
 from backend.observability import get_tracer
 from backend.openai_auth import (
     DYNAMIC_CLIENT_ID,
@@ -242,7 +243,7 @@ async def callback(request: Request, db: AsyncSession) -> Response:
 
     try:
         uid = await db.scalar(
-            text("SELECT auth_find_or_create_user(:sub, :email, :name)"),
+            text("SELECT auth_find_or_create_user('openai', :sub, :email, :name)"),
             {"sub": claims.sub, "email": claims.email, "name": claims.name},
         )
         await set_user(db, uid)
@@ -416,21 +417,48 @@ class DbTokenProvider:
             return tokens.access_token
 
 
-async def llm_for_user(user_id: UUID) -> LLMClient:
-    """LLMClient billed to this user's ChatGPT plan (services, SSE handlers, background jobs).
+async def _auth_provider(user_id: UUID) -> str | None:
+    """The account's sign-in provider ("openai" or "google"); it never changes for an id."""
+    provider = _providers.get(user_id)
+    if provider is None:
+        async with user_transaction(user_id) as db:
+            provider = await db.scalar(
+                text("SELECT auth_provider FROM users WHERE id = :uid"), {"uid": user_id}
+            )
+        if provider is not None:
+            if len(_providers) > 10_000:
+                _providers.clear()
+            _providers[user_id] = provider
+    return provider
 
-    Uses its own short RLS transactions; refreshes tokens with row locking when due. Raises
-    ApiError 401 `sign_in_required` when the user has no usable OpenAI sign-in (no tokens, no
-    plan-usage scope, or the refresh failed). Later calls on the client raise
-    LLMError("reauth_required") if the sign-in dies mid-way."""
-    provider = DbTokenProvider(user_id)
+
+_providers: dict[UUID, str] = {}
+
+
+async def llm_for_user(user_id: UUID) -> LLMClient:
+    """The model gateway for this user (services, SSE handlers, background jobs).
+
+    - ChatGPT accounts: billed to the user's own ChatGPT plan, as always. Uses its own short
+      RLS transactions; refreshes tokens with row locking when due. ApiError 401
+      `sign_in_required` when there is no usable OpenAI sign-in (no tokens, no plan-usage scope,
+      or the refresh failed); later calls raise LLMError("reauth_required") if it dies mid-way.
+    - Other accounts (Google): the server OpenAI API key (`OPENAI_API_KEY`) when configured,
+      else ApiError 503 `assistant_unavailable`.
+    """
+    provider = await _auth_provider(user_id)
+    if provider is not None and provider != "openai":
+        api_key = get_openai_settings().openai_api_key
+        if not api_key:
+            raise ApiError(503, ErrorCode.assistant_unavailable)
+        return LLMClient(ServerKeyProvider(api_key), tracer=get_tracer())
+    plan = DbTokenProvider(user_id)
     try:
-        await provider.get_token()
+        await plan.get_token()
     except LLMError as exc:
         if exc.code == "reauth_required":
             raise ApiError(401, ErrorCode.sign_in_required) from None
         raise ApiError(502, ErrorCode.upstream_error) from None
-    return LLMClient(provider, tracer=get_tracer())
+    return LLMClient(plan, tracer=get_tracer())
 
 
 async def get_user_llm(user: Annotated[CurrentUser, Depends(require_user)]) -> LLMClient:
