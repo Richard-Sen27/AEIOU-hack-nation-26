@@ -43,8 +43,8 @@ export function SignInDialog({
             </DialogTitle>
             <DialogDescription className="text-sm leading-relaxed text-muted-foreground">
               {reason ? `${reason} ` : ""}
-              Dr. Wu, the AI assistant, runs on your own ChatGPT plan, so it needs you to
-              sign in with ChatGPT. Exploring the atlas stays open to everyone.
+              Dr. Wu, the AI assistant, runs on your own ChatGPT plan. The atlas stays open to
+              everyone.
             </DialogDescription>
           </DialogHeader>
 
