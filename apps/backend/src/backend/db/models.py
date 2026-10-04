@@ -216,6 +216,14 @@ class Profile(Base):
     role: Mapped[str | None] = mapped_column(Text)
     role_verified: Mapped[bool] = mapped_column(Boolean, nullable=False, server_default="false")
     orcid_id: Mapped[str | None] = mapped_column(Text)
+    # Optional private work details (doctor and researcher roles only; never sent to a model).
+    first_name: Mapped[str | None] = mapped_column(Text)
+    last_name: Mapped[str | None] = mapped_column(Text)
+    institutions: Mapped[list[Any]] = mapped_column(
+        JSONB, nullable=False, server_default=text("'[]'::jsonb")
+    )
+    atlas_node_id: Mapped[str | None] = mapped_column(Text)
+    professional_updated_at: Mapped[datetime | None] = mapped_column()
     language: Mapped[str] = mapped_column(Text, nullable=False, server_default="en")
     gpc_opt_out: Mapped[bool] = mapped_column(Boolean, nullable=False, server_default="false")
     expert_mode: Mapped[bool] = mapped_column(Boolean, nullable=False, server_default="false")
