@@ -327,7 +327,9 @@ async def search(
             matched_synonym=h.synonym,
             score=_final_score(h),
             match_kind=h.kind,
-            cluster_id=h.cluster_id,
+            # Only diseases belong to clusters (graph.disease_group); other nodes carry the
+            # pipeline's map colour in cluster_id.
+            cluster_id=h.cluster_id if h.type == NodeType.disease else None,
         )
         for h in ranked
         if allowed is None or h.type in allowed

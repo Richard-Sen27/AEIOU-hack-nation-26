@@ -422,8 +422,9 @@ def atlas_summary(node_id: str, lens: Lens) -> AtlasSummary:
             for mid in store.members.get(node.id, ())
             if (m := graph.get_node(mid))
         ]
-    if node.cluster_id and node.cluster_id != node.id:
-        cluster = graph.get_node(node.cluster_id)
+    # Only a disease belongs to a cluster, and only a cluster of two or more is a group.
+    if (group := graph.disease_group(store, node)) is not None:
+        cluster = graph.get_node(group.id)
         if cluster is not None:
             membership.append((cluster, CLUSTER_OF_LABEL))
     seen = set(targets) | {node.id}

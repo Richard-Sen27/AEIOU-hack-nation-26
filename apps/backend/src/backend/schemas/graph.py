@@ -119,7 +119,13 @@ class ClusterSummary(ApiModel):
     id: str = Field(description="Cluster ID, e.g. CLUSTER:1.")
     label: str = Field(description="Cluster label (model-written, inferred).")
     mechanism_summary: str | None = Field(None, description="Shared mechanism, plain text.")
-    member_count: int = Field(description="Number of member nodes.")
+    member_count: int = Field(description="Number of member diseases.")
+    focus_member_count: int = Field(
+        0, description="Member diseases in the focus set (the ones drawn on the Atlas map)."
+    )
+    on_map: bool = Field(
+        False, description="True when the cluster holds focus diseases and so is on the Atlas map."
+    )
     attrs: dict[str, Any] = Field(
         default_factory=dict, description="Extra metadata (top genes, pathways, centroid ...)."
     )
@@ -140,7 +146,11 @@ class NodeDetail(ApiModel):
         default_factory=list, description="Edge counts by relation."
     )
     degree: int = Field(0, description="Total number of edges touching the node.")
-    cluster: ClusterSummary | None = Field(None, description="The node's cluster, if any.")
+    cluster: ClusterSummary | None = Field(
+        None,
+        description="The node's mechanism group: a disease's cluster of two or more members, or"
+        " a cluster node itself. Other nodes have none.",
+    )
     classification: VariantClassification | None = Field(
         None, description="For variants: the clinical classification."
     )

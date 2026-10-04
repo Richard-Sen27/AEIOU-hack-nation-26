@@ -84,6 +84,8 @@ HUB_PERCENTILE = 0.95
 # /neighborhood/{id} returns at most this many neighbours (wide scope: a symptom can be linked
 # to more than 2,000 diseases); the route reports the full count in a response header.
 MAX_NEIGHBORS = 300
+# A cluster with fewer member diseases is not presented as a mechanism group.
+MIN_GROUP_SIZE = 2
 
 PATH_FAMILIES: dict[PathFamily, frozenset[EdgeFamily]] = {
     PathFamily.dna: frozenset({EdgeFamily.dna}),
@@ -410,15 +412,7 @@ def build_store(
         pct = degrees[min(len(degrees) - 1, int(HUB_PERCENTILE * len(degrees)))]
         store.hub_degree = max(HUB_MIN_DEGREE, pct)
 
-    for node in store.nodes.values():
-        if node.cluster_id:
-            store.members.setdefault(node.cluster_id, []).append(node.id)
-    for cid, summary in store.clusters.items():
-        if not summary.member_count:
-            count = sum(
-                1 for m in store.members.get(cid, ()) if store.nodes[m].type == NodeType.disease
-            )
-            store.clusters[cid] = summary.model_copy(update={"member_count": count})
+    _fill_members(store)
 
     _fill_positions(store)
     _build_indexes(store)
@@ -426,6 +420,33 @@ def build_store(
     if skipped:
         log.warning("graph rows skipped: %s", dict(skipped))
     return store
+
+
+def _fill_members(store: GraphStore) -> None:
+    """Cluster members are diseases only. The pipeline also gives genes, variants, symptoms and
+    pathways the cluster of most of their diseases (a majority vote for the map's colours,
+    analytics.node_clusters) and a cluster node its own id; neither makes them members.
+    member_count, focus_member_count and on_map follow the member diseases."""
+    from backend.api.services.atlas_tree import is_focus  # atlas_tree imports this module
+
+    for node in store.nodes.values():
+        if node.cluster_id and node.type == NodeType.disease:
+            store.members.setdefault(node.cluster_id, []).append(node.id)
+    for cid, summary in store.clusters.items():
+        members = [store.nodes[m] for m in store.members.get(cid, ())]
+        focus = sum(1 for m in members if is_focus(m))
+        store.clusters[cid] = summary.model_copy(
+            update={
+                "member_count": len(members) or summary.member_count,
+                "focus_member_count": focus,
+                "on_map": focus > 0,
+            }
+        )
+
+
+def is_group(summary: ClusterSummary | None) -> bool:
+    """A mechanism group holds at least MIN_GROUP_SIZE diseases; a cluster of one is not."""
+    return summary is not None and summary.member_count >= MIN_GROUP_SIZE
 
 
 def _fill_positions(store: GraphStore) -> None:
@@ -691,10 +712,21 @@ def layout_hints(role: Role) -> LayoutHints:
     return ROLE_HINTS.get(role, ROLE_HINTS[Role.guest]).model_copy(deep=True)
 
 
+def disease_group(store: GraphStore, node: Node) -> ClusterSummary | None:
+    """The mechanism group of a disease (its cluster, when that has two or more members).
+    Other node types carry the pipeline's map colour in cluster_id, not a membership."""
+    if node.type != NodeType.disease or not node.cluster_id:
+        return None
+    summary = store.clusters.get(node.cluster_id)
+    return summary if is_group(summary) else None
+
+
 def _cluster_of(store: GraphStore, node: Node) -> ClusterSummary | None:
-    if node.type == NodeType.cluster and node.id in store.clusters:
-        return store.clusters[node.id]
-    return store.clusters.get(node.cluster_id) if node.cluster_id else None
+    """A cluster node's own summary (also a cluster of one, reachable by id), else the
+    disease's mechanism group."""
+    if node.type == NodeType.cluster:
+        return store.clusters.get(node.id)
+    return disease_group(store, node)
 
 
 def neighborhood(node_id: str, lens: Lens) -> Neighborhood:
@@ -707,10 +739,26 @@ def _neighbor_key(store: GraphStore, edge: Edge) -> tuple[bool, float, str]:
     return (not edge_is_active(store, edge), -edge.confidence, edge.id)
 
 
+def _member_key(
+    store: GraphStore, member_id: str, linked: Mapping[str, tuple[bool, float, str]]
+) -> tuple:
+    from backend.api.services.atlas_tree import is_focus  # atlas_tree imports this module
+
+    link = linked.get(member_id)
+    return (
+        link is None,
+        link or (),
+        not is_focus(store.nodes[member_id]),
+        -store.degree.get(member_id, 0),
+        member_id,
+    )
+
+
 def neighborhood_with_total(node_id: str, lens: Lens) -> tuple[Neighborhood, int]:
     """The neighborhood and the number of neighbours before the cap. A hub (a symptom linked
-    to 2,000 diseases) keeps its MAX_NEIGHBORS strongest neighbours: cluster members first,
-    then by the best direct edge (active first, higher confidence, edge id)."""
+    to 2,000 diseases) keeps its MAX_NEIGHBORS strongest neighbours by the best direct edge
+    (active first, higher confidence, edge id). A cluster keeps its member diseases first
+    (members linked to the cluster, then focus diseases, then by degree), then the others."""
     store = get_graph()
     center = _require_node(store, node_id)
     best: dict[str, tuple[bool, float, str]] = {}
@@ -719,7 +767,10 @@ def neighborhood_with_total(node_id: str, lens: Lens) -> tuple[Neighborhood, int
         if other != center.id and (other not in best or key < best[other]):
             best[other] = key
     members = (
-        [m for m in sorted(store.members.get(center.id, ())) if m != center.id]
+        sorted(
+            (m for m in store.members.get(center.id, ()) if m != center.id),
+            key=lambda m: _member_key(store, m, best),
+        )
         if center.type == NodeType.cluster
         else []
     )
@@ -781,8 +832,12 @@ def _summary(store: GraphStore, node: Node, neighbor_types: Counter, role: Role)
     if not lead.endswith("."):
         lead += "."
     if node.type == NodeType.cluster:
-        count = len(store.members.get(node.id, ()))
-        return f"{lead} Groups {count} members by shared mechanism or symptoms."
+        summary = store.clusters.get(node.id)
+        count = summary.member_count if summary else len(store.members.get(node.id, ()))
+        singular, plural = words[NodeType.disease]
+        if count < MIN_GROUP_SIZE:
+            return f"{lead} Holds a single {singular}, so it is not a group."
+        return f"{lead} Groups {count} {plural} by shared mechanism or symptoms."
     if not parts:
         return lead
     linked = ", ".join(parts[:-1]) + (" and " if len(parts) > 1 else "") + parts[-1]
@@ -827,10 +882,19 @@ def node_detail(node_id: str, lens: Lens) -> NodeDetail:
     )
 
 
+def _cluster_number(cluster_id: str) -> tuple[int, str]:
+    tail = cluster_id.rpartition(":")[2]
+    return (int(tail), cluster_id) if tail.isdigit() else (2**31, cluster_id)
+
+
 def clusters() -> list[ClusterSummary]:
-    """Cluster IDs, labels, sizes and mechanism summaries."""
+    """Cluster IDs, labels, sizes and mechanism summaries; the clusters on the map first, then
+    by member count (largest first), then by cluster number."""
     store = get_graph()
-    return [store.clusters[k] for k in sorted(store.clusters)]
+    return sorted(
+        store.clusters.values(),
+        key=lambda c: (not c.on_map, -c.member_count, _cluster_number(c.id)),
+    )
 
 
 def atlas_edges(within: set[str] | None = None, store: GraphStore | None = None) -> list[AtlasEdge]:
