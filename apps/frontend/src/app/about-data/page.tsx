@@ -64,10 +64,12 @@ export default async function AboutDataPage(props: PageProps<"/about-data">) {
                 [<Src key="h" href="https://www.genenames.org/">HGNC</Src>, "Approved gene symbols and aliases", "Freely available under the HGNC terms of use"],
                 [<Src key="hp" href="https://hpo.jax.org/">Human Phenotype Ontology (HPO)</Src>, "Symptom terms and disease–symptom links", "HPO licence, free to use with attribution; this atlas uses the HPO (hpo.jax.org)"],
                 [<Src key="c" href="https://www.ncbi.nlm.nih.gov/clinvar/">ClinVar</Src>, "Variant classifications for genes in scope", "Public domain (NCBI, U.S. National Library of Medicine)"],
+                [<Src key="mane" href="https://www.ncbi.nlm.nih.gov/refseq/MANE/">NCBI MANE</Src>, "Where each gene sits on the genome (chromosome, start, end; GRCh38)", "Public data, NCBI and EMBL-EBI"],
+                ["OMIM numbers", "Disease identifiers", "Taken from HPO annotations, MONDO cross-references and ClinVar; OMIM's own files are not used"],
                 [<Src key="cg" href="https://clinicalgenome.org/">ClinGen</Src>, "Gene–disease validity and dosage sensitivity", "Freely available under the ClinGen terms of use"],
                 [<Src key="r" href="https://reactome.org/">Reactome</Src>, "Gene to pathway mappings", "Freely available under the Reactome licence terms"],
                 [<Src key="g" href="https://geneontology.org/">Gene Ontology (GO)</Src>, "Gene functions and pathways", "CC BY 4.0, Gene Ontology Consortium"],
-                [<Src key="o" href="https://www.orphadata.com/">Orphanet</Src>, "Gene associations, symptoms, epidemiology", "CC BY 4.0, Orphanet / INSERM (Orphadata)"],
+                [<Src key="o" href="https://www.orphadata.com/">Orphanet</Src>, "Gene associations, symptoms, epidemiology", "CC BY 4.0, Orphanet / INSERM (Orphadata); links we compute from it are our modification, not Orphanet's"],
                 [<Src key="p" href="https://pubmed.ncbi.nlm.nih.gov/">PubMed</Src>, "Abstracts, authors and affiliations", "NLM terms; abstracts remain the publishers' and authors' work, quoted with a link"],
                 [<Src key="ct" href="https://clinicaltrials.gov/">ClinicalTrials.gov</Src>, "Studies, status, sites and investigators", "Public U.S. government data (NLM)"],
                 [<Src key="nih" href="https://reporter.nih.gov/">NIH RePORTER</Src>, "Grants, principal investigators, institutions", "Public U.S. government data (NIH)"],
@@ -80,8 +82,9 @@ export default async function AboutDataPage(props: PageProps<"/about-data">) {
             <NoticeSub title="Confidence">
               <p>
                 Each piece of evidence counts by its kind: curated databases most, then peer-reviewed studies, reviews,
-                preprints, links inferred by AI, and patient-reported information least. Several independent sources raise
-                confidence; contradicting findings lower it. The result is shown as
+                preprints, links inferred by AI, and patient-reported information least. A link computed by the atlas counts by
+                its own score and never reaches High. Several independent sources raise confidence; contradicting findings
+                lower it. The result is shown as
               </p>
               <p className="flex flex-wrap items-center gap-2">
                 <ConfidenceBadge confidence={0.9} /> <ConfidenceBadge confidence={0.6} /> <ConfidenceBadge confidence={0.3} />
@@ -105,6 +108,14 @@ export default async function AboutDataPage(props: PageProps<"/about-data">) {
                 ]}
               />
               <p>
+                A computed link is one the atlas works out from the data instead of reading it from a source: two diseases
+                that list many of the same specific symptoms (rarer symptoms weigh more, as do those a disease often shows), two diseases linked
+                to variants in the same gene, genes that act in the same pathway, or genes that lie close together on a
+                chromosome. Each is drawn dashed, labelled a hypothesis and shown with its confidence and one line on why it
+                exists. Closeness on a chromosome alone is weak evidence: nearby genes can be lost or duplicated together,
+                but most are unrelated.
+              </p>
+              <p>
                 When no route between two things passes the confidence threshold, the atlas says so and names the missing
                 evidence instead of guessing.
               </p>
@@ -114,7 +125,8 @@ export default async function AboutDataPage(props: PageProps<"/about-data">) {
           <NoticeSection id="version" title="Data version">
             <p>
               The atlas is rebuilt as a whole from its sources; each build has a version recorded with source versions, file
-              hashes and counts. The version you are seeing: <DataVersion />.
+              hashes and counts. The version you are seeing: <DataVersion />. Symptom annotations come from the HPO release of
+              2 September 2026.
             </p>
           </NoticeSection>
 
