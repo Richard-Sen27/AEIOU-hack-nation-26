@@ -175,8 +175,16 @@ async def _authorize_redirect(return_to: str, client_id: str, *, retry: bool) ->
 # ---- routes -------------------------------------------------------------------------------
 
 
+def chatgpt_login_available() -> bool:
+    """Partner mode (OPENAI_CLIENT_ID set), or API and frontend on loopback: the local flow only
+    accepts a 127.0.0.1 redirect, so on a hosted domain without a partner client it cannot work."""
+    return get_openai_settings().partner_mode or get_settings().is_local
+
+
 async def start(request: Request, return_to: str | None) -> Response:
     """Create state/nonce/PKCE, keep them in a short-lived sealed cookie, redirect to OpenAI."""
+    if not chatgpt_login_available():
+        raise ApiError(404, ErrorCode.not_found, "ChatGPT sign-in is not available here.")
     target = safe_return_to(return_to)
     try:
         client_id = _oidc().default_client_id(_remembered_client(request))

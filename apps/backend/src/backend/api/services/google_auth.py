@@ -23,6 +23,7 @@ from backend.api.services.auth import (
     _mark_state_used,
     _seal,
     _unseal,
+    chatgpt_login_available,
     safe_return_to,
 )
 from backend.db.session import set_user
@@ -43,10 +44,12 @@ TX_COOKIE_PATH = "/auth/google"
 
 
 def sign_in_methods() -> list[AuthProvider]:
-    """What /auth/session tells the frontend: ChatGPT always, Google only when enabled."""
+    """What /auth/session tells the frontend: ChatGPT only where it can work (loopback or
+    partner mode), Google only when enabled."""
+    methods = [AuthProvider.openai] if chatgpt_login_available() else []
     if google_login_available():
-        return [AuthProvider.openai, AuthProvider.google]
-    return [AuthProvider.openai]
+        methods.append(AuthProvider.google)
+    return methods
 
 
 def _require_enabled() -> None:

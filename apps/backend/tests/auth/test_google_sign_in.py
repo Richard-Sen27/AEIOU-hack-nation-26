@@ -8,12 +8,14 @@ import itertools
 import json
 import time
 import uuid
+from types import SimpleNamespace
 from urllib.parse import parse_qs, urlsplit
 
 import httpx
 import jwt
 import pytest
 from cryptography.hazmat.primitives.asymmetric import rsa
+from fastapi.responses import RedirectResponse
 from jwt.algorithms import RSAAlgorithm
 
 from backend import google_auth
@@ -156,6 +158,52 @@ async def test_disabled_by_default(browser, monkeypatch):
     assert session["sign_in_methods"] == ["openai"]
     assert (await browser.get("/auth/google/start")).status_code == 404
     assert (await browser.get("/auth/google/callback?state=x&code=y")).status_code == 404
+
+
+@pytest.fixture
+def no_google(monkeypatch):
+    monkeypatch.setattr(google_auth, "get_google_settings", lambda: GoogleSettings(_env_file=None))
+
+
+def _chatgpt_setup(monkeypatch, *, local: bool, client_id: str) -> None:
+    monkeypatch.setenv("OPENAI_CLIENT_ID", client_id)
+    get_openai_settings.cache_clear()
+    real = auth_service.get_settings()
+    hosted = SimpleNamespace(**{**real.__dict__, "is_local": local})
+    monkeypatch.setattr(auth_service, "get_settings", lambda: hosted)
+
+
+@pytest.mark.parametrize(
+    ("local", "client_id", "offered"),
+    [(True, "", True), (False, "", False), (False, "app_partner", True)],
+    ids=["loopback", "hosted", "hosted-partner"],
+)
+async def test_chatgpt_offered_only_where_it_can_work(
+    browser, monkeypatch, no_google, local, client_id, offered
+):
+    _chatgpt_setup(monkeypatch, local=local, client_id=client_id)
+
+    async def fake_redirect(return_to, client_id, *, retry):  # no network in this test
+        return RedirectResponse("https://auth.example.test/authorize", status_code=302)
+
+    monkeypatch.setattr(auth_service, "_authorize_redirect", fake_redirect)
+    try:
+        session = (await browser.get("/auth/session")).json()
+        assert session["sign_in_methods"] == (["openai"] if offered else [])
+        start = await browser.get("/auth/chatgpt/start")
+        if offered:
+            assert start.status_code == 302
+        else:
+            assert start.status_code == 404
+    finally:
+        monkeypatch.undo()
+        get_openai_settings.cache_clear()
+
+
+async def test_hosted_google_only(browser, google, monkeypatch):
+    _chatgpt_setup(monkeypatch, local=False, client_id="")
+    assert (await browser.get("/auth/session")).json()["sign_in_methods"] == ["google"]
+    assert (await browser.get("/auth/google/start")).status_code == 302
 
 
 # ---- flow ---------------------------------------------------------------------------------

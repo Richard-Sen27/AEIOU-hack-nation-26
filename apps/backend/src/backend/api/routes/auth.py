@@ -15,6 +15,7 @@ router = APIRouter(tags=["auth"])
     response_class=RedirectResponse,
     status_code=302,
     operation_id="authStart",
+    responses={404: {"description": "ChatGPT sign-in cannot work on this server."}},
 )
 async def auth_start(
     request: Request,

@@ -106,7 +106,10 @@ class SessionInfo(ApiModel):
     data_version: str | None = Field(None, description="Graph data version served.")
     sign_in_methods: list[AuthProvider] = Field(
         default_factory=lambda: [AuthProvider.openai],
-        description="Sign-in methods this server offers (google only when enabled).",
+        description=(
+            "Sign-in methods this server offers: openai only where it can work (loopback or "
+            "partner mode), google only when enabled. May be empty."
+        ),
     )
 
 
