@@ -1,18 +1,22 @@
 {
-  "name": "technical",
+  "name": "aeiou-technical-video",
   "version": "1.0.0",
-  "description": "My Remotion video",
+  "description": "Amber technical video (under 60 s) for Hack-Nation 7 (2026): architecture, verified extraction, confidence, mechanism clusters, the checked agent",
   "repository": {},
   "license": "UNLICENSED",
   "private": true,
   "dependencies": {
     "@remotion/cli": "4.0.532",
+    "@remotion/google-fonts": "4.0.532",
+    "@remotion/media": "4.0.532",
+    "@remotion/studio": "4.0.532",
     "react": "19.2.3",
     "react-dom": "19.2.3",
     "remotion": "4.0.532"
   },
   "devDependencies": {
     "@remotion/eslint-config-flat": "4.0.532",
+    "@types/node": "22.20.5",
     "@types/react": "19.2.7",
     "@types/web": "0.0.166",
     "eslint": "9.39.5",
@@ -21,6 +25,9 @@
   },
   "scripts": {
     "dev": "remotion studio",
+    "render": "remotion render TechnicalVideo out/technical.mp4",
+    "still": "remotion still TechnicalVideo",
+    "voiceover": "node --env-file-if-exists=.env --experimental-strip-types scripts/generate-voiceover.ts",
     "build": "remotion bundle",
     "upgrade": "remotion upgrade",
     "lint": "eslint src && tsc"
