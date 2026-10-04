@@ -1057,6 +1057,141 @@
         }
       }
     },
+    "/atlas/tree.json": {
+      "get": {
+        "tags": [
+          "graph"
+        ],
+        "summary": "Get Atlas Tree",
+        "description": "Category trees around the hub with backend positions (ETag keyed on data and layout).",
+        "operationId": "getAtlasTree",
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/AtlasTree"
+                }
+              }
+            }
+          },
+          "304": {
+            "description": "Not modified (If-None-Match matched the ETag)."
+          },
+          "501": {
+            "description": "not_implemented",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/atlas/summary/{node_id}": {
+      "get": {
+        "tags": [
+          "graph"
+        ],
+        "summary": "Get Atlas Summary",
+        "description": "A node's connections grouped into sections for the Atlas side panel.",
+        "operationId": "getAtlasSummary",
+        "parameters": [
+          {
+            "name": "node_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "title": "Node Id"
+            }
+          },
+          {
+            "name": "role",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "$ref": "#/components/schemas/Role"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "description": "Presentation role override.",
+              "title": "Role"
+            },
+            "description": "Presentation role override."
+          },
+          {
+            "name": "language",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string",
+                  "pattern": "^[a-z]{2,3}(-[A-Za-z0-9]{2,8})?$"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "description": "Output language override.",
+              "title": "Language"
+            },
+            "description": "Output language override."
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/AtlasSummary"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "not_found",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "501": {
+            "description": "not_implemented",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
     "/path": {
       "get": {
         "tags": [
@@ -2862,6 +2997,68 @@
         ],
         "title": "AssetType"
       },
+      "AtlasCategory": {
+        "type": "string",
+        "enum": [
+          "researchers",
+          "institutions",
+          "literature",
+          "community",
+          "pathways",
+          "genes",
+          "diseases",
+          "symptoms",
+          "doctors"
+        ],
+        "title": "AtlasCategory"
+      },
+      "AtlasCategorySummary": {
+        "properties": {
+          "id": {
+            "$ref": "#/components/schemas/AtlasCategory"
+          },
+          "node_id": {
+            "type": "string",
+            "title": "Node Id"
+          },
+          "label": {
+            "type": "string",
+            "title": "Label"
+          },
+          "entity_count": {
+            "type": "integer",
+            "title": "Entity Count"
+          },
+          "angle_start": {
+            "type": "number",
+            "title": "Angle Start"
+          },
+          "angle_end": {
+            "type": "number",
+            "title": "Angle End"
+          },
+          "label_x": {
+            "type": "number",
+            "title": "Label X"
+          },
+          "label_y": {
+            "type": "number",
+            "title": "Label Y"
+          }
+        },
+        "type": "object",
+        "required": [
+          "id",
+          "node_id",
+          "label",
+          "entity_count",
+          "angle_start",
+          "angle_end",
+          "label_x",
+          "label_y"
+        ],
+        "title": "AtlasCategorySummary"
+      },
       "AtlasEdge": {
         "properties": {
           "id": {
@@ -3016,6 +3213,271 @@
           "label"
         ],
         "title": "AtlasNode"
+      },
+      "AtlasSummary": {
+        "properties": {
+          "node": {
+            "$ref": "#/components/schemas/Node"
+          },
+          "tree_path": {
+            "items": {
+              "$ref": "#/components/schemas/TreePathItem"
+            },
+            "type": "array",
+            "title": "Tree Path"
+          },
+          "headline": {
+            "type": "string",
+            "title": "Headline"
+          },
+          "sections": {
+            "items": {
+              "$ref": "#/components/schemas/SummarySection"
+            },
+            "type": "array",
+            "title": "Sections"
+          },
+          "explain_edge_ids": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array",
+            "title": "Explain Edge Ids"
+          },
+          "vus_notice": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Vus Notice"
+          },
+          "data_version": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Data Version"
+          }
+        },
+        "type": "object",
+        "required": [
+          "node",
+          "tree_path",
+          "headline",
+          "sections",
+          "explain_edge_ids",
+          "vus_notice",
+          "data_version"
+        ],
+        "title": "AtlasSummary"
+      },
+      "AtlasTree": {
+        "properties": {
+          "data_version": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Data Version"
+          },
+          "layout_version": {
+            "type": "integer",
+            "title": "Layout Version"
+          },
+          "root_id": {
+            "type": "string",
+            "title": "Root Id"
+          },
+          "categories": {
+            "items": {
+              "$ref": "#/components/schemas/AtlasCategorySummary"
+            },
+            "type": "array",
+            "title": "Categories"
+          },
+          "nodes": {
+            "items": {
+              "$ref": "#/components/schemas/AtlasTreeNode"
+            },
+            "type": "array",
+            "title": "Nodes"
+          },
+          "edges": {
+            "items": {
+              "$ref": "#/components/schemas/AtlasEdge"
+            },
+            "type": "array",
+            "title": "Edges"
+          },
+          "clusters": {
+            "items": {
+              "$ref": "#/components/schemas/ClusterSummary"
+            },
+            "type": "array",
+            "title": "Clusters"
+          }
+        },
+        "type": "object",
+        "required": [
+          "data_version",
+          "layout_version",
+          "root_id",
+          "categories",
+          "nodes",
+          "edges",
+          "clusters"
+        ],
+        "title": "AtlasTree"
+      },
+      "AtlasTreeNode": {
+        "properties": {
+          "id": {
+            "type": "string",
+            "title": "Id"
+          },
+          "kind": {
+            "$ref": "#/components/schemas/TreeNodeKind"
+          },
+          "label": {
+            "type": "string",
+            "title": "Label"
+          },
+          "parent_id": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Parent Id"
+          },
+          "category": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/AtlasCategory"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "depth": {
+            "type": "integer",
+            "title": "Depth"
+          },
+          "x": {
+            "type": "number",
+            "title": "X"
+          },
+          "y": {
+            "type": "number",
+            "title": "Y"
+          },
+          "angle": {
+            "type": "number",
+            "title": "Angle"
+          },
+          "entity_type": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/NodeType"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "group_basis": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/GroupBasis"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "ref_id": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Ref Id"
+          },
+          "entity_count": {
+            "type": "integer",
+            "title": "Entity Count"
+          },
+          "child_count": {
+            "type": "integer",
+            "title": "Child Count"
+          },
+          "cluster_id": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Cluster Id"
+          },
+          "centrality": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Centrality"
+          },
+          "contributed": {
+            "type": "boolean",
+            "title": "Contributed",
+            "default": false
+          }
+        },
+        "type": "object",
+        "required": [
+          "id",
+          "kind",
+          "label",
+          "parent_id",
+          "category",
+          "depth",
+          "x",
+          "y",
+          "angle",
+          "entity_type",
+          "group_basis",
+          "ref_id",
+          "entity_count",
+          "child_count",
+          "cluster_id",
+          "centrality"
+        ],
+        "title": "AtlasTreeNode"
       },
       "Body_uploadDocument": {
         "properties": {
@@ -4933,6 +5395,19 @@
             ],
             "title": "Language",
             "description": "Output language; defaults to the profile."
+          },
+          "subject_node_id": {
+            "anyOf": [
+              {
+                "type": "string",
+                "maxLength": 200
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Subject Node Id",
+            "description": "Summarise how this node is connected via the edges."
           }
         },
         "type": "object",
@@ -5351,6 +5826,29 @@
           "highlight_path"
         ],
         "title": "GraphFocus"
+      },
+      "GroupBasis": {
+        "type": "string",
+        "enum": [
+          "subcategory",
+          "mechanism_cluster",
+          "research_field",
+          "focus_gene",
+          "hpo_class",
+          "chromosome",
+          "pathway_source",
+          "institution_kind",
+          "country",
+          "year_band",
+          "trial_status",
+          "agency",
+          "activity_code",
+          "registry_kind",
+          "alpha_range",
+          "not_recorded",
+          "contributed"
+        ],
+        "title": "GroupBasis"
       },
       "HTTPValidationError": {
         "properties": {
@@ -7274,6 +7772,157 @@
           "tour"
         ],
         "title": "StartLayout"
+      },
+      "SummaryItem": {
+        "properties": {
+          "id": {
+            "type": "string",
+            "title": "Id"
+          },
+          "label": {
+            "type": "string",
+            "title": "Label"
+          },
+          "type": {
+            "$ref": "#/components/schemas/NodeType"
+          },
+          "hops": {
+            "type": "integer",
+            "title": "Hops"
+          },
+          "score": {
+            "type": "integer",
+            "title": "Score"
+          },
+          "best_confidence": {
+            "type": "number",
+            "title": "Best Confidence"
+          },
+          "inferred": {
+            "type": "boolean",
+            "title": "Inferred"
+          },
+          "under_review": {
+            "type": "boolean",
+            "title": "Under Review"
+          },
+          "via": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array",
+            "title": "Via"
+          },
+          "via_label": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Via Label"
+          }
+        },
+        "type": "object",
+        "required": [
+          "id",
+          "label",
+          "type",
+          "hops",
+          "score",
+          "best_confidence",
+          "inferred",
+          "under_review",
+          "via",
+          "via_label"
+        ],
+        "title": "SummaryItem"
+      },
+      "SummarySection": {
+        "properties": {
+          "key": {
+            "$ref": "#/components/schemas/SummarySectionKey"
+          },
+          "node_type": {
+            "$ref": "#/components/schemas/NodeType"
+          },
+          "total": {
+            "type": "integer",
+            "title": "Total"
+          },
+          "items": {
+            "items": {
+              "$ref": "#/components/schemas/SummaryItem"
+            },
+            "type": "array",
+            "title": "Items"
+          }
+        },
+        "type": "object",
+        "required": [
+          "key",
+          "node_type",
+          "total",
+          "items"
+        ],
+        "title": "SummarySection"
+      },
+      "SummarySectionKey": {
+        "type": "string",
+        "enum": [
+          "clusters",
+          "diseases",
+          "similar_diseases",
+          "genes",
+          "variants",
+          "mechanisms",
+          "pathways",
+          "symptoms",
+          "researchers",
+          "doctors",
+          "institutions",
+          "papers",
+          "trials",
+          "grants",
+          "patient_orgs",
+          "registries",
+          "networks"
+        ],
+        "title": "SummarySectionKey"
+      },
+      "TreeNodeKind": {
+        "type": "string",
+        "enum": [
+          "root",
+          "category",
+          "group",
+          "entity"
+        ],
+        "title": "TreeNodeKind"
+      },
+      "TreePathItem": {
+        "properties": {
+          "id": {
+            "type": "string",
+            "title": "Id"
+          },
+          "label": {
+            "type": "string",
+            "title": "Label"
+          },
+          "kind": {
+            "$ref": "#/components/schemas/TreeNodeKind"
+          }
+        },
+        "type": "object",
+        "required": [
+          "id",
+          "label",
+          "kind"
+        ],
+        "title": "TreePathItem"
       },
       "ValidationError": {
         "properties": {

@@ -185,6 +185,46 @@ export type AssetPayload = {
 export type AssetType = 'registry' | 'natural_history_study' | 'model' | 'biomarker' | 'other';
 
 /**
+ * AtlasCategory
+ */
+export type AtlasCategory = 'researchers' | 'institutions' | 'literature' | 'community' | 'pathways' | 'genes' | 'diseases' | 'symptoms' | 'doctors';
+
+/**
+ * AtlasCategorySummary
+ */
+export type AtlasCategorySummary = {
+    id: AtlasCategory;
+    /**
+     * Node Id
+     */
+    node_id: string;
+    /**
+     * Label
+     */
+    label: string;
+    /**
+     * Entity Count
+     */
+    entity_count: number;
+    /**
+     * Angle Start
+     */
+    angle_start: number;
+    /**
+     * Angle End
+     */
+    angle_end: number;
+    /**
+     * Label X
+     */
+    label_x: number;
+    /**
+     * Label Y
+     */
+    label_y: number;
+};
+
+/**
  * AtlasEdge
  */
 export type AtlasEdge = {
@@ -267,6 +307,133 @@ export type AtlasNode = {
      * Centrality
      */
     centrality?: number | null;
+};
+
+/**
+ * AtlasSummary
+ */
+export type AtlasSummary = {
+    node: Node;
+    /**
+     * Tree Path
+     */
+    tree_path: Array<TreePathItem>;
+    /**
+     * Headline
+     */
+    headline: string;
+    /**
+     * Sections
+     */
+    sections: Array<SummarySection>;
+    /**
+     * Explain Edge Ids
+     */
+    explain_edge_ids: Array<string>;
+    /**
+     * Vus Notice
+     */
+    vus_notice: string | null;
+    /**
+     * Data Version
+     */
+    data_version: string | null;
+};
+
+/**
+ * AtlasTree
+ */
+export type AtlasTree = {
+    /**
+     * Data Version
+     */
+    data_version: string | null;
+    /**
+     * Layout Version
+     */
+    layout_version: number;
+    /**
+     * Root Id
+     */
+    root_id: string;
+    /**
+     * Categories
+     */
+    categories: Array<AtlasCategorySummary>;
+    /**
+     * Nodes
+     */
+    nodes: Array<AtlasTreeNode>;
+    /**
+     * Edges
+     */
+    edges: Array<AtlasEdge>;
+    /**
+     * Clusters
+     */
+    clusters: Array<ClusterSummary>;
+};
+
+/**
+ * AtlasTreeNode
+ */
+export type AtlasTreeNode = {
+    /**
+     * Id
+     */
+    id: string;
+    kind: TreeNodeKind;
+    /**
+     * Label
+     */
+    label: string;
+    /**
+     * Parent Id
+     */
+    parent_id: string | null;
+    category: AtlasCategory | null;
+    /**
+     * Depth
+     */
+    depth: number;
+    /**
+     * X
+     */
+    x: number;
+    /**
+     * Y
+     */
+    y: number;
+    /**
+     * Angle
+     */
+    angle: number;
+    entity_type: NodeType | null;
+    group_basis: GroupBasis | null;
+    /**
+     * Ref Id
+     */
+    ref_id: string | null;
+    /**
+     * Entity Count
+     */
+    entity_count: number;
+    /**
+     * Child Count
+     */
+    child_count: number;
+    /**
+     * Cluster Id
+     */
+    cluster_id: string | null;
+    /**
+     * Centrality
+     */
+    centrality: number | null;
+    /**
+     * Contributed
+     */
+    contributed?: boolean;
 };
 
 /**
@@ -1510,6 +1677,12 @@ export type ExplainRequest = {
      * Output language; defaults to the profile.
      */
     language?: string | null;
+    /**
+     * Subject Node Id
+     *
+     * Summarise how this node is connected via the edges.
+     */
+    subject_node_id?: string | null;
 };
 
 /**
@@ -1781,6 +1954,11 @@ export type GraphFocus = {
      */
     highlight_path: Array<string>;
 };
+
+/**
+ * GroupBasis
+ */
+export type GroupBasis = 'subcategory' | 'mechanism_cluster' | 'research_field' | 'focus_gene' | 'hpo_class' | 'chromosome' | 'pathway_source' | 'institution_kind' | 'country' | 'year_band' | 'trial_status' | 'agency' | 'activity_code' | 'registry_kind' | 'alpha_range' | 'not_recorded' | 'contributed';
 
 /**
  * HTTPValidationError
@@ -2940,6 +3118,90 @@ export type SourceCount = {
 export type StartLayout = 'ring' | 'force' | 'hierarchy' | 'cluster' | 'tour';
 
 /**
+ * SummaryItem
+ */
+export type SummaryItem = {
+    /**
+     * Id
+     */
+    id: string;
+    /**
+     * Label
+     */
+    label: string;
+    type: NodeType;
+    /**
+     * Hops
+     */
+    hops: number;
+    /**
+     * Score
+     */
+    score: number;
+    /**
+     * Best Confidence
+     */
+    best_confidence: number;
+    /**
+     * Inferred
+     */
+    inferred: boolean;
+    /**
+     * Under Review
+     */
+    under_review: boolean;
+    /**
+     * Via
+     */
+    via: Array<string>;
+    /**
+     * Via Label
+     */
+    via_label: string | null;
+};
+
+/**
+ * SummarySection
+ */
+export type SummarySection = {
+    key: SummarySectionKey;
+    node_type: NodeType;
+    /**
+     * Total
+     */
+    total: number;
+    /**
+     * Items
+     */
+    items: Array<SummaryItem>;
+};
+
+/**
+ * SummarySectionKey
+ */
+export type SummarySectionKey = 'clusters' | 'diseases' | 'similar_diseases' | 'genes' | 'variants' | 'mechanisms' | 'pathways' | 'symptoms' | 'researchers' | 'doctors' | 'institutions' | 'papers' | 'trials' | 'grants' | 'patient_orgs' | 'registries' | 'networks';
+
+/**
+ * TreeNodeKind
+ */
+export type TreeNodeKind = 'root' | 'category' | 'group' | 'entity';
+
+/**
+ * TreePathItem
+ */
+export type TreePathItem = {
+    /**
+     * Id
+     */
+    id: string;
+    /**
+     * Label
+     */
+    label: string;
+    kind: TreeNodeKind;
+};
+
+/**
  * ValidationError
  */
 export type ValidationError = {
@@ -3598,6 +3860,82 @@ export type ExportGraphResponses = {
 };
 
 export type ExportGraphResponse = ExportGraphResponses[keyof ExportGraphResponses];
+
+export type GetAtlasTreeData = {
+    body?: never;
+    path?: never;
+    query?: never;
+    url: '/atlas/tree.json';
+};
+
+export type GetAtlasTreeErrors = {
+    /**
+     * not_implemented
+     */
+    501: ErrorResponse;
+};
+
+export type GetAtlasTreeError = GetAtlasTreeErrors[keyof GetAtlasTreeErrors];
+
+export type GetAtlasTreeResponses = {
+    /**
+     * Successful Response
+     */
+    200: AtlasTree;
+};
+
+export type GetAtlasTreeResponse = GetAtlasTreeResponses[keyof GetAtlasTreeResponses];
+
+export type GetAtlasSummaryData = {
+    body?: never;
+    path: {
+        /**
+         * Node Id
+         */
+        node_id: string;
+    };
+    query?: {
+        /**
+         * Role
+         *
+         * Presentation role override.
+         */
+        role?: Role | null;
+        /**
+         * Language
+         *
+         * Output language override.
+         */
+        language?: string | null;
+    };
+    url: '/atlas/summary/{node_id}';
+};
+
+export type GetAtlasSummaryErrors = {
+    /**
+     * not_found
+     */
+    404: ErrorResponse;
+    /**
+     * Validation Error
+     */
+    422: HttpValidationError;
+    /**
+     * not_implemented
+     */
+    501: ErrorResponse;
+};
+
+export type GetAtlasSummaryError = GetAtlasSummaryErrors[keyof GetAtlasSummaryErrors];
+
+export type GetAtlasSummaryResponses = {
+    /**
+     * Successful Response
+     */
+    200: AtlasSummary;
+};
+
+export type GetAtlasSummaryResponse = GetAtlasSummaryResponses[keyof GetAtlasSummaryResponses];
 
 export type FindPathData = {
     body?: never;
