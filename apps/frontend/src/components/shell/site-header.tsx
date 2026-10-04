@@ -59,7 +59,7 @@ export function SiteHeader() {
       <div className="mx-auto flex h-14 w-full max-w-[1440px] items-center gap-3 px-4 sm:px-6">
         <Wordmark className="mr-2 shrink-0" />
 
-        <nav aria-label="Primary" className="hidden md:block">
+        <nav aria-label="Primary" className="hidden shrink-0 md:block">
           <ul className="flex items-center gap-0.5">
             {PRIMARY_NAV.map((item) => {
               const active = isActive(pathname, item.href);
@@ -69,7 +69,7 @@ export function SiteHeader() {
                     href={item.href}
                     aria-current={active ? "page" : undefined}
                     className={cn(
-                      "relative rounded-md px-3 py-1.5 text-sm text-muted-foreground transition-colors outline-none hover:text-foreground focus-visible:ring-2 focus-visible:ring-ring",
+                      "relative rounded-md px-3 py-1.5 text-sm whitespace-nowrap text-muted-foreground transition-colors outline-none hover:text-foreground focus-visible:ring-2 focus-visible:ring-ring",
                       active && "text-foreground after:absolute after:inset-x-3 after:-bottom-[13px] after:h-0.5 after:rounded-full after:bg-primary",
                     )}
                   >
@@ -81,18 +81,18 @@ export function SiteHeader() {
           </ul>
         </nav>
 
-        <div className="ml-auto flex items-center gap-1">
+        <div className="ml-auto flex min-w-0 items-center gap-1">
           <button
             type="button"
             onClick={() => openSearch()}
-            className="hidden h-8 w-56 items-center gap-2 rounded-lg border bg-card/60 px-2.5 text-sm text-muted-foreground shadow-xs transition-colors outline-none hover:bg-card hover:text-foreground focus-visible:ring-2 focus-visible:ring-ring sm:flex lg:w-64"
+            className="hidden h-8 w-56 min-w-0 items-center gap-2 rounded-lg border bg-card/60 px-2.5 text-sm text-muted-foreground shadow-xs transition-colors outline-none hover:bg-card hover:text-foreground focus-visible:ring-2 focus-visible:ring-ring sm:flex lg:w-64"
             aria-label="Search the atlas"
             aria-keyshortcuts="Meta+K Control+K"
             data-testid="search-trigger"
           >
-            <Search className="size-4" aria-hidden />
-            <span className="flex-1 text-left">Search the atlas…</span>
-            <Kbd className="text-[10px]">⌘K</Kbd>
+            <Search className="size-4 shrink-0" aria-hidden />
+            <span className="flex-1 truncate text-left">Search the atlas…</span>
+            <Kbd className="shrink-0 text-[10px]">⌘K</Kbd>
           </button>
           <Button
             variant="ghost"
@@ -104,12 +104,12 @@ export function SiteHeader() {
             <Search aria-hidden />
           </Button>
 
-          <div className="hidden items-center gap-1 md:flex">
+          <div className="hidden shrink-0 items-center gap-1 md:flex">
             <LensSwitcher />
             <ThemeToggle />
           </div>
 
-          <div className="hidden min-w-9 items-center justify-end pl-1 md:flex">
+          <div className="hidden min-w-9 shrink-0 items-center justify-end pl-1 md:flex">
             {user ? (
               <UserMenu />
             ) : status === "loading" ? (
