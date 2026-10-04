@@ -103,7 +103,7 @@ export function ChatView() {
   );
 
   return (
-    <div className="mx-auto flex h-[calc(100dvh-57px)] w-full max-w-[1280px] gap-6 px-3 sm:px-6">
+    <div className="mx-auto flex min-h-0 w-full max-w-[1280px] flex-1 gap-6 px-3 sm:px-6" data-fit-viewport>
       <aside className="hidden w-64 shrink-0 py-6 lg:block">{sessionList}</aside>
 
       <section
@@ -140,7 +140,7 @@ export function ChatView() {
         <AiDisclosure className="hidden sm:flex" />
         <AiDisclosure variant="inline" className="self-start sm:hidden" />
 
-        <div ref={logRef} className="-mx-1 min-h-0 flex-1 overflow-y-auto px-1 py-5" data-testid="chat-log">
+        <div ref={logRef} className="relative -mx-1 min-h-0 flex-1 overflow-y-auto px-1 py-5" data-testid="chat-log">
           {chat.loadingSession ? (
             <p className="flex items-center gap-2 text-sm text-muted-foreground">
               <Spinner className="size-4" /> Opening the conversation…

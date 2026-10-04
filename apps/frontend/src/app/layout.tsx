@@ -42,7 +42,7 @@ export default function RootLayout({ children }: LayoutProps<"/">) {
       suppressHydrationWarning
       className={`${archivo.variable} ${jetbrainsMono.variable} h-full antialiased`}
     >
-      <body className="flex min-h-full flex-col">
+      <body className="flex min-h-full flex-col has-[[data-fit-viewport]]:h-dvh">
         <Providers>
           <a
             href="#main"
@@ -51,7 +51,7 @@ export default function RootLayout({ children }: LayoutProps<"/">) {
             Skip to content
           </a>
           <SiteHeader />
-          <main id="main" tabIndex={-1} className="flex flex-1 flex-col outline-none">
+          <main id="main" tabIndex={-1} className="flex flex-1 flex-col outline-none has-[[data-fit-viewport]]:min-h-0">
             {children}
           </main>
           <SiteFooter />
