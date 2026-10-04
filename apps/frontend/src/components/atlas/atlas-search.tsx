@@ -18,6 +18,8 @@ import type { AtlasSearchProps } from "./atlas-props";
 import { ancestorsOf, searchTree, type AtlasTreeNode, type TreeIndex } from "./tree-model";
 
 const LOCAL_LIMIT = 8;
+/** `searchTree` stops at its limit in tree order, so take a wider pool and rank it here. */
+const LOCAL_POOL = 300;
 const SERVER_LIMIT = 5;
 const DEBOUNCE_MS = 220;
 
@@ -30,6 +32,33 @@ type Server =
 type Option =
   | { key: string; kind: "node"; node: AtlasTreeNode; synonym?: string }
   | { key: string; kind: "ask" };
+
+/** Types people most often look for come first among equally good matches. */
+const TYPE_RANK = [
+  "disease", "gene", "phenotype", "cluster", "branch", "institution", "doctor", "researcher",
+  "patient_org", "mechanism", "pathway", "variant", "registry", "network", "trial", "grant", "paper", "claim",
+];
+
+/**
+ * Exact names first, then names that start with the query, then a word
+ * that starts with it, then anything containing it; ties by type (tree
+ * branches right after conditions, genes and symptoms), then shorter names.
+ */
+function rankLocal(nodes: AtlasTreeNode[], query: string): AtlasTreeNode[] {
+  const t = query.trim().toLowerCase();
+  const score = (n: AtlasTreeNode) => {
+    const label = n.label.toLowerCase();
+    const name = label.split(" · ")[0];
+    const match =
+      name === t || n.id.toLowerCase() === t ? 0 : label.startsWith(t) ? 1 : new RegExp(`\\b${t.replace(/[.*+?^${}()|[\]\\]/g, "\\$&")}`).test(label) ? 2 : 3;
+    const type = TYPE_RANK.indexOf(n.kind === "entity" ? (n.entity_type ?? "") : "branch");
+    return { match, type: type < 0 ? TYPE_RANK.length : type, len: label.length };
+  };
+  return nodes
+    .map((n) => ({ n, s: score(n) }))
+    .sort((a, b) => a.s.match - b.s.match || a.s.type - b.s.type || a.s.len - b.s.len)
+    .map((x) => x.n);
+}
 
 /** Name shown for a tree node: categories follow the lens wording. */
 function nodeName(n: AtlasTreeNode, labelStyle: LabelStyle): string {
@@ -80,7 +109,7 @@ export function AtlasSearch({ index, onPick, onAskWu, className }: AtlasSearchPr
   const q = query.trim();
   const entityQuery = isEntityQuery(q);
 
-  const local = useMemo(() => searchTree(index, q, LOCAL_LIMIT), [index, q]);
+  const local = useMemo(() => rankLocal(searchTree(index, q, LOCAL_POOL), q).slice(0, LOCAL_LIMIT), [index, q]);
 
   // Synonym matches from the API: name-like queries only, debounced.
   useEffect(() => {
