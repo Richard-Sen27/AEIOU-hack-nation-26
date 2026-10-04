@@ -13,6 +13,7 @@ import logging
 from collections.abc import Awaitable, Callable, Iterable, Mapping
 from dataclasses import dataclass, field
 from datetime import UTC, datetime
+from functools import cached_property
 from pathlib import Path
 from typing import Any, Literal
 
@@ -56,6 +57,12 @@ ASSERTION_SCHEMA: dict[str, pl.DataType] = {
 TABLES = {"nodes": NODE_SCHEMA, "synonyms": SYNONYM_SCHEMA, "assertions": ASSERTION_SCHEMA}
 
 
+def is_focus(entry: Mapping[str, Any]) -> bool:
+    """Focus entries get literature, trials, grants, people and variant nodes; core-only entries
+    get their biology only. Entries without the flag (scopes written before tiers) are focus."""
+    return bool(entry.get("focus", True))
+
+
 @dataclass
 class Scope:
     data_version: str
@@ -63,21 +70,56 @@ class Scope:
     diseases: list[dict[str, Any]] = field(default_factory=list)
     phenotypes: list[dict[str, Any]] = field(default_factory=list)
 
-    @property
+    def focus(self) -> Scope:
+        """The focus part of the scope: what the scoped fetchers and literature stages see."""
+        return Scope(
+            data_version=self.data_version,
+            genes=[g for g in self.genes if is_focus(g)],
+            diseases=[d for d in self.diseases if is_focus(d)],
+            phenotypes=[p for p in self.phenotypes if is_focus(p)],
+        )
+
+    @cached_property
+    def focus_gene_ids(self) -> set[str]:
+        return {g["hgnc_id"] for g in self.genes if is_focus(g)}
+
+    @cached_property
+    def focus_disease_ids(self) -> set[str]:
+        return {d["mondo_id"] for d in self.diseases if is_focus(d)}
+
+    @cached_property
+    def focus_phenotype_ids(self) -> set[str]:
+        return {p["hpo_id"] for p in self.phenotypes if is_focus(p)}
+
+    @cached_property
     def gene_ids(self) -> set[str]:
         return {g["hgnc_id"] for g in self.genes}
 
-    @property
+    @cached_property
     def gene_symbols(self) -> set[str]:
         return {g["symbol"] for g in self.genes}
 
-    @property
+    @cached_property
     def disease_ids(self) -> set[str]:
         return {d["mondo_id"] for d in self.diseases}
 
-    @property
+    @cached_property
     def phenotype_ids(self) -> set[str]:
         return {p["hpo_id"] for p in self.phenotypes}
+
+    def tier(self, node_id: str) -> str | None:
+        """ "focus" or "core" for a disease, gene or phenotype in scope, else None."""
+        if "_tiers" not in self.__dict__:
+            tiers: dict[str, str] = {}
+            for key, entries in (
+                ("mondo_id", self.diseases),
+                ("hgnc_id", self.genes),
+                ("hpo_id", self.phenotypes),
+            ):
+                for e in entries:
+                    tiers[e[key]] = "focus" if is_focus(e) else "core"
+            self.__dict__["_tiers"] = tiers
+        return self._tiers.get(node_id)
 
     def to_dict(self) -> dict[str, Any]:
         return {

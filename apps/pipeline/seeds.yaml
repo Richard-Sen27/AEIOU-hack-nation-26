@@ -33,6 +33,25 @@ diseases:
   - developmental and epileptic encephalopathy, 14      # KCNT1
   - encephalopathy due to GLUT1 deficiency             # SLC2A1
 
+scope:
+  # expand: the seed expansion below is the whole atlas.
+  # qualify: every rare disease the open sources describe with a gene and symptoms (the core),
+  # plus the focus set (the seed expansion and focus_diseases). Only focus entries get
+  # literature, trials, grants, people, patient organisations, variant nodes and GO pathways.
+  mode: qualify
+  qualify:
+    # Orphanet product6: assessed associations whose type starts with this; HPO
+    # genes_to_phenotype adds genes. Diseases map to MONDO by exact match (and product1).
+    orphanet_association_prefix: Disease-causing germline
+    orphanet_status: Assessed
+    exclude_label_terms: [susceptibility, protection against]
+    exclude_omim_only_label_terms: [cancer, carcinoma]
+    max_descendants: 30
+
+# Diseases added to the focus set by name or MONDO id (operator-driven; each needs a scoped fetch).
+focus_diseases:
+  - fibrodysplasia ossificans progressiva
+
 expansion:
   # Diseases linked to a seed gene are always in scope (hop 0).
   max_hops: 2
@@ -69,6 +88,14 @@ validation:
     - {source: CDKL5 disorder, relation: caused_by_variant_in, target: CDKL5}
     - {source: encephalopathy due to GLUT1 deficiency, relation: caused_by_variant_in, target: SLC2A1}
     - {source: STXBP1, relation: acts_via, target: MECH:loss_of_function}
+    # Wide core (scope.mode qualify): fibrodysplasia ossificans progressiva and a chronic-cough
+    # condition (primary ciliary dyskinesia 25) are findable with their gene and symptoms.
+    - {source: "MONDO:0007606", relation: caused_by_variant_in, target: ACVR1}
+    - {source: "MONDO:0007606", relation: has_phenotype, target: "HP:0011987"}
+    - {source: "MONDO:0014203", relation: has_phenotype, target: "HP:0034315"}
+    - {source: "MONDO:0014203", relation: caused_by_variant_in, target: DNAAF4}
+  # Wide core: at least this many diseases with a gene and a recorded symptom each.
+  min_qualified_diseases: 7000
   # Same gene, opposite mechanism: these must never share a mechanism cluster.
   counterexamples:
     - gene: SCN2A

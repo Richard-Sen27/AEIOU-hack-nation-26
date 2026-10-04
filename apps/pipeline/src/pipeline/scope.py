@@ -5,7 +5,7 @@ from __future__ import annotations
 import hashlib
 import json
 import logging
-from collections import defaultdict
+from collections import Counter, defaultdict
 from datetime import date
 from typing import Any
 
@@ -237,6 +237,191 @@ def select_phenotypes(diseases: set[str], per_disease: int) -> list[str]:
     return sorted(set(top["hpo_id"].to_list()))
 
 
+# ---------------------------------------------------------------- qualify (wide core)
+
+QUALIFY_DEFAULTS: dict[str, Any] = {
+    "orphanet_association_prefix": "Disease-causing germline",
+    "orphanet_status": "Assessed",
+    "exclude_label_terms": ["susceptibility", "protection against"],
+    "exclude_omim_only_label_terms": ["cancer", "carcinoma"],
+    "max_descendants": 30,
+}
+
+
+def _descendant_counter(parents: dict[str, list[str]], cap: int):
+    children: dict[str, list[str]] = defaultdict(list)
+    for mid, ps in parents.items():
+        for p in ps:
+            children[p].append(mid)
+    memo: dict[str, int] = {}
+
+    def n_desc(mid: str) -> int:
+        if mid not in memo:
+            seen, stack = set(), list(children.get(mid, ()))
+            while stack and len(seen) <= cap:
+                c = stack.pop()
+                if c not in seen:
+                    seen.add(c)
+                    stack.extend(children.get(c, ()))
+            memo[mid] = len(seen)
+        return memo[mid]
+
+    return n_desc
+
+
+def qualify_diseases(
+    terms: pl.DataFrame,
+    source_genes: list[tuple[str, str, str]],
+    source_keys: list[tuple[str, str]],
+    phenotypes: dict[str, set[str]],
+    approved_genes: set[str],
+    cfg: dict[str, Any] | None = None,
+) -> tuple[dict[str, set[str]], dict[str, Any]]:
+    """The inclusion rule of the wide core.
+
+    ``terms``: MONDO terms (id, label, rare, exact_matches, parents, deprecated).
+    ``source_genes``: (MONDO id, HGNC id, source key such as "ORPHA:337" or "OMIM:135100") from
+    Orphanet's assessed germline associations and HPO's genes_to_phenotype.
+    ``source_keys``: (MONDO id, source key) of every OMIM- or ORPHA-keyed record that maps to a
+    MONDO term (gene associations and phenotype.hpoa entries).
+    ``phenotypes``: MONDO id -> recorded HPO terms (not NOT, not 0%), HPO and Orphanet merged.
+
+    A disease qualifies when it is a live MONDO term with at least one approved gene and at least
+    one phenotype, is rare (MONDO rare subset, an ORPHA cross-reference, or OMIM-keyed with a
+    causal gene), and is not excluded: labels with "susceptibility" / "protection against",
+    terms with more than ``max_descendants`` MONDO descendants, OMIM-only cancer or carcinoma
+    entries. Returns {MONDO id: genes} and a report with counts and the excluded groups.
+    """
+    cfg = {**QUALIFY_DEFAULTS, **(cfg or {})}
+    live = terms.filter(~pl.col("deprecated"))
+    info = {r["id"]: r for r in live.iter_rows(named=True)}
+    n_desc = _descendant_counter(
+        {r["id"]: list(r["parents"] or []) for r in info.values()}, cfg["max_descendants"]
+    )
+    genes: dict[str, set[str]] = defaultdict(set)
+    keys: dict[str, set[str]] = defaultdict(set)
+    withdrawn = 0
+    for mid, hid, key in source_genes:
+        if mid not in info:
+            continue
+        keys[mid].add(key)
+        if hid in approved_genes:
+            genes[mid].add(hid)
+        else:
+            withdrawn += 1
+    for mid, key in source_keys:
+        if mid in info:
+            keys[mid].add(key)
+    excluded: dict[str, list[str]] = defaultdict(list)
+    keep: dict[str, set[str]] = {}
+    no_gene = no_phen = 0
+    for mid in sorted(keys):
+        r = info[mid]
+        if not genes.get(mid):
+            no_gene += 1
+            continue
+        if not phenotypes.get(mid):
+            no_phen += 1
+            continue
+        label = (r["label"] or "").lower()
+        orpha = any(k.startswith("ORPHA:") for k in keys[mid]) or any(
+            x.startswith("ORPHA:") for x in r["exact_matches"] or []
+        )
+        omim = any(k.startswith("OMIM:") for k in keys[mid])
+        if any(t in label for t in cfg["exclude_label_terms"]):
+            excluded["susceptibility or protection label"].append(mid)
+        elif n_desc(mid) > cfg["max_descendants"]:
+            excluded[f"more than {cfg['max_descendants']} MONDO descendants"].append(mid)
+        elif not orpha and any(t in label for t in cfg["exclude_omim_only_label_terms"]):
+            excluded["OMIM-only cancer or carcinoma"].append(mid)
+        elif not (r["rare"] or orpha or omim):
+            excluded["not rare"].append(mid)
+        else:
+            keep[mid] = set(genes[mid])
+
+    def kind(mid: str) -> str:
+        ks = keys[mid]
+        o = any(k.startswith("OMIM:") for k in ks)
+        a = any(k.startswith("ORPHA:") for k in ks)
+        return "omim_and_orpha" if o and a else ("omim_only" if o else "orpha_only")
+
+    report = {
+        "diseases": len(keep),
+        "by_source": dict(sorted(Counter(kind(m) for m in keep).items())),
+        "genes": len(set().union(*keep.values())) if keep else 0,
+        "phenotypes": len(set().union(*(phenotypes[m] for m in keep))) if keep else 0,
+        "max_diseases_per_gene": max(
+            Counter(g for gs in keep.values() for g in gs).values(), default=0
+        ),
+        "left_out": {
+            "mapped_without_approved_gene": no_gene,
+            "with_gene_without_phenotypes": no_phen,
+            "withdrawn_gene_links": withdrawn,
+        },
+        "excluded": {
+            k: {"n": len(v), "examples": [f"{m} {info[m]['label']}" for m in v[:5]]}
+            for k, v in sorted(excluded.items())
+        },
+    }
+    return keep, report
+
+
+def qualify_inputs(cfg: dict[str, Any]) -> dict[str, Any]:
+    """Inputs of ``qualify_diseases`` from the parsed sources (no OMIM files)."""
+    cfg = {**QUALIFY_DEFAULTS, **cfg}
+    x2m = bio.xref_to_mondo()
+    e2h = bio.entrez_to_hgnc()
+    source_genes: list[tuple[str, str, str]] = []
+    for orpha, hid, sym, assoc, status in (
+        bio.orphanet_genes()
+        .select("orpha", "hgnc_id", "symbol", "assoc_type", "status")
+        .iter_rows()
+    ):
+        if not (assoc or "").startswith(cfg["orphanet_association_prefix"]):
+            continue
+        if status != cfg["orphanet_status"] or orpha not in x2m:
+            continue
+        hid = hid or bio.resolve_gene(sym or "")
+        if hid:
+            source_genes.append((x2m[orpha], hid, orpha))
+    for entrez, sym, key in bio.hpo_gene_disease().iter_rows():
+        if not key.startswith(("OMIM:", "ORPHA:")) or key not in x2m:
+            continue
+        hid = e2h.get(entrez) or bio.resolve_gene(sym or "")
+        if hid:
+            source_genes.append((x2m[key], hid, key))
+    hp_keys = bio.hpoa().select("disease_id").unique()["disease_id"].to_list()
+    source_keys = [(x2m[k], k) for k in hp_keys if k.startswith(("OMIM:", "ORPHA:")) and k in x2m]
+    phen: dict[str, set[str]] = defaultdict(set)
+    live_hpo = set(bio.hpo_terms().filter(~pl.col("deprecated"))["id"].to_list())
+    for mid, hid in bio.disease_phenotypes().select("mondo_id", "hpo_id").unique().iter_rows():
+        if hid in live_hpo:
+            phen[mid].add(hid)
+    return {
+        "terms": bio.mondo_terms(),
+        "source_genes": source_genes,
+        "source_keys": source_keys,
+        "phenotypes": dict(phen),
+        "approved_genes": set(bio.hgnc()["hgnc_id"].to_list()),
+    }
+
+
+def focus_disease_genes(
+    mids: list[str], qualified: dict[str, set[str]], gd: pl.DataFrame, limit: int
+) -> set[str]:
+    """Genes brought in by diseases added to the focus list: their qualifying genes, else their
+    causal genes when there are at most ``limit`` (grouping terms pull no genes)."""
+    out: set[str] = set()
+    for mid in mids:
+        if qualified.get(mid):
+            out |= qualified[mid]
+            continue
+        genes = set(gd.filter(pl.col("mondo_id") == mid)["hgnc_id"].to_list())
+        if len(genes) <= limit:
+            out |= genes
+    return out
+
+
 def run() -> dict[str, Any]:
     seeds = load_seeds()
     cfg = seeds.get("expansion", {})
@@ -279,19 +464,53 @@ def run() -> dict[str, Any]:
         eligible=eligibility(cfg, set(seed_diseases)),
     )
     gene_ids = select_genes(set(scope_map), set(seed_genes), gd, cfg)
-    phenotypes = select_phenotypes(set(scope_map), cfg.get("phenotypes_per_disease", 25))
 
-    terms = bio.mondo_terms().filter(pl.col("id").is_in(list(scope_map)))
-    hg = bio.hgnc().filter(pl.col("hgnc_id").is_in(gene_ids))
-    hp = bio.hpo_terms().filter(pl.col("id").is_in(phenotypes))
+    # Focus: the seed expansion plus the diseases named under focus_diseases.
+    extra_focus: dict[str, str] = {}
+    unresolved = []
+    for name in seeds.get("focus_diseases") or []:
+        mid = resolve_disease(name, index)
+        (unresolved.append(name) if mid is None else extra_focus.__setitem__(mid, name))
+    if unresolved:
+        raise SystemExit(f"unresolved focus diseases: {unresolved}")
+    mode = (seeds.get("scope") or {}).get("mode", "expand")
+    qualified: dict[str, set[str]] = {}
+    qualify_report: dict[str, Any] | None = None
+    if mode == "qualify":
+        qcfg = (seeds.get("scope") or {}).get("qualify") or {}
+        qualified, qualify_report = qualify_diseases(**qualify_inputs(qcfg))
+    elif mode != "expand":
+        raise SystemExit(f"unknown scope.mode {mode!r} (expand | qualify)")
+    for mid, name in extra_focus.items():
+        scope_map.setdefault(mid, {"hop": None, "via": f"focus list: {name}", "score": 1.0})
+    focus_diseases = set(scope_map)
+    focus_genes = set(gene_ids) | focus_disease_genes(
+        sorted(extra_focus), qualified, gd, cfg.get("gene_from_disease_max_genes", 8)
+    )
+    focus_phenotypes = set(select_phenotypes(focus_diseases, cfg.get("phenotypes_per_disease", 25)))
+    all_diseases = focus_diseases | set(qualified)
+    all_genes = focus_genes | {g for gs in qualified.values() for g in gs}
+    if mode == "qualify":
+        # The core keeps every recorded symptom of every disease (no per-disease cap).
+        dp = bio.disease_phenotypes().filter(pl.col("mondo_id").is_in(list(all_diseases)))
+        phenotypes = set(dp["hpo_id"].unique().to_list()) | focus_phenotypes
+    else:
+        phenotypes = focus_phenotypes
+
+    terms = bio.mondo_terms().filter(pl.col("id").is_in(list(all_diseases)))
+    hg = bio.hgnc().filter(pl.col("hgnc_id").is_in(list(all_genes)))
+    hp = bio.hpo_terms().filter(pl.col("id").is_in(list(phenotypes)))
+    if mode == "qualify":
+        hp = hp.filter(~pl.col("deprecated"))
     diseases = [
         {
             "mondo_id": r["id"],
             "label": r["label"],
             "synonyms": r["exact_synonyms"],
             "seed": r["id"] in seed_diseases,
-            "hop": scope_map[r["id"]]["hop"],
-            "via": scope_map[r["id"]]["via"],
+            "hop": scope_map[r["id"]]["hop"] if r["id"] in scope_map else None,
+            "via": scope_map[r["id"]]["via"] if r["id"] in scope_map else "qualify",
+            "focus": r["id"] in focus_diseases,
         }
         for r in terms.sort("id").iter_rows(named=True)
     ]
@@ -302,11 +521,18 @@ def run() -> dict[str, Any]:
             "name": r["name"],
             "aliases": sorted(set(r["aliases"] + r["prev_symbols"])),
             "seed": r["hgnc_id"] in seed_genes,
+            "focus": r["hgnc_id"] in focus_genes,
         }
         for r in hg.sort("hgnc_id").iter_rows(named=True)
     ]
-    phen = [{"hpo_id": r["id"], "label": r["label"]} for r in hp.sort("id").iter_rows(named=True)]
-
+    phen = [
+        {"hpo_id": r["id"], "label": r["label"], "focus": r["id"] in focus_phenotypes}
+        for r in hp.sort("id").iter_rows(named=True)
+    ]
+    if mode == "expand":  # keep the pre-tier file layout (and its content hash) unchanged
+        for entries in (diseases, genes, phen):
+            for e in entries:
+                e.pop("focus")
     body = {"genes": genes, "diseases": diseases, "phenotypes": phen}
     content_hash = hashlib.sha256(json.dumps(body, sort_keys=True).encode()).hexdigest()
     previous = json.loads(SCOPE_FILE.read_text()) if SCOPE_FILE.exists() else {}
@@ -315,16 +541,30 @@ def run() -> dict[str, Any]:
         "data_version": version,
         "content_hash": content_hash,
         "cluster": seeds.get("cluster"),
+        "mode": mode,
         **body,
     }
+    if qualify_report is not None:
+        qualify_report["focus"] = {
+            "diseases": len(focus_diseases),
+            "genes": len(focus_genes),
+            "phenotypes": len(focus_phenotypes),
+            "focus_list": sorted(extra_focus),
+            "focus_not_qualifying": len(focus_diseases - set(qualified)),
+        }
+        out["qualify"] = qualify_report
+        log.info("qualify: %s", json.dumps(qualify_report))
     SCOPE_FILE.parent.mkdir(parents=True, exist_ok=True)
     SCOPE_FILE.write_text(json.dumps(out, indent=1))
     log.info(
-        "scope %s: %d diseases (%d seeds), %d genes, %d phenotypes",
+        "scope %s: %d diseases (%d seeds, %d focus), %d genes (%d focus), %d phenotypes (%d focus)",
         version,
         len(diseases),
         sum(d["seed"] for d in diseases),
+        len(focus_diseases),
         len(genes),
+        len(focus_genes & {g["hgnc_id"] for g in genes}),
         len(phen),
+        len(focus_phenotypes & {p["hpo_id"] for p in phen}),
     )
     return out
