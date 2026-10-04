@@ -193,12 +193,237 @@ export function edgeEvidence(id: string) {
   };
 }
 
+const CATEGORY_ORDER = [
+  "researchers",
+  "institutions",
+  "literature",
+  "community",
+  "pathways",
+  "genes",
+  "diseases",
+  "symptoms",
+  "doctors",
+] as const;
+const CATEGORY_LABELS: Record<string, string> = {
+  researchers: "Researchers",
+  institutions: "Hospitals & universities",
+  literature: "Literature",
+  community: "Community",
+  pathways: "Pathways",
+  genes: "Genes",
+  diseases: "Diseases",
+  symptoms: "Symptoms",
+  doctors: "Doctors",
+};
+const TYPE_CATEGORY: Record<string, string> = {
+  researcher: "researchers",
+  institution: "institutions",
+  paper: "literature",
+  trial: "literature",
+  grant: "literature",
+  claim: "literature",
+  patient_org: "community",
+  registry: "community",
+  network: "community",
+  pathway: "pathways",
+  gene: "genes",
+  variant: "genes",
+  mechanism: "genes",
+  disease: "diseases",
+  cluster: "diseases",
+  phenotype: "symptoms",
+  doctor: "doctors",
+};
+
+/**
+ * A valid `GET /atlas/tree.json` built from the fixture: root -> 9 categories
+ * -> one group per node type -> entities, with simple polar positions
+ * (sectors clockwise from 12 o'clock, angle counter-clockwise from +x).
+ */
+export function atlasTreePayload() {
+  type TreeNode = {
+    id: string;
+    kind: "root" | "category" | "group" | "entity";
+    label: string;
+    parent_id: string | null;
+    category: string | null;
+    depth: number;
+    x: number;
+    y: number;
+    angle: number;
+    entity_type: string | null;
+    group_basis: string | null;
+    ref_id: string | null;
+    entity_count: number;
+    child_count: number;
+    cluster_id: string | null;
+    centrality: number | null;
+    contributed: boolean;
+  };
+  const byCat = new Map<string, Map<string, FxNode[]>>();
+  for (const n of fixture.nodes) {
+    const cat = TYPE_CATEGORY[n.type];
+    if (!byCat.has(cat)) byCat.set(cat, new Map());
+    const groups = byCat.get(cat)!;
+    if (!groups.has(n.type)) groups.set(n.type, []);
+    groups.get(n.type)!.push(n);
+  }
+  const total = fixture.nodes.length;
+  const gap = (3 * Math.PI) / 180;
+  const usable = 2 * Math.PI - gap * CATEGORY_ORDER.length;
+  const polar = (r: number, a: number) => ({ x: +(r * Math.cos(a)).toFixed(2), y: +(r * Math.sin(a)).toFixed(2), angle: +a.toFixed(5) });
+  const base = (over: Partial<TreeNode> & Pick<TreeNode, "id" | "kind" | "label">): TreeNode => ({
+    parent_id: null,
+    category: null,
+    depth: 0,
+    x: 0,
+    y: 0,
+    angle: 0,
+    entity_type: null,
+    group_basis: null,
+    ref_id: null,
+    entity_count: 0,
+    child_count: 0,
+    cluster_id: null,
+    centrality: null,
+    contributed: false,
+    ...over,
+  });
+  const nodes: TreeNode[] = [base({ id: "T:root", kind: "root", label: "Atlas", entity_count: total, child_count: 9 })];
+  const categories: Array<Record<string, unknown>> = [];
+  let start = Math.PI / 2;
+  for (const cat of CATEGORY_ORDER) {
+    const groups = byCat.get(cat) ?? new Map<string, FxNode[]>();
+    const count = [...groups.values()].reduce((s, g) => s + g.length, 0);
+    const span = Math.max((usable * count) / total, (14 * Math.PI) / 180);
+    const end = start - span;
+    const mid = (start + end) / 2;
+    const catId = `T:${cat}`;
+    nodes.push(
+      base({ id: catId, kind: "category", label: CATEGORY_LABELS[cat], parent_id: "T:root", category: cat, depth: 1, ...polar(180, mid), entity_count: count, child_count: groups.size }),
+    );
+    let gStart = start;
+    for (const [type, members] of groups) {
+      const gSpan = (span * members.length) / Math.max(count, 1);
+      const gMid = gStart - gSpan / 2;
+      const gid = `${catId}/${type}`;
+      nodes.push(
+        base({ id: gid, kind: "group", label: type, parent_id: catId, category: cat, depth: 2, ...polar(320, gMid), group_basis: "subcategory", entity_count: members.length, child_count: members.length }),
+      );
+      [...members]
+        .sort((a, b) => a.label.localeCompare(b.label))
+        .forEach((m, i) => {
+          const a = gStart - (gSpan * (i + 0.5)) / members.length;
+          nodes.push(
+            base({ id: m.id, kind: "entity", label: m.label, parent_id: gid, category: cat, depth: 3, ...polar(460 + (i % 3) * 40, a), entity_type: m.type, entity_count: 1, cluster_id: m.cluster_id, centrality: m.centrality }),
+          );
+        });
+      gStart -= gSpan;
+    }
+    categories.push({ id: cat, node_id: catId, label: CATEGORY_LABELS[cat], entity_count: count, angle_start: start, angle_end: end, ...(() => { const p = polar(660, mid); return { label_x: p.x, label_y: p.y }; })() });
+    start = end - gap;
+  }
+  return {
+    data_version: "fixture",
+    layout_version: 1,
+    root_id: "T:root",
+    categories,
+    nodes,
+    edges: atlasPayload().edges,
+    clusters,
+  };
+}
+
+const SECTION_BY_TYPE: Record<string, string> = {
+  cluster: "clusters",
+  disease: "diseases",
+  gene: "genes",
+  variant: "variants",
+  mechanism: "mechanisms",
+  pathway: "pathways",
+  phenotype: "symptoms",
+  researcher: "researchers",
+  doctor: "doctors",
+  institution: "institutions",
+  paper: "papers",
+  trial: "trials",
+  grant: "grants",
+  patient_org: "patient_orgs",
+  registry: "registries",
+  network: "networks",
+  claim: "claims",
+};
+const SECTION_ORDER = [
+  "clusters", "diseases", "similar_diseases", "genes", "variants", "mechanisms", "pathways", "symptoms", "researchers",
+  "doctors", "institutions", "papers", "trials", "grants", "patient_orgs", "registries", "networks", "claims",
+];
+
+/** `GET /atlas/summary/{id}`: 1-hop sections from the fixture (no extra chains). Null for unknown or `T:` ids. */
+export function atlasSummary(id: string) {
+  const n = nodeById.get(id);
+  if (!n) return null;
+  const tree = atlasTreePayload();
+  const treeById = new Map(tree.nodes.map((t) => [t.id, t]));
+  const path: Array<{ id: string; label: string; kind: string }> = [];
+  let parent = treeById.get(id)?.parent_id ?? null;
+  while (parent) {
+    const t = treeById.get(parent)!;
+    path.unshift({ id: t.id, label: t.label, kind: t.kind });
+    parent = t.parent_id;
+  }
+  const sections = new Map<string, { key: string; node_type: string; total: number; items: Array<Record<string, unknown>> }>();
+  for (const e of fixture.edges) {
+    if (e.source_id !== id && e.target_id !== id) continue;
+    const other = nodeById.get(e.source_id === id ? e.target_id : e.source_id);
+    if (!other) continue;
+    const key = n.type === "disease" && other.type === "disease" ? "similar_diseases" : SECTION_BY_TYPE[other.type];
+    if (!sections.has(key)) sections.set(key, { key, node_type: other.type, total: 0, items: [] });
+    const s = sections.get(key)!;
+    if (s.items.some((i) => i.id === other.id)) continue;
+    s.total += 1;
+    s.items.push({
+      id: other.id,
+      label: other.label,
+      type: other.type,
+      hops: 1,
+      score: 1,
+      best_confidence: e.confidence,
+      inferred: e.origin !== "observed",
+      under_review: e.status !== "active",
+      via: [e.id],
+      via_label: null,
+    });
+  }
+  const ordered = SECTION_ORDER.filter((k) => sections.has(k)).map((k) => {
+    const s = sections.get(k)!;
+    return { ...s, items: s.items.slice(0, 10) };
+  });
+  const classification = (n.attrs.classification as string | undefined) ?? null;
+  return {
+    node: apiNode(n),
+    tree_path: path,
+    headline: n.description ?? n.label,
+    sections: ordered,
+    explain_edge_ids: ordered.flatMap((s) => s.items.map((i) => (i.via as string[])[0])).slice(0, 20),
+    vus_notice:
+      classification === "uncertain_significance"
+        ? "This result is uncertain. Discuss it with a genetic counselor before acting on it."
+        : null,
+    data_version: "fixture",
+  };
+}
+
 /** Mock table for every graph read endpoint. Role is read from `?role=`. */
 export function graphMocks(extra: Record<string, unknown> = {}) {
   const lastSegment = (url: string) => decodeURIComponent(new URL(url).pathname.split("/").pop()!);
   return {
     "GET /auth/session": { user: null, gpc: false, demo_mode: false, data_version: "fixture" },
     "GET /atlas.json": atlasPayload(),
+    "GET /atlas/tree.json": atlasTreePayload(),
+    "GET /atlas/summary/*": ({ url }: { url: string }) => {
+      const d = atlasSummary(lastSegment(url));
+      return d ? { json: d } : { status: 404, json: { error: { code: "not_found", message: "Not found" } } };
+    },
     "GET /clusters": clusters,
     "GET /node/*": ({ url }: { url: string }) => {
       const d = nodeDetail(lastSegment(url));
