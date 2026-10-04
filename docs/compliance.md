@@ -32,6 +32,7 @@ The atlas processes health and genetic data of EU residents, often about childre
 - **Storage limitation:** raw uploads deleted immediately after extraction; anonymous sessions purged after 30 days of inactivity; application logs and traces kept at most 30 days; full-account data kept until the user deletes it or withdraws consent. Keep this retention table in `/docs/retention.md`.
 - **Accuracy:** extracted findings are confirmed by the user before use; every profile field is editable (Art. 16).
 - **Privacy by default:** every sharing option off by default; nothing public unless the user opts in.
+- **Agent state:** a chat turn's saved state (checkpoints) is health data like the chat itself: it lives in a user table under row-level security, holds redacted content only (never raw text, the profile or tokens), is deleted when the turn ends and with the session, the `health_data` consent and the account, and is part of the export while it exists. No third-party checkpoint store; LangSmith tracing (`LANGSMITH_TRACING`) is never configured.
 - **Integrity and confidentiality (Art. 32):** TLS everywhere, encryption at rest, row-level security on every user table, service-role key server-side only, least-privilege API keys, Presidio redaction before any LLM call.
 
 ### Processors and international transfers (Art. 28 and 44–49)
@@ -51,7 +52,7 @@ Respond within one month. Signed-in users are verified by their session; never a
 | Access and portability (Art. 15, 20) | `GET /me/export`: all user data as machine-readable JSON |
 | Rectification (Art. 16) | Edit profile and findings in the app |
 | Erasure (Art. 17) | `DELETE /me` with cascade; contributions removed from the shared graph; deleted from backups within the backup cycle |
-| Withdraw consent (Art. 7(3)) | `DELETE /consents/{type}`: stops processing and deletes data held under that consent (`health_data`: profile, chats, documents, findings, followed diseases and notifications; `contribute`: contributions). The public card is not held under a consent: it is withdrawn with its own switch (`PUT /me/professional/card`) |
+| Withdraw consent (Art. 7(3)) | `DELETE /consents/{type}`: stops processing and deletes data held under that consent (`health_data`: profile, chats including running turns and their checkpoints, documents, findings, followed diseases and notifications; `contribute`: contributions). The public card is not held under a consent: it is withdrawn with its own switch (`PUT /me/professional/card`) |
 | Object (Art. 21) | Researchers and doctors: claim-or-remove flow for their node. Linking one's account to an atlas entry in the work details is not a claim and proves nothing; any change to a node still goes through this flow |
 | Automated decisions (Art. 22) | The atlas makes no decisions with legal or similarly significant effect. It shows information, never a diagnosis or trial eligibility verdict; such questions are labeled "needs expert review" |
 

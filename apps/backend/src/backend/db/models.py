@@ -302,6 +302,10 @@ class Profile(Base):
     gpc_opt_out: Mapped[bool] = mapped_column(Boolean, nullable=False, server_default="false")
     expert_mode: Mapped[bool] = mapped_column(Boolean, nullable=False, server_default="false")
     age_confirmed_at: Mapped[datetime | None] = mapped_column()
+    # Self-declared at the first connect action ('18_plus' | '16_17'), correctable; held under
+    # the connect consent and cleared when it is withdrawn.
+    connect_age_group: Mapped[str | None] = mapped_column(Text)
+    connect_age_group_at: Mapped[datetime | None] = mapped_column()
     created_at: Mapped[datetime] = _created()
     updated_at: Mapped[datetime] = _created()
 
@@ -533,6 +537,148 @@ class NotificationRecord(Base):
     dedupe_key: Mapped[str] = mapped_column(Text, nullable=False)
     created_at: Mapped[datetime] = _created()
     read_at: Mapped[datetime | None] = mapped_column()
+
+
+# --- messaging (connect consent; policies and functions in migration a4c7e9b2d6f8) -------------
+
+
+class ThreadRecord(Base):
+    """A conversation between a patient (opener) and a professional (recipient).
+
+    Visible to both participants. Names are snapshots shown to the other side; a deleted
+    account's id and name become NULL (the thread closes)."""
+
+    __tablename__ = "threads"
+    __table_args__ = (
+        Index("ix_threads_opener_id", "opener_id"),
+        Index("ix_threads_recipient_id", "recipient_id"),
+    )
+
+    id: Mapped[uuid.UUID] = _uuid_pk()
+    opener_id: Mapped[uuid.UUID | None] = mapped_column(
+        UUID(as_uuid=True), ForeignKey("users.id", ondelete="SET NULL")
+    )
+    recipient_id: Mapped[uuid.UUID | None] = mapped_column(
+        UUID(as_uuid=True), ForeignKey("users.id", ondelete="SET NULL")
+    )
+    origin: Mapped[str] = mapped_column(Text, nullable=False)  # card | signup
+    call_id: Mapped[uuid.UUID | None] = mapped_column(UUID(as_uuid=True))  # stage 4, no FK yet
+    signup_id: Mapped[uuid.UUID | None] = mapped_column(UUID(as_uuid=True))  # stage 4, no FK yet
+    recipient_card_id: Mapped[uuid.UUID | None] = mapped_column(UUID(as_uuid=True))
+    opener_name: Mapped[str | None] = mapped_column(Text)
+    recipient_name: Mapped[str | None] = mapped_column(Text)
+    status: Mapped[str] = mapped_column(Text, nullable=False, server_default="requested")
+    created_at: Mapped[datetime] = _created()
+    accepted_at: Mapped[datetime | None] = mapped_column()
+    closed_at: Mapped[datetime | None] = mapped_column()
+    last_message_at: Mapped[datetime | None] = mapped_column()
+
+
+class ThreadReadRecord(Base):
+    """A participant's own read marker, hidden flag and guardian agreement (16-17) per thread."""
+
+    __tablename__ = "thread_reads"
+    __table_args__ = (
+        PrimaryKeyConstraint("thread_id", "user_id"),
+        Index("ix_thread_reads_user_id", "user_id"),
+    )
+
+    thread_id: Mapped[uuid.UUID] = mapped_column(
+        UUID(as_uuid=True), ForeignKey("threads.id", ondelete="CASCADE")
+    )
+    user_id: Mapped[uuid.UUID] = mapped_column(
+        UUID(as_uuid=True), ForeignKey("users.id", ondelete="CASCADE")
+    )
+    last_read_at: Mapped[datetime | None] = mapped_column()
+    hidden_at: Mapped[datetime | None] = mapped_column()
+    guardian_agreed_at: Mapped[datetime | None] = mapped_column()
+    guardian_text_version: Mapped[str | None] = mapped_column(Text)
+
+
+class MessageRecord(Base):
+    """One message; the body is Fernet ciphertext (MESSAGE_ENCRYPTION_KEY)."""
+
+    __tablename__ = "messages"
+    __table_args__ = (
+        Index("ix_messages_thread_created", "thread_id", "created_at"),
+        Index("ix_messages_sender_id", "sender_id"),
+    )
+
+    id: Mapped[uuid.UUID] = _uuid_pk()
+    thread_id: Mapped[uuid.UUID] = mapped_column(
+        UUID(as_uuid=True), ForeignKey("threads.id", ondelete="CASCADE"), nullable=False
+    )
+    sender_id: Mapped[uuid.UUID] = mapped_column(
+        UUID(as_uuid=True), ForeignKey("users.id", ondelete="CASCADE"), nullable=False
+    )
+    body_enc: Mapped[bytes] = mapped_column(LargeBinary, nullable=False)
+    created_at: Mapped[datetime] = _created()
+
+
+class BlockRecord(Base):
+    """The blocker's (user_id) block of another account; no messages either way."""
+
+    __tablename__ = "blocks"
+    __table_args__ = (
+        UniqueConstraint("user_id", "blocked_user_id", name="uq_blocks_pair"),
+        Index("ix_blocks_blocked_user_id", "blocked_user_id"),
+    )
+
+    id: Mapped[uuid.UUID] = _uuid_pk()
+    user_id: Mapped[uuid.UUID] = mapped_column(
+        UUID(as_uuid=True), ForeignKey("users.id", ondelete="CASCADE"), nullable=False
+    )
+    blocked_user_id: Mapped[uuid.UUID] = mapped_column(
+        UUID(as_uuid=True), ForeignKey("users.id", ondelete="CASCADE"), nullable=False
+    )
+    blocked_name: Mapped[str | None] = mapped_column(Text)  # snapshot from the thread
+    created_at: Mapped[datetime] = _created()
+
+
+class ReportRecord(Base):
+    """A report of a thread by a participant; authorizes the operator to read that thread."""
+
+    __tablename__ = "reports"
+    __table_args__ = (
+        Index("ix_reports_user_id", "user_id"),
+        Index("ix_reports_thread_id", "thread_id"),
+    )
+
+    id: Mapped[uuid.UUID] = _uuid_pk()
+    user_id: Mapped[uuid.UUID] = mapped_column(
+        UUID(as_uuid=True), ForeignKey("users.id", ondelete="CASCADE"), nullable=False
+    )
+    thread_id: Mapped[uuid.UUID | None] = mapped_column(
+        UUID(as_uuid=True), ForeignKey("threads.id", ondelete="SET NULL")
+    )
+    message_id: Mapped[uuid.UUID | None] = mapped_column(
+        UUID(as_uuid=True), ForeignKey("messages.id", ondelete="SET NULL")
+    )
+    reason: Mapped[str] = mapped_column(Text, nullable=False)
+    authorization_version: Mapped[str] = mapped_column(Text, nullable=False)
+    authorized_at: Mapped[datetime] = _created()
+    created_at: Mapped[datetime] = _created()
+    reviewed_at: Mapped[datetime | None] = mapped_column()
+
+
+class AdminAccessLogRecord(Base):
+    """Operator reads of reported threads (no API access; written by the CLI)."""
+
+    __tablename__ = "admin_access_log"
+
+    id: Mapped[uuid.UUID] = _uuid_pk()
+    operator: Mapped[str] = mapped_column(Text, nullable=False)
+    action: Mapped[str] = mapped_column(Text, nullable=False)
+    report_id: Mapped[uuid.UUID | None] = mapped_column(UUID(as_uuid=True))
+    thread_id: Mapped[uuid.UUID | None] = mapped_column(UUID(as_uuid=True))
+    reason: Mapped[str] = mapped_column(Text, nullable=False)
+    created_at: Mapped[datetime] = _created()
+
+
+# User tables whose rows two people share (threads, messages) or that hang off a thread: FORCE
+# row-level security with participant or owner policies, proven in tests/account/test_messaging.py
+# (the generic owner-column checks over USER_TABLES do not fit them).
+MESSAGING_TABLES = ("threads", "thread_reads", "messages", "blocks", "reports")
 
 
 USER_TABLES = (

@@ -349,6 +349,7 @@ One database: Postgres (with pgvector) holds the pipeline's staging schema, the 
 | `consents` | `user_id`, `consent_type` (health_data / contribute), `version`, `granted_at`, `revoked_at` |
 | `patient_profiles` | `user_id`, `profile` (JSON matching the `PatientProfile` schema), `updated_at` |
 | `chat_sessions` / `chat_messages` | `user_id`, session and message content |
+| `chat_runs` | `id`, `user_id`, `session_id` (unique: one running turn per session), `user_message_id`, `worker`, latest LangGraph checkpoint; exists only while the turn runs |
 | `documents` | `id`, `user_id`, `status`, `doc_type`, `created_at`, `raw_deleted_at` |
 | `findings` | `id`, `document_id`, `user_id`, `type`, `value`, `normalized_id`, `page`, `snippet`, `confirmed` |
 | `contributions` | `id`, `user_id`, `kind`, `payload`, `status`, `consent_id` |
@@ -452,6 +453,7 @@ Ten services, each a module under `/api/services`; the `PatientProfile` schema i
 
 Detailed design in [`agent.md`](agent.md).
 
+- Each turn runs on the server as a LangGraph graph, detached from the request: clients attach to it by run id and replay its numbered events, so a reload or a switch between the Atlas dock and `/chat` keeps the turn (details in [`agent.md`](agent.md)).
 - SSE chat with tools: `extract_entities`, `resolve_to_ids`, `search_graph`, `get_neighborhood`, `find_path`, `match_phenotypes`, `ask_followup`.
 - `match_phenotypes(present, absent)` ranks the atlas's diseases (both tiers) by how well their recorded symptoms overlap the user's, with the same similarity code as the pipeline; symptoms-only messages run it in code before the first round. Results are an overlap ranking with cited `has_phenotype` edges, never a probability or a diagnosis (details in [`agent.md`](agent.md)).
 - Live entity extraction for chips: diseases → MONDO, genes → HGNC, variants (HGVS) → ClinVar, symptoms → HPO, with negation ("no feeding problems" = excluded), age, onset and country.
@@ -509,7 +511,10 @@ Detailed design in [`agent.md`](agent.md).
 | GET | `/path?from=&to=&family=` | Anyone | Ordered path steps, or `no_supported_route` + coverage report |
 | GET | `/edge/{id}/evidence` | Anyone | Sources, quotes, tiers, contradictions |
 | POST | `/explain` (SSE) | Anyone for cached explanations; signed in to generate new ones | Streamed role-specific explanation of a path with citation IDs; with `subject_node_id`, a summary of that node's connections |
-| POST | `/chat` (SSE) | Signed in + health-data consent | Streamed reply, chips, cards, follow-up question |
+| POST | `/chat` (SSE) | Signed in + health-data consent | Starts the turn's run; streamed reply, chips, cards, follow-up question |
+| GET | `/chat/runs` | Owner | The user's running turns |
+| GET | `/chat/runs/{id}/events?after=` (SSE) | Owner | Replay a run's events after a sequence number, then follow it |
+| DELETE | `/chat/runs/{id}` | Owner | Stop a running turn (stored as interrupted) |
 | POST | `/gap-search` (SSE) | Signed in, rate-limited | Agent progress + candidate edges |
 | GET | `/export/graph` | Anyone | CSV / GraphML of the requested subgraph |
 | GET / PUT | `/profile` | Signed in (PUT: + health-data consent) | The `PatientProfile` |

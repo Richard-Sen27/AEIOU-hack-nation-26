@@ -66,7 +66,9 @@ no_supported_route ─▶ Gap-search agent (POST /gap-search, separate) ─▶ c
 Offline ingestion pipeline ─▶ the only writer of trusted graph edges
 ```
 
-User input is redacted before the model sees it; the model only reaches data through tools; the citation and safety checks run on every reply before it is streamed. The graph is precomputed offline (clusters, layouts, similarity and mechanism edges, demo-path explanations), so a chat turn only reads. Langfuse traces each turn end to end.
+User input is redacted before the model sees it; the model only reaches data through tools; the citation and safety checks run on every reply before it is streamed.
+
+**A turn is a LangGraph graph run on the server** (`api/services/chat/agent.py`, `runs.py`). Nodes: `safety` (boundary categories; emergency → `emergency`, a fixed reply without a model call) → `entities` (extract_entities, resolve_to_ids, match_phenotypes) → `agent` (the tool rounds and the final answer inside the gateway's `run_tools`, same budgets) → `partial` (only when the deadline or bad output cut the turn) → `postcheck` → `persist` (the reply and the end of the run in one transaction). Redaction and emergency detection run before the graph, so raw text never enters it. The run keeps going when the client goes away: its events carry sequence numbers, any client of the same user can attach (`GET /chat/runs/{id}/events?after=N`), and the dock and `/chat` show the same turn. A session has at most one running turn (409 otherwise). Stop cancels the run (`DELETE /chat/runs/{id}`); it is stored as an interrupted turn. State is checkpointed after each node into the run's own `chat_runs` row (redacted content only, deleted when the turn ends). A run whose API process died is not resumed: it is stored as an interrupted turn, and "Try again" reruns it. The graph is precomputed offline (clusters, layouts, similarity and mechanism edges, demo-path explanations), so a chat turn only reads. Langfuse traces each turn end to end.
 
 ## Tools
 
@@ -251,18 +253,20 @@ User role: {role}. Expert mode: {expert_mode}. Profile: {confirmed_profile_json}
 **Runtime**
 
 - OpenAI Responses API with function calling. Budget per turn, enforced in code: after the extraction and resolution, at most 3 tool rounds and 15 s of tool work (and 8 tool calls); then the final answer is written with tools disabled and names in `missing_evidence` what it could not check. A 90 s deadline is the backstop: when it fires, the turn answers in code from the edges its tools returned (one cited edge per claim, post-checked as usual), or ends with an error if it gathered nothing. The post-check's own model calls stop at the deadline.
-- A turn that ends in an error (deadline, model error, sign-in expired, stream cut) is stored as an assistant message holding only the error code, message and status steps the stream showed; the session view shows it with "Try again", and a retry (`retry_message_id`) replaces it without storing the user's message again.
+- A turn that ends in an error (deadline, model error, sign-in expired, stopped, API restart) is stored as an assistant message holding only the error code, message and status steps the stream showed; the session view shows it with "Try again", and a retry (`retry_message_id`) replaces it without storing the user's message again.
 - Billing: every agent call runs on the signed-in user's ChatGPT plan usage, using their stored OpenAI token. The team key is used only by the offline pipeline.
 - The gap-search agent uses the OpenAI Agents SDK with its own budgets.
 - Planner/answer model: the strongest OpenAI model on the team's credits; extraction and classification on a smaller, cheaper model; embeddings via OpenAI embeddings into pgvector. On a ChatGPT plan whose model list offers no smaller model, the small calls use the main model. Tool-selection rounds and the extraction ask for low reasoning effort only when the model list advertises it; the final answer keeps the default.
-- Streaming over SSE (`POST /chat`): `summary` streams first, then chips, claims, cards and actions.
+- Streaming over SSE (`POST /chat`, or attached later with `GET /chat/runs/{id}/events`): status steps, then `summary`, then chips, claims, cards and actions; each frame's SSE `id` is its sequence number in the run.
 - Path explanations go through the Explanation service (`POST /explain`), which is cached per `(path_id, role, language, data_version)` and gated by textstat per role. With `subject_node_id` the same service writes a summary of one node's connections (the Atlas panel's "Write a summary"), citing only the edges listed for that node.
 
 **Endpoints the agent uses or produces** (full API in `system.md`)
 
 | Method | Path | Purpose |
 | --- | --- | --- |
-| POST | `/chat` (SSE) | Send a message, stream the structured reply |
+| POST | `/chat` (SSE) | Send a message, start the turn's run and stream it |
+| GET | `/chat/runs`, `/chat/runs/{id}/events` (SSE) | Running turns; attach to one (replay after `after`, then live) |
+| DELETE | `/chat/runs/{id}` | Stop a running turn |
 | GET / PUT | `/profile` | Read or update the `PatientProfile` (confirmed chips and findings) |
 | POST | `/explain` (SSE) | Role-specific explanation of a path with citation IDs, or with `subject_node_id` a summary of one node's connections |
 | GET | `/edge/{id}/evidence` | Full evidence for the trust panel |
