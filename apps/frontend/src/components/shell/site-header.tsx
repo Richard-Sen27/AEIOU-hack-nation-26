@@ -42,13 +42,8 @@ export function Wordmark({ className }: { className?: string }) {
         priority
         className="size-7 drop-shadow-sm transition-transform group-hover:-rotate-6"
       />
-      <span className="flex items-baseline gap-1.5 leading-none">
-        <span className="text-[15px] font-semibold tracking-tight">Amber</span>
-        <span className="hidden font-mono text-[10.5px] uppercase tracking-[0.14em] text-muted-foreground lg:inline">
-          Rare Disease Atlas
-        </span>
-      </span>
-      <span className="sr-only"> — Rare Disease Atlas, home</span>
+      <span className="text-[15px] leading-none font-semibold tracking-tight">Amber</span>
+      <span className="sr-only">, home</span>
     </Link>
   );
 }
