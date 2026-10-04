@@ -1,5 +1,6 @@
 from collections import Counter
 
+from backend.api.services import atlas_tree
 from backend.api.services import graph as graph_service
 from backend.schemas.atlas import AtlasCategory, AtlasTree, TreeNodeKind
 
@@ -42,7 +43,7 @@ async def test_tree_contract_and_coverage(client):
 async def test_tree_etag_and_caching(client):
     resp = await client.get("/atlas/tree.json")
     etag = resp.headers["etag"]
-    assert etag.startswith('"fixture.1.')
+    assert etag.startswith(f'"fixture.{atlas_tree.LAYOUT_VERSION}.')
     assert "max-age" in resp.headers["cache-control"]
     again = await client.get("/atlas/tree.json", headers={"If-None-Match": etag})
     assert again.status_code == 304 and again.headers["etag"] == etag

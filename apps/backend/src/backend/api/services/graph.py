@@ -120,6 +120,7 @@ class GraphStore:
     contrib_edges: dict[str, Edge] = field(default_factory=dict)
     contrib_incident: dict[str, list[str]] = field(default_factory=dict)
     atlas_cache: tuple[bytes, str] | None = None
+    tree_cache: Any = None  # atlas_tree.TreeCache, reset together with atlas_cache
 
 
 _store = GraphStore()
@@ -259,14 +260,15 @@ async def load_graph(db: AsyncSession) -> GraphStore:
         except Exception as exc:  # noqa: BLE001 - overlays are optional at startup
             log.warning("%s failed (%s)", refresh.__name__, type(exc).__name__)
     atlas_payload()
+    from backend.api.services import atlas_tree, search
+
+    atlas_tree.tree_payload()
     log.info(
         "graph store built in %.2fs: %d nodes, %d edges",
         time.perf_counter() - started,
         len(store.nodes),
         len(store.edges),
     )
-    from backend.api.services import search
-
     search.warm_up()
     return store
 
@@ -456,6 +458,7 @@ async def refresh_flags(db: AsyncSession) -> None:
     store = get_graph()
     store.flag_counts = {r.edge_id: int(r.open_flags) for r in rows if r.open_flags}
     store.atlas_cache = None
+    store.tree_cache = None
 
 
 async def refresh_contributions(db: AsyncSession) -> None:
@@ -472,6 +475,7 @@ async def refresh_contributions(db: AsyncSession) -> None:
     store.contrib_nodes, store.contrib_edges = nodes, edges
     store.contrib_incident = dict(incident)
     store.atlas_cache = None
+    store.tree_cache = None
 
 
 def _overlay_id(prefix: str, key: str) -> str:
