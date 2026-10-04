@@ -6,10 +6,8 @@ import {
   Bot,
   ChevronRight,
   FolderTree,
-  MousePointerClick,
   RefreshCw,
   Route,
-  Search,
   Sparkles,
   TriangleAlert,
   X,
@@ -171,25 +169,8 @@ function PanelHeader({
 
 /** Summary panel for the node selected on the Atlas: entity summary, local group panel, or an invitation. */
 export function AtlasPanel({ index, nodeId, onSelect, onShowChain, onClose, className }: AtlasPanelProps) {
-  if (!nodeId) {
-    return (
-      <Shell className={className}>
-        <div className="flex h-full flex-col items-center justify-center gap-3 px-6 py-10 text-center" data-testid="atlas-panel-empty">
-          <span className="flex size-10 items-center justify-center rounded-full bg-primary/15 text-primary">
-            <MousePointerClick className="size-5" aria-hidden />
-          </span>
-          <p className="text-[15px] font-semibold">Search or click a dot</p>
-          <p className="max-w-[18rem] text-sm text-pretty text-muted-foreground">
-            Pick a condition, gene, person or group to see who and what it is connected to, and have a summary
-            written.
-          </p>
-          <p className="flex items-center gap-1.5 text-xs text-muted-foreground">
-            <Search className="size-3.5" aria-hidden /> Press <kbd className="rounded border bg-muted px-1 font-mono text-[10px]">/</kbd> to search
-          </p>
-        </div>
-      </Shell>
-    );
-  }
+  // Nothing selected: no card (the view shows the map only).
+  if (!nodeId) return null;
   const node = index.nodes.get(nodeId);
   if (node && node.kind !== "entity") {
     return <GroupPanel key={nodeId} index={index} node={node} onSelect={onSelect} onClose={onClose} className={className} />;
@@ -210,48 +191,47 @@ export function AtlasPanel({ index, nodeId, onSelect, onShowChain, onClose, clas
 // ---------------------------------------------------------------------------
 // Groups (local, no request)
 
-/** What a group is grouped by, in plain words. */
-function basisText(node: AtlasTreeNode, parent: AtlasTreeNode | undefined, labelStyle: LabelStyle): string {
+/** What a group is grouped by, in one short line. */
+function basisText(node: AtlasTreeNode): string {
   const basis = node.group_basis as GroupBasis | null;
   const ref = node.ref_id;
-  const under = parent ? (parent.kind === "category" && parent.category ? categoryLabel(parent.category, labelStyle) : parent.label) : "this tree";
   switch (basis) {
     case "subcategory":
-      return `A part of ${under}, sorted by what kind of record each entry is.`;
+      return "Grouped by record type.";
     case "mechanism_cluster":
-      return `Entries linked to one mechanism group${ref ? ` (${ref})` : ""}. Mechanism groups come from an analysis of shared genes, pathways and symptoms, so the grouping is a hypothesis.`;
+      return "Grouped by mechanism group (a hypothesis).";
     case "research_field":
-      return `People grouped by the mechanism group that most of their work is about${ref ? ` (${ref})` : ""}, counted from the papers or trials linked to them in the atlas.`;
+      return "Grouped by the mechanism group most of their work is about.";
     case "focus_gene":
-      return `Researchers in this field grouped by the gene that most of their papers are about${ref ? ` (${ref})` : ""}.`;
+      return "Grouped by the gene most of their papers are about.";
     case "hpo_class":
-      return `Symptoms filed under this class of the Human Phenotype Ontology${ref ? ` (${ref})` : ""}. Each symptom sits under one parent class only.`;
+      return `Grouped by HPO class${ref ? ` ${ref}` : ""}.`;
     case "chromosome":
-      return `Genes on chromosome ${ref ?? node.label}, read from the location recorded for each gene.`;
+      return `Genes on chromosome ${ref ?? node.label}.`;
     case "pathway_source":
-      return `Body processes from one source database (${node.label}).`;
+      return `Grouped by source database (${node.label}).`;
     case "institution_kind":
-      return `Hospitals, universities and other institutions, split by keywords in their stored name (for example "hospital" or "clinic", "university" or "institute"). The records do not say what kind of place each one is, so this split is approximate.`;
+      return "Grouped by keywords in the name, so approximate.";
     case "country":
-      return `Entries in ${ref ?? node.label}, as recorded on each entry. Different spellings of the same country are merged.`;
+      return "Grouped by recorded country.";
     case "year_band":
-      return `Papers published in ${node.label}.`;
+      return `Published ${node.label}.`;
     case "trial_status":
-      return `Trials whose registry status is "${node.label}".`;
+      return "Grouped by trial status.";
     case "agency":
-      return `Research funding from ${ref ?? node.label}.`;
+      return "Grouped by funder.";
     case "activity_code":
-      return `Grants with the funding activity code ${ref ?? node.label}.`;
+      return "Grouped by grant activity code.";
     case "registry_kind":
-      return `Registries and studies of the kind "${node.label}".`;
+      return "Grouped by kind of registry.";
     case "alpha_range":
-      return `An alphabetical slice (${node.label}) of ${under}. Large groups are split into slices of at most 30 entries.`;
+      return `Alphabetical slice ${node.label}.`;
     case "not_recorded":
-      return `Entries where the source does not record what this level sorts by. Nothing is left out of the atlas because of it.`;
+      return "The source does not record this.";
     case "contributed":
-      return `Records contributed by users that are pending review. No person has checked them yet.`;
+      return "Contributed by users, pending review.";
     default:
-      return `A group in ${under}.`;
+      return "A group in this tree.";
   }
 }
 
@@ -269,17 +249,12 @@ function GroupPanel({
   className?: string;
 }) {
   const { labelStyle } = useLens();
-  const parent = node.parent_id ? index.nodes.get(node.parent_id) : undefined;
   const children = (index.children.get(node.id) ?? []).map((id) => index.nodes.get(id)).filter((n): n is AtlasTreeNode => !!n);
   const groups = children.filter((c) => c.kind !== "entity").length;
   const isCategory = node.kind === "category" && node.category;
   const title = isCategory ? categoryLabel(node.category!, labelStyle) : node.kind === "root" ? "The whole atlas" : node.label;
   const description =
-    node.kind === "root"
-      ? "Every entry of the atlas, in nine trees by category."
-      : isCategory
-        ? `One of the nine trees of the atlas: every entry of this category has exactly one place in it. The branches sort entries by stored data only.`
-        : basisText(node, parent, labelStyle);
+    node.kind === "root" ? "Every entry, in nine trees." : isCategory ? "One of the nine trees of the atlas." : basisText(node);
 
   return (
     <Shell
@@ -296,24 +271,16 @@ function GroupPanel({
         />
       }
     >
-      <div className="space-y-4 px-4 py-3" data-testid="atlas-group-panel">
-        <p className="text-sm leading-relaxed text-pretty text-muted-foreground" data-testid="atlas-group-basis">
-          {description}
-        </p>
-        <dl className="grid grid-cols-2 gap-2 text-xs" data-testid="atlas-group-counts">
-          <div className="rounded-lg border bg-background/60 px-2.5 py-2">
-            <dt className="text-muted-foreground">Entries</dt>
-            <dd className="font-mono text-sm font-semibold tabular">{node.entity_count.toLocaleString("en")}</dd>
-          </div>
-          <div className="rounded-lg border bg-background/60 px-2.5 py-2">
-            <dt className="text-muted-foreground">{groups > 0 ? "Branches" : "Directly here"}</dt>
-            <dd className="font-mono text-sm font-semibold tabular">{node.child_count.toLocaleString("en")}</dd>
-          </div>
-        </dl>
-        <section aria-labelledby="atlas-group-children">
-          <h3 id="atlas-group-children" className="mb-2 text-xs font-medium text-muted-foreground">
-            In this {isCategory ? "category" : "group"}
-          </h3>
+      <div className="space-y-3 px-4 py-3" data-testid="atlas-group-panel">
+        <div className="space-y-1">
+          <p className="text-sm text-muted-foreground" data-testid="atlas-group-basis">
+            {description}
+          </p>
+          <p className="font-mono text-xs tabular text-muted-foreground" data-testid="atlas-group-counts">
+            {node.entity_count.toLocaleString("en")} entries · {node.child_count.toLocaleString("en")} {groups > 0 ? "branches" : "here"}
+          </p>
+        </div>
+        <section aria-label={`In this ${isCategory ? "category" : "group"}`}>
           <ul className="space-y-1" data-testid="atlas-group-children">
             {children.map((c) => {
               const meta = c.entity_type ? nodeTypeMeta(c.entity_type) : null;
@@ -435,7 +402,7 @@ function EntityPanel({
             <Skeleton className="h-3 w-11/12" />
             <Skeleton className="h-3 w-3/5" />
           </div>
-          {[0, 1, 2].map((i) => (
+          {[0, 1].map((i) => (
             <div key={i} className="space-y-1.5">
               <Skeleton className="h-3 w-1/3" />
               <Skeleton className="h-9 w-full" />
@@ -446,51 +413,47 @@ function EntityPanel({
       )}
 
       {load.kind === "not_found" && (
-        <div className="space-y-2 px-4 py-6 text-sm" role="alert" data-testid="atlas-summary-not-found">
-          <p className="font-medium">This entry is no longer in the atlas.</p>
-          <p className="text-muted-foreground">It may have been removed or renamed in the latest data update.</p>
+        <div className="px-4 py-4 text-sm" role="alert" data-testid="atlas-summary-not-found">
+          <p className="font-medium">No longer in the atlas.</p>
         </div>
       )}
 
       {load.kind === "error" && (
-        <div className="flex items-start gap-3 px-4 py-6 text-sm" role="alert" data-testid="atlas-summary-error">
-          <TriangleAlert className="mt-0.5 size-4 shrink-0 text-status-flag" aria-hidden />
-          <div className="space-y-2">
-            <p>The summary could not be loaded. Amber&apos;s server may be unreachable.</p>
-            <Button variant="outline" size="sm" onClick={() => setAttempt((a) => a + 1)}>
-              <RefreshCw aria-hidden /> Try again
-            </Button>
-          </div>
+        <div className="flex items-center gap-2 px-4 py-4 text-sm" role="alert" data-testid="atlas-summary-error">
+          <TriangleAlert className="size-4 shrink-0 text-status-flag" aria-hidden />
+          <p className="flex-1">Couldn&apos;t load the summary.</p>
+          <Button variant="outline" size="xs" onClick={() => setAttempt((a) => a + 1)}>
+            <RefreshCw aria-hidden /> Retry
+          </Button>
         </div>
       )}
 
       {data && (
         <div className="divide-y">
-          <section aria-label="Overview" className="space-y-3 px-4 py-3">
+          <section aria-label="Overview" className="space-y-2.5 px-4 py-3">
             {data.vus_notice && <VusNotice compact />}
-            {data.headline && <p className="text-sm leading-relaxed text-pretty text-muted-foreground" data-testid="atlas-summary-headline">{data.headline}</p>}
+            {data.headline && <Headline text={data.headline} />}
             {PEOPLE.has(data.node.type) && (
-              <p className="flex flex-wrap items-center gap-x-2 gap-y-1 text-[11px] text-muted-foreground">
-                <span>Public professional information only.</span>
+              <p className="text-[11px] text-muted-foreground">
+                Public info only ·{" "}
                 <Link
                   href={`/about-data?entry=${encodeURIComponent(data.node.id)}#claim`}
                   className="font-medium text-foreground underline underline-offset-2"
                   data-testid="claim-entry-link"
                 >
-                  Claim or remove this entry
+                  Claim or remove
                 </Link>
               </p>
             )}
             <WrittenSummary
               nodeId={nodeId}
               edgeIds={data.explain_edge_ids}
-              label={label}
               onShowChain={onShowChain}
             />
           </section>
 
           {data.sections.length === 0 && (
-            <p className="px-4 py-4 text-sm text-muted-foreground">No connections recorded for this entry yet.</p>
+            <p className="px-4 py-3 text-sm text-muted-foreground">No connections yet.</p>
           )}
           {data.sections.map((s) => (
             <SummarySectionView key={s.key} section={s} onSelect={onSelect} onShowChain={onShowChain} />
@@ -527,15 +490,13 @@ function SummarySectionView({
         ))}
       </ul>
       {(section.total > section.items.length || people) && (
-        <p className="mt-2 text-[11px] text-muted-foreground">
-          {section.total > section.items.length && <>Showing the {section.items.length} strongest of {section.total.toLocaleString("en")}. </>}
+        <p className="mt-1.5 text-[11px] text-muted-foreground">
+          {section.total > section.items.length && <>Top {section.items.length} of {section.total.toLocaleString("en")}</>}
+          {section.total > section.items.length && people && " · "}
           {people && (
-            <>
-              Public professional information only.{" "}
-              <Link href="/about-data" className="underline underline-offset-2 hover:text-foreground">
-                About this data
-              </Link>
-            </>
+            <Link href="/about-data" className="underline underline-offset-2 hover:text-foreground">
+              About this data
+            </Link>
           )}
         </p>
       )}
@@ -557,9 +518,9 @@ function SummaryItemRow({
   const Icon = meta.icon;
   // Cluster membership is a stored attribute, not an edge: no chain, no confidence.
   const membership = item.via.length === 0;
-  const via = item.via_label ?? (membership ? "Member of the same mechanism group" : item.hops <= 1 ? "Direct link" : `${item.hops} steps away`);
+  const via = item.via_label ?? (membership ? "Same mechanism group" : item.hops <= 1 ? "Direct" : `${item.hops} steps`);
   return (
-    <li className="rounded-lg border bg-background/50 px-2.5 py-2" data-testid="atlas-summary-item" data-membership={membership || undefined}>
+    <li className="rounded-lg border bg-background/50 px-2.5 py-1.5" data-testid="atlas-summary-item" data-membership={membership || undefined}>
       <div className="flex items-start gap-2">
         <button
           type="button"
@@ -567,23 +528,23 @@ function SummaryItemRow({
           className="flex min-w-0 flex-1 items-start gap-1.5 rounded text-left text-[13px] font-medium outline-none hover:underline focus-visible:ring-2 focus-visible:ring-ring"
         >
           <Icon className="mt-0.5 size-3.5 shrink-0" style={{ color: `var(${meta.colorVar})` }} aria-hidden />
-          <span className="line-clamp-2">{item.label}</span>
+          <span className="line-clamp-1" title={item.label}>{item.label}</span>
           <span className="sr-only">({meta.label[labelStyle]}). Select on the map</span>
         </button>
         {!membership && (
           <button
             type="button"
             onClick={() => onShowChain(item.via)}
-            className="inline-flex shrink-0 items-center gap-1 rounded px-1.5 py-0.5 text-[11px] font-medium text-muted-foreground outline-none hover:bg-muted hover:text-foreground focus-visible:ring-2 focus-visible:ring-ring"
+            title="Show the link on the map"
+            className="inline-flex size-6 shrink-0 items-center justify-center rounded text-muted-foreground outline-none hover:bg-muted hover:text-foreground focus-visible:ring-2 focus-visible:ring-ring"
             data-testid="atlas-summary-chain"
           >
-            <Route className="size-3" aria-hidden />
-            Show link
-            <span className="sr-only"> to {item.label} on the map</span>
+            <Route className="size-3.5" aria-hidden />
+            <span className="sr-only">Show the link to {item.label} on the map</span>
           </button>
         )}
       </div>
-      <div className="mt-1 flex flex-wrap items-center gap-1.5 pl-5">
+      <div className="mt-0.5 flex flex-wrap items-center gap-1.5 pl-5">
         <span className="text-xs text-muted-foreground" data-testid="atlas-summary-via">
           {via}
         </span>
@@ -597,6 +558,30 @@ function SummaryItemRow({
         </p>
       )}
     </li>
+  );
+}
+
+/** The headline, clamped to three lines with a toggle for the rest. */
+function Headline({ text }: { text: string }) {
+  const [open, setOpen] = useState(false);
+  const long = text.length > 160;
+  return (
+    <div>
+      <p className={cn("text-sm leading-snug text-pretty text-muted-foreground", !open && long && "line-clamp-3")} data-testid="atlas-summary-headline">
+        {text}
+      </p>
+      {long && (
+        <button
+          type="button"
+          onClick={() => setOpen((o) => !o)}
+          aria-expanded={open}
+          className="mt-0.5 rounded text-xs font-medium text-foreground underline-offset-2 outline-none hover:underline focus-visible:ring-2 focus-visible:ring-ring"
+          data-testid="atlas-summary-more"
+        >
+          {open ? "Less" : "More"}
+        </button>
+      )}
+    </div>
   );
 }
 
@@ -615,15 +600,15 @@ type WriteState =
 function writeError(code: string) {
   switch (code) {
     case "network_error":
-      return "Amber's server can't be reached, so the summary can't be written right now.";
+      return "Server unreachable.";
     case "rate_limited":
-      return "You've reached the usage limit for now. Please try again later.";
+      return "Usage limit reached.";
     case "upstream_error":
-      return "The AI service did not respond. Please try again in a moment.";
+      return "The AI service did not respond.";
     case "not_found":
-      return "This entry is no longer in the atlas, so it can't be summarised.";
+      return "No longer in the atlas.";
     default:
-      return "The summary could not be written. Please try again.";
+      return "Couldn't write the summary.";
   }
 }
 
@@ -674,12 +659,10 @@ function CitedSummary({
 function WrittenSummary({
   nodeId,
   edgeIds,
-  label,
   onShowChain,
 }: {
   nodeId: string;
   edgeIds: string[];
-  label: string;
   onShowChain: (edgeIds: string[]) => void;
 }) {
   const { role } = useLens();
@@ -742,11 +725,11 @@ function WrittenSummary({
   }
 
   return (
-    <div className="rounded-lg border bg-background/60 p-3" data-testid="atlas-summary-written" aria-live="off">
-      <div className="mb-2 flex flex-wrap items-center justify-between gap-2">
+    <div className="rounded-lg border bg-background/60 p-2.5" data-testid="atlas-summary-written" aria-live="off">
+      <div className="mb-1.5 flex flex-wrap items-center justify-between gap-2">
         <h3 className="flex items-center gap-1.5 text-xs font-semibold">
           <Bot className="size-3.5 text-primary" aria-hidden />
-          Summary of {label.length > 40 ? "this entry" : label}
+          Summary
         </h3>
         {(state.kind === "streaming" || state.kind === "done") && <AiDisclosure variant="inline" />}
       </div>
@@ -776,14 +759,13 @@ function WrittenSummary({
             <p className="mt-2 flex flex-wrap items-center gap-x-3 gap-y-1 text-[11px] text-muted-foreground">
               {state.final.cached ? (
                 <span className="inline-flex items-center gap-1" data-testid="atlas-summary-cached">
-                  <Archive className="size-3" aria-hidden /> Prepared in advance (cached)
+                  <Archive className="size-3" aria-hidden /> Cached
                 </span>
               ) : (
                 <span className="inline-flex items-center gap-1" data-testid="atlas-summary-fresh">
-                  <Sparkles className="size-3" aria-hidden /> Written just now
+                  <Sparkles className="size-3" aria-hidden /> New
                 </span>
               )}
-              <span>Numbers show the link each sentence relies on.</span>
               <span>Not medical advice.</span>
             </p>
           )}
@@ -791,33 +773,28 @@ function WrittenSummary({
       )}
 
       {state.kind === "sign_in" && (
-        <div className="space-y-2" data-testid="atlas-summary-sign-in">
-          <p className="text-sm text-muted-foreground">
-            No summary has been prepared for this entry yet. Dr. Wu can write one for you from the links listed here,
-            on your own ChatGPT plan.
-          </p>
-          <Button variant="outline" size="sm" onClick={signIn}>
+        <div className="flex flex-wrap items-center justify-between gap-2" data-testid="atlas-summary-sign-in">
+          <p className="text-sm text-muted-foreground">Not prepared yet.</p>
+          <Button variant="outline" size="xs" onClick={signIn}>
             <Bot className="text-primary" aria-hidden />
-            Sign in to have Dr. Wu write it
+            Sign in to write it
           </Button>
         </div>
       )}
 
       {state.kind === "unavailable" && (
         <p className="text-sm text-muted-foreground" data-testid="atlas-summary-unavailable">
-          Written summaries aren&apos;t available on this server yet. The lists below are complete without one.
+          Not available on this server.
         </p>
       )}
 
       {state.kind === "error" && (
-        <div className="flex items-start gap-2 text-sm" role="alert" data-testid="atlas-summary-write-error">
-          <TriangleAlert className="mt-0.5 size-4 shrink-0 text-status-flag" aria-hidden />
-          <div className="space-y-2">
-            <p>{state.message}</p>
-            <Button variant="ghost" size="sm" onClick={write}>
-              <RefreshCw aria-hidden /> Try again
-            </Button>
-          </div>
+        <div className="flex items-center gap-2 text-sm" role="alert" data-testid="atlas-summary-write-error">
+          <TriangleAlert className="size-4 shrink-0 text-status-flag" aria-hidden />
+          <p className="flex-1">{state.message}</p>
+          <Button variant="ghost" size="xs" onClick={write}>
+            <RefreshCw aria-hidden /> Retry
+          </Button>
         </div>
       )}
     </div>

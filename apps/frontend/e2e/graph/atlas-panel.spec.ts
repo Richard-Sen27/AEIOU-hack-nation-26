@@ -1,7 +1,7 @@
 import { expect, test, type Page } from "@playwright/test";
 
 import { errorEnvelope, guestSession, mockApi, setTheme, signedInSession, sseBody, trackConsoleErrors } from "../helpers";
-import { explainEvents, fecTree, GENE_GROUP, summaryMock } from "./atlas-fec-mocks";
+import { explainEvents, fecTree, GENE_GROUP, stxbp1Summary, summaryMock } from "./atlas-fec-mocks";
 
 type Req = { url: string; method: string; body: unknown };
 
@@ -33,7 +33,7 @@ test.describe("atlas summary panel", () => {
     const sections = p.getByTestId("atlas-summary-section");
     await expect(sections).toHaveCount(4);
     await expect(sections.getByRole("heading")).toHaveText([/Mechanism group\s*1/, /Similar conditions\s*14/, /Genes\s*1/, /Leading researchers\s*2/]);
-    await expect(p.locator('[data-section="similar_diseases"]')).toContainText("Showing the 2 strongest of 14");
+    await expect(p.locator('[data-section="similar_diseases"]')).toContainText("Top 2 of 14");
 
     // Data vs hypothesis and the review flag on items.
     const similar = p.locator('[data-section="similar_diseases"] [data-testid="atlas-summary-item"]').first();
@@ -60,6 +60,25 @@ test.describe("atlas summary panel", () => {
     await expect(p.getByRole("heading", { name: "STXBP1", exact: true })).toBeVisible();
     await expect(page).toHaveURL(/focus=HGNC%3A11444|focus=HGNC:11444/);
     expect(errors()).toEqual([]);
+  });
+
+  test("nothing selected renders no panel", async ({ page }) => {
+    await atlas(page);
+    await page.goto("/atlas");
+    await expect(page.getByTestId("atlas-view")).toBeVisible();
+    await expect(page.getByTestId("atlas-wu-dock")).toBeVisible();
+    await expect(panel(page)).toHaveCount(0);
+  });
+
+  test("a long headline is clamped with a toggle", async ({ page }) => {
+    const long = { ...stxbp1Summary(), headline: "A long description of the condition. ".repeat(12) };
+    await atlas(page, { "GET /atlas/summary/*": summaryMock({ "MONDO:9900007": { json: long } }) });
+    await page.goto("/atlas?focus=MONDO:9900007");
+    const headline = panel(page).getByTestId("atlas-summary-headline");
+    await expect(headline).toHaveClass(/line-clamp-3/);
+    await panel(page).getByTestId("atlas-summary-more").click();
+    await expect(headline).not.toHaveClass(/line-clamp-3/);
+    await expect(panel(page).getByTestId("atlas-summary-more")).toHaveText("Less");
   });
 
   test("a crumb selects its group, which renders a local panel", async ({ page }) => {
@@ -96,7 +115,7 @@ test.describe("atlas summary panel", () => {
     });
     await atlas(page, { "GET /atlas/tree.json": tree });
     await page.goto("/atlas?focus=T:institutions/clinical");
-    await expect(panel(page).getByTestId("atlas-group-basis")).toContainText("keywords in their stored name");
+    await expect(panel(page).getByTestId("atlas-group-basis")).toContainText("keywords in the name");
   });
 
   test("not found and error states", async ({ page }) => {
@@ -112,7 +131,7 @@ test.describe("atlas summary panel", () => {
     await page.goto("/atlas?focus=MONDO:9900007");
     await expect(panel(page).getByTestId("atlas-summary-error")).toBeVisible();
     fail = false;
-    await panel(page).getByRole("button", { name: "Try again" }).click();
+    await panel(page).getByRole("button", { name: "Retry" }).click();
     await expect(panel(page).getByTestId("atlas-summary-section").first()).toBeVisible();
 
     await page.goto("/atlas?focus=HGNC:10585");
