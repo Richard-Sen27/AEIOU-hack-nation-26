@@ -38,11 +38,18 @@ async def seed_rows(conn: asyncpg.Connection, uid: uuid.UUID) -> dict[str, uuid.
         ids["session"] = await conn.fetchval(
             "INSERT INTO chat_sessions (user_id, title) VALUES ($1, 't') RETURNING id", uid
         )
-        await conn.execute(
+        ids["message"] = await conn.fetchval(
             "INSERT INTO chat_messages (session_id, user_id, role, content)"
-            " VALUES ($1, $2, 'user', 'hi')",
+            " VALUES ($1, $2, 'user', 'hi') RETURNING id",
             ids["session"],
             uid,
+        )
+        await conn.execute(
+            "INSERT INTO chat_runs (user_id, session_id, user_message_id, worker)"
+            " VALUES ($1, $2, $3, 'w')",
+            uid,
+            ids["session"],
+            ids["message"],
         )
         ids["document"] = await conn.fetchval(
             "INSERT INTO documents (user_id) VALUES ($1) RETURNING id", uid
@@ -143,6 +150,11 @@ async def test_user_cannot_write_other_users_rows(two_users):
             "INSERT INTO chat_messages (session_id, user_id, role, content)"
             " VALUES ($2, $1, 'user', 'x')",
             (b, rows_b["session"]),
+        ),
+        "chat_runs": (
+            "INSERT INTO chat_runs (user_id, session_id, user_message_id, worker)"
+            " VALUES ($1, $2, $3, 'w')",
+            (b, rows_b["session"], rows_b["message"]),
         ),
         "documents": ("INSERT INTO documents (user_id) VALUES ($1)", (b,)),
         "findings": (

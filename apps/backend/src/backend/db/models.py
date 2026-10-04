@@ -19,6 +19,7 @@ from sqlalchemy import (
     ForeignKey,
     Index,
     Integer,
+    LargeBinary,
     PrimaryKeyConstraint,
     Text,
     UniqueConstraint,
@@ -361,6 +362,36 @@ class ChatMessageRecord(Base):
     created_at: Mapped[datetime] = _created()
 
 
+class ChatRunRecord(Base):
+    """An unfinished Dr. Wu turn and its latest LangGraph checkpoint (redacted content only).
+
+    The row exists only while the turn runs: it is deleted in the same transaction that stores
+    the reply or the failed turn, which also prunes the checkpoint."""
+
+    __tablename__ = "chat_runs"
+
+    id: Mapped[uuid.UUID] = _uuid_pk()
+    user_id: Mapped[uuid.UUID] = _user_fk()
+    session_id: Mapped[uuid.UUID] = mapped_column(
+        UUID(as_uuid=True),
+        ForeignKey("chat_sessions.id", ondelete="CASCADE"),
+        nullable=False,
+        unique=True,  # at most one active run per session
+    )
+    user_message_id: Mapped[uuid.UUID] = mapped_column(
+        UUID(as_uuid=True),
+        ForeignKey("chat_messages.id", ondelete="CASCADE"),
+        nullable=False,
+        index=True,
+    )
+    worker: Mapped[str] = mapped_column(Text, nullable=False)  # boot id of the running process
+    checkpoint_id: Mapped[str | None] = mapped_column(Text)
+    checkpoint_type: Mapped[str | None] = mapped_column(Text)
+    checkpoint: Mapped[bytes | None] = mapped_column(LargeBinary)
+    created_at: Mapped[datetime] = _created()
+    updated_at: Mapped[datetime] = _created()
+
+
 class DocumentRecord(Base):
     """Document metadata only: no filename, no raw bytes."""
 
@@ -505,6 +536,7 @@ USER_TABLES = (
     "patient_profiles",
     "chat_sessions",
     "chat_messages",
+    "chat_runs",
     "documents",
     "findings",
     "contributions",
