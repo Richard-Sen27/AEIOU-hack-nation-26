@@ -70,7 +70,7 @@ User input is redacted before the model sees it; the model only reaches data thr
 
 ## Tools
 
-The orchestrator has the six tools defined in `system.md`. They wrap the backend services, so the agent sees exactly what the API serves. Tool inputs and outputs are Pydantic models that double as the OpenAI JSON schemas.
+The orchestrator has the seven tools defined in `system.md`. They wrap the backend services, so the agent sees exactly what the API serves. Tool inputs and outputs are Pydantic models that double as the OpenAI JSON schemas.
 
 | Tool | Input | Output | Service |
 | --- | --- | --- | --- |
@@ -79,15 +79,20 @@ The orchestrator has the six tools defined in `system.md`. They wrap the backend
 | `search_graph` | query, node types, limit | typed matches with the matched synonym ("Ohtahara syndrome → STXBP1 encephalopathy"); in expert mode, mechanism queries return ranked clusters | Search (trigram + pgvector + type/centrality boost) |
 | `get_neighborhood` | node id, role | full neighbourhood with positions, edges with evidence summaries, cluster membership, role presentation hints | Graph |
 | `find_path` | from id, to id, edge family (dna / symptoms / research / all) | top-k paths by edge cost `−log(confidence)`, or `no_supported_route` with a coverage report (sources queried, closest partial path, missing link, suggested next question) | Path |
+| `match_phenotypes` | `present` and `absent` symptom mentions (at most 20 each) | the top 10 diseases by symptom overlap, each with `overlap` (how many of the user's symptoms are recorded for it) of `of`, a similarity `score`, the shared terms (user's symptom, recorded term, match `same` / `more_specific` / `broader`, frequency when recorded, and the `has_phenotype` `edge_id`), recorded symptoms the user said are absent, and unresolved mentions | Phenotype matching over the in-memory `hpo_terms` table and the graph; run in code before the first round for symptoms-only messages, offered to the model for symptoms that run lacked |
 | `ask_followup` | remaining candidate clusters | at most one question, chosen by which answer best separates the candidates, with quick-reply options; always skippable | Orchestrator |
 
 How the action layer maps onto the graph (all precomputed edges, read via `get_neighborhood` and `find_path`):
 
-- **Who shares characteristics:** `same_gene_same_mechanism`, `shared_pathway`, `similar_symptoms` edges and the node's cluster.
+- **Who shares characteristics:** `same_gene_same_mechanism`, `shared_gene`, `shared_pathway`, `similar_symptoms` edges and the node's cluster; `near_on_chromosome` between their genes is weak evidence only. All of these are computed hypotheses (`origin = inferred`) with a one-line `explanation`.
 - **Counterexample:** `same_gene_different_mechanism` edges (e.g. SCN2A gain- vs. loss-of-function).
 - **Reusable assets:** `serves` and `runs` edges (organization → registry or study).
 - **Common people and funders:** `shared_researcher`, `authored`, `pi_of`, `funds_research_on`, `investigator_of`.
 - **Trials:** `studies` edges (trial → disease), ingested from ClinicalTrials.gov.
+
+**`match_phenotypes` in detail.** Mentions resolve against the HPO term table (an HP id, an exact label, a synonym, a singular form, then a fuzzy match), so terms that are not graph nodes still resolve. Every disease with recorded symptoms is ranked, core and focus tier alike, so diseases that are not on the Atlas map can be returned. The score is the shared `phenotype_similarity` function the pipeline uses for `similar_symptoms` (information content over the whole HPO annotation corpus, the disease's recorded frequencies, the user's symptoms at weight 1), reduced by the share of the user's symptoms that contradict the record: symptoms the user said are absent but the disease records, and present symptoms the disease records as excluded. Only diseases with at least one shared term are returned. It adds no model round-trip.
+
+What the agent may claim from it: these are "conditions in the atlas whose recorded symptoms overlap", with the overlap count ("3 of your 4 symptoms are recorded for it"), each shared symptom citing its `has_phenotype` edge. The score is a similarity, not a probability: never a probability, likelihood or percentage, never "you have" or "this is", never a diagnosis; the conditions are to discuss with a clinical geneticist. The tool result carries this rule as a note, and the system prompt repeats it.
 
 ## Graph and evidence model
 
@@ -114,7 +119,7 @@ Defined in `system.md` (Graph data model, Database). What the agent relies on:
 
 - `origin` is `observed`, `inferred`, `patient_reported` or `user_contributed`. Only `observed` is rendered as data; `inferred` is rendered as a hypothesis; `patient_reported` and `user_contributed` carry their own labels.
 - `status` other than `active` (`pending_review`, `under_review`) is shown with a visible flag and never used as support for an action.
-- `confidence` comes from the Stage 4 formula (tier weights, minus a penalty per contradicting evidence item) and is shown as High / Medium / Low with the breakdown on click.
+- `confidence` comes from the Stage 4 formula (tier weights, minus a penalty of 0.1 per contradicting evidence item) and is shown as High / Medium / Low with the breakdown on click. Computed links have tier `computed`, are capped per relation (at most 0.79, chromosome proximity 0.45), so they never show as High, and carry `explanation`, a one-line reason the link exists, which the tools pass to the model with the edge.
 - Evidence with `polarity: contradicts` must be surfaced next to the claim.
 - VUS variants are stored with classification `uncertain_significance` and are excluded from path-finding unless the user asks.
 
@@ -125,7 +130,7 @@ W1 → W3 → W4 together are the one complete journey the 24h goal asks for.
 **W1 — Chat intake**
 
 1. User types a disease, gene, variant or symptoms ("My daughter is 2, diagnosed with STXBP1 last month. Lots of seizures, not walking yet, no problems with eating.").
-2. Redact, then `extract_entities` → `resolve_to_ids`, both in code before the first model round, so the model starts from the resolved IDs. The resolved items appear as chips the user confirms, corrects or removes; only confirmed chips enter the `PatientProfile`.
+2. Redact, then `extract_entities` → `resolve_to_ids`, both in code before the first model round, so the model starts from the resolved IDs. A message with symptoms but no disease, gene or variant also runs `match_phenotypes` in code, and the model starts from its ranking. The resolved items appear as chips the user confirms, corrects or removes; only confirmed chips enter the `PatientProfile`.
 3. If resolution is ambiguous or several clusters remain, `ask_followup` asks one skippable question with quick replies.
 4. Open the resolved node in the graph view at the lens's starting point (one global search principle).
 5. Reply: two-sentence plain summary, then cards (mini graph, patient group, evidence chips, "Open in Atlas").
@@ -289,4 +294,4 @@ The agent follows the system build order in `system.md`: it needs the graph and 
 - [ ] Which disease cluster is the demo journey (needs good ClinVar, trial and patient-group coverage)? The examples point to STXBP1 and the SCN1A/SCN2A channelopathies.
 - [ ] Final assistant name: "Dr. Henry Wu" is a Jurassic Park character; a trademark-safe original name may be safer for the submission.
 - [ ] OMIM is optional and needs a registered key; request it now or rely on MONDO cross-references.
-- [ ] The confidence threshold for "supported" paths (0.6 here) and the contradiction penalty `p` in the confidence formula still need values.
+- [x] The confidence threshold for "supported" paths is 0.6 and the contradiction penalty `p` is 0.1.
