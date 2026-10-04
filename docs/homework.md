@@ -144,6 +144,7 @@ Decided and built (Oct 4): a Dr. Wu turn is a LangGraph graph (`api/services/cha
 - **Orphans of users who never return** stay in `chat_runs` (redacted content, same class as `chat_messages`) until they do or delete the session, consent or account; a sweep would need a `SECURITY DEFINER` function, since RLS hides other users' rows.
 - **Tool rounds are one node:** the rounds and the final answer run inside the gateway's `run_tools` (budgets, tool-mode fallbacks); splitting each round into its own node means moving that loop out of `llm/client.py`.
 - **Next agent features** (not built): pauses for the user's confirmation (`interrupt` between `agent` and `postcheck`, a `resume` route), long multi-step tasks (a planner node and a loop over `agent`), live streaming of the final answer's text (the summary is chunked after the post-check today).
+- **Smooth reveal** (`components/ui/smooth-reveal.tsx`, chat, dock, Atlas summary): a reload in the moment between the reply's events and the run's end replays the reveal from the start (the progress that lets a second view continue lives in memory only); a background tab pauses the reveal (requestAnimationFrame); the dock frames its finds on the map at the `final` event, before the text has finished revealing.
 - **Gap search** could move onto the same run machinery and the Agents SDK be retired.
 
 ## Hosting (Railway)
