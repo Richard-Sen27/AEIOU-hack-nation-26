@@ -307,6 +307,11 @@ class Profile(Base):
     # the connect consent and cleared when it is withdrawn.
     connect_age_group: Mapped[str | None] = mapped_column(Text)
     connect_age_group_at: Mapped[datetime | None] = mapped_column()
+    # Suggestions of calls (connect consent, off by default); computed per request, never stored.
+    suggestions_enabled: Mapped[bool] = mapped_column(
+        Boolean, nullable=False, server_default="false"
+    )
+    suggestions_enabled_at: Mapped[datetime | None] = mapped_column()
     created_at: Mapped[datetime] = _created()
     updated_at: Mapped[datetime] = _created()
 
@@ -553,6 +558,7 @@ class ThreadRecord(Base):
     __table_args__ = (
         Index("ix_threads_opener_id", "opener_id"),
         Index("ix_threads_recipient_id", "recipient_id"),
+        Index("ix_threads_signup_id", "signup_id"),
     )
 
     id: Mapped[uuid.UUID] = _uuid_pk()
@@ -563,8 +569,13 @@ class ThreadRecord(Base):
         UUID(as_uuid=True), ForeignKey("users.id", ondelete="SET NULL")
     )
     origin: Mapped[str] = mapped_column(Text, nullable=False)  # card | signup
-    call_id: Mapped[uuid.UUID | None] = mapped_column(UUID(as_uuid=True))  # stage 4, no FK yet
-    signup_id: Mapped[uuid.UUID | None] = mapped_column(UUID(as_uuid=True))  # stage 4, no FK yet
+    call_id: Mapped[uuid.UUID | None] = mapped_column(
+        UUID(as_uuid=True), ForeignKey("calls.id", ondelete="SET NULL")
+    )
+    signup_id: Mapped[uuid.UUID | None] = mapped_column(
+        UUID(as_uuid=True),
+        ForeignKey("call_signups.id", ondelete="SET NULL", use_alter=True),  # cycle with threads
+    )
     recipient_card_id: Mapped[uuid.UUID | None] = mapped_column(UUID(as_uuid=True))
     opener_name: Mapped[str | None] = mapped_column(Text)
     recipient_name: Mapped[str | None] = mapped_column(Text)
@@ -765,6 +776,65 @@ class CallReviewRecord(Base):
     note: Mapped[str | None] = mapped_column(Text)
     operator: Mapped[str] = mapped_column(Text, nullable=False)
     created_at: Mapped[datetime] = _created()
+
+
+# --- sign-ups to calls (connect consent; policies, triggers and functions in d7f2a9c4e6b1) ----
+
+
+class CallSignupRecord(Base):
+    """A patient's sign-up to a published call with exactly the items they ticked.
+
+    The patient has full access to their own rows (the trigger call_signups_guard allows only
+    withdrawing and linking the sign-up's conversation); the call's publisher may read the
+    sign-ups of their own calls; the publisher declines through decline_call_signup()."""
+
+    __tablename__ = "call_signups"
+    __table_args__ = (
+        Index("ix_call_signups_patient_id", "patient_id"),
+        Index("ix_call_signups_call_id", "call_id"),
+        Index(
+            "uq_call_signups_one_per_call",
+            "call_id",
+            "patient_id",
+            unique=True,
+            postgresql_where=text("status IN ('active', 'declined')"),
+        ),
+    )
+
+    id: Mapped[uuid.UUID] = _uuid_pk()
+    call_id: Mapped[uuid.UUID | None] = mapped_column(
+        UUID(as_uuid=True), ForeignKey("calls.id", ondelete="SET NULL")
+    )
+    patient_id: Mapped[uuid.UUID] = mapped_column(
+        UUID(as_uuid=True), ForeignKey("users.id", ondelete="CASCADE"), nullable=False
+    )
+    call_title_snapshot: Mapped[str] = mapped_column(Text, nullable=False)
+    recipient_name: Mapped[str] = mapped_column(Text, nullable=False)  # named in the authorization
+    display_name: Mapped[str] = mapped_column(Text, nullable=False)
+    shared: Mapped[dict[str, Any]] = mapped_column(
+        JSONB, nullable=False, server_default=text("'{}'::jsonb")
+    )
+    about_child: Mapped[bool] = mapped_column(Boolean, nullable=False, server_default="false")
+    note: Mapped[str | None] = mapped_column(Text)
+    authorization_version: Mapped[str] = mapped_column(Text, nullable=False)
+    authorized_at: Mapped[datetime] = _created()
+    guardian_agreed_at: Mapped[datetime | None] = mapped_column()
+    guardian_text_version: Mapped[str | None] = mapped_column(Text)
+    status: Mapped[str] = mapped_column(Text, nullable=False, server_default="active")
+    withdrawn_at: Mapped[datetime | None] = mapped_column()
+    declined_at: Mapped[datetime | None] = mapped_column()
+    call_ended_at: Mapped[datetime | None] = mapped_column()
+    purge_after: Mapped[datetime | None] = mapped_column()
+    thread_id: Mapped[uuid.UUID | None] = mapped_column(
+        UUID(as_uuid=True), ForeignKey("threads.id", ondelete="SET NULL")
+    )
+    created_at: Mapped[datetime] = _created()
+    updated_at: Mapped[datetime] = _created()
+
+
+# Shared between the patient and the call's publisher, so outside the generic owner-column tests
+# over USER_TABLES; FORCE row-level security proven in tests/account/test_signups.py.
+SIGNUP_TABLES = ("call_signups",)
 
 
 USER_TABLES = (

@@ -31,6 +31,7 @@ import { cn } from "@/lib/utils";
 
 import { routeGlobalError } from "./api-errors";
 import { EntityPicker } from "./entity-picker";
+import { useMyCard } from "./use-my-card";
 
 /**
  * Optional, private work details of doctors and researchers (`/me/professional`):
@@ -169,6 +170,9 @@ export function WorkDetailsForm({
   const [matches, setMatches] = useState<Matches>({ kind: "idle" });
   const [orcidTouched, setOrcidTouched] = useState(false);
   const [busy, setBusy] = useState<"save" | "remove" | null>(null);
+  // Verification facts that change what saving here does (profile only).
+  const myCard = useMyCard({ enabled: variant === "profile" });
+  const verification = myCard.card?.verification;
 
   const apply = useCallback((p: ProfessionalProfile) => {
     const { draft: d, prefilled } = draftFrom(p);
@@ -241,6 +245,16 @@ export function WorkDetailsForm({
     load.prefilled &&
     d.first_name === (saved.suggested?.first_name ?? "") &&
     d.last_name === (saved.suggested?.last_name ?? "");
+  // A confirmed ORCID iD is locked; a manual review checked the name and institutions.
+  const orcidLocked = !!verification?.orcid_id_confirmed;
+  const reviewedChanged =
+    !!verification?.verified &&
+    verification.method === "institutional_email" &&
+    !!initial &&
+    (d.first_name.trim() !== initial.first_name.trim() ||
+      d.last_name.trim() !== initial.last_name.trim() ||
+      JSON.stringify(d.institutions) !== JSON.stringify(initial.institutions));
+  const endsCard = !!verification?.verified || !!myCard.card?.settings.visible;
 
   async function findMatches() {
     if (!canMatch) return;
@@ -294,6 +308,8 @@ export function WorkDetailsForm({
     try {
       const p = await unwrap(putProfessionalProfile({ body, meta: { quiet: true } }));
       await refresh();
+      // The card shows name and institutions; a reviewed name change ends the verification.
+      void myCard.reload();
       toast("Work details saved");
       announce("Work details saved.");
       if (variant === "welcome") {
@@ -323,6 +339,7 @@ export function WorkDetailsForm({
     try {
       await unwrap(deleteProfessionalProfile({ meta: { quiet: true } }));
       await refresh();
+      void myCard.reload();
       toast("Work details removed");
       announce("Work details removed.");
       await fetchProfile();
@@ -429,6 +446,7 @@ export function WorkDetailsForm({
         <span className="font-medium">ORCID iD</span>
         <Input
           value={d.orcid}
+          readOnly={orcidLocked}
           onChange={(e) => update({ orcid: e.target.value })}
           onBlur={() => {
             setOrcidTouched(true);
@@ -440,8 +458,13 @@ export function WorkDetailsForm({
           spellCheck={false}
           className="font-mono"
           aria-invalid={showOrcidError}
-          aria-describedby={showOrcidError ? `${ids}-orcid-err` : undefined}
+          aria-describedby={showOrcidError ? `${ids}-orcid-err` : orcidLocked ? `${ids}-orcid-lock` : undefined}
         />
+        {orcidLocked && (
+          <span id={`${ids}-orcid-lock`} className="block text-xs text-muted-foreground" data-testid="orcid-locked">
+            Confirmed with ORCID. Locked.
+          </span>
+        )}
         {showOrcidError && (
           <span id={`${ids}-orcid-err`} className="block text-xs text-destructive">
             Not a valid ORCID iD.
@@ -534,11 +557,23 @@ export function WorkDetailsForm({
           </Button>
         ) : (
           saved.updated_at && (
-            <Button variant="ghost" onClick={() => void remove()} disabled={busy !== null} data-testid="remove-work-details">
-              {busy === "remove" ? <Loader2 className="animate-spin" aria-hidden /> : <Trash2 aria-hidden />}
-              Remove
-            </Button>
+            <span className="flex flex-wrap items-center gap-x-2">
+              <Button variant="ghost" onClick={() => void remove()} disabled={busy !== null} data-testid="remove-work-details">
+                {busy === "remove" ? <Loader2 className="animate-spin" aria-hidden /> : <Trash2 aria-hidden />}
+                Remove
+              </Button>
+              {endsCard && (
+                <span className="text-xs text-muted-foreground" data-testid="remove-ends-card">
+                  Also ends your verification and card.
+                </span>
+              )}
+            </span>
           )
+        )}
+        {reviewedChanged && (
+          <span className="text-xs text-status-flag sm:order-last" data-testid="save-ends-verification">
+            Saving ends your verification.
+          </span>
         )}
         <Button
           className="sm:ml-auto"

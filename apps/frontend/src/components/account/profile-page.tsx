@@ -13,7 +13,7 @@ import { DataRights, GpcStatus } from "./privacy-choices";
 import { ProfileEditor } from "./profile-editor";
 import { SettingsSection } from "./settings-section";
 import { SessionLoading, SignInPrompt } from "./sign-in-prompt";
-import { WORK_DETAILS_NOTE, WorkDetailsForm } from "./work-details";
+import { WorkDetailsForm } from "./work-details";
 
 const SECTIONS = [
   { id: "health-profile", title: "Health profile" },
@@ -101,8 +101,11 @@ export function ProfilePage() {
           <FollowingSection />
         </Panel>
         {professional && (
-          <Panel id="your-work" title="Your work" description={WORK_DETAILS_NOTE}>
-            <WorkDetailsForm variant="profile" />
+          <Panel id="your-work" title="Your work" description={<WorkNote />}>
+            <div className="space-y-6">
+              <WorkDetailsForm variant="profile" />
+              <CardSection />
+            </div>
           </Panel>
         )}
         <Panel id="settings" title="Settings">

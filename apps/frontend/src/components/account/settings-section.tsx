@@ -49,6 +49,7 @@ export function SettingsSection({ user }: { user: SessionUser }) {
         {(role === "doctor" || role === "researcher") && (
           <p className="text-sm text-muted-foreground" data-testid="role-switch-note">
             Switching to {ROLE_COPY.patient.label} removes your work details.
+            {user.role_verified && " Any role change ends your verification and card."}
           </p>
         )}
         <RadioGroup
