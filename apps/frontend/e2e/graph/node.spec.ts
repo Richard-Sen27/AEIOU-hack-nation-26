@@ -7,12 +7,10 @@ const DRAVET = "/node/MONDO%3A0100135";
 const SCN2A_LATE = "/node/MONDO%3A9900005"; // has the contradicted seizure edge
 const SCN2A_EARLY = "/node/MONDO%3A9900003"; // counterexample + similar symptoms
 
-async function switchLens(page: Page, name: RegExp) {
-  await page.getByTestId("lens-switcher").click();
-  await page.getByRole("menuitemradio", { name }).click();
-  // Radio items keep the menu open; close it like a keyboard user would.
-  await page.keyboard.press("Escape");
-  await expect(page.getByRole("menuitemradio", { name })).toBeHidden();
+/** The lens follows the signed-in role from settings: sign in with that role and reload. */
+async function signInAs(page: Page, role: string, extra: Record<string, unknown> = {}) {
+  await mockApi(page, graphMocks({ ...extra, "GET /auth/session": signedInSession({ role }) }));
+  await page.reload();
 }
 
 test.describe("node view", () => {
@@ -33,17 +31,15 @@ test.describe("node view", () => {
     expect(errors()).toEqual([]);
   });
 
-  test("lens switch changes wording but not the nodes or edges", async ({ page }) => {
+  test("the role's lens changes wording but not the nodes or edges", async ({ page }) => {
     const roles: string[] = [];
-    await mockApi(
-      page,
-      graphMocks({
-        "GET /neighborhood/*": (req: { url: string }) => {
-          roles.push(new URL(req.url).searchParams.get("role") ?? "");
-          return (graphMocks()["GET /neighborhood/*"] as (r: { url: string }) => unknown)(req) as never;
-        },
-      }),
-    );
+    const neighborhood = {
+      "GET /neighborhood/*": (req: { url: string }) => {
+        roles.push(new URL(req.url).searchParams.get("role") ?? "");
+        return (graphMocks()["GET /neighborhood/*"] as (r: { url: string }) => unknown)(req) as never;
+      },
+    };
+    await mockApi(page, graphMocks(neighborhood));
     await page.goto(DRAVET);
     const counts = page.getByTestId("node-counts");
     await expect(counts).toContainText("connections");
@@ -53,14 +49,15 @@ test.describe("node view", () => {
     await page.getByRole("radio", { name: "List" }).click();
     const rowsBefore = await page.getByTestId("node-list-row").count();
 
-    await switchLens(page, /Researcher/);
+    await signInAs(page, "researcher", neighborhood);
+    await page.getByRole("radio", { name: "List" }).click();
     await expect(headings.filter({ hasText: "has_phenotype" })).toHaveCount(1);
     await expect(headings.filter({ hasText: "can cause" })).toHaveCount(0);
     await expect(counts).toHaveText(before!);
     await expect(page.getByTestId("node-list-row")).toHaveCount(rowsBefore);
     expect(roles).toContain("researcher");
 
-    await switchLens(page, /Doctor/);
+    await signInAs(page, "doctor", neighborhood);
     await expect(headings.filter({ hasText: "presents with" })).toHaveCount(1);
     await expect(counts).toHaveText(before!);
   });
@@ -243,7 +240,7 @@ test.describe("node view", () => {
       await page.waitForTimeout(400);
       await shot(page, `node-edge-${theme}-desktop`);
     }
-    await switchLens(page, /Researcher/);
+    await signInAs(page, "researcher");
     await page.goto(SCN2A_EARLY);
     await expect(page.getByTestId("node-graph").locator("canvas").first()).toBeVisible({ timeout: 30_000 });
     await page.waitForTimeout(800);

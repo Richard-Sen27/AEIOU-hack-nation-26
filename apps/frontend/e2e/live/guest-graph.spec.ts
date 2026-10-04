@@ -1,17 +1,11 @@
 /**
  * Live guest journey through the graph: landing → search → node → connection
- * → evidence → lens switch → Atlas (search, focus, filters, outline, tour) → clusters.
+ * → evidence → Atlas (search, focus, filters, outline, tour) → clusters.
  * Start the processes as described in live-helpers.ts, then `PORT=3106 pnpm test:e2e:live`.
  */
-import { expect, test, type Page } from "@playwright/test";
+import { expect, test } from "@playwright/test";
 
 import { IDS, shot, storageDump, trackProblems, trackUrls } from "./live-helpers";
-
-async function switchLens(page: Page, name: RegExp) {
-  await page.getByTestId("lens-switcher").click();
-  await page.getByRole("menuitemradio", { name }).click();
-  await page.keyboard.press("Escape");
-}
 
 test.describe("guest graph journey", () => {
   test("landing search opens the node, its connections and their evidence", async ({ page }) => {
@@ -56,28 +50,6 @@ test.describe("guest graph journey", () => {
     await expect(edge.getByTestId("contradiction-note")).toContainText(/contradict/);
     await expect(edge.getByTestId("evidence-list").locator('[data-polarity="contradicts"]')).toHaveCount(1);
     await shot(page, "guest-edge-contradiction");
-    expect(problems()).toEqual([]);
-  });
-
-  test("lens switch changes wording, never the node or edge set", async ({ page }) => {
-    const problems = trackProblems(page);
-    await page.goto(`/node/${encodeURIComponent(IDS.dee4)}`);
-    const counts = page.getByTestId("node-counts");
-    await expect(counts).toContainText("connections");
-    const before = await counts.textContent();
-    await page.getByRole("radio", { name: "List" }).click();
-    const rows = page.getByTestId("node-list-row");
-    await expect(rows.first()).toBeVisible();
-    const nRows = await rows.count();
-    const headingsBefore = await page.getByTestId("relation-heading").allTextContents();
-    await switchLens(page, /Researcher/);
-    await expect.poll(() => page.getByTestId("relation-heading").allTextContents()).not.toEqual(headingsBefore);
-    await expect(counts).toHaveText(before!);
-    await expect(rows).toHaveCount(nRows);
-    await switchLens(page, /Doctor/);
-    await expect(counts).toHaveText(before!);
-    await expect(rows).toHaveCount(nRows);
-    await switchLens(page, /Guest/);
     expect(problems()).toEqual([]);
   });
 

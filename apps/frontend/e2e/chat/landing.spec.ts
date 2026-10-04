@@ -122,8 +122,7 @@ test.describe("landing", () => {
     await mockApi(page, { "GET /auth/session": { ...guestSession, demo_mode: true } });
     await page.goto("/");
     await expect(page.getByTestId("demo-journey")).toBeVisible();
-    // Guests see the tour first.
-    await expect(page.getByTestId("entry-guest")).toContainText("Your view");
+    await expect(page.getByTestId("entry-guest")).toBeVisible();
     await page.getByTestId("entry-researcher").click();
     await expect(page).toHaveURL(/\/clusters$/);
     await page.goBack();

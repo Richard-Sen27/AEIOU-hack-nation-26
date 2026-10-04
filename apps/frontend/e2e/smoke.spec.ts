@@ -95,20 +95,34 @@ test.describe("shell", () => {
     await expect(dialog.getByRole("link", { name: "Privacy notice" })).toHaveAttribute("href", "/privacy");
   });
 
-  test("signed-in user sees the account menu and their lens", async ({ page }) => {
+  test("signed-in user sees the account menu with their role, and no lens switcher", async ({ page }) => {
     await mockApi(page, { "GET /auth/session": signedInSession({ role: "researcher" }) });
     await page.goto("/atlas");
-    await expect(page.getByTestId("user-menu")).toBeVisible();
-    await expect(page.getByTestId("lens-switcher")).toContainText("Researcher");
+    await page.getByTestId("user-menu").click();
+    await expect(page.getByRole("menu")).toContainText("Researcher");
+    await expect(page.getByTestId("lens-switcher")).toHaveCount(0);
+    await expect(page.getByTestId("privacy-menu")).toHaveCount(0);
+  });
+
+  test("a guest's old stored lens is ignored: guest wording and no errors", async ({ page }) => {
+    await page.addInitScript(() => window.localStorage.setItem("amber.lens", "researcher"));
+    await mockApi(page, { "GET /auth/session": guestSession, "GET /clusters": [] });
+    const errors = trackConsoleErrors(page);
+    await page.goto("/clusters");
+    await expect(page.getByRole("heading", { level: 1 })).toHaveText("Groups of related conditions");
+    await expect(page.getByTestId("lens-switcher")).toHaveCount(0);
+    expect(errors()).toEqual([]);
   });
 
   test("privacy and about this data stay reachable from the header without a footer", async ({ page }) => {
     await mockApi(page, { "GET /auth/session": guestSession });
-    await page.goto("/chat");
-    await page.getByTestId("lens-switcher").click();
-    await expect(page.getByRole("menuitem", { name: "Privacy" })).toHaveAttribute("href", "/privacy");
-    await expect(page.getByRole("menuitem", { name: "About this data" })).toHaveAttribute("href", "/about-data");
-    await page.keyboard.press("Escape");
+    for (const route of ["/chat", "/atlas"]) {
+      await page.goto(route);
+      await page.getByTestId("privacy-menu").click();
+      await expect(page.getByRole("menuitem", { name: "Privacy" })).toHaveAttribute("href", "/privacy");
+      await expect(page.getByRole("menuitem", { name: "About this data" })).toHaveAttribute("href", "/about-data");
+      await page.keyboard.press("Escape");
+    }
 
     await page.unrouteAll({ behavior: "ignoreErrors" });
     await mockApi(page, { "GET /auth/session": signedInSession({ role: "patient" }) });
@@ -169,6 +183,20 @@ test.describe("shell", () => {
       await shot(page, `sign-in-${theme}-desktop`);
     }
   });
+});
+
+test("privacy and about this data stay reachable from the phone menu for guests @mobile", async ({ page }) => {
+  await mockApi(page, { "GET /auth/session": guestSession });
+  for (const route of ["/chat", "/atlas"]) {
+    await page.goto(route);
+    await page.getByRole("button", { name: "Open menu" }).click();
+    const menu = page.getByRole("dialog", { name: "Menu" });
+    await expect(menu.getByRole("link", { name: "Privacy" })).toHaveAttribute("href", "/privacy");
+    await expect(menu.getByRole("link", { name: "About this data" })).toHaveAttribute("href", "/about-data");
+    await expect(menu.getByTestId("lens-switcher")).toHaveCount(0);
+  }
+  await page.getByRole("dialog", { name: "Menu" }).getByRole("link", { name: "About this data" }).click();
+  await expect(page).toHaveURL(/\/about-data$/);
 });
 
 test("mobile shell @mobile", async ({ page }) => {

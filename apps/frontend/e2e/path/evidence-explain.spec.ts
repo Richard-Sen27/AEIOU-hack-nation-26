@@ -1,6 +1,6 @@
 import { expect, test } from "@playwright/test";
 
-import { errorEnvelope, setTheme, sseBody, trackConsoleErrors } from "../helpers";
+import { errorEnvelope, setTheme, signedInSession, sseBody, trackConsoleErrors } from "../helpers";
 import { DEMO_URL, E, cachedExplanation, mockPathApi, pathShot } from "./fixtures";
 
 test.describe("/path: evidence", () => {
@@ -63,20 +63,19 @@ test.describe("/path: explanation", () => {
     expect(errors()).toEqual([]);
   });
 
-  test("re-fetches when the lens changes", async ({ page }) => {
+  test("asks for the explanation in the signed-in role's lens", async ({ page }) => {
     const roles: unknown[] = [];
-    await mockPathApi(page, {
+    const explain = {
       "POST /explain": (req: { body: unknown }) => {
         roles.push((req.body as { role: string }).role);
         return sseBody(cachedExplanation);
       },
-    });
+    };
+    await mockPathApi(page, explain);
     await page.goto(DEMO_URL);
     await expect(page.getByTestId("explanation-cached")).toBeVisible();
-    await page.evaluate(() => {
-      localStorage.setItem("amber.lens", "researcher");
-      window.dispatchEvent(new StorageEvent("storage", { key: "amber.lens" }));
-    });
+    await mockPathApi(page, { ...explain, "GET /auth/session": signedInSession({ role: "researcher" }) });
+    await page.reload();
     await expect.poll(() => roles).toContain("researcher");
     await expect(page.getByTestId("explanation")).toContainText("Researcher lens");
   });

@@ -1,6 +1,6 @@
 import { expect, test } from "@playwright/test";
 
-import { errorEnvelope, mockApi, setTheme, shot, trackConsoleErrors } from "../helpers";
+import { errorEnvelope, mockApi, setTheme, shot, signedInSession, trackConsoleErrors } from "../helpers";
 import { graphMocks } from "./fixtures";
 
 test.describe("clusters", () => {
@@ -25,13 +25,12 @@ test.describe("clusters", () => {
     expect(errors()).toEqual([]);
   });
 
-  test("wording follows the lens", async ({ page }) => {
+  test("wording follows the signed-in role", async ({ page }) => {
     await mockApi(page, graphMocks());
     await page.goto("/clusters");
     await expect(page.getByRole("heading", { level: 1 })).toHaveText("Groups of related conditions");
-    await page.getByTestId("lens-switcher").click();
-    await page.getByRole("menuitemradio", { name: /Researcher/ }).click();
-    await page.keyboard.press("Escape");
+    await mockApi(page, graphMocks({ "GET /auth/session": signedInSession({ role: "researcher" }) }));
+    await page.reload();
     await expect(page.getByRole("heading", { level: 1 })).toHaveText("Mechanism clusters");
     await expect(page.getByTestId("cluster-card").first()).toContainText("HGNC:");
   });

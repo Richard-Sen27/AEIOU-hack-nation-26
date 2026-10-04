@@ -338,20 +338,16 @@ test.describe("atlas", () => {
   });
 
   for (const c of [
-    { name: "a guest's Doctor lens", stored: "doctor", category: "symptoms" },
-    { name: "a guest's Patient lens", stored: "patient", category: "diseases" },
-    { name: "a signed-in doctor whose session arrives late", role: "doctor", category: "symptoms" },
+    { name: "a signed-in patient", role: "patient", category: "diseases" },
+    { name: "a signed-in doctor whose session arrives late", role: "doctor", delay: 800, category: "symptoms" },
   ]) {
     test(`after a reload, ${c.name} starts on its tree`, async ({ page }) => {
       await page.emulateMedia({ reducedMotion: "reduce" });
-      const session = c.role
-        ? async () => {
-            await new Promise((r) => setTimeout(r, 800));
-            return { json: { ...signedInSession({ role: c.role }), data_version: "fixture" } };
-          }
-        : undefined;
-      await mockApi(page, graphMocks(session ? { "GET /auth/session": session } : {}));
-      if (c.stored) await page.addInitScript((lens) => window.localStorage.setItem("amber.lens", lens), c.stored);
+      const session = async () => {
+        await new Promise((r) => setTimeout(r, c.delay ?? 0));
+        return { json: { ...signedInSession({ role: c.role }), data_version: "fixture" } };
+      };
+      await mockApi(page, graphMocks({ "GET /auth/session": session }));
       await page.goto("/atlas");
       await mapReady(page);
       // The camera frames the category's tree: the middle of its extent sits in the middle of the canvas.

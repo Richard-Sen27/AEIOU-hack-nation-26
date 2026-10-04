@@ -145,6 +145,28 @@ test("settings: role, language and expert mode save immediately", async ({ page 
   expect(patches).toEqual([{ role: "researcher" }, { language: "fr" }, { expert_mode: true }]);
 });
 
+test("settings: a role change sets the lens at once, without a reload", async ({ page }) => {
+  let role = "patient";
+  await mockApi(
+    page,
+    baseMocks({
+      "GET /auth/session": () => ({ json: signedInSession({ role, consents: ["health_data"] }) }),
+      "PATCH /me/settings": (req: { body: unknown }) => {
+        role = (req.body as { role: string }).role;
+        return { json: signedInSession({ role }).user };
+      },
+      "GET /clusters": [],
+    }),
+  );
+  await page.goto("/profile");
+  await page.evaluate(() => ((window as unknown as { __sameDocument: boolean }).__sameDocument = true));
+  await page.locator("#settings").getByRole("radio", { name: "Researcher" }).click();
+  await expect(page.getByText("Role saved")).toBeVisible();
+  await page.getByRole("banner").getByRole("link", { name: "Clusters" }).click();
+  await expect(page.getByRole("heading", { level: 1 })).toHaveText("Mechanism clusters");
+  expect(await page.evaluate(() => (window as unknown as { __sameDocument?: boolean }).__sameDocument)).toBe(true);
+});
+
 test("consents: state, history and one-click withdraw", async ({ page }) => {
   let revoked = "";
   let session = signedInSession({ consents: ["health_data"] });
