@@ -1,6 +1,8 @@
 """Wide scope, stage A, on the fixture: core diseases stay off the Atlas tree but are found by
 search, the summary panel and Dr. Wu's symptom matching; the term table loads at startup."""
 
+import math
+
 import pytest
 
 from backend.api.services import atlas_tree, phenotype_match
@@ -416,7 +418,7 @@ def test_diseases_trunk_follows_cluster_lineage():
         (n.id, n.parent_id) for n in plain.nodes if n.category == "symptoms"
     )
     assert len({n.id for n in tree.nodes}) == len(tree.nodes)
-    assert atlas_tree.LAYOUT_VERSION == 5
+    assert atlas_tree.LAYOUT_VERSION == 6
 
 
 def test_lone_cluster_not_kept_under_a_group_repeating_its_name():
@@ -450,3 +452,88 @@ def atlas_tree_ancestors(tree, node_id: str) -> list:
         node = by_id[node.parent_id]
         chain.append(node)
     return chain[::-1]
+
+
+def _lineage_store(seed: int = 5) -> graph_service.GraphStore:
+    """Synthetic: 26 clusters under an HPO lineage up to 5 levels deep (1-34 diseases each),
+    next to 9,000 symptoms, so the Diseases trunk gets a narrow sector as on the wide data."""
+    import random
+
+    rng = random.Random(seed)
+    systems = [(f"HP:00{i:05d}", f"System {i}") for i in range(1, 6)]
+    nodes = []
+    for c in range(26):
+        sys_id, sys_label = systems[0] if c < 16 else rng.choice(systems[1:])
+        chain = [{"id": sys_id, "label": sys_label}]
+        for level in range(rng.randint(0, 4)):
+            k = rng.randint(0, 2)
+            chain.append({"id": f"{chain[-1]['id']}.{k}", "label": f"group {level}.{k}"})
+        cid = f"CLUSTER:{c}"
+        nodes.append(
+            {
+                "id": cid,
+                "type": "cluster",
+                "label": f"Cluster {c} · G{c}",
+                "attrs": {"lineage": chain},
+            }
+        )
+        for i in range(rng.choice([1, 1, 2, 3, 5, 8, 15, 27, 34])):
+            nodes.append(
+                {
+                    "id": f"MONDO:{c:03d}{i:04d}",
+                    "type": "disease",
+                    "label": f"d {c} {i}",
+                    "attrs": {},
+                    "cluster_id": cid,
+                }
+            )
+    nodes += [
+        {"id": f"HP:9{i:06d}", "type": "phenotype", "label": f"s {i}", "attrs": {}}
+        for i in range(9000)
+    ]
+    for n in nodes:
+        n.update(x=0.0, y=0.0)
+    return graph_service.build_store(nodes=nodes, edges=[], ingestion={"data_version": "lin"})
+
+
+def _trunk_crossings(tree, category: str) -> int:
+    by_id = {n.id: n for n in tree.nodes}
+    segs = [
+        (n.id, p.id, (p.x, p.y, n.x, n.y))
+        for n in tree.nodes
+        if n.category == category and (p := by_id.get(n.parent_id)) and p.category == category
+    ]
+    return sum(
+        1
+        for i, (a1, a2, s1) in enumerate(segs)
+        for b1, b2, s2 in segs[i + 1 :]
+        if not {a1, a2} & {b1, b2} and atlas_tree._crosses(s1, s2)
+    )
+
+
+@pytest.mark.parametrize("seed", [5, 6, 7])
+def test_lineage_trunk_has_no_crossing_lines(seed):
+    store = _lineage_store(seed)
+    drafts = atlas_tree._build_drafts(store)
+    trunk = next(d for d in drafts if d.category == "diseases")
+    assert trunk.tidy
+    tree = atlas_tree.build_tree(store)
+    assert _trunk_crossings(tree, "diseases") == 0
+    pts = sorted((n.x, n.y) for n in tree.nodes)
+    closest = min(
+        math.hypot(x2 - x1, y2 - y1)
+        for i, (x1, y1) in enumerate(pts)
+        for x2, y2 in pts[i + 1 : i + 40]
+    )
+    assert closest >= atlas_tree.SPACING - 0.5
+    lo, hi = next((c.angle_end, c.angle_start) for c in tree.categories if c.id == "diseases")
+    for n in tree.nodes:  # every node of the trunk stays inside its sector
+        if n.category == "diseases" and n.kind != "category":
+            a = math.atan2(n.y, n.x)
+            a += 2 * math.pi * round(((lo + hi) / 2 - a) / (2 * math.pi))
+            assert lo - 1e-6 <= a <= hi + 1e-6
+
+
+def test_tree_without_lineage_is_not_tidy():
+    drafts = atlas_tree._build_drafts(fixture_store())
+    assert not any(d.tidy for d in drafts)

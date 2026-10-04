@@ -37,7 +37,7 @@ from backend.schemas.atlas import (
 from backend.schemas.enums import NodeType, Relation
 from backend.schemas.graph import Node
 
-LAYOUT_VERSION = 5  # 5: the Diseases trunk follows attrs.lineage of clusters
+LAYOUT_VERSION = 6  # 5: Diseases trunk from cluster lineage; 6: that trunk without crossings
 ROOT_ID = "T:root"
 MAX_LEAVES = 30
 
@@ -103,6 +103,7 @@ class _Draft:
     ordered: bool = False  # children keep their given order (ranges, years, chromosomes)
     count: int = 0  # entities in subtree, filled by _count
     need: float | None = None  # layout: estimated area of the subtree, see _need
+    tidy: bool = False  # layout: a lineage-built trunk, laid out by _Grower.grow_tidy
 
 
 def _sort_key(node: Node) -> tuple[str, str]:
@@ -1232,6 +1233,9 @@ def _build_drafts(store: graph.GraphStore) -> list[_Draft]:
         _split_leaves(d)
         _count(d)
         _order(d)
+        d.tidy = category == AtlasCategory.diseases and any(
+            c.basis == GroupBasis.hpo_class for c in d.children
+        )
         drafts.append(d)
     return drafts
 
@@ -1254,6 +1258,8 @@ UPRIGHT_BONUS = 1.0  # extra sector weight for categories pointing up or down
 LABEL_OFFSET = 120.0
 EDGE_MARGIN = math.radians(0.6)  # keep nodes this far off the sector edges
 MAX_TRIES_R = 300
+TIDY_LENGTHS = (160.0, 130.0, 110.0, 95.0, 85.0, 80.0)  # tidy trunks: length by level
+TIDY_CORRIDOR = 2 * SPACING  # tidy trunks: arc kept free for the lines to later stages
 
 
 def _h(key: str, salt: str = "") -> float:
@@ -1316,10 +1322,12 @@ def _sectors(drafts: list[_Draft]) -> list[tuple[float, float]]:
     return out
 
 
-def _fan(n: int) -> list[tuple[float, float]]:
-    """Leaf offsets (distance, angle) in front of a node: rows of arcs, staggered, inner first."""
+def _fan(n: int, half: float | None = None) -> list[tuple[float, float]]:
+    """Leaf offsets (distance, angle) in front of a node: rows of arcs, staggered, inner first.
+    `half` caps the half spread (tidy trunks fit a fan into its slice)."""
     pts: list[tuple[float, float]] = []
-    half = min(1.3, 0.35 + 0.07 * n)  # half spread grows with the number of leaves
+    default = min(1.3, 0.35 + 0.07 * n)  # half spread grows with the number of leaves
+    half = default if half is None else min(default, half)
     row = 0
     left = n
     while left:
@@ -1397,10 +1405,10 @@ class _Fan:
     r: float  # bounding disc radius
 
 
-def _fan_disc(n: int) -> _Fan | None:
+def _fan_disc(n: int, half: float | None = None) -> _Fan | None:
     if not n:
         return None
-    offsets = _fan(n)
+    offsets = _fan(n, half)
     us = [rho * math.cos(off) for rho, off in offsets]
     vs = [rho * math.sin(off) for rho, off in offsets]
     fu = (min(min(us), 0.0) + max(us)) / 2
@@ -1507,6 +1515,254 @@ class _Grower:
             for i in reversed(_middle_out(len(branches))):
                 stack.append((branches[i], *wedges[i], placed[i], depth + 1))
 
+    # --- lineage-built trunks: slices and stages, no crossing lines -----------------------
+
+    def grow_tidy(self, root: _Draft) -> None:
+        """A trunk built from a lineage, laid out so that no two parent-child lines cross,
+        thin near the hub and granular further out.
+
+        Every subtree owns a contiguous slice of its parent's slice and starts beyond its
+        parent, so subtrees never interleave. A node's branches are placed in stages along
+        the radius: a stage puts the smallest remaining branches at the sector's edges, on
+        either side of a corridor around the parent's direction, as many as fit at that
+        radius; the biggest branch (the limb that branches again) comes last with the full
+        slice, so the trunk stays thin near the hub and splits further out. The next stage
+        starts beyond everything the previous one grew, and its lines run through the
+        corridor. All branches of one stage sit at one radius, pushed out until the lines to
+        them cross nothing drawn before and pass no node (checked, not assumed). Leaf fans are
+        narrowed to fit their slice. `_pull_forks` skips the trunk."""
+        r0 = self.place(root, self.lo, self.hi, 0.0, 1)
+        self.segs: list[tuple[float, float, float, float]] = []
+        self.points: list[tuple[float, float]] = [(self.pos[root.id].x, self.pos[root.id].y)]
+        lo, hi = self.lo + INNER_MARGIN, self.hi - INNER_MARGIN
+        self._tidy_branches(root, lo, hi, r0, 2)
+
+    @staticmethod
+    def _tidy_width(d: _Draft) -> float:
+        """Arc a subtree prefers at its start: its default leaf fan, or its widest branch
+        plus clear space (its own branches can stack in stages inside its slice)."""
+        branches = [c for c in d.children if c.children]
+        leaves = sum(1 for c in d.children if not c.children)
+        own = 2 * SPACING + 1.2 * LEAF_SPACING * (math.sqrt(leaves) - 1) if leaves else 2 * SPACING
+        if not branches:
+            return own
+        widest = max(_Grower._tidy_width(c) for c in branches)
+        return max(own, widest if len(branches) == 1 else widest + SPACING)
+
+    def _tidy_branches(self, d: _Draft, lo: float, hi: float, r_d: float, depth: int) -> float:
+        """Place the branches of `d` (already placed at radius r_d) in stages inside [lo, hi];
+        returns the outermost radius the subtree reaches."""
+        p = self.pos[d.id]
+        mid = (lo + hi) / 2  # the parent's direction, unwrapped next to the slice
+        theta_p = mid + (math.atan2(p.y, p.x) - mid + math.pi) % (2 * math.pi) - math.pi
+        remaining = _arrange([c for c in d.children if c.children], d.ordered)
+        length = TIDY_LENGTHS[min(depth - 2, len(TIDY_LENGTHS) - 1)]
+        band = r_d + length * (0.85 + 0.3 * _h(d.id, "t"))
+        end = r_d
+        stage_no = 0
+        waited = 0
+        while remaining:
+            stage, slices = self._tidy_stage(remaining, lo, hi, band, theta_p, stage_no)
+            if not stage and waited < MAX_TRIES_R:  # no room beside the corridor here yet
+                band += SPACING
+                waited += 1
+                continue
+            if not stage:  # a slice too thin to ever hold a corridor: the rest side by side
+                stage = list(remaining)
+                remaining.clear()
+                share = (hi - lo) / len(stage)
+                slices = [(hi - (i + 1) * share, hi - i * share) for i in range(len(stage))]
+            waited = 0
+            # one radius for the stage: out until every line to it is clear
+            r = band
+            for _ in range(MAX_TRIES_R):
+                spots = [
+                    self._tidy_spot(c, a, b, r, theta_p, 0.5 if stage_no == 0 else 1.0)
+                    for c, (a, b) in zip(stage, slices, strict=True)
+                ]
+                if all(self._tidy_clear(p, x, y, leaves) for x, y, _t, leaves in spots):
+                    break
+                r += SPACING
+            stage_end = r
+            for c, (a, b), (x, y, _theta, leaves) in zip(stage, slices, spots, strict=True):
+                self.pos[c.id] = _Placed(x, y)
+                self.discs.add(x, y, SPACING / 2)
+                self.segs.append((p.x, p.y, x, y))
+                self.points.append((x, y))
+                kids = [k for k in c.children if not k.children]
+                for k, (lx, ly) in zip(kids, leaves, strict=True):
+                    self.pos[k.id] = _Placed(lx, ly)
+                    self.segs.append((x, y, lx, ly))
+                    self.points.append((lx, ly))
+                    stage_end = max(stage_end, math.hypot(lx, ly))
+                stage_end = max(stage_end, self._tidy_branches(c, a, b, r, depth + 1))
+            self.reach = max(self.reach, stage_end)
+            end = max(end, stage_end)
+            stage_no += 1
+            band = stage_end + 0.35 * length * (0.85 + 0.3 * _h(d.id, f"s{stage_no}"))
+        return end
+
+    def _tidy_stage(
+        self,
+        remaining: list[_Draft],
+        lo: float,
+        hi: float,
+        band: float,
+        theta_p: float,
+        stage_no: int = 0,
+    ) -> tuple[list[_Draft], list[tuple[float, float]]]:
+        """The next stage: all remaining branches when they fit side by side at `band`, else
+        the outermost ones that fit beside a corridor around the parent's direction (the lines
+        to later stages run through it). Takes them out of `remaining`; returns the stage in
+        angular order (high to low) with its slices."""
+        width = {c.id: self._tidy_width(c) for c in remaining}
+
+        def share(group: list[_Draft], a: float, b: float) -> list[tuple[float, float]]:
+            """Each its preferred arc, the rest by subtree size (as the other trunks)."""
+            base = [width[c.id] / band for c in group]
+            extra = (b - a) - sum(base)
+            if extra < 0:
+                angles = [(b - a) * x / sum(base) for x in base]
+            else:
+                need = [_need(c) ** WEDGE_EXPONENT for c in group]
+                angles = [x + extra * n / sum(need) for x, n in zip(base, need, strict=True)]
+            out, cursor = [], b
+            for w in angles:
+                out.append((cursor - w, cursor))
+                cursor -= w
+            return out
+
+        biggest = max(remaining, key=lambda c: (c.count, c.id))  # continues the limb: last
+        limb = any(k.children for k in biggest.children)  # it branches again further out
+        if len(remaining) == 1 or (not limb and sum(width.values()) <= (hi - lo) * band):
+            stage = list(remaining)
+            remaining.clear()
+            return stage, share(stage, lo, hi)
+        half = min(max(TIDY_CORRIDOR / band / 2, (hi - lo) / 8), (hi - lo) / 3)
+        tp = min(max(theta_p, lo + half), hi - half)
+        rooms = {"left": (hi - tp - half) * band, "right": (tp - half - lo) * band}
+        used = {"left": 0.0, "right": 0.0}
+        sides: dict[str, list[_Draft]] = {"left": [], "right": []}
+        for c in sorted((c for c in remaining if c is not biggest), key=lambda c: (c.count, c.id)):
+            # roomier side first; on a tie the sides alternate from stage to stage
+            prefer = ["left", "right"][stage_no % 2]
+            for side in sorted(sides, key=lambda k: (used[k] - rooms[k], k != prefer)):
+                if used[side] + width[c.id] <= rooms[side]:
+                    sides[side].append(c)
+                    used[side] += width[c.id]
+                    break
+        squeezed = None
+        if not sides["left"] and not sides["right"]:  # none fits: the smallest, squeezed
+            side = max(
+                sides, key=lambda k: (round(rooms[k], 6), k == ["left", "right"][stage_no % 2])
+            )
+            if rooms[side] < 2 * SPACING:  # no room beside a corridor yet: start further out
+                return [], []
+            sides[side].append(min(remaining, key=lambda c: (c.count, c.id)))
+            squeezed = side
+        taken = {c.id for group in sides.values() for c in group}
+        remaining[:] = [c for c in remaining if c.id not in taken]
+        left, right = sides["left"], sides["right"]  # smallest first: at the sector's edges
+        if squeezed == "left":
+            slices = [(tp + half, hi)]
+        elif squeezed == "right":
+            slices = [(lo, tp - half)]
+        else:
+            slices = share(left, tp + half, hi) if left else []
+            slices += share(right[::-1], lo, tp - half) if right else []
+        return left + right[::-1], slices
+
+    def _tidy_spot(
+        self, c: _Draft, a: float, b: float, r: float, theta_p: float, pull: float
+    ) -> tuple[float, float, float, list[tuple[float, float]]]:
+        """Node position in slice [a, b] at radius r, nearest the parent's direction (with a
+        little jitter), and its leaf fan narrowed to the slice."""
+        n = sum(1 for k in c.children if not k.children)
+        half_arc = max((b - a) * r / 2 - SPACING / 2, 0.0)
+        fan = None
+        if n:
+            half = 1.3
+            for _ in range(4):  # the fan's reach depends on its spread
+                fan = _fan_disc(n, half)
+                assert fan is not None
+                reach = max(rho for rho, _off in fan.offsets) + LEAF_SPACING / 2
+                half = math.asin(min(1.0, max(half_arc - LEAF_SPACING / 2, 1.0) / reach))
+            fan = _fan_disc(n, half)
+        lateral = (
+            max((rho * math.sin(abs(off)) for rho, off in fan.offsets), default=0.0) if fan else 0.0
+        )
+        margin = min((lateral + SPACING / 2) / r, (b - a) / 2)
+        a_lo, a_hi = a + margin, b - margin
+        # `pull` 1: towards the parent's direction (the last stage: short lines); below 0:
+        # towards the slice's outer side, leaving the corridor free for later stages
+        target = (a_lo + a_hi) / 2 + pull * (min(max(theta_p, a_lo), a_hi) - (a_lo + a_hi) / 2)
+        theta = target + (_h(c.id, "a") - 0.5) * 0.3 * (a_hi - a_lo)
+        theta = min(max(theta, a_lo), a_hi)
+        x, y = r * math.cos(theta), r * math.sin(theta)
+        leaves = (
+            [
+                (x + rho * math.cos(theta + off), y + rho * math.sin(theta + off))
+                for rho, off in fan.offsets
+            ]
+            if fan
+            else []
+        )
+        return x, y, theta, leaves
+
+    def _tidy_clear(
+        self, p: _Placed, x: float, y: float, leaves: list[tuple[float, float]]
+    ) -> bool:
+        """The line p -> (x, y) and the leaf lines cross no line drawn so far and pass no
+        node closer than SPACING / 2; the new nodes keep that distance from old lines."""
+        new = [(p.x, p.y, x, y)] + [(x, y, lx, ly) for lx, ly in leaves]
+        points = [(x, y), *leaves]
+        for seg in new:
+            for old in self.segs:
+                if _crosses(seg, old):
+                    return False
+            for q in self.points:
+                if _near_segment(seg, q):
+                    return False
+        for old in self.segs:
+            for q in points:
+                if _near_segment(old, q):
+                    return False
+        for q in points:
+            for o in self.points:
+                if (q[0] - o[0]) ** 2 + (q[1] - o[1]) ** 2 < SPACING**2:
+                    return False
+        return True
+
+
+Seg = tuple[float, float, float, float]
+
+
+def _crosses(a: Seg, b: Seg) -> bool:
+    """Proper crossing of two segments (touching at an end does not count)."""
+
+    def orient(px: float, py: float, qx: float, qy: float, rx: float, ry: float) -> float:
+        return (qx - px) * (ry - py) - (qy - py) * (rx - px)
+
+    ax, ay, bx, by = a
+    cx, cy, dx, dy = b
+    d1, d2 = orient(cx, cy, dx, dy, ax, ay), orient(cx, cy, dx, dy, bx, by)
+    d3, d4 = orient(ax, ay, bx, by, cx, cy), orient(ax, ay, bx, by, dx, dy)
+    return d1 * d2 < 0 and d3 * d4 < 0
+
+
+def _near_segment(seg: Seg, q: tuple[float, float]) -> bool:
+    """q lies within SPACING / 2 of the segment's inside (its own ends excluded)."""
+    ax, ay, bx, by = seg
+    vx, vy = bx - ax, by - ay
+    length2 = vx * vx + vy * vy
+    if length2 == 0:
+        return False
+    t = ((q[0] - ax) * vx + (q[1] - ay) * vy) / length2
+    if t <= 1e-6 or t >= 1 - 1e-6:
+        return False
+    dx, dy = ax + t * vx - q[0], ay + t * vy - q[1]
+    return dx * dx + dy * dy < (SPACING / 2) ** 2
+
 
 def _layout(
     drafts: list[_Draft],
@@ -1518,14 +1774,17 @@ def _layout(
     reach: dict[AtlasCategory, float] = {}
     for draft, (start, end) in zip(drafts, sectors, strict=True):
         grower = _Grower(discs, end, start, pos)
-        grower.grow(draft)
+        if draft.tidy:
+            grower.grow_tidy(draft)
+        else:
+            grower.grow(draft)
         assert draft.category is not None
         reach[draft.category] = grower.reach
-    _pull_forks(drafts, pos)
+    _pull_forks(drafts, pos, skip={i for d in drafts if d.tidy for i in _subtree_ids(d)})
     return pos, sectors, reach
 
 
-def _pull_forks(drafts: list[_Draft], pos: dict[str, _Placed]) -> None:
+def _pull_forks(drafts: list[_Draft], pos: dict[str, _Placed], skip: set[str]) -> None:
     """Move branching nodes (with their leaf fans) out towards their branch children, so a
     limb runs out and forks late instead of many long spokes leaving one point."""
     cell = SPACING
@@ -1557,7 +1816,7 @@ def _pull_forks(drafts: list[_Draft], pos: dict[str, _Placed]) -> None:
         stack.extend((c, node) for c in reversed(node.children))
     for node, parent in reversed(order):  # deepest first
         branches = [c for c in node.children if c.children]
-        if not branches:
+        if not branches or node.id in skip:  # tidy trunks: moving a fork would redraw lines
             continue
         group = [node.id] + [c.id for c in node.children if not c.children]
         moving = set(group)
