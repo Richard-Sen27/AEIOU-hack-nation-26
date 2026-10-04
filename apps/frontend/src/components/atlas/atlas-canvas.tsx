@@ -1,12 +1,15 @@
 "use client";
 
 /**
- * The Sigma.js (WebGL) map. Loaded with `next/dynamic({ ssr: false })` only.
+ * The Sigma.js (WebGL) Atlas: a logo hub with one tree per category.
+ * Loaded with `next/dynamic({ ssr: false })` only.
  *
- * Positions are precomputed by the pipeline and never re-laid out here.
- * React state stays outside: hover/selection/filters live in a ref and
- * Sigma's reducers read it, so a 3,000-node / 20,000-edge graph stays
- * smooth (one `refresh()` per change, no React re-render of the canvas).
+ * Positions come from `/atlas/tree.json` and are never re-laid out here.
+ * The graph holds every tree node and tree edge (`tree:<childId>`); real
+ * edges are added on demand (selection, chains, Dr. Wu's path) and hidden
+ * through the reducer afterwards instead of dropped, so showing and hiding a
+ * node's connections never rebuilds the graph. React state stays outside:
+ * Sigma's reducers read a ref, one `refresh()` per change.
  */
 import { MultiGraph } from "graphology";
 import { forwardRef, useEffect, useImperativeHandle, useLayoutEffect, useRef } from "react";
@@ -14,68 +17,181 @@ import Sigma from "sigma";
 import type { EdgeProgramType } from "sigma/rendering";
 import type { EdgeDisplayData, NodeDisplayData } from "sigma/types";
 
-import { ORIGIN_META, confidenceLevel } from "@/lib/graph/meta";
-import { nodeSize, type GraphTheme } from "@/lib/graph/style";
+import type { LabelStyle } from "@/lib/graph/meta";
+import { ORIGIN_META } from "@/lib/graph/meta";
+import type { GraphTheme } from "@/lib/graph/style";
 import type { EdgeFamily, NodeType } from "@/lib/graph/types";
 
-import { clusterColor, fallbackPosition, withAlpha, type AtlasIndex } from "./atlas-model";
+import { CATEGORY_META, categoryColor, categoryLabel } from "./atlas-categories";
+import { withAlpha } from "./atlas-model";
+import type { WuFound } from "./atlas-props";
 import { EdgeDashProgram, type DashKind } from "./edge-dash-program";
-
-export type ColorBy = "type" | "cluster";
+import { ancestorsOf, descendantIds, type AtlasCategory, type TreeIndex, type TreeNodeKind } from "./tree-model";
 
 export type AtlasCanvasHandle = {
   zoomIn: () => void;
   zoomOut: () => void;
+  /** Whole map. */
   reset: () => void;
+  /** Frame a node: an entity closely, a group or category with its subtree. */
   focusNode: (id: string) => void;
+  /** Frame the endpoints of real edges. */
   focusEdges: (ids: string[]) => void;
+  /** Frame a set of nodes. */
+  frameNodes: (ids: string[]) => void;
 };
 
 type Props = {
-  index: AtlasIndex;
+  index: TreeIndex;
   theme: GraphTheme;
-  colorBy: ColorBy;
-  visibleTypes: Set<NodeType>;
+  labelStyle: LabelStyle;
+  /** Edge families drawn when a node is clicked. */
   visibleFamilies: Set<EdgeFamily>;
   selectedId: string | null;
-  /** Edge ids to highlight as a path (`/atlas?path=`); unknown ids are ignored. */
-  pathEdgeIds?: string[];
+  /** Real edge ids drawn as a chain (`?path=`, a panel item's `via`, Dr. Wu's path). */
+  chainEdgeIds: string[];
+  /** Dr. Wu's finds: ringed on the map. */
+  found: WuFound | null;
+  /** Where the camera starts when nothing is focused: the whole map or one category. */
+  startCategory: AtlasCategory | null;
   onSelect: (id: string | null) => void;
-  onHover?: (id: string | null) => void;
   onError?: () => void;
   reducedMotion: boolean;
   labelledBy?: string;
-  describedBy?: string;
 };
 
 const DASH: Record<string, DashKind> = { solid: 0, dashed: 1, dotted: 2 };
+const LOGO_PX = 64;
+/** Camera ratio below which deeper groups are labelled too. */
+const DEEP_LABEL_RATIO = 0.45;
 
 type NodeAttrs = {
   x: number;
   y: number;
   size: number;
   label: string;
-  nodeType: NodeType;
-  cluster: string | null;
+  kind: TreeNodeKind;
+  depth: number;
+  category: AtlasCategory | null;
+  entityType: NodeType | null;
+  /** Label drawn to the left of the dot (left half of the map: labels point outward). */
+  left: boolean;
 };
 type EdgeAttrs = {
-  s: string;
-  t: string;
-  st: NodeType;
-  tt: NodeType;
   size: number;
   dash: DashKind;
-  family: EdgeFamily;
-  level: "high" | "medium" | "low";
+  /** Tree edge (parent → child) or a real edge. */
+  tree: boolean;
+  category: AtlasCategory | null;
+  /** Tree edge: depth of the child. */
+  depth: number;
+  family: EdgeFamily | null;
   flagged: boolean;
 };
 
+/** What is emphasised, derived from props once per change and read by the reducers. */
+type Emphasis = {
+  active: boolean;
+  keep: Set<string>;
+  labelled: Set<string>;
+  treeEdges: Set<string>;
+  real: Set<string>;
+  chain: Set<string>;
+  rings: Set<string>;
+};
+
+const EMPTY: Emphasis = {
+  active: false,
+  keep: new Set(),
+  labelled: new Set(),
+  treeEdges: new Set(),
+  real: new Set(),
+  chain: new Set(),
+  rings: new Set(),
+};
+
+function treePathEdges(index: TreeIndex, id: string, into: Set<string>, nodes?: Set<string>) {
+  let cur = index.nodes.get(id);
+  while (cur && cur.parent_id != null) {
+    into.add(`tree:${cur.id}`);
+    nodes?.add(cur.parent_id);
+    cur = index.nodes.get(cur.parent_id);
+  }
+}
+
+function computeEmphasis(p: Props): Emphasis {
+  const { index, selectedId, chainEdgeIds, found, visibleFamilies } = p;
+  const e: Emphasis = {
+    active: false,
+    keep: new Set(),
+    labelled: new Set(),
+    treeEdges: new Set(),
+    real: new Set(),
+    chain: new Set(),
+    rings: new Set(),
+  };
+  const sel = selectedId ? index.nodes.get(selectedId) : undefined;
+  if (sel && sel.kind !== "root") {
+    e.active = true;
+    e.keep.add(sel.id);
+    e.labelled.add(sel.id);
+    e.rings.add(sel.id);
+    treePathEdges(index, sel.id, e.treeEdges, e.keep);
+    for (const a of ancestorsOf(index, sel.id)) e.labelled.add(a.id);
+    if (sel.kind === "entity") {
+      const near: string[] = [];
+      for (const id of index.incident.get(sel.id) ?? []) {
+        const edge = index.edges.get(id);
+        if (!edge || !visibleFamilies.has(edge.family) || edge.source === edge.target) continue;
+        e.real.add(id);
+        const other = edge.source === sel.id ? edge.target : edge.source;
+        if (!e.keep.has(other)) near.push(other);
+        e.keep.add(other);
+      }
+      if (near.length <= 40) near.forEach((n) => e.labelled.add(n));
+    } else {
+      for (const d of descendantIds(index, sel.id)) {
+        e.keep.add(d);
+        e.treeEdges.add(`tree:${d}`);
+      }
+    }
+  }
+  const chainIds = [...chainEdgeIds, ...(found?.edgeIds ?? [])];
+  for (const id of chainIds) {
+    const edge = index.edges.get(id);
+    if (!edge) continue;
+    e.active = true;
+    e.real.add(id);
+    e.chain.add(id);
+    for (const n of [edge.source, edge.target]) {
+      e.keep.add(n);
+      e.labelled.add(n);
+    }
+  }
+  if (found && found.nodeIds.length > 0) {
+    e.active = true;
+    for (const id of found.nodeIds) {
+      if (!index.nodes.has(id)) continue;
+      e.keep.add(id);
+      e.rings.add(id);
+      if (found.nodeIds.length <= 40) e.labelled.add(id);
+      treePathEdges(index, id, e.treeEdges, e.keep);
+    }
+  }
+  return e;
+}
+
 export const AtlasCanvas = forwardRef<AtlasCanvasHandle, Props>(function AtlasCanvas(props, ref) {
   const container = useRef<HTMLDivElement>(null);
+  const overlay = useRef<HTMLCanvasElement>(null);
   const labelLayer = useRef<HTMLDivElement>(null);
+  const logo = useRef<HTMLButtonElement>(null);
   const sigmaRef = useRef<Sigma<NodeAttrs, EdgeAttrs> | null>(null);
+  const emphasis = useRef<Emphasis>(EMPTY);
+  const hoverPath = useRef<Set<string>>(new Set());
   const hovered = useRef<string | null>(null);
   const propsRef = useRef(props);
+  const frameRef = useRef<(ids: string[], close?: boolean) => void>(() => {});
   useLayoutEffect(() => {
     propsRef.current = props;
   });
@@ -95,21 +211,26 @@ export const AtlasCanvas = forwardRef<AtlasCanvasHandle, Props>(function AtlasCa
     },
     zoomOut: () => {
       const c = sigmaRef.current?.getCamera();
-      if (c) animate({ ratio: Math.min(c.getState().ratio * 1.6, 4) });
+      if (c) animate({ ratio: Math.min(c.getState().ratio * 1.6, 1.6) });
     },
     reset: () => animate({ x: 0.5, y: 0.5, ratio: 1 }),
-    focusEdges: (ids: string[]) => {
-      const sigma = sigmaRef.current;
-      if (!sigma) return;
-      const cam = frameEdges(sigma, ids.filter((id) => sigma.getGraph().hasEdge(id)));
-      if (cam) animate(cam);
-    },
     focusNode: (id: string) => {
-      const sigma = sigmaRef.current;
-      if (!sigma || !sigma.getGraph().hasNode(id)) return;
-      const d = sigma.getNodeDisplayData(id);
-      if (d) animate({ x: d.x, y: d.y, ratio: 0.3 });
+      const { index } = propsRef.current;
+      const n = index.nodes.get(id);
+      if (!n) return;
+      if (n.kind === "root") animate({ x: 0.5, y: 0.5, ratio: 1 });
+      else if (n.kind === "entity") frameRef.current([id], true);
+      else frameRef.current([id, ...descendantIds(index, id)]);
     },
+    focusEdges: (ids: string[]) => {
+      const { index } = propsRef.current;
+      const nodes = ids.flatMap((id) => {
+        const e = index.edges.get(id);
+        return e ? [e.source, e.target] : [];
+      });
+      frameRef.current(nodes);
+    },
+    frameNodes: (ids: string[]) => frameRef.current(ids, ids.length === 1),
   }));
 
   // Build the graph and the renderer once per payload.
@@ -118,55 +239,132 @@ export const AtlasCanvas = forwardRef<AtlasCanvasHandle, Props>(function AtlasCa
     if (!el) return;
     const { index } = propsRef.current;
     const graph = new MultiGraph<NodeAttrs, EdgeAttrs>();
+
+    // Largest subtree per category, for trunk thickness and group sizes.
+    const catMax = new Map<string, number>();
     for (const n of index.nodes.values()) {
-      const p = n.x != null && n.y != null ? { x: n.x, y: n.y } : fallbackPosition(n.id);
+      if (n.kind === "group" && n.category) catMax.set(n.category, Math.max(catMax.get(n.category) ?? 1, n.entity_count));
+    }
+    let maxCentrality = 0;
+    for (const n of index.nodes.values()) if (n.centrality != null) maxCentrality = Math.max(maxCentrality, n.centrality);
+
+    for (const n of index.tree.nodes) {
+      let size: number;
+      if (n.kind === "root") size = 4;
+      else if (n.kind === "category") size = 9;
+      else if (n.kind === "group") size = 3.5 + 4.5 * Math.sqrt(n.entity_count / (catMax.get(n.category ?? "") ?? 1));
+      else size = 2 + 3 * Math.sqrt((n.centrality ?? 0) / (maxCentrality || 1));
       graph.addNode(n.id, {
-        x: p.x,
-        y: p.y,
-        size: nodeSize(n.type, n.centrality, { min: 2.5, max: 11 }),
+        x: n.x,
+        y: n.y,
+        size,
         label: n.label,
-        nodeType: n.type,
-        cluster: n.cluster_id ?? null,
+        kind: n.kind,
+        depth: n.depth,
+        category: n.category,
+        entityType: n.entity_type,
+        left: Math.cos(n.angle) < -0.05,
       });
     }
-    for (const e of index.edges.values()) {
-      if (e.source === e.target) continue;
-      const level = confidenceLevel(e.confidence);
-      graph.addEdgeWithKey(e.id, e.source, e.target, {
-        s: e.source,
-        t: e.target,
-        st: index.nodes.get(e.source)!.type,
-        tt: index.nodes.get(e.target)!.type,
-        size: level === "high" ? 1.1 : level === "medium" ? 0.8 : 0.6,
-        dash: DASH[ORIGIN_META[e.origin]?.line ?? "solid"] ?? 0,
-        family: e.family,
-        level,
-        flagged: e.status !== "active",
+    for (const n of index.tree.nodes) {
+      if (n.parent_id == null || !graph.hasNode(n.parent_id)) continue;
+      const share = n.entity_count / (catMax.get(n.category ?? "") ?? n.entity_count);
+      const size = n.kind === "category" ? 2.4 : n.kind === "group" ? 0.7 + 1.5 * Math.sqrt(Math.min(1, share)) : 0.5;
+      graph.addEdgeWithKey(`tree:${n.id}`, n.parent_id, n.id, {
+        size,
+        dash: 0,
+        tree: true,
+        category: n.category,
+        depth: n.depth,
+        family: null,
+        flagged: false,
       });
     }
 
-    type Focus = { focus: string | null; near: Set<string> | null; path: Set<string> | null };
-    function focusSet(): Focus {
-      const { pathEdgeIds, index: idx, selectedId } = propsRef.current;
-      // A path (from `?path=`) wins over the selection's neighbourhood until the user hovers.
-      if (!hovered.current && pathEdgeIds && pathEdgeIds.length > 0) {
-        const path = new Set(pathEdgeIds.filter((id) => graph.hasEdge(id)));
-        if (path.size > 0) {
-          const near = new Set<string>();
-          path.forEach((id) => graph.extremities(id).forEach((n) => near.add(n)));
-          return { focus: selectedId && graph.hasNode(selectedId) ? selectedId : null, near, path };
-        }
+    const syncRealEdges = () => {
+      for (const id of emphasis.current.real) {
+        if (graph.hasEdge(id)) continue;
+        const e = index.edges.get(id);
+        if (!e || e.source === e.target || !graph.hasNode(e.source) || !graph.hasNode(e.target)) continue;
+        graph.addEdgeWithKey(id, e.source, e.target, {
+          size: 1,
+          dash: DASH[ORIGIN_META[e.origin]?.line ?? "solid"] ?? 0,
+          tree: false,
+          category: null,
+          depth: 0,
+          family: e.family,
+          flagged: e.status !== "active",
+        });
       }
-      const focus = hovered.current ?? selectedId;
-      if (!focus || !graph.hasNode(focus)) return { focus: null, near: null, path: null };
-      return { focus, near: idx.neighbors.get(focus) ?? new Set(), path: null };
-    }
-    let cache: { key: string; value: Focus } = { key: "", value: focusSet() };
-    const getFocus = () => {
-      const key = `${hovered.current}|${propsRef.current.selectedId}|${propsRef.current.pathEdgeIds?.join(",") ?? ""}`;
-      if (cache.key !== key) cache = { key, value: focusSet() };
-      return cache.value;
     };
+
+    // Category colours per theme, resolved once per theme object.
+    let colorTheme: GraphTheme | null = null;
+    const colors = new Map<string, { solid: string; group: string; edge: string; trunk: string; dim: string }>();
+    const palette = (category: AtlasCategory | null) => {
+      const t = propsRef.current.theme;
+      if (colorTheme !== t) {
+        colors.clear();
+        colorTheme = t;
+      }
+      const key = category ?? "";
+      let c = colors.get(key);
+      if (!c) {
+        const solid = category ? categoryColor(category, t) : t.muted;
+        c = {
+          solid,
+          group: withAlpha(solid, t.dark ? 0.85 : 0.8),
+          edge: withAlpha(solid, t.dark ? 0.3 : 0.26),
+          trunk: withAlpha(solid, t.dark ? 0.55 : 0.5),
+          dim: withAlpha(solid, 0.07),
+        };
+        colors.set(key, c);
+      }
+      return c;
+    };
+
+    const ratioNow = () => sigmaRef.current?.getCamera().getState().ratio ?? 1;
+
+    function reduceNode(node: string, data: NodeAttrs & NodeDisplayData): Partial<NodeDisplayData> {
+      const t = propsRef.current.theme;
+      const em = emphasis.current;
+      const res: Partial<NodeDisplayData> & { label?: string | null; left?: boolean } = { ...data };
+      if (data.kind === "root") return { ...res, color: "rgba(0,0,0,0)", label: null, zIndex: 0 };
+      const pal = palette(data.category);
+      res.color =
+        data.kind === "entity" && data.entityType ? (t.node[data.entityType] ?? pal.solid) : data.kind === "group" ? pal.group : pal.solid;
+      if (data.kind === "category") res.label = null;
+      const onHover = hoverPath.current.has(node);
+      if (em.active && !em.keep.has(node) && !onHover) {
+        res.color = withAlpha(t.muted, t.dark ? 0.16 : 0.13);
+        res.label = null;
+        res.zIndex = 0;
+        return res;
+      }
+      res.zIndex = em.active ? 2 : data.kind === "entity" ? 1 : 2;
+      if (em.labelled.has(node) || onHover) res.forceLabel = data.kind !== "category";
+      else if (!em.active && data.kind === "group") res.forceLabel = data.depth <= 2 || ratioNow() < DEEP_LABEL_RATIO;
+      if (node === propsRef.current.selectedId || node === hovered.current) res.highlighted = true;
+      return res;
+    }
+
+    function reduceEdge(edge: string, data: EdgeAttrs & EdgeDisplayData): Partial<EdgeDisplayData> {
+      const t = propsRef.current.theme;
+      const em = emphasis.current;
+      if (data.tree) {
+        const pal = palette(data.category);
+        const base = data.depth <= 2 ? pal.trunk : pal.edge;
+        if (em.treeEdges.has(edge) || hoverPath.current.has(edge)) {
+          return { ...data, color: withAlpha(pal.solid, 0.95), size: data.size * 1.6 + 0.6, zIndex: 3 };
+        }
+        if (em.active) return { ...data, color: pal.dim, zIndex: 0 };
+        return { ...data, color: base, zIndex: 0 };
+      }
+      if (!em.real.has(edge)) return { hidden: true };
+      const color = data.flagged ? t.statusFlag : data.family ? t.edge[data.family] : t.muted;
+      if (em.chain.has(edge)) return { ...data, color: withAlpha(color, 1), size: 3.2, zIndex: 5 };
+      return { ...data, color: withAlpha(color, 0.85), size: 1.4, zIndex: 4 };
+    }
 
     let sigma: Sigma<NodeAttrs, EdgeAttrs>;
     try {
@@ -175,34 +373,37 @@ export const AtlasCanvas = forwardRef<AtlasCanvasHandle, Props>(function AtlasCa
         defaultEdgeType: "dash",
         edgeProgramClasses: { dash: EdgeDashProgram as unknown as EdgeProgramType<NodeAttrs, EdgeAttrs> },
         renderEdgeLabels: false,
-        hideEdgesOnMove: graph.size > 4000,
         labelFont: font,
         labelSize: 12,
         labelWeight: "500",
         labelColor: { color: propsRef.current.theme.label },
-        labelRenderedSizeThreshold: 7,
-        labelDensity: 0.6,
-        labelGridCellSize: 110,
+        labelRenderedSizeThreshold: 6,
+        labelDensity: 0.5,
+        labelGridCellSize: 120,
         zIndex: true,
-        minCameraRatio: 0.02,
-        maxCameraRatio: 4,
-        stagePadding: 24,
+        minCameraRatio: 0.008,
+        maxCameraRatio: 1.6,
+        stagePadding: 16,
         defaultDrawNodeLabel: (ctx, data, settings) => {
           if (!data.label) return;
           const t = propsRef.current.theme;
-          ctx.font = `${settings.labelWeight} ${settings.labelSize}px ${settings.labelFont}`;
-          const x = data.x + data.size + 4;
+          const group = (data as unknown as NodeAttrs).kind === "group";
+          const left = (data as unknown as NodeAttrs).left;
+          ctx.font = `${group ? 600 : settings.labelWeight} ${group ? 11.5 : settings.labelSize}px ${settings.labelFont}`;
+          const w = ctx.measureText(data.label).width;
+          const x = left ? data.x - data.size - 4 - w : data.x + data.size + 4;
           const y = data.y + settings.labelSize / 3;
           ctx.lineJoin = "round";
           ctx.lineWidth = 3;
-          ctx.strokeStyle = withAlpha(t.background, 0.85);
+          ctx.strokeStyle = withAlpha(t.background, 0.88);
           ctx.strokeText(data.label, x, y);
-          ctx.fillStyle = t.label;
+          ctx.fillStyle = group ? withAlpha(t.label, 0.78) : t.label;
           ctx.fillText(data.label, x, y);
         },
         defaultDrawNodeHover: (ctx, data, settings) => {
           const t = propsRef.current.theme;
           const size = settings.labelSize;
+          const left = (data as unknown as NodeAttrs).left;
           ctx.font = `600 ${size}px ${settings.labelFont}`;
           ctx.beginPath();
           ctx.arc(data.x, data.y, data.size + 3, 0, Math.PI * 2);
@@ -211,7 +412,7 @@ export const AtlasCanvas = forwardRef<AtlasCanvasHandle, Props>(function AtlasCa
           ctx.stroke();
           if (typeof data.label !== "string" || !data.label) return;
           const w = ctx.measureText(data.label).width;
-          const x = data.x + data.size + 7;
+          const x = left ? data.x - data.size - 7 - w : data.x + data.size + 7;
           const h = size + 8;
           ctx.fillStyle = t.dark ? "#1f2725" : "#ffffff";
           ctx.strokeStyle = t.border;
@@ -231,144 +432,226 @@ export const AtlasCanvas = forwardRef<AtlasCanvasHandle, Props>(function AtlasCa
       return;
     }
     sigmaRef.current = sigma;
-    const initialPath = (propsRef.current.pathEdgeIds ?? []).filter((id) => graph.hasEdge(id));
-    const initial = propsRef.current.selectedId;
-    if (initialPath.length > 0) {
-      const cam = frameEdges(sigma, initialPath);
-      if (cam) sigma.getCamera().setState(cam);
-    } else if (initial && graph.hasNode(initial)) {
-      const d = sigma.getNodeDisplayData(initial);
-      if (d) sigma.getCamera().setState({ x: d.x, y: d.y, ratio: 0.3 });
+
+    // Frame the tree and the category labels, not just the nodes.
+    {
+      let minX = Infinity, minY = Infinity, maxX = -Infinity, maxY = -Infinity;
+      const add = (x: number, y: number) => {
+        minX = Math.min(minX, x);
+        maxX = Math.max(maxX, x);
+        minY = Math.min(minY, y);
+        maxY = Math.max(maxY, y);
+      };
+      graph.forEachNode((_, a) => add(a.x, a.y));
+      for (const c of index.categories.values()) add(c.label_x, c.label_y);
+      const pad = Math.max(maxX - minX, maxY - minY) * 0.06;
+      // Square and centred on the hub so the logo sits in the middle of the map.
+      const half = Math.max(Math.abs(minX), Math.abs(maxX), Math.abs(minY), Math.abs(maxY)) + pad;
+      if (Number.isFinite(half)) sigma.setCustomBBox({ x: [-half, half], y: [-half, half] });
     }
 
-    function nodeColor(attrs: NodeAttrs) {
-      const { theme, colorBy, index: idx } = propsRef.current;
-      if (colorBy === "cluster" && attrs.nodeType !== "cluster") {
-        const c = attrs.cluster ? idx.clusters.get(attrs.cluster) : undefined;
-        return c ? clusterColor(c.order, theme.dark) : withAlpha(theme.muted, 0.7);
+    const frame = (ids: string[], close = false) => {
+      let minX = Infinity, minY = Infinity, maxX = -Infinity, maxY = -Infinity;
+      for (const id of ids) {
+        if (!graph.hasNode(id)) continue;
+        const d = sigma.getNodeDisplayData(id);
+        if (!d) continue;
+        minX = Math.min(minX, d.x);
+        maxX = Math.max(maxX, d.x);
+        minY = Math.min(minY, d.y);
+        maxY = Math.max(maxY, d.y);
       }
-      return theme.node[attrs.nodeType] ?? theme.muted;
+      if (!Number.isFinite(minX)) return;
+      const extent = Math.max(maxX - minX, maxY - minY);
+      const ratio = close && extent === 0 ? 0.06 : Math.min(1, Math.max(0.05, extent * 1.35));
+      animate({ x: (minX + maxX) / 2, y: (minY + maxY) / 2, ratio });
+    };
+    frameRef.current = frame;
+
+    emphasis.current = computeEmphasis(propsRef.current);
+    syncRealEdges();
+    sigma.refresh();
+
+    // Initial camera: `?path=`, then `?focus=`, then the lens's category.
+    {
+      const p = propsRef.current;
+      const set = (fn: () => void) => {
+        const motion = p.reducedMotion;
+        propsRef.current = { ...p, reducedMotion: true };
+        fn();
+        propsRef.current = { ...propsRef.current, reducedMotion: motion };
+      };
+      const chainNodes = p.chainEdgeIds.flatMap((id) => {
+        const e = index.edges.get(id);
+        return e ? [e.source, e.target] : [];
+      });
+      const sel = p.selectedId ? index.nodes.get(p.selectedId) : undefined;
+      if (chainNodes.length > 0) set(() => frame(chainNodes));
+      else if (sel && sel.kind === "entity") set(() => frame([sel.id], true));
+      else if (sel && sel.kind !== "root") set(() => frame([sel.id, ...descendantIds(index, sel.id)]));
+      else if (p.startCategory) {
+        const node = index.categories.get(p.startCategory)?.node_id;
+        if (node) set(() => frame([node, ...descendantIds(index, node)]));
+      }
     }
 
-    function reduceNode(node: string, data: NodeAttrs & NodeDisplayData): Partial<NodeDisplayData> {
-      const { visibleTypes, theme, selectedId } = propsRef.current;
-      const res: Partial<NodeDisplayData> & { label?: string | null } = { ...data, color: nodeColor(data) };
-      if (!visibleTypes.has(data.nodeType)) return { ...res, hidden: true };
-      const { focus, near, path } = getFocus();
-      if (focus || path) {
-        if (node === focus || near?.has(node)) {
-          res.zIndex = node === focus ? 2 : 1;
-          res.forceLabel = node === focus || !!path || (near?.size ?? 0) <= 40;
-          if (node === selectedId || node === focus) res.highlighted = true;
-        } else {
-          res.color = theme.border;
-          res.size = data.size * 0.6;
-          res.label = null;
-          res.zIndex = 0;
-        }
+    // Hover: emphasise the ancestor path only (partial refresh, no re-index).
+    const setHover = (node: string | null) => {
+      const prev = hoverPath.current;
+      const next = new Set<string>();
+      if (node && index.nodes.get(node)?.kind !== "root") {
+        next.add(node);
+        treePathEdges(index, node, next, next);
       }
-      return res;
-    }
-
-    function reduceEdge(_edge: string, data: EdgeAttrs & EdgeDisplayData): Partial<EdgeDisplayData> {
-      const { visibleFamilies, visibleTypes, theme } = propsRef.current;
-      if (!visibleFamilies.has(data.family)) return { hidden: true };
-      const { s, t } = data;
-      if (!visibleTypes.has(data.st) || !visibleTypes.has(data.tt)) return { hidden: true };
-      const { focus, path } = getFocus();
-      const base = data.flagged ? theme.statusFlag : theme.edge[data.family];
-      if (path) {
-        if (!path.has(_edge)) return { hidden: true };
-        return { ...data, color: withAlpha(base, 1), size: data.size * 3.2, zIndex: 2 };
-      }
-      if (focus) {
-        if (s !== focus && t !== focus) return { hidden: true };
-        return {
-          ...data,
-          color: withAlpha(base, data.level === "low" ? 0.6 : 0.95),
-          size: data.size * 2.2,
-          zIndex: 1,
-        };
-      }
-      const alpha = data.level === "high" ? 0.55 : data.level === "medium" ? 0.42 : 0.3;
-      return { ...data, color: withAlpha(base, data.flagged ? Math.max(alpha, 0.6) : alpha) };
-    }
-
-    sigma.on("enterNode", ({ node }) => {
       hovered.current = node;
+      hoverPath.current = next;
+      const nodes: string[] = [];
+      const edges: string[] = [];
+      for (const k of new Set([...prev, ...next])) {
+        if (k.startsWith("tree:")) {
+          if (graph.hasEdge(k)) edges.push(k);
+        } else if (graph.hasNode(k)) nodes.push(k);
+      }
+      sigma.refresh({ partialGraph: { nodes, edges }, skipIndexation: true });
+    };
+    sigma.on("enterNode", ({ node }) => {
+      if (index.nodes.get(node)?.kind === "root") return;
       el.style.cursor = "pointer";
-      propsRef.current.onHover?.(node);
-      sigma.refresh({ skipIndexation: true });
+      setHover(node);
     });
     sigma.on("leaveNode", () => {
-      hovered.current = null;
       el.style.cursor = "";
-      propsRef.current.onHover?.(null);
-      sigma.refresh({ skipIndexation: true });
+      setHover(null);
     });
-    sigma.on("clickNode", ({ node }) => propsRef.current.onSelect(node));
+    sigma.on("clickNode", ({ node }) => {
+      if (index.nodes.get(node)?.kind === "root") {
+        propsRef.current.onSelect(null);
+        animate({ x: 0.5, y: 0.5, ratio: 1 });
+        return;
+      }
+      propsRef.current.onSelect(node);
+    });
     sigma.on("clickStage", () => propsRef.current.onSelect(null));
 
-    // Cluster names at low zoom, as an HTML layer (crisp text, theme-aware).
+    // Deeper group labels appear when zooming in: refresh when crossing the threshold.
+    let deep = ratioNow() < DEEP_LABEL_RATIO;
+    sigma.getCamera().on("updated", ({ ratio }) => {
+      const next = ratio < DEEP_LABEL_RATIO;
+      if (next !== deep) {
+        deep = next;
+        sigma.refresh({ schedule: true });
+      }
+    });
+
+    // Category labels (HTML, rotated along the outer edge) and the logo on the hub.
     const layer = labelLayer.current;
     const labelEls = new Map<string, HTMLDivElement>();
     if (layer) {
       layer.replaceChildren();
-      for (const c of [...index.clusters.values()].sort((a, b) => b.members - a.members)) {
-        if (c.members === 0) continue;
+      for (const c of index.categories.values()) {
         const d = document.createElement("div");
         d.className =
-          "absolute max-w-[220px] -translate-x-1/2 -translate-y-1/2 rounded-md border bg-background/80 px-2 py-0.5 text-center text-[11px] leading-tight font-medium text-foreground shadow-xs backdrop-blur-sm transition-opacity";
-        d.textContent = c.label;
-        d.dataset.cluster = c.id;
+          "absolute top-0 left-0 whitespace-nowrap font-heading text-[13px] font-semibold tracking-[0.08em] uppercase sm:text-sm";
+        d.style.color = `color-mix(in oklab, var(${CATEGORY_META[c.id].colorVar}) 80%, var(--foreground))`;
+        d.style.textShadow = "0 0 3px var(--background), 0 0 6px var(--background)";
+        d.dataset.testid = "atlas-category-label";
+        d.setAttribute("data-testid", "atlas-category-label");
+        d.dataset.category = c.id;
         layer.appendChild(d);
         labelEls.set(c.id, d);
       }
     }
-    const placeLabels = () => {
-      const { colorBy, index: idx } = propsRef.current;
-      const ratio = sigma.getCamera().getState().ratio;
-      const show = ratio > 0.35 && !hovered.current;
+    const placeOverlays = () => {
+      const { labelStyle } = propsRef.current;
+      const origin = sigma.graphToViewport({ x: 0, y: 0 });
+      for (const c of index.categories.values()) {
+        const d = labelEls.get(c.id);
+        if (!d) continue;
+        const text = categoryLabel(c.id, labelStyle);
+        if (d.textContent !== text) d.textContent = text;
+        const mid = (c.angle_start + c.angle_end) / 2;
+        const p = sigma.graphToViewport({ x: c.label_x, y: c.label_y });
+        const dir = sigma.graphToViewport({ x: Math.cos(mid) * 100, y: Math.sin(mid) * 100 });
+        // Text runs along the tangent of the outer edge; flipped where it would read upside down.
+        let rot = (Math.atan2(dir.y - origin.y, dir.x - origin.x) * 180) / Math.PI + 90;
+        rot = ((rot + 540) % 360) - 180;
+        if (rot > 90) rot -= 180;
+        else if (rot < -90) rot += 180;
+        d.style.transform = `translate(${p.x}px, ${p.y}px) translate(-50%, -50%) rotate(${rot.toFixed(1)}deg)`;
+      }
+      const btn = logo.current;
+      if (btn) {
+        const px = Math.round(Math.min(120, Math.max(48, LOGO_PX / Math.sqrt(sigma.getCamera().getState().ratio))));
+        btn.style.width = btn.style.height = `${px}px`;
+        btn.style.transform = `translate(${origin.x}px, ${origin.y}px) translate(-50%, -50%)`;
+      }
+      drawRings();
+    };
+
+    // Rings around the selection and Dr. Wu's finds (2D overlay, few items).
+    const drawRings = () => {
+      const cvs = overlay.current;
+      if (!cvs) return;
+      const dpr = window.devicePixelRatio || 1;
       const w = el.clientWidth;
       const h = el.clientHeight;
-      const placed: DOMRect[] = [];
-      for (const [id, d] of labelEls) {
-        const c = idx.clusters.get(id);
-        if (!c) continue;
-        const p = sigma.graphToViewport({ x: c.x, y: c.y });
-        const inView = p.x > -50 && p.y > -20 && p.x < w + 50 && p.y < h + 20;
-        d.style.left = `${p.x}px`;
-        d.style.top = `${p.y}px`;
-        let visible = show && inView;
-        if (visible) {
-          const bw = d.offsetWidth;
-          const bh = d.offsetHeight;
-          const r = new DOMRect(p.x - bw / 2, p.y - bh / 2, bw, bh);
-          if (placed.some((o) => r.left < o.right && r.right > o.left && r.top < o.bottom && r.bottom > o.top)) visible = false;
-          else placed.push(r);
+      if (cvs.width !== Math.round(w * dpr) || cvs.height !== Math.round(h * dpr)) {
+        cvs.width = Math.round(w * dpr);
+        cvs.height = Math.round(h * dpr);
+        cvs.style.width = `${w}px`;
+        cvs.style.height = `${h}px`;
+      }
+      const ctx = cvs.getContext("2d");
+      if (!ctx) return;
+      ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+      ctx.clearRect(0, 0, w, h);
+      const { theme: t, found, selectedId } = propsRef.current;
+      const foundSet = new Set(found?.nodeIds ?? []);
+      for (const id of emphasis.current.rings) {
+        if (!graph.hasNode(id)) continue;
+        const a = graph.getNodeAttributes(id);
+        const d = sigma.getNodeDisplayData(id);
+        if (!d) continue;
+        const p = sigma.graphToViewport({ x: a.x, y: a.y });
+        if (p.x < -20 || p.y < -20 || p.x > w + 20 || p.y > h + 20) continue;
+        const r = sigma.scaleSize(d.size) + 5;
+        ctx.beginPath();
+        ctx.arc(p.x, p.y, r, 0, Math.PI * 2);
+        ctx.lineWidth = id === selectedId ? 2.5 : 2;
+        ctx.strokeStyle = foundSet.has(id) && id !== selectedId ? t.statusFlag : t.highlight;
+        ctx.stroke();
+        if (foundSet.has(id)) {
+          ctx.beginPath();
+          ctx.arc(p.x, p.y, r + 4, 0, Math.PI * 2);
+          ctx.lineWidth = 1;
+          ctx.strokeStyle = withAlpha(t.statusFlag.startsWith("#") ? t.statusFlag : t.highlight, 0.45);
+          ctx.stroke();
         }
-        d.style.opacity = visible ? "1" : "0";
-        d.style.borderLeft =
-          colorBy === "cluster" ? `3px solid ${clusterColor(c.order, propsRef.current.theme.dark)}` : "";
       }
     };
-    sigma.on("afterRender", placeLabels);
-    placeLabels();
+    sigma.on("afterRender", placeOverlays);
+    placeOverlays();
+    restyle.current = () => {
+      emphasis.current = computeEmphasis(propsRef.current);
+      syncRealEdges();
+      sigma.setSetting("labelColor", { color: propsRef.current.theme.label });
+      sigma.refresh();
+    };
 
     return () => {
+      restyle.current = null;
       sigma.kill();
       sigmaRef.current = null;
       layer?.replaceChildren();
     };
   }, [props.index]);
 
-  // Re-style on any visual input change.
+  const restyle = useRef<(() => void) | null>(null);
+
+  // Re-style on any visual input change (one refresh; real edges added, never rebuilt).
   useEffect(() => {
-    const sigma = sigmaRef.current;
-    if (!sigma) return;
-    sigma.setSetting("labelColor", { color: props.theme.label });
-    sigma.refresh();
-  }, [props.theme, props.colorBy, props.visibleTypes, props.visibleFamilies, props.selectedId, props.pathEdgeIds]);
+    restyle.current?.();
+  }, [props.theme, props.labelStyle, props.visibleFamilies, props.selectedId, props.chainEdgeIds, props.found]);
 
   const onKeyDown = (e: React.KeyboardEvent) => {
     const sigma = sigmaRef.current;
@@ -383,7 +666,7 @@ export const AtlasCanvas = forwardRef<AtlasCanvasHandle, Props>(function AtlasCa
       ArrowDown: { y: s.y - step },
       "+": { ratio: s.ratio / 1.4 },
       "=": { ratio: s.ratio / 1.4 },
-      "-": { ratio: Math.min(s.ratio * 1.4, 4) },
+      "-": { ratio: Math.min(s.ratio * 1.4, 1.6) },
       "0": { x: 0.5, y: 0.5, ratio: 1 },
     };
     if (move[e.key]) {
@@ -403,32 +686,28 @@ export const AtlasCanvas = forwardRef<AtlasCanvasHandle, Props>(function AtlasCa
         role="img"
         aria-roledescription="interactive map"
         aria-labelledby={props.labelledBy}
-        aria-describedby={props.describedBy}
         onKeyDown={onKeyDown}
         data-testid="atlas-canvas"
       />
-      <div ref={labelLayer} className="pointer-events-none absolute inset-0" aria-hidden data-testid="atlas-cluster-labels" />
+      <canvas ref={overlay} className="pointer-events-none absolute inset-0" aria-hidden />
+      <div ref={labelLayer} className="pointer-events-none absolute inset-0" aria-hidden />
+      <button
+        ref={logo}
+        type="button"
+        onClick={() => {
+          props.onSelect(null);
+          animate({ x: 0.5, y: 0.5, ratio: 1 });
+        }}
+        aria-label="Show the whole map"
+        title="Show the whole map"
+        className="absolute top-0 left-0 flex size-16 items-center justify-center rounded-full border bg-card p-[12%] shadow-md outline-none hover:ring-2 hover:ring-primary/40 focus-visible:ring-2 focus-visible:ring-ring"
+        data-testid="atlas-logo"
+      >
+        {/* eslint-disable-next-line @next/next/no-img-element -- scaled every frame with the camera */}
+        <img src="/amber-logo-128.png" alt="" className="size-full object-contain" draggable={false} />
+      </button>
     </div>
   );
 });
 
 export default AtlasCanvas;
-
-/** Camera state that frames the endpoints of the given edges. */
-function frameEdges(sigma: Sigma<NodeAttrs, EdgeAttrs>, edgeIds: string[]) {
-  const graph = sigma.getGraph();
-  let minX = Infinity, minY = Infinity, maxX = -Infinity, maxY = -Infinity;
-  for (const id of edgeIds) {
-    for (const n of graph.extremities(id)) {
-      const d = sigma.getNodeDisplayData(n);
-      if (!d) continue;
-      minX = Math.min(minX, d.x);
-      maxX = Math.max(maxX, d.x);
-      minY = Math.min(minY, d.y);
-      maxY = Math.max(maxY, d.y);
-    }
-  }
-  if (!Number.isFinite(minX)) return null;
-  const ratio = Math.min(1, Math.max(0.12, Math.max(maxX - minX, maxY - minY) * 1.6));
-  return { x: (minX + maxX) / 2, y: (minY + maxY) / 2, ratio };
-}

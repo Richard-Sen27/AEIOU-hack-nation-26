@@ -4,7 +4,9 @@
  * No React, no Sigma, so it is cheap to test and safe on the server.
  */
 import type { Schemas } from "@/lib/api";
-import { EDGE_FAMILIES, NODE_TYPES, type EdgeFamily, type NodeType } from "@/lib/graph/types";
+import { EDGE_FAMILIES, NODE_TYPES, type EdgeFamily, type NodeType, type Role } from "@/lib/graph/types";
+
+import type { AtlasCategory, TreeIndex } from "./tree-model";
 
 export type AtlasPayload = Schemas.AtlasLayout;
 export type AtlasNode = Schemas.AtlasNode;
@@ -154,4 +156,27 @@ export function searchAtlas(index: AtlasIndex, q: string, limit = 8): AtlasNode[
   }
   const byCentrality = (a: AtlasNode, b: AtlasNode) => (b.centrality ?? 0) - (a.centrality ?? 0);
   return [...starts.sort(byCentrality), ...contains.sort(byCentrality)].slice(0, limit);
+}
+
+/** Edge families and node types present in the tree, with counts (Filters popover and Key). */
+export function treeFacets(index: TreeIndex) {
+  const familyCounts = new Map<EdgeFamily, number>();
+  for (const e of index.edges.values()) familyCounts.set(e.family, (familyCounts.get(e.family) ?? 0) + 1);
+  const typeCounts = new Map<NodeType, number>();
+  for (const n of index.nodes.values()) {
+    if (n.kind === "entity" && n.entity_type) typeCounts.set(n.entity_type, (typeCounts.get(n.entity_type) ?? 0) + 1);
+  }
+  return {
+    familyCounts,
+    typeCounts,
+    presentFamilies: EDGE_FAMILIES.filter((f) => familyCounts.has(f)),
+    presentTypes: NODE_TYPES.filter((t) => typeCounts.has(t)),
+  };
+}
+
+/** Where the camera starts per lens: guests see the whole map. */
+export function lensStartCategory(role: Role): AtlasCategory | null {
+  if (role === "patient" || role === "researcher") return "diseases";
+  if (role === "doctor") return "symptoms";
+  return null;
 }
