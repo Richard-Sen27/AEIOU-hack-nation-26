@@ -102,18 +102,18 @@ export const CLIPS = {
 // Every scene's length is derived from this table. While a value is null the
 // scene uses an estimate of ESTIMATED_WORDS_PER_SECOND instead.
 export const CLIP_SECONDS: Record<ClipId, number | null> = {
-  hello: null,
-  studies: null,
-  school: null,
-  robotics: null,
-  vienna: null,
-  hackathons: null,
-  challenges: null,
-  goal: null,
-  awards: null,
-  challenge: null,
-  members: null,
-  decision: null,
+  hello: 2.740,
+  studies: 2.136,
+  school: 2.276,
+  robotics: 5.155,
+  vienna: 7.152,
+  hackathons: 3.808,
+  challenges: 4.180,
+  goal: 4.830,
+  awards: 5.944,
+  challenge: 2.461,
+  members: 3.065,
+  decision: 4.180,
 };
 
 export const ESTIMATED_WORDS_PER_SECOND = 2.6;
