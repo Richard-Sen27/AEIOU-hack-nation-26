@@ -600,3 +600,116 @@ def test_check_cluster_lineage_fanout():
     rows.append(cluster("CLUSTER:5", [], ["M:2"]))
     res = validate.check_cluster_lineage({"nodes": pl.DataFrame(rows)}, 1)
     assert [r["ok"] for r in res] == [False, False]
+
+
+# ---------------------------------------------------------------- cluster names
+
+
+def test_cluster_name_keeps_model_casing_and_appends_the_lead_gene():
+    assert analytics.cluster_name("Neuronal signaling disorders with seizures", "PRRT2") == (
+        "Neuronal signaling disorders with seizures · PRRT2"
+    )
+    # no lowercasing: gene symbols and terms such as DNA or N-linked survive as written
+    assert analytics.cluster_name("N-linked glycosylation and DNA repair  disorders.", "ALG14") == (
+        "N-linked glycosylation and DNA repair disorders · ALG14"
+    )
+    assert analytics.cluster_name("Usher syndrome", None) == "Usher syndrome"
+
+
+def test_cluster_label_prompt_asks_for_sentence_case_with_examples():
+    text = analytics.CLUSTER_LABEL_INSTRUCTIONS
+    assert "sentence case" in text
+    for example in ("Neuronal signaling disorders with seizures", "N-linked", "DNA repair"):
+        assert example in text
+    assert "lead gene is added separately" in text
+
+
+def test_duplicate_cluster_names_differ_deterministically():
+    items = [
+        ("CLUSTER:9", "Epilepsy disorders · SCN1A", "Febrile seizure"),
+        ("CLUSTER:2", "Epilepsy disorders · SCN1A", "Ataxia"),
+        ("CLUSTER:3", "epilepsy disorders · SCN1A", "Ataxia"),  # same name ignoring case
+        ("CLUSTER:4", "Other · KCNQ2", "Ataxia"),
+        ("CLUSTER:5", "Cardiac disorders · TTN", None),
+        ("CLUSTER:6", "Cardiac disorders · TTN", None),
+    ]
+    out = analytics.disambiguate_labels(items)
+    assert out["CLUSTER:9"] == "Epilepsy disorders · SCN1A · Febrile seizure"
+    assert out["CLUSTER:2"] == "Epilepsy disorders · SCN1A · Ataxia (cluster 2)"
+    assert out["CLUSTER:3"] == "epilepsy disorders · SCN1A · Ataxia (cluster 3)"
+    assert out["CLUSTER:4"] == "Other · KCNQ2"  # unique names are untouched
+    assert out["CLUSTER:5"] == "Cardiac disorders · TTN (cluster 5)"
+    assert len({v.casefold() for v in out.values()}) == len(out)
+    assert analytics.disambiguate_labels(list(reversed(items))) == out
+
+
+class _LabelClient:
+    """Fake model client: answers every cluster with the same name, tracks concurrency."""
+
+    def __init__(self):
+        self.calls = 0
+        self.in_flight = self.peak = 0
+
+    async def structured(self, schema, *, instructions, input, kind="small"):
+        import asyncio
+
+        self.calls += 1
+        self.in_flight += 1
+        self.peak = max(self.peak, self.in_flight)
+        await asyncio.sleep(0.01)
+        self.in_flight -= 1
+        genes = json.loads(input)["genes"]
+        return schema(label="Neuronal signaling disorders", mechanism_summary=f"About {genes[0]}.")
+
+
+def _label_rows(n: int):
+    rows, pending = [], {}
+    for c in range(1, n + 1):
+        attrs = {"label_origin": "template", "members": ["M:a", "M:b"]}
+        rows.append(
+            {
+                "id": f"CLUSTER:{c}",
+                "label": f"Template {c}",
+                "mechanism_summary": "template summary",
+                "attrs": json.dumps(attrs),
+                "_distinct": f"Phenotype {c}",
+            }
+        )
+        pending[c] = (json.dumps({"genes": [f"GENE{c}"], "n": c}), f"GENE{c}")
+    rows.append(
+        {"id": "CLUSTER:99", "label": "Dravet syndrome", "mechanism_summary": "x",
+         "attrs": "{}", "_distinct": None}
+    )  # fmt: skip
+    return rows, pending
+
+
+async def test_cluster_names_are_cached_concurrent_and_budgeted(tmp_path, monkeypatch):
+    from pipeline import llm
+
+    monkeypatch.setattr(llm, "LLM_CACHE", tmp_path / "llm")
+    client = _LabelClient()
+    rows, pending = _label_rows(6)
+    run = llm.LLMRun(client=client, max_calls=10, concurrency=4)
+    await analytics.name_clusters(rows, pending, run)
+    names = {r["id"]: r["label"] for r in rows}
+    assert names["CLUSTER:1"] == "Neuronal signaling disorders · GENE1"
+    assert names["CLUSTER:99"] == "Dravet syndrome"  # single-disease cluster keeps its name
+    assert json.loads(rows[0]["attrs"])["label_origin"] == "llm"
+    assert rows[0]["mechanism_summary"] == "About GENE1."
+    assert all("_distinct" not in r for r in rows)
+    assert client.calls == 6 and 1 < client.peak <= 4
+    assert len(list((tmp_path / "llm").rglob("*.json"))) == 6
+    # a second run without a login is served from the disk cache
+    rows2, pending2 = _label_rows(6)
+    cached = llm.LLMRun(client=None, max_calls=10)
+    await analytics.name_clusters(rows2, pending2, cached)
+    assert [r["label"] for r in rows2] == [r["label"] for r in rows]
+    assert cached.cache_hits == 6 and cached.calls == 0
+    # the call budget counts cluster names: beyond it, clusters keep their template labels
+    rows3, pending3 = _label_rows(3)
+    pending3 = {c: (p.replace('"n"', '"m"'), g) for c, (p, g) in pending3.items()}
+    tight = llm.LLMRun(client=_LabelClient(), max_calls=1, concurrency=1)
+    await analytics.name_clusters(rows3, pending3, tight)
+    origins = [json.loads(r["attrs"]).get("label_origin") for r in rows3[:3]]
+    assert origins.count("llm") == 1 and tight.stop_reason == "budget"
+    assert sum(r["label"].startswith("Template") for r in rows3) == 2
