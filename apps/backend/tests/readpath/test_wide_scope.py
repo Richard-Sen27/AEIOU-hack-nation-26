@@ -352,3 +352,101 @@ async def test_small_neighborhood_has_no_header(client):
     resp = await client.get("/neighborhood/MONDO:9900009")
     assert resp.status_code == 200
     assert "x-neighborhood-truncated" not in resp.headers
+
+
+# --- the Diseases trunk from attrs.lineage of clusters -----------------------------------------
+
+NERVOUS = {"id": "HP:0000707", "label": "Abnormality of the nervous system"}
+PHYSIOLOGY = {"id": "HP:0012638", "label": "Abnormal nervous system physiology"}
+SEIZURE = {"id": "HP:0001250", "label": "Seizure"}
+MIGRAINE = {"id": "HP:0002076", "label": "Migraine"}
+
+
+def _with_lineage(lineages: dict[str, list[dict]]):
+    def mutate(by_id: dict) -> None:
+        for cid, chain in lineages.items():
+            by_id[cid]["attrs"]["lineage"] = chain
+
+    return mutate
+
+
+def _kids(tree) -> dict[str, list]:
+    out: dict[str, list] = {}
+    for n in tree.nodes:
+        out.setdefault(n.parent_id, []).append(n)
+    return out
+
+
+def test_diseases_trunk_follows_cluster_lineage():
+    store = fixture_store(
+        _with_lineage(
+            {
+                "CLUSTER:1": [NERVOUS, PHYSIOLOGY, MIGRAINE],
+                "CLUSTER:2": [NERVOUS, PHYSIOLOGY, SEIZURE],
+            }
+        )
+    )
+    plain = atlas_tree.build_tree(fixture_store())
+    tree = atlas_tree.build_tree(store)
+    by_id = {n.id: n for n in tree.nodes}
+    kids = _kids(tree)
+    top = {n.id for n in kids["T:diseases"]}
+    # CLUSTER:3 has no lineage: directly under the category, as before
+    assert "CLUSTER:3" in top and "T:diseases/HP:0000707" in top
+    nervous = by_id["T:diseases/HP:0000707"]
+    assert nervous.kind == "group" and nervous.group_basis == "hpo_class"
+    assert nervous.ref_id == "HP:0000707" and nervous.category == "diseases"
+    # Migraine and Seizure hold one cluster each: spliced, so physiology branches into both
+    assert "T:diseases/HP:0002076" not in by_id and "T:diseases/HP:0001250" not in by_id
+    assert [n.id for n in kids[nervous.id]] == ["T:diseases/HP:0012638"]
+    assert {n.id for n in kids["T:diseases/HP:0012638"]} == {"CLUSTER:1", "CLUSTER:2"}
+    # every entity still once; disease summaries see the groups in tree_path order
+    assert _tree_entities(tree) == _tree_entities(plain)
+    chain = [a.id for a in atlas_tree_ancestors(tree, "MONDO:0100135")]
+    assert chain == [
+        "T:root",
+        "T:diseases",
+        "T:diseases/HP:0000707",
+        "T:diseases/HP:0012638",
+        "CLUSTER:2",
+    ]
+    # the Symptoms trunk is untouched and its HP group ids are namespaced apart
+    sym = sorted((n.id, n.parent_id, n.x, n.y) for n in tree.nodes if n.category == "symptoms")
+    assert [s[:2] for s in sym] == sorted(
+        (n.id, n.parent_id) for n in plain.nodes if n.category == "symptoms"
+    )
+    assert len({n.id for n in tree.nodes}) == len(tree.nodes)
+    assert atlas_tree.LAYOUT_VERSION == 5
+
+
+def test_lone_cluster_not_kept_under_a_group_repeating_its_name():
+    # CLUSTER:1's label starts "SCN2A, ..." in the fixture: give it a lineage ending in a group
+    # with that same name, under a top group of its own
+    store = fixture_store()
+    short = atlas_tree._cluster_short(store, "CLUSTER:1")
+    same = {"id": "HP:0099999", "label": short}
+    store = fixture_store(_with_lineage({"CLUSTER:1": [same], "CLUSTER:2": [NERVOUS, SEIZURE]}))
+    tree = atlas_tree.build_tree(store)
+    by_id = {n.id: n for n in tree.nodes}
+    assert "T:diseases/HP:0099999" not in by_id
+    assert by_id["CLUSTER:1"].parent_id == "T:diseases"
+    # a lone child under a top group with another name keeps the group
+    assert by_id["CLUSTER:2"].parent_id == "T:diseases/HP:0000707"
+
+
+def test_no_lineage_keeps_todays_diseases_trunk():
+    plain = atlas_tree.build_tree(fixture_store())
+    empty = atlas_tree.build_tree(fixture_store(_with_lineage({"CLUSTER:1": []})))
+    assert plain.model_dump_json() == empty.model_dump_json()
+    assert {n.id for n in _kids(plain)["T:diseases"]} == {"CLUSTER:1", "CLUSTER:2", "CLUSTER:3"} | {
+        n.id for n in _kids(plain)["T:diseases"] if n.id == "T:diseases/none"
+    }
+
+
+def atlas_tree_ancestors(tree, node_id: str) -> list:
+    by_id = {n.id: n for n in tree.nodes}
+    chain, node = [], by_id[node_id]
+    while node.parent_id:
+        node = by_id[node.parent_id]
+        chain.append(node)
+    return chain[::-1]

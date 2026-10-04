@@ -37,7 +37,7 @@ from backend.schemas.atlas import (
 from backend.schemas.enums import NodeType, Relation
 from backend.schemas.graph import Node
 
-LAYOUT_VERSION = 4
+LAYOUT_VERSION = 5  # 5: the Diseases trunk follows attrs.lineage of clusters
 ROOT_ID = "T:root"
 MAX_LEAVES = 30
 
@@ -467,6 +467,7 @@ def _build_diseases(store: graph.GraphStore, nodes: list[Node]) -> list[_Draft]:
                 cluster_id=cid,
             )
         out.append(d)
+    out = _by_cluster_lineage(store, out)
     if members.get(None):
         gid = "T:diseases/none"
         out.append(
@@ -481,8 +482,78 @@ def _build_diseases(store: graph.GraphStore, nodes: list[Node]) -> list[_Draft]:
     return out
 
 
+def _cluster_lineage(store: graph.GraphStore, cluster_id: str) -> list[tuple[str, str]]:
+    """`attrs.lineage` of a cluster (node, else the clusters table row): HPO groups from the
+    organ system down to the cluster's direct parent; [] when absent or malformed."""
+    node = store.nodes.get(cluster_id)
+    summary = store.clusters.get(cluster_id)
+    for attrs in (node.attrs if node else None, summary.attrs if summary else None):
+        if attrs and attrs.get("lineage"):
+            chain = _parse_lineage(attrs.get("lineage"))
+            return [(h, label) for h, label in chain or () if h != cluster_id]
+    return []
+
+
+def _by_cluster_lineage(store: graph.GraphStore, clusters: list[_Draft]) -> list[_Draft]:
+    """The Diseases trunk below the category: clusters hang under the HPO groups of their
+    `attrs.lineage` (basis hpo_class), built like the Symptoms trunk: a group is kept at the
+    top or where it branches, single-child chains are spliced out, and a lone child is never
+    kept under a group that only repeats its name. Clusters without a lineage stay directly
+    under the category (unchanged output when no cluster has one)."""
+    chains = {d.cluster_id or d.id: _cluster_lineage(store, d.cluster_id or d.id) for d in clusters}
+    if not any(chains.values()):
+        return clusters
+    parent: dict[str, str | None] = {}
+    labels: dict[str, str] = {}
+    under: dict[str | None, list[_Draft]] = defaultdict(list)
+    for d in clusters:  # sorted by cluster id
+        chain = chains[d.cluster_id or d.id]
+        prev: str | None = None
+        for hid, label in chain:
+            parent.setdefault(hid, prev)
+            labels.setdefault(hid, label)
+            prev = hid
+        under[prev].append(d)
+    for start in sorted(parent):  # break cycles (inconsistent lineages)
+        seen, cur = set(), start
+        while cur is not None and cur not in seen:
+            seen.add(cur)
+            cur = parent.get(cur)
+        if cur is not None:
+            parent[cur] = None
+    kids: dict[str | None, list[str]] = defaultdict(list)
+    for hid in sorted(parent):
+        kids[parent[hid]].append(hid)
+
+    def same_name(group: str, child: _Draft) -> bool:
+        short = _cluster_short(store, child.cluster_id or child.id)
+        return graph.normalize_name(labels.get(group, group)) == graph.normalize_name(short)
+
+    def build(hid: str) -> list[_Draft]:
+        children = [d for c in kids.get(hid, []) for d in build(c)] + under.get(hid, [])
+        if len(children) == 1 and same_name(hid, children[0]):
+            return children
+        if parent.get(hid) is None or len(children) >= 2:
+            return [
+                _group(
+                    f"T:diseases/{hid}",
+                    labels.get(hid, hid),
+                    AtlasCategory.diseases,
+                    GroupBasis.hpo_class,
+                    children,
+                    ref_id=hid,
+                )
+            ]
+        return children
+
+    return [d for top in kids.get(None, []) for d in build(top)] + under.get(None, [])
+
+
 def _lineage(node: Node) -> list[tuple[str, str]] | None:
-    raw = _attr(node, "hpo_lineage")
+    return _parse_lineage(_attr(node, "hpo_lineage"))
+
+
+def _parse_lineage(raw: Any) -> list[tuple[str, str]] | None:
     if not isinstance(raw, list):
         return None
     out = []
