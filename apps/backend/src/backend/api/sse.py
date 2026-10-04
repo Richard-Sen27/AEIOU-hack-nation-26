@@ -22,9 +22,16 @@ class EventStream(EventSourceResponse):
 
     media_type = "text/event-stream"
 
-    def __init__(self, *args: Any, headers: dict[str, str] | None = None, **kwargs: Any):
+    # `status_code` is named so FastAPI can read the default status for OpenAPI.
+    def __init__(
+        self,
+        content: Any,
+        status_code: int = 200,
+        headers: dict[str, str] | None = None,
+        **kwargs: Any,
+    ):
         headers = {"Cache-Control": "no-store, no-transform", **(headers or {})}
-        super().__init__(*args, headers=headers, **kwargs)
+        super().__init__(content, status_code=status_code, headers=headers, **kwargs)
 
 
 def sse_doc(event_model: type[BaseModel], description: str) -> dict[int | str, dict[str, Any]]:
