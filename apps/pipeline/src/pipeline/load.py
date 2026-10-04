@@ -31,9 +31,27 @@ STAGING_DDL = {
     " confidence double precision, origin text, status text, features text, data_version text",
     "evidence": "edge_id text, tier text, source_type text, source_id text, url text, quote text,"
     " retrieved_at text, polarity text, claim_type text",
+    # synonyms and parents as JSON arrays (converted to text[] on promote)
+    "hpo_terms": "id text, label text, synonyms text, parents text, ic double precision",
 }
 
-PROMOTE = """
+HPO_TERMS = """
+SELECT to_regclass('public.hpo_terms') IS NOT NULL AS has_hpo_terms_table \\gset
+\\if :has_hpo_terms_table
+TRUNCATE hpo_terms;
+INSERT INTO hpo_terms (id, label, synonyms, parents, ic)
+  SELECT id, label,
+         ARRAY(SELECT jsonb_array_elements_text(COALESCE(synonyms, '[]')::jsonb)),
+         ARRAY(SELECT jsonb_array_elements_text(COALESCE(parents, '[]')::jsonb)),
+         ic
+  FROM staging.hpo_terms;
+\\else
+\\echo hpo_terms: table missing (migration not applied); HPO term table not loaded
+\\endif
+"""
+
+PROMOTE = (
+    """
 BEGIN;
 DELETE FROM explanations_cache WHERE data_version IS DISTINCT FROM :'version';
 TRUNCATE evidence, edges, node_synonyms, nodes, clusters;
@@ -64,8 +82,12 @@ INSERT INTO ingestion_runs (data_version, pipeline_commit, source_versions, coun
       counts = EXCLUDED.counts, created_at = now();
 -- Only the run whose graph is loaded stays recorded (older versions no longer exist here).
 DELETE FROM ingestion_runs WHERE data_version <> :'version';
+"""
+    + HPO_TERMS
+    + """
 COMMIT;
 """
+)
 
 
 def pipeline_commit() -> str:
@@ -111,6 +133,7 @@ def export_csv(tables: dict[str, pl.DataFrame]) -> dict[str, Path]:
         "node_synonyms": tables["synonyms"],
         "edges": tables["edges"],
         "evidence": tables["evidence"],
+        "hpo_terms": hpo_terms_frame(tables.get("hpo_terms")),
     }
     paths = {}
     for name, ddl in STAGING_DDL.items():
@@ -119,6 +142,24 @@ def export_csv(tables: dict[str, pl.DataFrame]) -> dict[str, Path]:
         frames[name].select(cols).write_csv(path, null_value="")
         paths[name] = path
     return paths
+
+
+def hpo_terms_frame(df: pl.DataFrame | None) -> pl.DataFrame:
+    """hpo_terms with its list columns as JSON text for the CSV staging table."""
+    cols = {"id": pl.String, "label": pl.String, "synonyms": pl.String, "parents": pl.String}
+    if df is None:
+        return pl.DataFrame(schema={**cols, "ic": pl.Float64})
+
+    def as_json(col: str) -> pl.Series:
+        values = [
+            json.dumps(list(v) if v is not None else [], ensure_ascii=False)
+            for v in df[col].to_list()
+        ]
+        return pl.Series(col, values, dtype=pl.String)
+
+    return df.with_columns(as_json("synonyms"), as_json("parents")).select(
+        "id", "label", "synonyms", "parents", "ic"
+    )
 
 
 def counts(tables: dict[str, pl.DataFrame]) -> dict[str, Any]:
@@ -130,6 +171,7 @@ def counts(tables: dict[str, pl.DataFrame]) -> dict[str, Any]:
         "evidence": tables["evidence"].height,
         "synonyms": tables["synonyms"].height,
         "clusters": tables["clusters"].height,
+        "hpo_terms": tables["hpo_terms"].height if "hpo_terms" in tables else 0,
         "nodes_by_type": summary.get("nodes_by_type"),
         "edges_by_relation": summary.get("edges_by_relation"),
     }
@@ -142,6 +184,9 @@ def psql(script: str, variables: dict[str, str] | None = None) -> None:
     proc = subprocess.run(cmd, input=script, text=True, capture_output=True)
     if proc.returncode != 0:
         raise SystemExit(f"psql failed:\n{proc.stderr}")
+    for line in proc.stdout.splitlines():  # the scripts' \echo lines (diff and hpo_terms notes)
+        if line.strip():
+            log.info("psql: %s", line.strip())
 
 
 def run() -> dict[str, Any]:
@@ -170,4 +215,5 @@ def run() -> dict[str, Any]:
 
 
 def tables_len(tables: dict[str, pl.DataFrame], name: str) -> int:
-    return tables["synonyms" if name == "node_synonyms" else name].height
+    key = "synonyms" if name == "node_synonyms" else name
+    return tables[key].height if key in tables else 0
