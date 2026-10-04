@@ -19,7 +19,7 @@ from backend.schemas.enums import (
 )
 
 from pipeline import bio, taxonomy
-from pipeline.build import FINAL, read_graph
+from pipeline.build import FINAL, inferred_cap, read_graph
 from pipeline.paths import EXTRACTED
 from pipeline.scope import load_seeds
 
@@ -109,7 +109,82 @@ def check_structure(t: dict[str, pl.DataFrame]) -> list[dict[str, Any]]:
     add("every disease has a cluster", clustered.height == 0, {"n": clustered.height})
     results += check_positions(nodes)
     results += check_lineage(nodes)
+    results += check_inferred(t)
     return results
+
+
+# Inferred relations that must never sit on a "supported" route (their cap is below 0.6).
+WEAK_HYPOTHESES = ("near_on_chromosome", "candidate_phenotype", "suggested_by_neighbour")
+
+
+def _explanation_ok(text: object) -> bool:
+    return isinstance(text, str) and bool(text.strip()) and "\n" not in text and len(text) <= 400
+
+
+def check_inferred(t: dict[str, pl.DataFrame], summary: dict | None = None) -> list[dict[str, Any]]:
+    """Every inferred edge explains itself in one line, stays within its relation's cap and is
+    backed by computed hypothesis rows; weak hypotheses stay below the supported threshold; the
+    symptom similarity threshold was calibrated against random pairs."""
+    edges, evidence = t["edges"], t["evidence"]
+    inf = edges.filter(pl.col("origin") == "inferred")
+    no_expl, no_meta, over_cap, weak_supported = [], [], [], []
+    for eid, rel, conf, feats in inf.select("id", "relation", "confidence", "features").iter_rows():
+        f = json.loads(feats) if feats else {}
+        if not _explanation_ok(f.get("explanation")):
+            no_expl.append(eid)
+        if not (isinstance(f.get("method"), str) and isinstance(f.get("confidence_basis"), str)):
+            no_meta.append(eid)
+        if conf > inferred_cap(rel) + 1e-9:
+            over_cap.append(eid)
+        if rel in WEAK_HYPOTHESES and conf >= CONFIDENCE_THRESHOLD:
+            weak_supported.append(eid)
+    inf_ids = inf["id"].to_list()
+    rows = evidence.filter(pl.col("edge_id").is_in(inf_ids))
+    if "claim_type" not in rows.columns:
+        rows = rows.with_columns(pl.lit(None, dtype=pl.String).alias("claim_type"))
+    bad_rows = rows.filter(
+        (pl.col("tier") != "computed") | (pl.col("claim_type") != "hypothesis").fill_null(True)
+    )
+    if summary is None:
+        f = FINAL / "summary.json"
+        summary = json.loads(f.read_text()) if f.exists() else {}
+    cal = summary.get("similar_symptoms_calibration") or {}
+    has_sim = inf.filter(pl.col("relation") == "similar_symptoms").height > 0
+    cal_ok = not has_sim or (
+        isinstance(cal.get("threshold_percentile_random"), int | float)
+        and cal.get("threshold", 0) >= cal.get("random_p95", 1)
+    )
+    return [
+        {
+            "check": "every inferred edge has a one-line explanation, method and confidence basis",
+            "ok": not no_expl and not no_meta,
+            "detail": {
+                "n": inf.height,
+                "missing_explanation": no_expl[:20],
+                "missing_method_or_basis": no_meta[:20],
+            },
+        },
+        {
+            "check": "inferred edges stay within their relation's confidence cap",
+            "ok": not over_cap,
+            "detail": {"over_cap": over_cap[:20], "n": len(over_cap)},
+        },
+        {
+            "check": "inferred edges are backed by computed hypothesis evidence only",
+            "ok": bad_rows.height == 0,
+            "detail": {"n": bad_rows.height, "edges": bad_rows["edge_id"].head(20).to_list()},
+        },
+        {
+            "check": "no proximity or candidate link can sit on a supported path",
+            "ok": not weak_supported,
+            "detail": {"edges": weak_supported[:20], "n": len(weak_supported)},
+        },
+        {
+            "check": "symptom similarity threshold calibrated against random pairs",
+            "ok": bool(cal_ok),
+            "detail": cal,
+        },
+    ]
 
 
 def _attrs_by_id(nodes: pl.DataFrame, node_type: str) -> dict[str, dict]:
