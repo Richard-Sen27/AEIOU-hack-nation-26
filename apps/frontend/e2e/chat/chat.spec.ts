@@ -617,7 +617,8 @@ test.describe("chat", () => {
 
     await expect(page).toHaveURL(/\/atlas$/);
     expect(new URL(page.url()).search).toBe("");
-    await expect(page.getByTestId("atlas-wu-found")).toContainText("Dr. Wu found 1");
+    // The focus node plus the found route's nodes (the route is resolved from its edge ids).
+    await expect(page.getByTestId("atlas-wu-found")).toContainText("Dr. Wu found 4");
     const ids = ["MONDO:9900007", ...reply.graph_focus.highlight_path];
     const hrefs = await page.locator("a[href]").evaluateAll((as) => as.map((a) => decodeURIComponent(a.getAttribute("href") ?? "")));
     for (const id of ids) {
@@ -629,7 +630,8 @@ test.describe("chat", () => {
 
     // The finds are the dock's: the list opens and clears like a reply in the dock.
     await page.getByTestId("atlas-wu-open").click();
-    await expect(page.getByTestId("atlas-wu-found-item")).toHaveText([/STXBP1 encephalopathy/]);
+    await expect(page.getByTestId("atlas-wu-found-item")).toHaveCount(4);
+    await expect(page.getByTestId("atlas-wu-found-item").first()).toHaveText(/STXBP1 encephalopathy/);
     await page.getByTestId("atlas-wu-clear").click();
     await expect(page.getByTestId("atlas-wu-found")).toHaveCount(0);
   });
