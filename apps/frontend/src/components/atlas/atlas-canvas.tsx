@@ -23,7 +23,7 @@ import type { GraphTheme } from "@/lib/graph/style";
 import type { EdgeFamily, NodeType } from "@/lib/graph/types";
 
 import { CATEGORY_META, categoryColor, categoryLabel } from "./atlas-categories";
-import { withAlpha } from "./atlas-model";
+import { mixColor, withAlpha } from "./atlas-model";
 import type { WuFound } from "./atlas-props";
 import { EdgeDashProgram, type DashKind } from "./edge-dash-program";
 import { ancestorsOf, descendantIds, type AtlasCategory, type TreeIndex, type TreeNodeKind } from "./tree-model";
@@ -300,7 +300,10 @@ export const AtlasCanvas = forwardRef<AtlasCanvasHandle, Props>(function AtlasCa
 
     // Category colours per theme, resolved once per theme object.
     let colorTheme: GraphTheme | null = null;
-    const colors = new Map<string, { solid: string; group: string; edge: string; trunk: string; dim: string }>();
+    const colors = new Map<
+      string,
+      { solid: string; group: string; edge: string; trunk: string; dim: string; text: string; dot: string }
+    >();
     const palette = (category: AtlasCategory | null) => {
       const t = propsRef.current.theme;
       if (colorTheme !== t) {
@@ -311,12 +314,16 @@ export const AtlasCanvas = forwardRef<AtlasCanvasHandle, Props>(function AtlasCa
       let c = colors.get(key);
       if (!c) {
         const solid = category ? categoryColor(category, t) : t.muted;
+        // Opaque fades towards the background (Sigma blends premultiplied).
+        const bg = t.background;
         c = {
           solid,
-          group: withAlpha(solid, t.dark ? 0.85 : 0.8),
-          edge: withAlpha(solid, t.dark ? 0.3 : 0.26),
-          trunk: withAlpha(solid, t.dark ? 0.55 : 0.5),
-          dim: withAlpha(solid, 0.07),
+          group: mixColor(solid, bg, 0.12),
+          edge: mixColor(solid, bg, t.dark ? 0.62 : 0.66),
+          trunk: mixColor(solid, bg, t.dark ? 0.35 : 0.4),
+          dim: mixColor(solid, bg, 0.9),
+          text: mixColor(t.label, solid, 0.4),
+          dot: mixColor(t.muted, bg, t.dark ? 0.72 : 0.78),
         };
         colors.set(key, c);
       }
@@ -333,17 +340,18 @@ export const AtlasCanvas = forwardRef<AtlasCanvasHandle, Props>(function AtlasCa
       const pal = palette(data.category);
       res.color =
         data.kind === "entity" && data.entityType ? (t.node[data.entityType] ?? pal.solid) : data.kind === "group" ? pal.group : pal.solid;
-      if (data.kind === "category") res.label = null;
+      // Category names are HTML; group names are drawn on the overlay with collision avoidance.
+      if (data.kind === "category" || (data.kind === "group" && node !== hovered.current)) res.label = null;
       const onHover = hoverPath.current.has(node);
       if (em.active && !em.keep.has(node) && !onHover) {
-        res.color = withAlpha(t.muted, t.dark ? 0.16 : 0.13);
+        res.color = data.kind === "entity" ? pal.dot : pal.dim;
+        res.size = data.size * 0.7;
         res.label = null;
         res.zIndex = 0;
         return res;
       }
       res.zIndex = em.active ? 2 : data.kind === "entity" ? 1 : 2;
-      if (em.labelled.has(node) || onHover) res.forceLabel = data.kind !== "category";
-      else if (!em.active && data.kind === "group") res.forceLabel = data.depth <= 2 || ratioNow() < DEEP_LABEL_RATIO;
+      if ((em.labelled.has(node) || node === hovered.current) && data.kind === "entity") res.forceLabel = true;
       if (node === propsRef.current.selectedId || node === hovered.current) res.highlighted = true;
       return res;
     }
@@ -355,15 +363,15 @@ export const AtlasCanvas = forwardRef<AtlasCanvasHandle, Props>(function AtlasCa
         const pal = palette(data.category);
         const base = data.depth <= 2 ? pal.trunk : pal.edge;
         if (em.treeEdges.has(edge) || hoverPath.current.has(edge)) {
-          return { ...data, color: withAlpha(pal.solid, 0.95), size: data.size * 1.6 + 0.6, zIndex: 3 };
+          return { ...data, color: pal.solid, size: data.size * 1.4 + 0.6, zIndex: 3 };
         }
         if (em.active) return { ...data, color: pal.dim, zIndex: 0 };
         return { ...data, color: base, zIndex: 0 };
       }
       if (!em.real.has(edge)) return { hidden: true };
       const color = data.flagged ? t.statusFlag : data.family ? t.edge[data.family] : t.muted;
-      if (em.chain.has(edge)) return { ...data, color: withAlpha(color, 1), size: 3.2, zIndex: 5 };
-      return { ...data, color: withAlpha(color, 0.85), size: 1.4, zIndex: 4 };
+      if (em.chain.has(edge)) return { ...data, color, size: 3, zIndex: 5 };
+      return { ...data, color, size: 1.1, zIndex: 4 };
     }
 
     let sigma: Sigma<NodeAttrs, EdgeAttrs>;
@@ -444,7 +452,7 @@ export const AtlasCanvas = forwardRef<AtlasCanvasHandle, Props>(function AtlasCa
       };
       graph.forEachNode((_, a) => add(a.x, a.y));
       for (const c of index.categories.values()) add(c.label_x, c.label_y);
-      const pad = Math.max(maxX - minX, maxY - minY) * 0.06;
+      const pad = Math.max(maxX - minX, maxY - minY) * 0.1;
       // Square and centred on the hub so the logo sits in the middle of the map.
       const half = Math.max(Math.abs(minX), Math.abs(maxX), Math.abs(minY), Math.abs(maxY)) + pad;
       if (Number.isFinite(half)) sigma.setCustomBBox({ x: [-half, half], y: [-half, half] });
@@ -463,7 +471,7 @@ export const AtlasCanvas = forwardRef<AtlasCanvasHandle, Props>(function AtlasCa
       }
       if (!Number.isFinite(minX)) return;
       const extent = Math.max(maxX - minX, maxY - minY);
-      const ratio = close && extent === 0 ? 0.06 : Math.min(1, Math.max(0.05, extent * 1.35));
+      const ratio = close && extent === 0 ? 0.12 : Math.min(1, Math.max(0.05, extent * 1.35));
       animate({ x: (minX + maxX) / 2, y: (minY + maxY) / 2, ratio });
     };
     frameRef.current = frame;
@@ -533,15 +541,56 @@ export const AtlasCanvas = forwardRef<AtlasCanvasHandle, Props>(function AtlasCa
     });
     sigma.on("clickStage", () => propsRef.current.onSelect(null));
 
-    // Deeper group labels appear when zooming in: refresh when crossing the threshold.
-    let deep = ratioNow() < DEEP_LABEL_RATIO;
-    sigma.getCamera().on("updated", ({ ratio }) => {
-      const next = ratio < DEEP_LABEL_RATIO;
-      if (next !== deep) {
-        deep = next;
-        sigma.refresh({ schedule: true });
+    // Group names: shallow groups first, larger first; a name that would overlap one already
+    // placed is skipped, so labels never pile up. Deeper groups join when zoomed in.
+    const groupOrder = index.tree.nodes
+      .filter((n) => n.kind === "group")
+      .sort((a, b) => a.depth - b.depth || b.entity_count - a.entity_count)
+      .map((n) => n.id);
+    const widths = new Map<string, number>();
+    const GROUP_FONT_PX = 11;
+    const drawGroupLabels = (ctx: CanvasRenderingContext2D, w: number, h: number) => {
+      const { theme: t } = propsRef.current;
+      const em = emphasis.current;
+      const ratio = ratioNow();
+      const font = getComputedStyle(document.body).fontFamily || "sans-serif";
+      ctx.font = `600 ${GROUP_FONT_PX}px ${font}`;
+      ctx.lineJoin = "round";
+      ctx.textBaseline = "middle";
+      const placed: Array<[number, number, number, number]> = [];
+      const hits = (x0: number, y0: number, x1: number, y1: number) =>
+        placed.some(([a, b, c, d]) => x0 < c && x1 > a && y0 < d && y1 > b);
+      // Selection-related names first, then the rest by priority.
+      const order = em.active ? [...em.labelled, ...groupOrder] : groupOrder;
+      const seen = new Set<string>();
+      for (const id of order) {
+        if (seen.has(id)) continue;
+        seen.add(id);
+        if (id === hovered.current) continue;
+        const n = index.nodes.get(id);
+        if (!n || n.kind !== "group") continue;
+        const forced = em.labelled.has(id);
+        if (em.active && !forced && !em.keep.has(id)) continue;
+        if (!forced && n.depth > 2 && ratio >= DEEP_LABEL_RATIO) continue;
+        const a = graph.getNodeAttributes(id);
+        const d = sigma.getNodeDisplayData(id);
+        if (!d) continue;
+        const p = sigma.graphToViewport({ x: a.x, y: a.y });
+        if (p.x < -200 || p.y < -20 || p.x > w + 200 || p.y > h + 20) continue;
+        let tw = widths.get(id);
+        if (tw === undefined) widths.set(id, (tw = ctx.measureText(n.label).width));
+        const r = sigma.scaleSize(d.size) + 3;
+        const x0 = a.left ? p.x - r - tw : p.x + r;
+        const box: [number, number, number, number] = [x0 - 2, p.y - 7, x0 + tw + 2, p.y + 7];
+        if (!forced && hits(...box)) continue;
+        placed.push(box);
+        ctx.lineWidth = 3;
+        ctx.strokeStyle = t.background;
+        ctx.strokeText(n.label, x0, p.y);
+        ctx.fillStyle = palette(a.category).text;
+        ctx.fillText(n.label, x0, p.y);
       }
-    });
+    };
 
     // Category labels (HTML, rotated along the outer edge) and the logo on the hub.
     const layer = labelLayer.current;
@@ -581,8 +630,9 @@ export const AtlasCanvas = forwardRef<AtlasCanvasHandle, Props>(function AtlasCa
       }
       const btn = logo.current;
       if (btn) {
-        const px = Math.round(Math.min(120, Math.max(48, LOGO_PX / Math.sqrt(sigma.getCamera().getState().ratio))));
+        const px = Math.round(Math.min(120, Math.max(48, LOGO_PX / Math.pow(sigma.getCamera().getState().ratio, 0.35))));
         btn.style.width = btn.style.height = `${px}px`;
+        btn.style.padding = `${Math.round(px * 0.14)}px`;
         btn.style.transform = `translate(${origin.x}px, ${origin.y}px) translate(-50%, -50%)`;
       }
       drawRings();
@@ -605,6 +655,7 @@ export const AtlasCanvas = forwardRef<AtlasCanvasHandle, Props>(function AtlasCa
       if (!ctx) return;
       ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
       ctx.clearRect(0, 0, w, h);
+      drawGroupLabels(ctx, w, h);
       const { theme: t, found, selectedId } = propsRef.current;
       const foundSet = new Set(found?.nodeIds ?? []);
       for (const id of emphasis.current.rings) {
@@ -700,7 +751,7 @@ export const AtlasCanvas = forwardRef<AtlasCanvasHandle, Props>(function AtlasCa
         }}
         aria-label="Show the whole map"
         title="Show the whole map"
-        className="absolute top-0 left-0 flex size-16 items-center justify-center rounded-full border bg-card p-[12%] shadow-md outline-none hover:ring-2 hover:ring-primary/40 focus-visible:ring-2 focus-visible:ring-ring"
+        className="absolute top-0 left-0 flex size-16 items-center justify-center rounded-full border bg-card p-2 shadow-md outline-none hover:ring-2 hover:ring-primary/40 focus-visible:ring-2 focus-visible:ring-ring"
         data-testid="atlas-logo"
       >
         {/* eslint-disable-next-line @next/next/no-img-element -- scaled every frame with the camera */}
