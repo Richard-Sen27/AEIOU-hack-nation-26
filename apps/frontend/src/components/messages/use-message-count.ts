@@ -4,6 +4,7 @@ import { useCallback, useEffect, useRef, useState } from "react";
 
 import { useSession } from "@/components/providers/session-provider";
 import { getMessageUnreadCount } from "@/lib/api";
+import { backgroundPaused } from "@/lib/api/errors";
 
 const POLL_MS = 60_000;
 const MIN_GAP_MS = 2_000;
@@ -21,7 +22,8 @@ export function publishMessageCounts(counts: Counts) {
 /**
  * Unread messages and waiting requests for the header. Polled every 60 s while
  * the tab is visible, and on focus; never for guests or before the 16+
- * confirmation (the routes answer 403 until then). Only counts, never content.
+ * confirmation (the routes answer 403 until then), not while a 429 asks to
+ * wait. Only counts, never content.
  */
 export function useMessageCount() {
   const { user } = useSession();
@@ -52,7 +54,7 @@ export function useMessageCount() {
     let timer: number | undefined;
     const visible = () => document.visibilityState === "visible";
     const tick = () => {
-      if (visible() && Date.now() - last.current >= MIN_GAP_MS) void refresh();
+      if (visible() && !backgroundPaused() && Date.now() - last.current >= MIN_GAP_MS) void refresh();
     };
     const stop = () => {
       if (timer !== undefined) window.clearInterval(timer);

@@ -93,6 +93,7 @@ const ERROR_COPY: Record<string, { icon: typeof CircleAlert; title: string; hint
     hint: "Please try again later.",
     retry: true,
   },
+  busy: { icon: Clock, title: "Dr. Wu is busy", hint: "Try again in a moment.", retry: true },
   reauth_required: {
     icon: KeyRound,
     title: "Please sign in again",

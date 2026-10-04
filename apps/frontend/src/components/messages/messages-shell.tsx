@@ -10,6 +10,7 @@ import { useSession } from "@/components/providers/session-provider";
 import { Button } from "@/components/ui/button";
 import { Skeleton } from "@/components/ui/skeleton";
 import { listThreads, type Schemas } from "@/lib/api";
+import { backgroundPaused } from "@/lib/api/errors";
 import { cn } from "@/lib/utils";
 
 import { useConnectFlow } from "./connect-flow";
@@ -76,7 +77,7 @@ function Shell({ children }: { children: React.ReactNode }) {
     void reload();
     void load();
     const timer = window.setInterval(() => {
-      if (document.visibilityState === "visible" && Date.now() - last.current > 5_000) void reload();
+      if (document.visibilityState === "visible" && !backgroundPaused() && Date.now() - last.current > 5_000) void reload();
     }, LIST_POLL_MS);
     return () => window.clearInterval(timer);
   }, [reload, load]);

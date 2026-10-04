@@ -119,6 +119,9 @@ export function GateProvider({ children }: { children: React.ReactNode }) {
               description: "Too many requests in a short time. Try again shortly.",
             });
             return;
+          case "busy":
+            toast("Amber is busy", { id: "busy", description: "Try again in a moment." });
+            return;
           default:
             if (error.status >= 500) {
               toast("Something went wrong on our side", { id: "server-error" });

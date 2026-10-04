@@ -18,6 +18,8 @@ export type ApiErrorCode =
   | "not_implemented"
   | "not_found"
   | "rate_limited"
+  /** A 429 with `reason: "busy"`: too many answers running at once; try again in a moment. */
+  | "busy"
   | "validation_error"
   | "network_error"
   | "aborted"
@@ -56,6 +58,26 @@ const FALLBACK_CODE_BY_STATUS: Record<number, ApiErrorCode> = {
   501: "not_implemented",
 };
 
+/** Default pause after a 429 without `retry_after`. */
+const DEFAULT_PAUSE_S = 30;
+/** Never pause background requests longer than this, whatever the server says. */
+const MAX_PAUSE_S = 600;
+let pausedUntil = 0;
+
+/**
+ * After any 429, background requests (polls) wait until the server's
+ * `retry_after` has passed instead of asking again on their next tick.
+ */
+export function pauseBackground(seconds: number): void {
+  const s = Number.isFinite(seconds) && seconds > 0 ? Math.min(seconds, MAX_PAUSE_S) : DEFAULT_PAUSE_S;
+  pausedUntil = Math.max(pausedUntil, Date.now() + s * 1000);
+}
+
+/** True while a recent 429 asks background requests to wait. */
+export function backgroundPaused(): boolean {
+  return Date.now() < pausedUntil;
+}
+
 /** Parse an error body (already JSON-decoded or raw) into an ApiError. */
 export function toApiError(status: number, body: unknown): ApiError {
   const envelope =
@@ -64,20 +86,33 @@ export function toApiError(status: number, body: unknown): ApiError {
       : undefined;
   if (envelope && typeof envelope === "object") {
     const { code, message, ...rest } = envelope as Record<string, unknown>;
+    if (status === 429) pauseBackground(Number(rest.retry_after));
+    const busy = status === 429 && rest.reason === "busy";
     return new ApiError(
-      typeof code === "string"
-        ? code
-        : (FALLBACK_CODE_BY_STATUS[status] ?? "http_error"),
+      busy
+        ? "busy"
+        : typeof code === "string"
+          ? code
+          : (FALLBACK_CODE_BY_STATUS[status] ?? "http_error"),
       typeof message === "string" ? message : `Request failed (${status})`,
       status,
       rest,
     );
   }
+  if (status === 429) pauseBackground(DEFAULT_PAUSE_S);
   return new ApiError(
     FALLBACK_CODE_BY_STATUS[status] ?? "http_error",
     `Request failed (${status})`,
     status,
   );
+}
+
+/**
+ * Whether a `quiet` request's error still goes to the global UI: a 429 on a
+ * read (GET), so a limit never fails silently. Writes keep their own texts.
+ */
+export function reportsWhenQuiet(error: ApiError, method: string | undefined): boolean {
+  return (error.code === "rate_limited" || error.code === "busy") && (method ?? "GET").toUpperCase() === "GET";
 }
 
 export async function errorFromResponse(res: Response): Promise<ApiError> {

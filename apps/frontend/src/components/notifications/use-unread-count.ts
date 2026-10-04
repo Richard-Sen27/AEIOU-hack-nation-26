@@ -4,6 +4,7 @@ import { useCallback, useEffect, useRef, useState } from "react";
 
 import { useSession } from "@/components/providers/session-provider";
 import { getUnreadNotificationCount } from "@/lib/api";
+import { backgroundPaused } from "@/lib/api/errors";
 
 const POLL_MS = 60_000;
 /** A focus and a visibility change often arrive together: one request for both. */
@@ -12,7 +13,7 @@ const MIN_GAP_MS = 2_000;
 /**
  * Unread notifications for the signed-in user. Polled every 60 s while the tab
  * is visible, and on focus; never for guests or before the 16+ confirmation
- * (the routes answer 403 until then).
+ * (the routes answer 403 until then), and not while a 429 asks to wait.
  */
 export function useUnreadCount() {
   const { user } = useSession();
@@ -36,7 +37,7 @@ export function useUnreadCount() {
     let timer: number | undefined;
     const visible = () => document.visibilityState === "visible";
     const tick = () => {
-      if (visible() && Date.now() - last.current >= MIN_GAP_MS) void refresh();
+      if (visible() && !backgroundPaused() && Date.now() - last.current >= MIN_GAP_MS) void refresh();
     };
     const stop = () => {
       if (timer !== undefined) window.clearInterval(timer);

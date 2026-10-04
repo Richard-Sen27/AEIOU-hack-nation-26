@@ -29,7 +29,7 @@ import {
 import { Skeleton } from "@/components/ui/skeleton";
 import { Textarea } from "@/components/ui/textarea";
 import { announce } from "@/lib/a11y";
-import { ApiError } from "@/lib/api/errors";
+import { ApiError, backgroundPaused } from "@/lib/api/errors";
 import {
   acceptThread,
   blockThreadParticipant,
@@ -80,7 +80,7 @@ export function ThreadView({ id }: { id: string }) {
     // eslint-disable-next-line react-hooks/set-state-in-effect -- fetch, state set after await
     void fetchThread().then((d) => alive && d && void reload());
     const timer = window.setInterval(() => {
-      if (document.visibilityState === "visible" && !sending.current) void fetchThread();
+      if (document.visibilityState === "visible" && !sending.current && !backgroundPaused()) void fetchThread();
     }, THREAD_POLL_MS);
     return () => {
       alive = false;

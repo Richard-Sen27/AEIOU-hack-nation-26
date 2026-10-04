@@ -2568,6 +2568,24 @@ export type ErrorDetail = {
      * Human-readable message. Never echoes user content.
      */
     message: string;
+    /**
+     * Request Id
+     *
+     * The request's id, as in the X-Request-ID header and the server log.
+     */
+    request_id?: string | null;
+    /**
+     * Reason
+     *
+     * rate_limited only: rate (too many requests), busy (too many answers running at once) or budget (the daily AI usage limit).
+     */
+    reason?: 'rate' | 'busy' | 'budget' | null;
+    /**
+     * Retry After
+     *
+     * rate_limited only: seconds to wait, as in the Retry-After header.
+     */
+    retry_after?: number | null;
 };
 
 /**

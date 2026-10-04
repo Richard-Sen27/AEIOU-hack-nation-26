@@ -46,6 +46,8 @@ export function uploadErrorMessage(code: string, serverMessage?: string): string
     case "empty_file":
       return "This file is empty.";
     case "rate_limited":
+      // The daily AI limit and the general request limit have their own short messages.
+      if (/usage limit|short time/i.test(serverMessage ?? "")) return serverMessage!;
       return `You have uploaded ${UPLOADS_PER_HOUR} documents in the last hour, which is the limit. Please try again later.`;
     case "consent_required":
       return "Uploading needs your consent. Nothing was uploaded.";

@@ -1,5 +1,5 @@
 import { client } from "./generated/client.gen";
-import { networkError, reportApiError, toApiError } from "./errors";
+import { networkError, reportApiError, reportsWhenQuiet, toApiError } from "./errors";
 
 /**
  * The generated Hey API client, configured for Amber:
@@ -16,13 +16,13 @@ let installed = false;
 
 if (!installed) {
   installed = true;
-  client.interceptors.error.use((error, response, _request, options) => {
+  client.interceptors.error.use((error, response, request, options) => {
     const apiError =
       response === undefined
         ? networkError(error)
         : toApiError(response.status, error);
     const meta = (options as { meta?: { quiet?: boolean } } | undefined)?.meta;
-    if (!meta?.quiet) reportApiError(apiError);
+    if (!meta?.quiet || reportsWhenQuiet(apiError, request?.method)) reportApiError(apiError);
     return apiError;
   });
 }

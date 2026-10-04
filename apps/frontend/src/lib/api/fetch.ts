@@ -4,6 +4,7 @@ import {
   errorFromResponse,
   networkError,
   reportApiError,
+  reportsWhenQuiet,
 } from "./errors";
 
 export type ApiFetchOptions = Omit<RequestInit, "body"> & {
@@ -57,7 +58,7 @@ export async function apiFetch<T>(
   }
   if (!res.ok) {
     const err = await errorFromResponse(res);
-    if (!quiet) reportApiError(err);
+    if (!quiet || reportsWhenQuiet(err, init.method)) reportApiError(err);
     throw err;
   }
   if (res.status === 204) return undefined as T;

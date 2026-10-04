@@ -32,6 +32,8 @@ function errorMessage(code: string) {
       return "Amber's server can't be reached, so the explanation can't be loaded right now.";
     case "rate_limited":
       return "You've reached the usage limit for explanations for now. Please try again later.";
+    case "busy":
+      return "Dr. Wu is busy. Try again in a moment.";
     case "upstream_error":
       return "The AI service did not respond. Please try again in a moment.";
     case "not_found":

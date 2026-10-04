@@ -516,6 +516,7 @@ function SignedInDock({
 
 const ERROR_COPY: Record<string, { icon: typeof CircleAlert; title: string; retry: boolean }> = {
   rate_limited: { icon: Clock, title: "The usage limit is reached", retry: true },
+  busy: { icon: Clock, title: "Dr. Wu is busy. Try again in a moment.", retry: true },
   reauth_required: { icon: KeyRound, title: "Please sign in again", retry: false },
   sign_in_required: { icon: KeyRound, title: "Please sign in again", retry: false },
   timeout: { icon: Clock, title: "No answer in time", retry: true },

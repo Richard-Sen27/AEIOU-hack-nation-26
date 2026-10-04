@@ -63,6 +63,8 @@ function errorEnding(code: string): string {
   switch (code) {
     case "rate_limited":
       return "You've reached the gap-search usage limit for now. Please try again later.";
+    case "busy":
+      return "Amber is busy. Try again in a moment.";
     case "reauth_required":
       return "Your ChatGPT sign-in has expired. Please sign in again to search.";
     case "assistant_unavailable":

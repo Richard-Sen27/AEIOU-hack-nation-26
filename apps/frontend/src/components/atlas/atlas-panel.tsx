@@ -744,6 +744,8 @@ function writeError(code: string) {
       return "Server unreachable.";
     case "rate_limited":
       return "Usage limit reached.";
+    case "busy":
+      return "Busy. Try again in a moment.";
     case "upstream_error":
       return "The AI service did not respond.";
     case "timeout":
