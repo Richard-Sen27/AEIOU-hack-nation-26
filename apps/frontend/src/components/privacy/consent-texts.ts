@@ -9,7 +9,7 @@ import type { ConsentType } from "@/lib/api/types";
 export const CONSENT_VERSION: Record<ConsentType, string> = {
   health_data: "health-data-2026-10-04",
   contribute: "contribute-2026-10-04",
-  connect: "connect-2026-10-04",
+  connect: "connect-signups-2026-10-04",
 };
 
 export type ConsentNotice = {

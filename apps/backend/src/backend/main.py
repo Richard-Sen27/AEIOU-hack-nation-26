@@ -28,6 +28,7 @@ from backend.api.routes import (
     people,
     proposal,
     session,
+    signups,
     stats,
 )
 from backend.api.services.documents import MAX_UPLOAD_BYTES
@@ -55,6 +56,7 @@ ROUTERS = (
     follows,
     people,
     messaging,
+    signups,  # before calls: /calls/suggested is not a call id
     calls,
 )
 

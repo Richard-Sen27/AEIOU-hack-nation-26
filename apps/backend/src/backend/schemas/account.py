@@ -15,6 +15,7 @@ from backend.schemas.calls import CallExport, CallReviewExport
 from backend.schemas.follows import FollowExport, NotificationExport
 from backend.schemas.messaging import ConnectExport
 from backend.schemas.profile import PatientProfile
+from backend.schemas.signups import SignupsExport
 
 
 class CurrentUser(ApiModel):
@@ -46,7 +47,8 @@ class Consent(ApiModel):
 CONSENT_TEXT_VERSIONS: dict[ConsentType, str] = {
     ConsentType.health_data: "health-data-2026-10-04",
     ConsentType.contribute: "contribute-2026-10-04",
-    ConsentType.connect: "connect-2026-10-04",
+    # connect-signups: the text now names suggestions and sign-ups (connect stage 4).
+    ConsentType.connect: "connect-signups-2026-10-04",
 }
 
 
@@ -57,7 +59,7 @@ class ConsentGrant(ApiModel):
         max_length=40,
         description="Consent text version shown; must be the current version for the type "
         "(health_data: health-data-2026-10-04, contribute: contribute-2026-10-04, connect: "
-        "connect-2026-10-04).",
+        "connect-signups-2026-10-04).",
     )
     about_child: bool = Field(False, description="Consent covers data about a child.")
     parental_responsibility_confirmed: bool = Field(
@@ -399,4 +401,7 @@ class DataExport(ApiModel):
     )
     call_reviews: list[CallReviewExport] = Field(
         default_factory=list, description="Review decisions about the user's calls."
+    )
+    signups: SignupsExport | None = Field(
+        None, description="The suggestions setting and the user's own sign-ups to calls."
     )

@@ -72,7 +72,7 @@ async def test_connect_consent_grant_and_age_group(make_user):
     r = await user.client.put("/me/connect/age-group", json={"age_group": "18_plus"})
     assert_error(r, 403, "consent_required")
     r = await user.client.post(
-        "/consents", json={"consent_type": "connect", "version": "connect-2026-10-04"}
+        "/consents", json={"consent_type": "connect", "version": "connect-signups-2026-10-04"}
     )
     assert r.status_code in (200, 201), r.text
     r = await user.client.get("/me/connect")

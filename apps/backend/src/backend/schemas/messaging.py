@@ -36,12 +36,16 @@ REPORT_AUTHORIZATION_TEXT = (
 # The connect consent notice (the frontend dialog shows it; version in schemas/account.py).
 CONNECT_CONSENT_TEXT = (
     "Studies, surveys and contacts: Amber lets you write to verified doctors and researchers who "
-    "accept messages. We store your messages encrypted and show them only to you and the person "
-    "you write to. No AI model reads them, and the Amber team reads a conversation only when you "
-    "report it, and every such access is logged. Messages are not a medical consultation. You "
-    "tell us your age group; if you are 16 or 17, you confirm that a parent or guardian agrees "
-    "(self-declared, not checked). Withdrawing this consent deletes your messages and closes "
-    "your conversations."
+    "accept messages, sign up to studies, surveys and trials, and, if you switch it on, get "
+    "suggestions of calls that match the confirmed items of your profile. Suggestions are "
+    "worked out inside your account; nobody else sees them and study teams never learn who was "
+    "suggested. When you sign up, only the items you tick are sent, to the team that runs the "
+    "call. We store your messages encrypted and show them only to you and the person you write "
+    "to. No AI model reads them, and the Amber team reads a conversation only when you report "
+    "it, and every such access is logged. Messages are not a medical consultation. You tell us "
+    "your age group; if you are 16 or 17, you confirm that a parent or guardian agrees "
+    "(self-declared, not checked). Withdrawing this consent deletes your messages, withdraws "
+    "your sign-ups, switches suggestions off and closes your conversations."
 )
 
 
@@ -109,6 +113,10 @@ class ReportReason(StrEnum):
 
 class ConnectStatus(ApiModel):
     consent_active: bool = Field(description="An active `connect` consent exists.")
+    consent_current: bool = Field(
+        description="The active consent was given to the current text. Suggestions and sign-ups "
+        "need it (the earlier text named messaging only): ask again when false."
+    )
     age_group: AgeGroup | None = Field(
         description="Self-declared at the first connect action; null until stated."
     )

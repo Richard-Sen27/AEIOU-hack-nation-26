@@ -5,8 +5,9 @@
   with the operator's name and reason, in the same transaction. The report itself is the
   reporter's authorization. Nothing else in the codebase reads message bodies of other users.
 - `purge`: the 12-month deletion of inactive threads (plus orphaned threads, reports after 12
-  months and access-log rows after 24 months). The API also deletes a user's own inactive
-  threads at read time; run this daily for threads nobody opens.
+  months and access-log rows after 24 months), and sign-ups to calls past their time (stubs
+  after 30 days, sign-ups of closed calls after 90). The API also deletes a user's own inactive
+  threads and sign-ups at read time; run this daily for the rows nobody opens.
 - `rotate_key`: re-encrypts every body under the newest MESSAGE_ENCRYPTION_KEY.
 """
 
@@ -103,6 +104,12 @@ def read_reported_thread(
     return messages
 
 
+def signups_purge_sql() -> str:
+    from backend.api.services.signups import PURGE_ALL_SQL  # signups imports messaging
+
+    return PURGE_ALL_SQL
+
+
 def purge(*, out: TextIO | None = None) -> dict[str, int]:
     with _connect() as conn, conn.transaction():
         counts = {
@@ -118,6 +125,8 @@ def purge(*, out: TextIO | None = None) -> dict[str, int]:
                 "DELETE FROM admin_access_log"
                 f" WHERE created_at < now() - interval '{ACCESS_LOG_MONTHS} months'"
             ).rowcount,
+            # Sign-up stubs after 30 days, sign-ups of closed calls after 90 (connect stage 4).
+            "call_signups": conn.execute(signups_purge_sql()).rowcount,
         }
     print(", ".join(f"{k} deleted: {v}" for k, v in counts.items()), file=out or sys.stdout)
     return counts

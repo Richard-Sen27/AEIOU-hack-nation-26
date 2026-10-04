@@ -2,7 +2,8 @@
 
 `connect` is the third consent type: contact with other people is a different purpose from the
 user's own use (`health_data`) and from sharing with the atlas (`contribute`). It covers
-messaging today and suggestions and sign-ups later (stage 4).
+messaging, suggestions of calls and sign-ups to them; suggestions and sign-ups need a consent to
+the current text (`has_current_consent`), since the first text named messaging only.
 
 Withdrawal runs every effect in `_withdrawal_effects()` inside the user's transaction, then
 clears the age group. A feature held under this consent adds its effect there with one line.
@@ -15,7 +16,7 @@ from sqlalchemy import text
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from backend.api.errors import ApiError
-from backend.schemas.account import CurrentUser
+from backend.schemas.account import CONSENT_TEXT_VERSIONS, CurrentUser
 from backend.schemas.enums import ConsentType, ErrorCode
 from backend.schemas.messaging import (
     GUARDIAN_TEXT,
@@ -31,11 +32,11 @@ WithdrawalEffect = Callable[[AsyncSession, UUID], Awaitable[None]]
 
 def _withdrawal_effects() -> tuple[WithdrawalEffect, ...]:
     """What withdrawing `connect` deletes or closes, one entry per feature."""
-    from backend.api.services import messaging  # messaging imports this module
+    from backend.api.services import messaging, signups  # both import this module
 
     return (
         messaging.on_connect_withdrawn,  # deletes the user's messages, closes their threads
-        # stage 4 adds: signups.on_connect_withdrawn (suggestions off, sign-ups withdrawn)
+        signups.on_connect_withdrawn,  # withdraws every sign-up, stops suggestions
     )
 
 
@@ -49,6 +50,22 @@ async def has_consent(db: AsyncSession, user_id: UUID) -> bool:
             {"uid": user_id, "t": ConsentType.connect.value},
         )
     )
+
+
+async def _active_version(db: AsyncSession, user_id: UUID) -> str | None:
+    return await db.scalar(
+        text(
+            "SELECT version FROM consents WHERE user_id = :uid AND consent_type = :t"
+            " AND revoked_at IS NULL ORDER BY granted_at DESC LIMIT 1"
+        ),
+        {"uid": user_id, "t": ConsentType.connect.value},
+    )
+
+
+async def has_current_consent(db: AsyncSession, user_id: UUID) -> bool:
+    """An active `connect` consent given to the current text. Suggestions and sign-ups need it:
+    the earlier text covered messaging only."""
+    return await _active_version(db, user_id) == CONSENT_TEXT_VERSIONS[ConsentType.connect]
 
 
 async def _age_row(db: AsyncSession, user_id: UUID):
@@ -81,8 +98,10 @@ async def require_age_group(db: AsyncSession, user_id: UUID) -> AgeGroup:
 
 async def get_status(db: AsyncSession, user: CurrentUser) -> ConnectStatus:
     row = await _age_row(db, user.id)
+    version = await _active_version(db, user.id)
     return ConnectStatus(
-        consent_active=await has_consent(db, user.id),
+        consent_active=version is not None,
+        consent_current=version == CONSENT_TEXT_VERSIONS[ConsentType.connect],
         age_group=AgeGroup(row["connect_age_group"]) if row and row["connect_age_group"] else None,
         age_group_set_at=row["connect_age_group_at"] if row else None,
         guardian_text=GUARDIAN_TEXT,

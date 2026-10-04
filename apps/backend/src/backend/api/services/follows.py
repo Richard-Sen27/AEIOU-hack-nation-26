@@ -70,7 +70,7 @@ _FILL_SQL = text(
 )
 _UNREAD_SQL = text(
     "SELECT count(*) FROM notifications WHERE user_id = :uid AND read_at IS NULL"
-    f" AND kind IN ('added', 'now_recruiting')"
+    f" AND kind IN ('added', 'now_recruiting', 'call_match')"
     f" AND created_at >= now() - interval '{RETENTION_DAYS} days'"
 )
 
@@ -231,10 +231,13 @@ async def _fill(db: AsyncSession, user_id: UUID, marker: datetime | None) -> Non
 
 async def refresh(db: AsyncSession, user_id: UUID, *, force: bool) -> None:
     """Purge notifications past retention, then fill new ones (gated unless forced)."""
+    from backend.api.services import suggestions  # call_match rows (connect stage 4)
+
     await db.execute(_PURGE_SQL, {"uid": user_id})
     marker = await db.scalar(_MARKER_SQL)
     if force or user_id not in _filled or _filled[user_id] != marker:
         await _fill(db, user_id, marker)
+    await suggestions.fill_notifications(db, user_id, force=force)
 
 
 def _int(value: Any) -> int | None:
@@ -244,7 +247,54 @@ def _int(value: Any) -> int | None:
         return None
 
 
-def _notification(row: Any) -> Notification:
+def _call_notification(row: Any, titles: dict[str, str]) -> Notification:
+    disease = get_graph().nodes.get(row["subject_node_id"]) if row["subject_node_id"] else None
+    title = titles.get(row["ref_id"])
+    try:
+        call_id = UUID(row["ref_id"])
+    except ValueError:
+        call_id = None
+    return Notification(
+        id=row["id"],
+        kind=NotificationKind.call_match,
+        disease_id=row["subject_node_id"],
+        disease_label=disease.label if disease is not None else None,
+        item_id=row["ref_id"],
+        call_id=call_id,
+        item_type=None,
+        item_label=title,
+        registry_id=None,
+        year=None,
+        gone=title is None,
+        data_version=row["data_version"],
+        created_at=row["created_at"],
+        read_at=row["read_at"],
+    )
+
+
+async def _open_call_titles(db: AsyncSession, rows: list[Any]) -> dict[str, str]:
+    ids = []
+    for r in rows:
+        if r["kind"] == NotificationKind.call_match:
+            try:
+                ids.append(UUID(r["ref_id"]))
+            except ValueError:
+                continue
+    if not ids:
+        return {}
+    found = await db.execute(
+        text(
+            "SELECT id, title FROM calls WHERE id = ANY(:ids) AND status = 'published'"
+            " AND (closes_at IS NULL OR closes_at >= current_date)"
+        ),
+        {"ids": ids},
+    )
+    return {str(r[0]): r[1] for r in found}
+
+
+def _notification(row: Any, titles: dict[str, str] | None = None) -> Notification:
+    if row["kind"] == NotificationKind.call_match:
+        return _call_notification(row, titles or {})
     nodes = get_graph().nodes
     disease = nodes.get(row["subject_node_id"]) if row["subject_node_id"] else None
     item = nodes.get(row["ref_id"])
@@ -279,19 +329,23 @@ async def _unread(db: AsyncSession, user_id: UUID) -> int:
 
 async def list_notifications(db: AsyncSession, user: CurrentUser, limit: int) -> NotificationList:
     await refresh(db, user.id, force=True)
-    rows = (
-        await db.execute(
-            text(
-                "SELECT id, kind, ref_id, subject_node_id, data_version, created_at, read_at"
-                " FROM notifications WHERE user_id = :uid AND kind IN ('added', 'now_recruiting')"
-                " ORDER BY created_at DESC, data_version DESC NULLS LAST, kind DESC, id"
-                " LIMIT :limit"
-            ),
-            {"uid": user.id, "limit": limit},
-        )
-    ).mappings()
+    rows = list(
+        (
+            await db.execute(
+                text(
+                    "SELECT id, kind, ref_id, subject_node_id, data_version, created_at, read_at"
+                    " FROM notifications WHERE user_id = :uid"
+                    " AND kind IN ('added', 'now_recruiting', 'call_match')"
+                    " ORDER BY created_at DESC, data_version DESC NULLS LAST, kind DESC, id"
+                    " LIMIT :limit"
+                ),
+                {"uid": user.id, "limit": limit},
+            )
+        ).mappings()
+    )
+    titles = await _open_call_titles(db, rows)
     return NotificationList(
-        items=[_notification(r) for r in rows], unread_count=await _unread(db, user.id)
+        items=[_notification(r, titles) for r in rows], unread_count=await _unread(db, user.id)
     )
 
 
@@ -323,11 +377,13 @@ async def mark_read(db: AsyncSession, user: CurrentUser, body: MarkRead) -> Unre
 
 
 async def delete_health_data(db: AsyncSession, user_id: UUID) -> None:
-    """Withdrawal of health_data: follows and the notifications made from them."""
+    """Withdrawal of health_data: follows and the notifications made from them, and the
+    call_match notifications (made from the profile, which is deleted too)."""
     params = {"uid": user_id}
     await db.execute(
         text(
-            "DELETE FROM notifications WHERE user_id = :uid AND kind IN ('added', 'now_recruiting')"
+            "DELETE FROM notifications WHERE user_id = :uid"
+            " AND kind IN ('added', 'now_recruiting', 'call_match')"
         ),
         params,
     )

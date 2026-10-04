@@ -19,6 +19,7 @@ from backend.api.services import connect as connect_service
 from backend.api.services import calls as calls_service
 from backend.api.services import follows as follows_service
 from backend.api.services import messaging as messaging_service
+from backend.api.services import signups as signups_service
 from backend.api.services.chat import message_from_row as chat_message_from_row
 from backend.api.services.chat import runs as chat_runs
 from backend.api.services.contributions import contribution_from_row, refresh_shared_graph
@@ -291,7 +292,8 @@ async def revoke_consent(db: AsyncSession, user: CurrentUser, consent_type: Cons
     details and the contribute consent with its contributions stay (work details are not health
     data and not held under this consent).
     contribute: every contribution, which removes it from the shared graph.
-    connect: the user's messages and stated age group; their threads close (connect.withdraw).
+    connect: the user's messages and stated age group; their threads close; every sign-up is
+    withdrawn and suggestions stop (connect.withdraw).
     """
     existing = await _active_consent(db, user.id, consent_type)
     if existing is None:
@@ -695,6 +697,7 @@ async def export_data(db: AsyncSession, user: CurrentUser) -> DataExport:
         notifications=notifications,
         connect=await messaging_service.export(db, uid),
         **dict(zip(("calls", "call_reviews"), await calls_service.export(db, uid), strict=True)),
+        signups=await signups_service.export(db, uid),
     )
 
 
