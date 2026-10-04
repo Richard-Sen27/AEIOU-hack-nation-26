@@ -47,6 +47,97 @@ function truncate(s: string, n = 26) {
   return s.length > n ? `${s.slice(0, n - 1)}…` : s;
 }
 
+/**
+ * Sizes are in graph units; at zoom 1 one unit is one CSS pixel. Fitting never
+ * zooms past MAX_FIT_ZOOM, so a small neighbourhood keeps labels near the UI's
+ * small text size (11 × 1.1 ≈ 12 px) instead of being blown up to fill the card.
+ */
+const LABEL_SIZE = 11;
+const LABEL_WIDTH = 110;
+const CENTER_SIZE = 34;
+const NODE_SIZE = { min: 12, max: 22 };
+const MAX_FIT_ZOOM = 1.1;
+const MAX_ZOOM = 3;
+const FIT_PADDING = 40;
+/** Rendered size of a hovered node's full name and of the centre's label, whatever the zoom. */
+const HOVER_LABEL_PX = 12;
+/** Neighbour labels drawn smaller than this (zoomed out on a big neighbourhood) are hidden until hover or zoom-in. */
+const MIN_LABEL_PX = 8;
+
+/** Distance between neighbours on a ring: one label width while labels fit, tighter for big hubs. */
+function ringArc(count: number) {
+  return count <= 40 ? LABEL_WIDTH + 24 : count <= 120 ? 64 : 40;
+}
+
+/**
+ * Neighbour labels appear once neighbours sit about a label width apart on
+ * screen, so a big hub shows dots until zoomed in (names on hover) instead of
+ * a pile of overlapping text.
+ */
+function minLabelPx(count: number) {
+  return Math.max(MIN_LABEL_PX, Math.round((LABEL_SIZE * LABEL_WIDTH) / ringArc(count)));
+}
+
+/** Fit `eles` into the viewport without zooming in past MAX_FIT_ZOOM. */
+function fitViewport(cy: Core, eles = cy.elements(":visible")) {
+  const bb = eles.boundingBox();
+  const w = cy.width();
+  const h = cy.height();
+  if (!bb.w || !bb.h || !w || !h) return null;
+  const zoom = Math.max(cy.minZoom(), Math.min(MAX_FIT_ZOOM, (w - 2 * FIT_PADDING) / bb.w, (h - 2 * FIT_PADDING) / bb.h));
+  return { zoom, pan: { x: (w - zoom * (bb.x1 + bb.x2)) / 2, y: (h - zoom * (bb.y1 + bb.y2)) / 2 } };
+}
+
+function fitCapped(cy: Core, animate: boolean) {
+  const vp = fitViewport(cy);
+  if (!vp) return;
+  if (animate) cy.animate(vp, { duration: 300 });
+  else cy.viewport(vp);
+}
+
+/**
+ * Rings around the centre: direct neighbours first (the lens's highlighted
+ * families innermost), then the rest. Each ring holds as many nodes as fit at
+ * one label width apart, so labels do not overlap in small and mid-sized
+ * neighbourhoods; big hubs pack tighter and show names on hover.
+ */
+function ringPositions(cy: Core, centerId: string, highlight: Set<string>) {
+  const center = cy.getElementById(centerId);
+  const rank = (n: cytoscape.NodeSingular) => {
+    const direct = n.edgesWith(center);
+    if (direct.length === 0) return 2;
+    return direct.some((e) => highlight.has(e.data("family"))) ? 0 : 1;
+  };
+  const others = cy
+    .nodes()
+    .filter((n) => n.id() !== centerId)
+    .toArray()
+    .map((n, i) => ({ id: n.id(), rank: rank(n as cytoscape.NodeSingular), i }))
+    .sort((a, b) => a.rank - b.rank || a.i - b.i);
+  const count = others.length;
+  const arc = ringArc(count);
+  const gap = count <= 40 ? 96 : 52;
+  const positions: Record<string, { x: number; y: number }> = { [centerId]: { x: 0, y: 0 } };
+  let radius = count <= 8 ? 120 : 140;
+  let placed = 0;
+  let ring = 0;
+  while (placed < count) {
+    const capacity = Math.max(4, Math.floor((2 * Math.PI * radius) / arc));
+    const left = count - placed;
+    // Spread a last, partly filled ring evenly instead of bunching it on one side.
+    const onRing = left <= capacity ? left : capacity;
+    const offset = ring % 2 ? Math.PI / onRing : 0;
+    for (let i = 0; i < onRing; i++) {
+      const a = -Math.PI / 2 + offset + (2 * Math.PI * i) / onRing;
+      positions[others[placed + i].id] = { x: radius * Math.cos(a), y: radius * Math.sin(a) };
+    }
+    placed += onRing;
+    radius += gap;
+    ring += 1;
+  }
+  return positions;
+}
+
 export const NodeGraph = forwardRef<NodeGraphHandle, Props>(function NodeGraph(props, ref) {
   const { theme, labelStyle, hints, edges, centerId } = props;
   const container = useRef<HTMLDivElement>(null);
@@ -57,7 +148,9 @@ export const NodeGraph = forwardRef<NodeGraphHandle, Props>(function NodeGraph(p
   });
 
   useImperativeHandle(ref, () => ({
-    fit: () => cyRef.current?.animate({ fit: { eles: cyRef.current.elements(":visible"), padding: 40 } }, { duration: propsRef.current.reducedMotion ? 0 : 300 }),
+    fit: () => {
+      if (cyRef.current) fitCapped(cyRef.current, !propsRef.current.reducedMotion);
+    },
     zoomIn: () => {
       const cy = cyRef.current;
       if (cy) cy.zoom({ level: cy.zoom() * 1.3, renderedPosition: { x: cy.width() / 2, y: cy.height() / 2 } });
@@ -78,7 +171,7 @@ export const NodeGraph = forwardRef<NodeGraphHandle, Props>(function NodeGraph(p
     const elements: ElementDefinition[] = [
       ...nodes.map((n) => ({
         group: "nodes" as const,
-        data: { id: n.id, type: n.type, name: n.label, centrality: n.centrality ?? 0, center: n.id === centerId },
+        data: { id: n.id, type: n.type, name: n.label, fullName: n.label, centrality: n.centrality ?? 0, center: n.id === centerId },
         position: n.x != null && n.y != null ? { x: n.x, y: n.y } : undefined,
         classes: n.id === centerId ? "center" : undefined,
       })),
@@ -92,8 +185,8 @@ export const NodeGraph = forwardRef<NodeGraphHandle, Props>(function NodeGraph(p
     const cy = cytoscape({
       container: el,
       elements,
-      minZoom: 0.15,
-      maxZoom: 4,
+      minZoom: 0.1,
+      maxZoom: MAX_ZOOM,
       wheelSensitivity: 0.3,
       boxSelectionEnabled: false,
       autoungrabify: false,
@@ -101,6 +194,13 @@ export const NodeGraph = forwardRef<NodeGraphHandle, Props>(function NodeGraph(p
       layout: { name: "preset" },
     });
     cyRef.current = cy;
+    // The centre keeps a readable label when zoomed out.
+    const scaleCenterLabel = () => {
+      const c = cy.getElementById(propsRef.current.centerId);
+      const size = Math.max(LABEL_SIZE + 1, HOVER_LABEL_PX / cy.zoom());
+      if (c.nonempty()) c.style({ "font-size": size, "text-outline-width": Math.max(2.5, 3 / cy.zoom()) });
+    };
+    cy.on("zoom", scaleCenterLabel);
     cy.on("tap", "node", (e) => {
       const id = e.target.id();
       if (id !== propsRef.current.centerId) propsRef.current.onNodeTap(id);
@@ -108,13 +208,33 @@ export const NodeGraph = forwardRef<NodeGraphHandle, Props>(function NodeGraph(p
     cy.on("tap", "edge", (e) => propsRef.current.onEdgeTap(e.target.id()));
     cy.on("mouseover", "node, edge", (e) => {
       e.target.addClass("hover");
+      // Full name at a readable size, also when the graph is zoomed out.
+      if (e.target.isNode()) {
+        const z = cy.zoom();
+        e.target.style({
+          label: e.target.data("fullName"),
+          "font-size": Math.max(LABEL_SIZE, HOVER_LABEL_PX / z),
+          "text-max-width": `${Math.max(LABEL_WIDTH, 240 / z)}px`,
+          "text-outline-width": Math.max(2.5, 3 / z),
+          "min-zoomed-font-size": 0,
+          "z-index": 30,
+        });
+      }
       el.style.cursor = e.target.isNode() && e.target.id() === propsRef.current.centerId ? "" : "pointer";
     });
     cy.on("mouseout", "node, edge", (e) => {
       e.target.removeClass("hover");
+      if (e.target.isNode()) {
+        e.target.removeStyle("label font-size text-max-width text-outline-width min-zoomed-font-size z-index");
+        if (e.target.id() === propsRef.current.centerId) scaleCenterLabel();
+      }
       el.style.cursor = "";
     });
+    // The card's height follows the viewport on desktop: tell Cytoscape when it changes.
+    const observer = new ResizeObserver(() => cy.resize());
+    observer.observe(el);
     return () => {
+      observer.disconnect();
       cy.destroy();
       cyRef.current = null;
     };
@@ -135,7 +255,7 @@ export const NodeGraph = forwardRef<NodeGraphHandle, Props>(function NodeGraph(p
         n.data({
           label: hints.show_ids ? `${name}\n${n.id()}` : name,
           color: theme.node[type] ?? theme.muted,
-          size: isCenter ? 46 : nodeSize(type, n.data("centrality"), { min: 14, max: 30 }),
+          size: isCenter ? CENTER_SIZE : nodeSize(type, n.data("centrality"), NODE_SIZE),
         });
         n.toggleClass("emph", !isCenter && highlightTypes.has(type));
       });
@@ -167,10 +287,10 @@ export const NodeGraph = forwardRef<NodeGraphHandle, Props>(function NodeGraph(p
           label: "data(label)",
           color: theme.label,
           "font-family": getComputedStyle(document.body).fontFamily,
-          "font-size": 11,
-          "min-zoomed-font-size": 7,
+          "font-size": LABEL_SIZE,
+          "min-zoomed-font-size": minLabelPx(cy.nodes().length - 1),
           "text-wrap": "wrap",
-          "text-max-width": "120px",
+          "text-max-width": `${LABEL_WIDTH}px`,
           "text-valign": "bottom",
           "text-margin-y": 4,
           "text-outline-color": theme.background,
@@ -189,7 +309,7 @@ export const NodeGraph = forwardRef<NodeGraphHandle, Props>(function NodeGraph(p
         style: {
           "border-width": 4,
           "border-color": theme.highlight,
-          "font-size": 12,
+          "font-size": LABEL_SIZE + 1,
           "font-weight": 700,
           "min-zoomed-font-size": 0,
           "z-index": 10,
@@ -252,26 +372,18 @@ export const NodeGraph = forwardRef<NodeGraphHandle, Props>(function NodeGraph(p
     const cy = cyRef.current;
     if (!cy) return;
     const { hints, centerId, reducedMotion } = propsRef.current;
-    const highlight = new Set(hints.highlight_family ?? []);
-    const center = cy.getElementById(centerId);
+    const highlight = new Set<string>(hints.highlight_family ?? []);
     const hasPositions = cy.nodes().filter((n) => n.position("x") === 0 && n.position("y") === 0).length === 0;
     const animate = !reducedMotion && cy.nodes().length < 300;
     let options: LayoutOptions;
+    // Layouts place nodes only; the viewport is fitted afterwards with a zoom cap.
+    const positions = ringPositions(cy, centerId, highlight);
     const ring: LayoutOptions = {
-      name: "concentric",
-      concentric: (n) => {
-        if (n.id() === centerId) return 3;
-        const direct = n.edgesWith(center);
-        if (direct.length === 0) return 0;
-        return direct.some((e) => highlight.has(e.data("family"))) ? 2 : 1;
-      },
-      levelWidth: () => 1,
-      minNodeSpacing: 34,
-      spacingFactor: 1.15,
-      avoidOverlap: true,
+      name: "preset",
+      positions: (n: cytoscape.NodeSingular) => positions[n.id()],
+      fit: false,
       animate,
       animationDuration: 350,
-      padding: 30,
     } as LayoutOptions;
     switch (hints.start_layout) {
       case "force":
@@ -283,22 +395,42 @@ export const NodeGraph = forwardRef<NodeGraphHandle, Props>(function NodeGraph(p
           animationDuration: 400,
           nodeRepulsion: 12000,
           idealEdgeLength: 120,
-          padding: 30,
+          fit: false,
         } as unknown as LayoutOptions;
         break;
       case "hierarchy":
-        options = { name: "breadthfirst", roots: [centerId], directed: false, spacingFactor: 1.1, animate, padding: 30 } as LayoutOptions;
+        options = { name: "breadthfirst", roots: [centerId], directed: false, spacingFactor: 1.1, animate, fit: false } as LayoutOptions;
         break;
       case "cluster":
-        options = hasPositions ? ({ name: "preset", fit: true, padding: 30 } as LayoutOptions) : ring;
+        options = hasPositions ? ({ name: "preset", fit: false } as LayoutOptions) : ring;
         break;
       default:
         options = ring;
     }
     const layout = cy.layout(options);
+    // The ring's end positions are known up front: frame them first, then let the nodes move in.
+    if (options === ring) {
+      const before = cy.nodes().map((n) => ({ n, p: { ...n.position() } }));
+      cy.nodes().positions((n) => positions[n.id()]);
+      fitCapped(cy, false);
+      before.forEach(({ n, p }) => n.position(p));
+    }
+    let running = true;
+    layout.one("layoutstop", () => {
+      running = false;
+      if (!cy.destroyed()) fitCapped(cy, animate && options !== ring);
+    });
     layout.run();
+    // Keep the frame when the card changes size (window resize, desktop fit).
+    const onResize = () => {
+      if (!running) fitCapped(cy, false);
+    };
+    cy.on("resize", onResize);
     return () => {
+      // The create effect may already have destroyed this instance.
+      if (cy.destroyed()) return;
       layout.stop();
+      cy.off("resize", onResize);
     };
   }, [props.hints.start_layout, props.hints.highlight_family, props.nodes, props.edges, props.centerId]);
 
@@ -329,7 +461,7 @@ export const NodeGraph = forwardRef<NodeGraphHandle, Props>(function NodeGraph(p
         } else if (e.key === "-") {
           cy.zoom({ level: cy.zoom() / 1.2, renderedPosition: { x: cy.width() / 2, y: cy.height() / 2 } });
         } else if (e.key === "0") {
-          cy.fit(undefined, 40);
+          fitCapped(cy, false);
         }
       }}
     />
