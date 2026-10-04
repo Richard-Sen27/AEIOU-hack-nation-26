@@ -182,6 +182,67 @@ test.describe("landing", () => {
     expect(errors()).toEqual([]);
   });
 
+  test("hero map cycles through nodes, pauses on hover and with the control", async ({ page }) => {
+    await mockApi(page, { "GET /auth/session": guestSession, "GET /atlas/tree.json": atlasTreePayload() });
+    await page.goto("/");
+    const map = page.getByTestId("hero-map");
+    await expect(map).toHaveAttribute("data-cycle-step", "0");
+    await page.mouse.move(2, 2);
+    await expect(map).toHaveAttribute("data-paused", "false");
+    const first = await map.getAttribute("data-focus");
+    await expect(page.getByTestId("atlas-preview-label")).toBeVisible();
+
+    // End the current node's CSS timeline instead of waiting for it.
+    const finishCycle = () =>
+      page.evaluate(() =>
+        document
+          .getAnimations()
+          .filter((a) => (a as CSSAnimation).animationName === "lp-cycle")
+          .forEach((a) => a.finish()),
+      );
+    await finishCycle();
+    await expect(map).toHaveAttribute("data-cycle-step", "1");
+    await expect(map).not.toHaveAttribute("data-focus", first ?? "");
+
+    const cycleState = () =>
+      page.evaluate(() =>
+        document
+          .getAnimations()
+          .filter((a) => (a as CSSAnimation).animationName === "lp-cycle")
+          .map((a) => a.playState),
+      );
+    await page.getByTestId("atlas-preview").hover();
+    await expect(map).toHaveAttribute("data-paused", "true");
+    await expect.poll(cycleState).toContain("paused");
+    await page.mouse.move(2, 2);
+    await expect(map).toHaveAttribute("data-paused", "false");
+    await expect.poll(cycleState).toContain("running");
+
+    // The control is a sibling of the link, keyboard-reachable and labelled.
+    const toggle = page.getByRole("button", { name: "Pause the map animation" });
+    await expect(page.getByTestId("atlas-preview").getByRole("button")).toHaveCount(0);
+    await toggle.click();
+    await page.mouse.move(2, 2);
+    await expect(map).toHaveAttribute("data-paused", "true");
+    await expect(page.getByRole("button", { name: "Play the map animation" })).toBeVisible();
+    await page.getByRole("button", { name: "Play the map animation" }).focus();
+    await page.keyboard.press("Enter");
+    await expect(map).toHaveAttribute("data-paused", "false");
+  });
+
+  test("hero map does not cycle under reduced motion", async ({ page }) => {
+    await page.emulateMedia({ reducedMotion: "reduce" });
+    await mockApi(page, { "GET /auth/session": guestSession, "GET /atlas/tree.json": atlasTreePayload() });
+    await page.goto("/");
+    await expect(page.getByTestId("atlas-preview")).toHaveAttribute("data-state", "ready");
+    const map = page.getByTestId("hero-map");
+    await expect(map).not.toHaveAttribute("data-cycle-step", /.*/);
+    await expect(page.getByTestId("hero-cycle-toggle")).toHaveCount(0);
+    await expect(page.getByTestId("atlas-preview-highlight")).toBeAttached();
+    const running = await page.evaluate(() => document.getAnimations().filter((a) => (a as CSSAnimation).animationName === "lp-cycle").length);
+    expect(running).toBe(0);
+  });
+
   test("API down: hero and prepared-data steps render, no counts line", async ({ page }) => {
     await mockApi(page, { "GET /auth/session": guestSession });
     const errors = trackConsoleErrors(page);
