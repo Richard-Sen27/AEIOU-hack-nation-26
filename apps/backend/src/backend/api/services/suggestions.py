@@ -219,11 +219,14 @@ async def stop(db: AsyncSession, user_id: UUID) -> None:
 
 
 async def delete_notifications(db: AsyncSession, user_id: UUID) -> None:
+    from backend.api.services import follows  # follows imports this module
+
     await db.execute(
         text("DELETE FROM notifications WHERE user_id = :uid AND kind = :k"),
         {"uid": user_id, "k": CALL_MATCH},
     )
     _filled.pop(user_id, None)
+    follows.forget_calls_fill(user_id)  # a followed call is then notified as call_published
 
 
 # ---- matching -------------------------------------------------------------------------------
@@ -297,7 +300,11 @@ async def fill_notifications(db: AsyncSession, user_id: UUID, *, force: bool) ->
             text(
                 "INSERT INTO notifications (user_id, kind, ref_id, subject_node_id, dedupe_key)"
                 " VALUES (:uid, :k, :ref, :disease, :key)"
-                " ON CONFLICT (user_id, dedupe_key) DO NOTHING"
+                # One notification per call: a call_published row (followed disease) for the
+                # same call becomes this more specific call_match; read state is kept.
+                " ON CONFLICT (user_id, dedupe_key) DO UPDATE"
+                " SET kind = EXCLUDED.kind, subject_node_id = EXCLUDED.subject_node_id"
+                " WHERE notifications.kind = 'call_published'"
             ),
             {
                 "uid": user_id,

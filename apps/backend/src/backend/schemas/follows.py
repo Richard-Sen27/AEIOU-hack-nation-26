@@ -33,9 +33,10 @@ class Follow(ApiModel):
     label: str | None = Field(description="Disease label; null if no longer in the atlas.")
     in_atlas: bool = Field(description="The disease is in the current atlas.")
     updates_available: bool = Field(
-        description="Papers, trials, grants and patient groups (and so updates) exist only for "
-        "the atlas's focus diseases. False for core diseases and for diseases no longer in the "
-        "atlas: following still works, but no notifications are expected."
+        description="Papers, trials, grants and patient groups (and so atlas updates) exist only "
+        "for the atlas's focus diseases. False for core diseases and for diseases no longer in "
+        "the atlas: following still notifies about surveys, studies and trials published for "
+        "the disease (call_published), but no atlas updates are expected."
     )
     created_at: datetime
     since_version: str | None = Field(
@@ -70,6 +71,7 @@ class NotificationKind(StrEnum):
     added = "added"  # a paper, trial, grant or patient group newly linked to the disease
     now_recruiting = "now_recruiting"  # a trial whose status changed to recruiting
     call_match = "call_match"  # a published call that matches the profile (suggestions on)
+    call_published = "call_published"  # a call published for a followed disease
 
 
 class Notification(ApiModel):
@@ -80,29 +82,38 @@ class Notification(ApiModel):
     kind: NotificationKind = Field(
         description="added: a paper, trial, grant or patient group newly linked to the disease "
         "in the atlas; now_recruiting: a trial whose status changed to recruiting; call_match: "
-        "a published call matches your profile (suggestions switched on; link to the call)."
+        "a published call matches your profile (suggestions switched on; link to the call); "
+        "call_published: a survey, study or trial was published for a followed disease after "
+        "the follow started (link to the call). A call is notified once: when it is both, it "
+        "is a call_match."
     )
     disease_id: str | None = Field(
-        description="The followed disease (call_match: the matching disease, if any)."
+        description="The followed disease (call_match: the matching disease, if any; "
+        "call_published: the followed disease the call names)."
     )
     disease_label: str | None = Field(description="Null if no longer in the atlas.")
     item_id: str = Field(
-        description="Node ID of the new item; link to its node page. call_match: the call id."
+        description="Node ID of the new item; link to its node page. call_match, "
+        "call_published: the call id."
     )
-    call_id: UUID | None = Field(None, description="call_match only: the call to open.")
+    call_id: UUID | None = Field(
+        None, description="call_match and call_published only: the call to open."
+    )
     item_type: NodeType | None = Field(
         description="paper, trial, grant or patient_org; null if no longer in the atlas."
     )
     item_label: str | None = Field(
-        description="Null if no longer in the atlas. call_match: the call's title."
+        description="Null if no longer in the atlas. call_match, call_published: the call's "
+        "title (null once the call is no longer listed)."
     )
     registry_id: str | None = Field(description="Trials: the registry ID (NCT...).")
     year: int | None = Field(
         description="Papers: publication year. Say 'added to the atlas (2025)', not 'published'.",
     )
     gone: bool = Field(
-        description="The item or the disease has left the atlas since (call_match: the call is no "
-        "longer published and open); render without a link."
+        description="The item or the disease has left the atlas since (call_match, "
+        "call_published: the call is no longer listed: closed, expired, withdrawn or its "
+        "publisher's card hidden); render without a link."
     )
     data_version: str | None = Field(description="Atlas data version that added it.")
     created_at: datetime

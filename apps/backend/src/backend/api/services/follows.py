@@ -6,9 +6,14 @@ and notifications are owner-only tables, and the only other input is the public 
 
 Notifications are filled lazily when the user reads the list or the unread count: new
 `graph_changes` rows for followed diseases, from loads after the follow started, that are not
-yet a notification (unique dedupe key). No text is stored; labels come from the current graph
-when read. The unread count fills at most once per change marker (the newest `graph_changes`
-row) per user and process, so the once-a-minute poll is two cheap queries.
+yet a notification (unique dedupe key); and `call_published` rows for listed calls (published,
+open, publisher's card visible, not the user's own) that name a followed disease and were
+published after the follow started (one per call, dedupe key `call|<id>`, shared with
+`call_match` so a call is never notified twice). No text is stored; labels come from the current
+graph and the calls table when read. The unread count fills at most once per change marker (the
+newest `graph_changes` row; the newest `published_at` and the number of published calls) per
+user and process, so the once-a-minute poll stays a few cheap queries. Publishers never learn
+who follows a disease or who was notified: the rows live only in the follower's own table.
 """
 
 import re
@@ -39,13 +44,18 @@ from backend.schemas.follows import (
 )
 
 RETENTION_DAYS = 90
-GRAPH_KINDS = tuple(k.value for k in NotificationKind)
+CALL_PUBLISHED = NotificationKind.call_published.value
+CALL_KINDS = (NotificationKind.call_match, NotificationKind.call_published)
+# The kinds shown in the list and counted; all of them rest on the health_data consent.
+_KINDS_SQL = "('added', 'now_recruiting', 'call_match', 'call_published')"
 _MONDO = re.compile(r"^MONDO:\d{7}$")
 _NCT = re.compile(r"^NCT\d{8}$")
 _FILL_CACHE_MAX = 50_000
 
 # user id -> the change marker the user's notifications were last filled for (per process).
 _filled: dict[UUID, datetime | None] = {}
+# user id -> the published-calls marker the user's call_published rows were last filled for.
+_calls_filled: dict[UUID, tuple[Any, ...]] = {}
 
 _PURGE_SQL = text(
     "DELETE FROM notifications WHERE user_id = :uid"
@@ -68,9 +78,34 @@ _FILL_SQL = text(
     ON CONFLICT (user_id, dedupe_key) DO NOTHING
     """
 )
+_CALLS_MARKER_SQL = text("SELECT max(published_at), count(*) FROM calls WHERE status = 'published'")
+# Listed calls (as calls.list_published: published, not expired, the publisher's card visible
+# and verified) naming a followed disease, published after that follow started, not the user's
+# own, within the retention period (so a purged row is not made again). One row per call; the
+# subject is the first such followed disease. The dedupe key is the one call_match uses, so a
+# call that is already a call_match is not notified again.
+_CALLS_FILL_SQL = text(
+    f"""
+    INSERT INTO notifications (user_id, kind, ref_id, subject_node_id, dedupe_key)
+    SELECT DISTINCT ON (c.id) f.user_id, '{CALL_PUBLISHED}', c.id::text, f.node_id,
+           'call|' || c.id::text
+      FROM follows f
+      JOIN calls c ON f.node_id = ANY(c.disease_ids)
+      JOIN call_publisher_cards() cp ON cp.call_id = c.id
+      JOIN professional_cards() pc ON pc.card_id = cp.card_id
+     WHERE f.user_id = :uid
+       AND c.status = 'published'
+       AND (c.closes_at IS NULL OR c.closes_at >= current_date)
+       AND c.published_at > f.created_at
+       AND c.published_at >= now() - interval '{RETENTION_DAYS} days'
+       AND c.publisher_id <> :uid
+     ORDER BY c.id, f.node_id
+    ON CONFLICT (user_id, dedupe_key) DO NOTHING
+    """
+)
 _UNREAD_SQL = text(
     "SELECT count(*) FROM notifications WHERE user_id = :uid AND read_at IS NULL"
-    f" AND kind IN ('added', 'now_recruiting', 'call_match')"
+    f" AND kind IN {_KINDS_SQL}"
     f" AND created_at >= now() - interval '{RETENTION_DAYS} days'"
 )
 
@@ -177,7 +212,9 @@ async def follow(db: AsyncSession, user: CurrentUser, node_id: str) -> Follow:
 
 
 async def unfollow(db: AsyncSession, user: CurrentUser, node_id: str) -> None:
-    """Stop following (idempotent) and delete the notifications about that disease."""
+    """Stop following (idempotent) and delete the notifications about that disease. A
+    call_published notification whose call also names another disease the user still follows
+    (followed before the call was published) moves to that disease instead of reappearing."""
     params = {"uid": user.id, "node": node_id}
     await db.execute(text("DELETE FROM follows WHERE user_id = :uid AND node_id = :node"), params)
     await db.execute(
@@ -186,6 +223,26 @@ async def unfollow(db: AsyncSession, user: CurrentUser, node_id: str) -> None:
             " AND kind IN ('added', 'now_recruiting')"
         ),
         params,
+    )
+    await db.execute(
+        text(
+            f"""
+            UPDATE notifications n SET subject_node_id = (
+                SELECT min(f.node_id) FROM calls c
+                  JOIN follows f ON f.user_id = n.user_id AND f.node_id = ANY(c.disease_ids)
+                 WHERE c.id::text = n.ref_id AND f.created_at < c.published_at)
+             WHERE n.user_id = :uid AND n.kind = '{CALL_PUBLISHED}'
+               AND n.subject_node_id = :node
+            """
+        ),
+        params,
+    )
+    await db.execute(
+        text(
+            "DELETE FROM notifications WHERE user_id = :uid AND kind = :k"
+            " AND subject_node_id IS NULL"
+        ),
+        {"uid": user.id, "k": CALL_PUBLISHED},
     )
 
 
@@ -229,8 +286,18 @@ async def _fill(db: AsyncSession, user_id: UUID, marker: datetime | None) -> Non
     _filled[user_id] = marker
 
 
+async def _fill_calls(db: AsyncSession, user_id: UUID, marker: tuple[Any, ...]) -> None:
+    if marker[0] is not None:
+        await db.execute(_CALLS_FILL_SQL, {"uid": user_id})
+    if len(_calls_filled) >= _FILL_CACHE_MAX:
+        _calls_filled.clear()
+    _calls_filled[user_id] = marker
+
+
 async def refresh(db: AsyncSession, user_id: UUID, *, force: bool) -> None:
-    """Purge notifications past retention, then fill new ones (gated unless forced)."""
+    """Purge notifications past retention, then fill new ones (gated unless forced). call_match
+    fills before call_published, so a call that both matches the profile and names a followed
+    disease is shown once, as the more specific call_match."""
     from backend.api.services import suggestions  # call_match rows (connect stage 4)
 
     await db.execute(_PURGE_SQL, {"uid": user_id})
@@ -238,6 +305,15 @@ async def refresh(db: AsyncSession, user_id: UUID, *, force: bool) -> None:
     if force or user_id not in _filled or _filled[user_id] != marker:
         await _fill(db, user_id, marker)
     await suggestions.fill_notifications(db, user_id, force=force)
+    calls_marker = tuple((await db.execute(_CALLS_MARKER_SQL)).one())
+    if force or _calls_filled.get(user_id) != calls_marker:
+        await _fill_calls(db, user_id, calls_marker)
+
+
+def forget_calls_fill(user_id: UUID) -> None:
+    """Let the next unread-count poll fill call_published rows again (after call_match rows
+    were deleted, a followed call they covered is notified as call_published)."""
+    _calls_filled.pop(user_id, None)
 
 
 def _int(value: Any) -> int | None:
@@ -248,6 +324,7 @@ def _int(value: Any) -> int | None:
 
 
 def _call_notification(row: Any, titles: dict[str, str]) -> Notification:
+    """call_match and call_published: the call's title while it is listed, else gone."""
     disease = get_graph().nodes.get(row["subject_node_id"]) if row["subject_node_id"] else None
     title = titles.get(row["ref_id"])
     try:
@@ -256,7 +333,7 @@ def _call_notification(row: Any, titles: dict[str, str]) -> Notification:
         call_id = None
     return Notification(
         id=row["id"],
-        kind=NotificationKind.call_match,
+        kind=NotificationKind(row["kind"]),
         disease_id=row["subject_node_id"],
         disease_label=disease.label if disease is not None else None,
         item_id=row["ref_id"],
@@ -275,17 +352,21 @@ def _call_notification(row: Any, titles: dict[str, str]) -> Notification:
 async def _open_call_titles(db: AsyncSession, rows: list[Any]) -> dict[str, str]:
     ids = []
     for r in rows:
-        if r["kind"] == NotificationKind.call_match:
+        if r["kind"] in CALL_KINDS:
             try:
                 ids.append(UUID(r["ref_id"]))
             except ValueError:
                 continue
     if not ids:
         return {}
+    # Listed exactly as calls.list_published: published, open, the publisher's card visible.
     found = await db.execute(
         text(
-            "SELECT id, title FROM calls WHERE id = ANY(:ids) AND status = 'published'"
-            " AND (closes_at IS NULL OR closes_at >= current_date)"
+            "SELECT c.id, c.title FROM calls c"
+            " JOIN call_publisher_cards() cp ON cp.call_id = c.id"
+            " JOIN professional_cards() pc ON pc.card_id = cp.card_id"
+            " WHERE c.id = ANY(:ids) AND c.status = 'published'"
+            " AND (c.closes_at IS NULL OR c.closes_at >= current_date)"
         ),
         {"ids": ids},
     )
@@ -293,7 +374,7 @@ async def _open_call_titles(db: AsyncSession, rows: list[Any]) -> dict[str, str]
 
 
 def _notification(row: Any, titles: dict[str, str] | None = None) -> Notification:
-    if row["kind"] == NotificationKind.call_match:
+    if row["kind"] in CALL_KINDS:
         return _call_notification(row, titles or {})
     nodes = get_graph().nodes
     disease = nodes.get(row["subject_node_id"]) if row["subject_node_id"] else None
@@ -335,7 +416,7 @@ async def list_notifications(db: AsyncSession, user: CurrentUser, limit: int) ->
                 text(
                     "SELECT id, kind, ref_id, subject_node_id, data_version, created_at, read_at"
                     " FROM notifications WHERE user_id = :uid"
-                    " AND kind IN ('added', 'now_recruiting', 'call_match')"
+                    f" AND kind IN {_KINDS_SQL}"
                     " ORDER BY created_at DESC, data_version DESC NULLS LAST, kind DESC, id"
                     " LIMIT :limit"
                 ),
@@ -377,18 +458,17 @@ async def mark_read(db: AsyncSession, user: CurrentUser, body: MarkRead) -> Unre
 
 
 async def delete_health_data(db: AsyncSession, user_id: UUID) -> None:
-    """Withdrawal of health_data: follows and the notifications made from them, and the
-    call_match notifications (made from the profile, which is deleted too)."""
+    """Withdrawal of health_data: follows and the notifications made from them (including
+    call_published), and the call_match notifications (made from the profile, which is deleted
+    too)."""
     params = {"uid": user_id}
     await db.execute(
-        text(
-            "DELETE FROM notifications WHERE user_id = :uid"
-            " AND kind IN ('added', 'now_recruiting', 'call_match')"
-        ),
+        text(f"DELETE FROM notifications WHERE user_id = :uid AND kind IN {_KINDS_SQL}"),
         params,
     )
     await db.execute(text("DELETE FROM follows WHERE user_id = :uid"), params)
     _filled.pop(user_id, None)
+    _calls_filled.pop(user_id, None)
 
 
 async def export(
