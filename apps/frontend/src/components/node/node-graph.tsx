@@ -283,10 +283,16 @@ export const NodeGraph = forwardRef<NodeGraphHandle, Props>(function NodeGraph(p
         ed.toggleClass("peripheral", e.source_id !== centerId && e.target_id !== centerId);
       });
     });
+    // Hover, selection and filter fades ease over 200 ms instead of switching (none with reduced
+    // motion, and none on very large graphs where per-element transitions would stutter).
+    const fade = !propsRef.current.reducedMotion && cy.elements().length < 1500;
+    const transition = (props: string) =>
+      fade ? { "transition-property": props, "transition-duration": 0.2, "transition-timing-function": "ease-out" as const } : {};
     cy.style([
       {
         selector: "node",
         style: {
+          ...transition("opacity, underlay-opacity"),
           "background-color": "data(color)",
           width: "data(size)",
           height: "data(size)",
@@ -346,6 +352,7 @@ export const NodeGraph = forwardRef<NodeGraphHandle, Props>(function NodeGraph(p
       {
         selector: "edge",
         style: {
+          ...transition("opacity, width, overlay-opacity"),
           width: "data(width)",
           "line-color": "data(color)",
           "line-style": "data(lineStyle)" as never,
