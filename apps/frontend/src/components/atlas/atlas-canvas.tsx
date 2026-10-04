@@ -14,7 +14,7 @@
 import { MultiGraph } from "graphology";
 import { forwardRef, useEffect, useImperativeHandle, useLayoutEffect, useRef } from "react";
 import Sigma from "sigma";
-import type { EdgeProgramType } from "sigma/rendering";
+import type { EdgeProgramType, NodeProgramType } from "sigma/rendering";
 import type { EdgeDisplayData, NodeDisplayData } from "sigma/types";
 
 import type { LabelStyle } from "@/lib/graph/meta";
@@ -23,9 +23,10 @@ import type { GraphTheme } from "@/lib/graph/style";
 import type { EdgeFamily, NodeType } from "@/lib/graph/types";
 
 import { CATEGORY_META, categoryColor, categoryLabel, categoryLabelChars, categoryShortLabel } from "./atlas-categories";
-import { LABEL_CHAR_SHARE, LABEL_HEIGHT_SHARE, labelFitExtent, mixColor, withAlpha } from "./atlas-model";
+import { LABEL_CHAR_SHARE, LABEL_HEIGHT_SHARE, labelFitExtent, mixColor, nodeMinRadius, withAlpha, zoomToSizeRatio } from "./atlas-model";
 import type { WuFound } from "./atlas-props";
 import { EdgeDashProgram, type DashKind } from "./edge-dash-program";
+import { NodeMinCircleProgram } from "./node-min-program";
 import { ancestorsOf, descendantIds, type AtlasCategory, type TreeIndex, type TreeNodeKind } from "./tree-model";
 
 export type AtlasCanvasHandle = {
@@ -389,6 +390,8 @@ export const AtlasCanvas = forwardRef<AtlasCanvasHandle, Props>(function AtlasCa
     };
 
     const ratioNow = () => sigmaRef.current?.getCamera().getState().ratio ?? 1;
+    /** On-screen radius of a dot as the node program draws it (Sigma's size with a floor when zoomed in). */
+    const drawnRadius = (size: number) => Math.max(sigmaRef.current?.scaleSize(size) ?? size, nodeMinRadius(ratioNow()));
     // Dots are sized in screen pixels; on a small canvas the same map needs smaller dots.
     const dotScale = () => Math.min(1, Math.max(0.55, Math.min(el.clientWidth, el.clientHeight) / 700));
     let sizeScale = dotScale();
@@ -475,6 +478,7 @@ export const AtlasCanvas = forwardRef<AtlasCanvasHandle, Props>(function AtlasCa
       sigma = new Sigma<NodeAttrs, EdgeAttrs>(graph, el, {
         defaultEdgeType: "dash",
         edgeProgramClasses: { dash: EdgeDashProgram as unknown as EdgeProgramType<NodeAttrs, EdgeAttrs> },
+        nodeProgramClasses: { circle: NodeMinCircleProgram as unknown as NodeProgramType<NodeAttrs, EdgeAttrs> },
         renderEdgeLabels: false,
         renderLabels: false,
         labelFont: font,
@@ -484,20 +488,23 @@ export const AtlasCanvas = forwardRef<AtlasCanvasHandle, Props>(function AtlasCa
         zIndex: true,
         minCameraRatio: 0.008,
         maxCameraRatio: 1.6,
+        // The tree is large, so selecting zooms far in; capped growth keeps lines thin there.
+        zoomToSizeRatioFunction: zoomToSizeRatio,
         stagePadding: 16,
         defaultDrawNodeHover: (ctx, data, settings) => {
           const t = propsRef.current.theme;
           const size = settings.labelSize;
           const left = (data as unknown as NodeAttrs).left;
+          const r = Math.max(data.size, nodeMinRadius(ratioNow()));
           ctx.font = `600 ${size}px ${settings.labelFont}`;
           ctx.beginPath();
-          ctx.arc(data.x, data.y, data.size + 3, 0, Math.PI * 2);
+          ctx.arc(data.x, data.y, r + 3, 0, Math.PI * 2);
           ctx.lineWidth = 2;
           ctx.strokeStyle = t.highlight;
           ctx.stroke();
           if (typeof data.label !== "string" || !data.label) return;
           const w = ctx.measureText(data.label).width;
-          const x = left ? data.x - data.size - 7 - w : data.x + data.size + 7;
+          const x = left ? data.x - r - 7 - w : data.x + r + 7;
           const h = size + 8;
           ctx.fillStyle = t.dark ? "#1f2725" : "#ffffff";
           ctx.strokeStyle = t.border;
@@ -655,7 +662,7 @@ export const AtlasCanvas = forwardRef<AtlasCanvasHandle, Props>(function AtlasCa
       ctx.font = `600 12px ${font}`;
       const tw = ctx.measureText(n.label).width;
       const p = sigma.framedGraphToViewport(d);
-      const r = sigma.scaleSize(d.size);
+      const r = drawnRadius(d.size);
       const x = graph.getNodeAttribute(id, "left") ? p.x - r - 7 - tw : p.x + r + 7;
       const box: [number, number, number, number] = [x - 6, p.y - 11, x + tw + 6, p.y + 11];
       return { n, x, y: p.y, tw, box };
@@ -735,8 +742,9 @@ export const AtlasCanvas = forwardRef<AtlasCanvasHandle, Props>(function AtlasCa
         if (!forced && group && n.depth > 2 && ratio >= DEEP_LABEL_RATIO) continue;
         const d = sigma.getNodeDisplayData(id);
         if (!d || d.hidden) continue;
-        const r = sigma.scaleSize(d.size);
-        if (!forced && !group && r < ENTITY_LABEL_MIN_PX) continue;
+        const r = drawnRadius(d.size);
+        // Names appear with zoom as if dots grew at Sigma's default rate, although their growth is capped.
+        if (!forced && !group && d.size / Math.sqrt(ratio) < ENTITY_LABEL_MIN_PX) continue;
         const p = sigma.framedGraphToViewport(d);
         if (p.x < -300 || p.y < -20 || p.x > w + 300 || p.y > h + 20) continue;
         const f = `${group ? 600 : 500} ${LABEL_FONT_PX}px ${font}`;
@@ -982,7 +990,7 @@ export const AtlasCanvas = forwardRef<AtlasCanvasHandle, Props>(function AtlasCa
         if (!d) continue;
         const p = sigma.graphToViewport({ x: a.x, y: a.y });
         if (p.x < -20 || p.y < -20 || p.x > w + 20 || p.y > h + 20) continue;
-        const r = sigma.scaleSize(d.size) + 5;
+        const r = drawnRadius(d.size) + 5;
         ctx.beginPath();
         ctx.arc(p.x, p.y, r, 0, Math.PI * 2);
         ctx.lineWidth = id === selectedId ? 2.5 : 2;

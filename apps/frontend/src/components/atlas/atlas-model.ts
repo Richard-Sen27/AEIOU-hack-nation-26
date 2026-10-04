@@ -79,3 +79,41 @@ export function labelFitExtent(index: TreeIndex): number {
   if (!Number.isFinite(minX)) return 1;
   return Math.max(maxX - minX, (maxY - minY) / 0.5625, 1);
 }
+
+/** Camera ratio down to which items grow with zoom as in Sigma's default (overview and the first zoom step). */
+export const SIZE_ZOOM_KNEE = 0.7;
+/** How fast items still grow below the knee (Sigma's default is 0.5). */
+export const SIZE_ZOOM_SLOPE = 0.05;
+/**
+ * Sigma's `zoomToSizeRatioFunction`: drawn sizes are divided by it. Follows
+ * Sigma's default `sqrt(ratio)` down to the knee, so the overview is unchanged,
+ * then flattens, so zooming in on a large tree keeps lines thin and dots small
+ * (at the deepest zoom items are about 1.5 times their overview size, not 11).
+ */
+export function zoomToSizeRatio(ratio: number): number {
+  if (ratio >= SIZE_ZOOM_KNEE) return Math.sqrt(ratio);
+  return Math.sqrt(SIZE_ZOOM_KNEE) * Math.pow(ratio / SIZE_ZOOM_KNEE, SIZE_ZOOM_SLOPE);
+}
+
+/** Camera ratio from which dots get their full minimum radius (a leaf fan is spread out by then). */
+export const NODE_MIN_FULL_RATIO = 0.03;
+/** Smallest on-screen radius of a dot, in CSS pixels, once zoomed in. */
+export const NODE_MIN_RADIUS_PX = 5.5;
+/** Extra pixels around a dot that still hover and click it, once zoomed in. */
+export const NODE_HIT_PADDING_PX = 4;
+
+/** 0 at the knee and above (overview untouched), rising to 1 at NODE_MIN_FULL_RATIO and below. */
+function zoomedInShare(ratio: number): number {
+  if (ratio >= SIZE_ZOOM_KNEE) return 0;
+  return Math.min(1, Math.log(SIZE_ZOOM_KNEE / ratio) / Math.log(SIZE_ZOOM_KNEE / NODE_MIN_FULL_RATIO));
+}
+
+/** Floor on a dot's on-screen radius at this camera ratio (0 at the overview). */
+export function nodeMinRadius(ratio: number): number {
+  return NODE_MIN_RADIUS_PX * zoomedInShare(ratio);
+}
+
+/** Padding of a dot's hit area at this camera ratio (0 at the overview). */
+export function nodeHitPadding(ratio: number): number {
+  return NODE_HIT_PADDING_PX * zoomedInShare(ratio);
+}
