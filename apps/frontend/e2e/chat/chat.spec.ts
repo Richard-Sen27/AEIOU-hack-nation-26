@@ -1,6 +1,7 @@
 import { expect, test, type Page } from "@playwright/test";
 
 import { errorEnvelope, guestSession, mockApi, setTheme, shot, signedInSession, sseBody, trackConsoleErrors } from "../helpers";
+import { fecTree, summaryMock } from "../graph/atlas-fec-mocks";
 import { emptyReply, graphMocks, reply, SESSION_ID, STORY, turnBody } from "./fixtures";
 
 type Req = { url: string; method: string; body: unknown };
@@ -58,11 +59,11 @@ test.describe("chat", () => {
     await expect(t.getByTestId("mini-graph")).toBeVisible();
     await expect(t.getByTestId("mini-graph").locator('[data-edge-origin="inferred"] line').first()).toHaveAttribute("stroke-dasharray", "6 4");
     await expect(t.getByTestId("card-patient_group")).toContainText("STXBP1 Parents Group (fixture)");
-    await expect(t.getByTestId("card-open_in_atlas").getByRole("link", { name: /Open in Atlas/ })).toHaveAttribute("href", "/atlas?focus=MONDO%3A9900007");
+    await expect(t.getByTestId("card-open_in_atlas").getByRole("link", { name: /Open in Atlas/ })).toHaveAttribute("href", "/atlas");
     await expect(t.locator('[data-viable="true"]')).toContainText("Enrol within 3 months");
     await expect(t.locator('[data-viable="false"]')).toBeVisible();
     await expect(t.getByTestId("follow-up")).toBeVisible();
-    await expect(t.getByTestId("show-in-graph")).toHaveAttribute("href", /\/atlas\?focus=MONDO%3A9900007&path=/);
+    await expect(t.getByTestId("show-in-graph")).toHaveAttribute("href", "/atlas");
 
     // Document order: status → summary → chips → claims → cards → actions → follow-up.
     const order = await t.evaluate((el) =>
@@ -533,6 +534,36 @@ test.describe("chat", () => {
     await expect(page.getByRole("textbox", { name: "Message Dr. Wu" })).toHaveValue(STORY);
     await expect(page.getByTestId("user-message")).toHaveCount(0);
     expect(posted).toBe(false);
+  });
+
+  test("show in graph hands the finds to the Atlas in memory, never in a URL or storage", async ({ page }) => {
+    await signedIn(page, {
+      "POST /chat": turnBody(),
+      "GET /atlas/tree.json": fecTree(),
+      "GET /atlas/summary/*": summaryMock(),
+    });
+    await page.goto("/chat");
+    await ask(page);
+    await expect(turn(page)).toHaveAttribute("data-phase", "done");
+    await turn(page).getByTestId("show-in-graph").click();
+
+    await expect(page).toHaveURL(/\/atlas$/);
+    expect(new URL(page.url()).search).toBe("");
+    await expect(page.getByTestId("atlas-wu-found")).toContainText("Dr. Wu found 1");
+    const ids = ["MONDO:9900007", ...reply.graph_focus.highlight_path];
+    const hrefs = await page.locator("a[href]").evaluateAll((as) => as.map((a) => decodeURIComponent(a.getAttribute("href") ?? "")));
+    for (const id of ids) {
+      expect(decodeURIComponent(page.url())).not.toContain(id);
+      expect(hrefs.some((h) => h.includes(id))).toBe(false);
+    }
+    const stored = await page.evaluate(() => JSON.stringify({ ...localStorage }) + JSON.stringify({ ...sessionStorage }));
+    for (const id of ids) expect(stored).not.toContain(id);
+
+    // The finds are the dock's: the list opens and clears like a reply in the dock.
+    await page.getByTestId("atlas-wu-open").click();
+    await expect(page.getByTestId("atlas-wu-found-item")).toHaveText([/STXBP1 encephalopathy/]);
+    await page.getByTestId("atlas-wu-clear").click();
+    await expect(page.getByTestId("atlas-wu-found")).toHaveCount(0);
   });
 
   test("message text never reaches URLs or browser storage", async ({ page }) => {
