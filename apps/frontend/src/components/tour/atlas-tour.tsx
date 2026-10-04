@@ -4,7 +4,7 @@ import { Popover as PopoverPrimitive } from "@base-ui/react/popover";
 import { ArrowLeft, ArrowRight, Bot } from "lucide-react";
 import { useEffect, useLayoutEffect, useRef, useState } from "react";
 
-import { ConfidenceBadge, OriginBadge } from "@/components/graph-ui";
+import { ConfidenceBadge } from "@/components/graph-ui";
 import { Button } from "@/components/ui/button";
 import { announce } from "@/lib/a11y";
 import { cn } from "@/lib/utils";
@@ -27,65 +27,66 @@ function LineSample({ dash }: { dash?: string }) {
 export const TOUR_STEPS: Step[] = [
   {
     target: "canvas",
-    title: "Every dot is one thing",
+    title: "One map, many trees",
     body: (
       <p>
-        A dot can be a condition, a gene, a symptom, a patient group or a study. Bigger dots have more
-        connections. Scroll or pinch to zoom in and read the names.
+        The logo in the middle is the start. Each tree is one kind of thing: conditions, genes, symptoms,
+        doctors and more. Branches get more detailed further out. Scroll or pinch to zoom.
       </p>
     ),
   },
   {
-    target: "legend",
-    title: "Lines show how things are linked",
+    target: "canvas",
+    title: "Click a dot to see its connections",
     body: (
-      <ul className="space-y-1.5">
-        <li className="flex items-center gap-2">
-          <LineSample /> <span><strong className="font-semibold">Solid</strong>: found in a published source.</span>
-        </li>
-        <li className="flex items-center gap-2">
-          <LineSample dash="6 4" /> <span><strong className="font-semibold">Dashed</strong>: a guess from analysis, not proven.</span>
-        </li>
-        <li className="flex items-center gap-2">
-          <LineSample dash="1.5 3" /> <span><strong className="font-semibold">Dotted</strong>: shared by people, not checked yet.</span>
-        </li>
-      </ul>
+      <p>
+        Every dot is one thing. Click it and lines show what it is linked to, in any tree. The panel lists
+        them. Click empty space to clear.
+      </p>
     ),
   },
   {
-    title: "How sure are we?",
+    target: "filters",
+    title: "How sure is a connection?",
     body: (
       <div className="space-y-2">
-        <p>Every link has a badge. More bars means stronger sources. Click a badge to see why.</p>
+        <ul className="space-y-1.5">
+          <li className="flex items-center gap-2">
+            <LineSample /> <span><strong className="font-semibold">Solid</strong>: found in a published source.</span>
+          </li>
+          <li className="flex items-center gap-2">
+            <LineSample dash="6 4" /> <span><strong className="font-semibold">Dashed</strong>: a guess from analysis, not proven.</span>
+          </li>
+        </ul>
+        <p>More bars means stronger sources.</p>
         <div className="flex flex-wrap items-center gap-1.5">
           <ConfidenceBadge confidence={0.92} />
           <ConfidenceBadge confidence={0.62} />
           <ConfidenceBadge confidence={0.3} />
         </div>
-        <p className="flex flex-wrap items-center gap-1.5">
-          <OriginBadge origin="observed" /> means data. <OriginBadge origin="inferred" /> means a guess.
-        </p>
+        <p>The key is under Filters.</p>
       </div>
     ),
   },
   {
-    target: "find",
-    title: "Open a condition",
+    target: "search",
+    title: "Search the map",
     body: (
       <p>
-        Click a dot, then choose <strong className="font-semibold">Open</strong> to see everything linked to it.
-        Or find a name here, or with the search at the top.
+        Type a condition, gene, symptom or hospital. Each result shows where it sits in the trees. Press{" "}
+        <strong className="font-semibold">/</strong> to jump here.
       </p>
     ),
   },
   {
-    title: "Want help reading it?",
+    target: "wu",
+    title: "Ask Dr. Wu",
     body: (
       <p className="flex gap-2">
         <Bot className="mt-0.5 size-4 shrink-0 text-primary" aria-hidden />
         <span>
-          Signing in adds Dr. Wu, an AI assistant that explains what you see. Exploring the map stays free,
-          with no account.
+          Describe the problem in your own words. Dr. Wu, an AI assistant, finds the dots that fit. Chatting
+          needs sign-in; the map stays free.
         </span>
       </p>
     ),

@@ -11,30 +11,34 @@ test.describe("guided tour", () => {
     const tour = page.getByTestId("atlas-tour");
     await expect(tour).toBeVisible();
     await expect(tour).toContainText("1 of 5");
-    await expect(tour).toContainText("Every dot is one thing");
+    await expect(tour).toContainText("One map, many trees");
     await expect(page.getByTestId("tour-next")).toBeFocused();
     await page.keyboard.press("Enter");
+    await expect(tour).toContainText("Click a dot to see its connections");
+    await page.keyboard.press("ArrowRight");
+    await expect(tour).toContainText("How sure is a connection?");
     await expect(tour).toContainText("Solid");
     await expect(tour).toContainText("Dashed");
-    await page.keyboard.press("ArrowRight");
-    await expect(tour).toContainText("How sure are we?");
     await expect(tour.getByTestId("confidence-badge")).toHaveCount(3);
+    await page.keyboard.press("ArrowRight");
+    await expect(tour).toContainText("Search the map");
     await page.keyboard.press("ArrowLeft");
-    await expect(tour).toContainText("2 of 5");
+    await expect(tour).toContainText("3 of 5");
     await page.getByTestId("tour-skip").click();
     await expect(tour).toBeHidden();
     await expect(page).not.toHaveURL(/tour=1/);
     expect(errors()).toEqual([]);
   });
 
-  test("runs to the end and mentions sign-in; Escape closes", async ({ page }) => {
+  test("runs to the end with Dr. Wu and sign-in; Escape closes", async ({ page }) => {
     await mockApi(page, graphMocks());
     await page.goto("/atlas");
     await page.getByTestId("tour-start").click();
     const tour = page.getByTestId("atlas-tour");
     for (let i = 0; i < 4; i++) await page.getByTestId("tour-next").click();
     await expect(tour).toContainText("5 of 5");
-    await expect(tour).toContainText("Dr. Wu");
+    await expect(tour).toContainText("Ask Dr. Wu");
+    await expect(tour).toContainText("sign-in");
     await page.getByTestId("tour-next").click();
     await expect(tour).toBeHidden();
     await page.getByTestId("tour-start").click();
