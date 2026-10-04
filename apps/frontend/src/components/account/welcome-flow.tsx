@@ -3,7 +3,7 @@
 import { ArrowRight, Check, Loader2 } from "lucide-react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
-import { useId, useState } from "react";
+import { useEffect, useId, useRef, useState } from "react";
 import { toast } from "sonner";
 
 import { safeReturnTo, useSession } from "@/components/providers/session-provider";
@@ -28,6 +28,7 @@ import { DeleteAccountButton } from "./delete-account";
 import { LANGUAGES, ROLE_COPY, SELECTABLE_ROLES, type SelectableRole } from "./labels";
 import { NativeSelect } from "./native-select";
 import { SessionLoading, SignInPrompt } from "./sign-in-prompt";
+import { WORK_DETAILS_NOTE, WorkDetailsForm } from "./work-details";
 
 function browserLanguage(): string {
   if (typeof navigator === "undefined") return "en";
@@ -107,6 +108,7 @@ function WelcomeForm({ user, next }: { user: SessionUser; next?: string }) {
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [triedSubmit, setTriedSubmit] = useState(false);
+  const [step, setStep] = useState<"settings" | "work">("settings");
   const target = safeReturnTo(next);
 
   async function submit(e: React.FormEvent) {
@@ -123,6 +125,12 @@ function WelcomeForm({ user, next }: { user: SessionUser; next?: string }) {
       await unwrap(updateSettings({ body, meta: { quiet: true } }));
       await refresh();
       toast("You're all set", { description: `${ROLE_COPY[role].label} view. Change it any time in your profile.` });
+      // Doctors and researchers get one optional extra screen; skipping never blocks.
+      if (role === "doctor" || role === "researcher") {
+        setBusy(false);
+        setStep("work");
+        return;
+      }
       router.replace(target);
     } catch (err) {
       const code = err instanceof ApiError ? err.code : "";
@@ -136,6 +144,8 @@ function WelcomeForm({ user, next }: { user: SessionUser; next?: string }) {
       setBusy(false);
     }
   }
+
+  if (step === "work") return <WorkStep onDone={() => router.replace(target)} />;
 
   return (
     <>
@@ -247,5 +257,29 @@ function WelcomeForm({ user, next }: { user: SessionUser; next?: string }) {
         </div>
       </form>
     </>
+  );
+}
+
+/** Optional second screen for doctors and researchers: private work details. */
+function WorkStep({ onDone }: { onDone: () => void }) {
+  const headingRef = useRef<HTMLHeadingElement>(null);
+  useEffect(() => {
+    window.scrollTo({ top: 0 });
+    headingRef.current?.focus();
+  }, []);
+  return (
+    <section
+      aria-labelledby="work-step-h"
+      className="rounded-xl border bg-card p-5 sm:p-6"
+      data-testid="welcome-work-step"
+    >
+      <div className="mb-5 space-y-1">
+        <h2 id="work-step-h" ref={headingRef} tabIndex={-1} className="text-base font-semibold tracking-tight outline-none">
+          About your work (optional)
+        </h2>
+        <p className="text-sm text-muted-foreground">{WORK_DETAILS_NOTE}</p>
+      </div>
+      <WorkDetailsForm variant="welcome" onDone={onDone} />
+    </section>
   );
 }
