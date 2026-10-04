@@ -116,7 +116,12 @@ async def test_structured_bad_output_after_retries(mock_openai):
 def _tools(log):
     async def search(p: SearchIn):
         log.append(("search_graph", p.query))
-        return {"results": [{"id": "MONDO:0100135", "edge_id": "e_0123456789ab"}]}
+        return {
+            "results": [
+                {"id": "MONDO:0100135", "label": "Dravet syndrome", "edge_id": "e_0123456789ab"},
+                {"id": "MONDO:0011873", "label": "Doose syndrome"},
+            ]
+        }
 
     async def path(p: PathIn):
         log.append(("find_path", p.from_id, p.to_id))
@@ -141,8 +146,8 @@ async def test_run_tools_native_namespace(mock_openai):
     )
     assert result.tool_mode == "namespace"
     assert [c.name for c in result.tool_calls] == ["search_graph", "find_path"]
-    assert calls[0] == ("search_graph", "My daughter has STXBP1 and seizures")
-    assert calls[1][1] == "MONDO:0100135"
+    assert calls[0] == ("search_graph", "STXBP1")
+    assert calls[1][1:] == ("MONDO:0100135", "MONDO:0011873")
     assert set(result.output.edge_ids) == {"e_0123456789ab", "e_fedcba987654"}
     assert result.usage.total_tokens > 0
     kinds = [e.type for e in events]
@@ -192,13 +197,13 @@ async def test_run_tools_falls_back_to_json_protocol(mock_openai):
 async def test_run_tools_json_protocol_plain_text(mock_openai):
     mock_openai.configure(reject_function_tools=True)
     result = await _llm(mock_openai).run_tools(instructions="x", input="hi", tools=_tools([]))
-    assert result.output is None and "mock answer" in result.text
+    assert result.output is None and "Dravet syndrome" in result.text
 
 
 async def test_run_tools_without_final_schema_and_reasoning_rejected(mock_openai):
     mock_openai.configure(reject_include=True)
     result = await _llm(mock_openai).run_tools(instructions="x", input="hi", tools=_tools([]))
-    assert "mock answer" in result.text
+    assert "Dravet syndrome" in result.text
     assert "include" not in _bodies(mock_openai)[-1]
 
 
@@ -357,7 +362,7 @@ async def test_agents_sdk_streamed_run(mock_openai):
     run = Runner.run_streamed(agent, "SCN1A pathway", run_config=run_config(), max_turns=4)
     async for _ in run.stream_events():
         pass
-    assert seen == ["SCN1A pathway"]
+    assert seen == ["SCN1A"]
     assert "e_0123456789ab" in run.final_output
     for body in _bodies(mock_openai):
         _assert_plan_safe(body)
