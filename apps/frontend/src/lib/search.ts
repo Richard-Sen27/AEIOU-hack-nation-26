@@ -1,4 +1,5 @@
 import { search, unwrap } from "@/lib/api";
+import type { NodeType } from "@/lib/api/generated/types.gen";
 import type { SearchHit, SearchResponse } from "@/lib/api/types";
 
 /**
@@ -22,9 +23,10 @@ export function isEntityQuery(q: string): boolean {
   return true;
 }
 
-/** Typeahead against the API. Throws `ApiError` (quietly, no global toast). */
-export async function searchEntities(q: string, signal?: AbortSignal): Promise<SearchHit[]> {
+/** Typeahead against the API, optionally limited to node types. Throws `ApiError` (quietly, no global toast). */
+export async function searchEntities(q: string, signal?: AbortSignal, types?: NodeType[]): Promise<SearchHit[]> {
   if (!isEntityQuery(q)) return [];
-  const res: SearchResponse | SearchHit[] = await unwrap(search({ query: { q: q.trim() }, signal, meta: { quiet: true } }));
+  const query = types?.length ? { q: q.trim(), types } : { q: q.trim() };
+  const res: SearchResponse | SearchHit[] = await unwrap(search({ query, signal, meta: { quiet: true } }));
   return Array.isArray(res) ? res : (res?.results ?? []);
 }

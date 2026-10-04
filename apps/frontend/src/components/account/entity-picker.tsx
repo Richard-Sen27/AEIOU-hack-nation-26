@@ -1,33 +1,46 @@
 "use client";
 
-import { Loader2 } from "lucide-react";
+import { Loader2, PenLine } from "lucide-react";
 import { useEffect, useRef, useState } from "react";
 
 import { Command, CommandGroup, CommandInput, CommandItem, CommandList } from "@/components/ui/command";
 import { nodeTypeMeta } from "@/lib/graph/meta";
+import type { NodeType } from "@/lib/api/generated/types.gen";
 import type { SearchHit } from "@/lib/api/types";
 import { isEntityQuery, searchEntities } from "@/lib/search";
 import { cn } from "@/lib/utils";
 
 /**
  * Typeahead for one node type (disease → MONDO, gene → HGNC, phenotype →
- * HPO) over `GET /search`. Only short entity-like terms are ever searched
- * (lib/search enforces it); longer text is never sent.
+ * HPO, institution) over `GET /search?types=`. Only short entity-like terms
+ * are ever searched (lib/search enforces it); longer text is never sent.
+ * With `onFreeText`, a "Use '…' as typed" item keeps what was typed, for
+ * names the atlas does not have (or that are never searched, like "St. Jude").
  */
 export function EntityPicker({
   types,
   label,
   placeholder,
   onSelect,
+  onFreeText,
+  freeTextMax = 200,
+  idleHint = "Type a name, like a diagnosis, gene or symptom. Sentences are not searched.",
+  disabled,
   exclude = [],
   className,
   testId,
 }: {
-  types: string[];
+  types: NodeType[];
   /** Accessible name of the input. */
   label: string;
   placeholder?: string;
   onSelect: (hit: SearchHit) => void;
+  /** Offer the typed text itself as a choice. */
+  onFreeText?: (text: string) => void;
+  freeTextMax?: number;
+  /** Shown while the typed text is not something that is searched. */
+  idleHint?: string;
+  disabled?: boolean;
   exclude?: string[];
   className?: string;
   testId?: string;
@@ -61,7 +74,7 @@ export function EntityPicker({
     setState("loading");
     timerRef.current = window.setTimeout(async () => {
       try {
-        const res = await searchEntities(term, ctrl.signal);
+        const res = await searchEntities(term, ctrl.signal, types);
         if (ctrl.signal.aborted) return;
         setResults(res.filter((h) => types.includes(h.type)));
         setState("done");
@@ -74,7 +87,9 @@ export function EntityPicker({
   }
 
   const hits = results.filter((h) => !exclude.includes(h.id)).slice(0, 8);
-  const open = q.trim().length >= 2;
+  const typed = q.trim();
+  const open = typed.length >= 2;
+  const freeText = !!onFreeText && open && typed.length <= freeTextMax && !hits.some((h) => h.label.toLowerCase() === typed.toLowerCase());
   const meta = nodeTypeMeta(types[0]);
 
   return (
@@ -91,7 +106,7 @@ export function EntityPicker({
       data-testid={testId}
       label={label}
     >
-      <CommandInput value={q} onValueChange={onChange} placeholder={placeholder} aria-label={label} />
+      <CommandInput value={q} onValueChange={onChange} placeholder={placeholder} aria-label={label} disabled={disabled} />
       {open && (
         <CommandList className="max-h-60 border-t px-1 pt-1 pb-1">
           {state === "loading" && (
@@ -99,15 +114,11 @@ export function EntityPicker({
               <Loader2 className="size-3.5 animate-spin" aria-hidden /> Searching…
             </div>
           )}
-          {state === "idle" && (
-            <p className="px-2 py-2 text-xs text-muted-foreground">
-              Type a name, like a diagnosis, gene or symptom. Sentences are not searched.
-            </p>
-          )}
+          {state === "idle" && !freeText && <p className="px-2 py-2 text-xs text-muted-foreground">{idleHint}</p>}
           {state === "error" && (
             <p className="px-2 py-2 text-xs text-muted-foreground">Search is not available right now.</p>
           )}
-          {state === "done" && hits.length === 0 && (
+          {state === "done" && hits.length === 0 && !freeText && (
             <p className="px-2 py-2 text-xs text-muted-foreground">No match. Try another name or spelling.</p>
           )}
           {hits.length > 0 && (
@@ -131,6 +142,20 @@ export function EntityPicker({
                   <span className="font-mono text-[10.5px] text-muted-foreground">{h.id}</span>
                 </CommandItem>
               ))}
+            </CommandGroup>
+          )}
+          {freeText && (
+            <CommandGroup>
+              <CommandItem
+                value="__free-text__"
+                onSelect={() => {
+                  onFreeText?.(typed);
+                  onChange("");
+                }}
+              >
+                <PenLine className="size-3.5 text-muted-foreground" aria-hidden />
+                <span className="min-w-0 flex-1 truncate">Use &ldquo;{typed}&rdquo; as typed</span>
+              </CommandItem>
             </CommandGroup>
           )}
         </CommandList>
