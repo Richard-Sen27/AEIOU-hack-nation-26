@@ -60,3 +60,22 @@ export function mixColor(a: string, b: string, t: number): string {
   const c = x.map((v, i) => Math.round(v + (y[i] - v) * t));
   return `#${c.map((v) => v.toString(16).padStart(2, "0")).join("")}`;
 }
+
+/**
+ * Size of the box the backend layout keeps free for a category label, in graph units
+ * (`_label_points` in apps/backend/.../atlas_tree.py: one character 0.6% and the height 1.8%
+ * of the map's 16:9 fitting extent, written along the outer edge, centred on label_x/y).
+ */
+export const LABEL_CHAR_SHARE = 0.006;
+export const LABEL_HEIGHT_SHARE = 0.018;
+export function labelFitExtent(index: TreeIndex): number {
+  let minX = Infinity, maxX = -Infinity, minY = Infinity, maxY = -Infinity;
+  for (const n of index.nodes.values()) {
+    minX = Math.min(minX, n.x);
+    maxX = Math.max(maxX, n.x);
+    minY = Math.min(minY, n.y);
+    maxY = Math.max(maxY, n.y);
+  }
+  if (!Number.isFinite(minX)) return 1;
+  return Math.max(maxX - minX, (maxY - minY) / 0.5625, 1);
+}

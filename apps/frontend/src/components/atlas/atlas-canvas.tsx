@@ -22,8 +22,8 @@ import { ORIGIN_META } from "@/lib/graph/meta";
 import type { GraphTheme } from "@/lib/graph/style";
 import type { EdgeFamily, NodeType } from "@/lib/graph/types";
 
-import { CATEGORY_META, categoryColor, categoryLabel } from "./atlas-categories";
-import { mixColor, withAlpha } from "./atlas-model";
+import { CATEGORY_META, categoryColor, categoryLabel, categoryLabelChars, categoryShortLabel } from "./atlas-categories";
+import { LABEL_CHAR_SHARE, LABEL_HEIGHT_SHARE, labelFitExtent, mixColor, withAlpha } from "./atlas-model";
 import type { WuFound } from "./atlas-props";
 import { EdgeDashProgram, type DashKind } from "./edge-dash-program";
 import { ancestorsOf, descendantIds, type AtlasCategory, type TreeIndex, type TreeNodeKind } from "./tree-model";
@@ -701,12 +701,30 @@ export const AtlasCanvas = forwardRef<AtlasCanvasHandle, Props>(function AtlasCa
     // Category labels (HTML, rotated along the outer edge) and the logo on the hub.
     const layer = labelLayer.current;
     const labelEls = new Map<string, HTMLDivElement>();
+    const LABEL_CLASS = "whitespace-nowrap font-heading font-semibold leading-none tracking-[0.01em]";
+    // Each name is drawn inside the box the layout keeps free for it (no node, no other name):
+    // its size follows the map, capped when zoomed in; small canvases switch to a short name.
+    const fitExtent = labelFitExtent(index);
+    const LABEL_MAX_PX = 17;
+    const LABEL_READABLE_PX = 9.5;
+    const measure = document.createElement("span");
+    measure.className = `${LABEL_CLASS} pointer-events-none invisible absolute top-0 left-0`;
+    measure.style.fontSize = "100px";
+    const widthPerPx = new Map<string, number>();
+    const textWidth = (text: string) => {
+      let w = widthPerPx.get(text);
+      if (w === undefined) {
+        measure.textContent = text;
+        w = measure.getBoundingClientRect().width / 100;
+        if (w > 0) widthPerPx.set(text, w);
+      }
+      return w || text.length * 0.75;
+    };
     if (layer) {
-      layer.replaceChildren();
+      layer.replaceChildren(measure);
       for (const c of index.categories.values()) {
         const d = document.createElement("div");
-        d.className =
-          "absolute top-0 left-0 whitespace-nowrap font-heading text-[11px] font-semibold tracking-[0.08em] uppercase sm:text-sm";
+        d.className = `absolute top-0 left-0 ${LABEL_CLASS}`;
         d.style.color = `color-mix(in oklab, var(${CATEGORY_META[c.id].colorVar}) 80%, var(--foreground))`;
         d.style.textShadow = "0 0 3px var(--background), 0 0 6px var(--background)";
         d.dataset.testid = "atlas-category-label";
@@ -719,12 +737,41 @@ export const AtlasCanvas = forwardRef<AtlasCanvasHandle, Props>(function AtlasCa
     const placeOverlays = () => {
       const { labelStyle } = propsRef.current;
       const origin = sigma.graphToViewport({ x: 0, y: 0 });
+      const unit = sigma.graphToViewport({ x: 1000, y: 0 });
+      const pxPerUnit = Math.hypot(unit.x - origin.x, unit.y - origin.y) / 1000;
+      const boxH = LABEL_HEIGHT_SHARE * fitExtent * pxPerUnit;
+      // Pick each name (short where the full one would be unreadable) and its largest fitting
+      // size; all names share one size unless their box forces one smaller.
+      const picks = new Map<string, { text: string; size: number }>();
+      let common = LABEL_MAX_PX;
+      for (const c of index.categories.values()) {
+        const boxW = categoryLabelChars(c.id) * LABEL_CHAR_SHARE * fitExtent * pxPerUnit;
+        // Mixed case: ascender to baseline is about 0.75 of the font size (few descenders).
+        const fit = (t: string) => Math.min(LABEL_MAX_PX, boxH / 0.95, boxW / textWidth(t));
+        let text = categoryLabel(c.id, labelStyle);
+        let size = fit(text);
+        if (size < LABEL_READABLE_PX) {
+          const short = categoryShortLabel(c.id, labelStyle);
+          const shortSize = fit(short);
+          if (shortSize > size) {
+            text = short;
+            size = shortSize;
+          }
+        }
+        picks.set(c.id, { text, size });
+        common = Math.min(common, size);
+      }
+      common = Math.max(common, LABEL_READABLE_PX);
       for (const c of index.categories.values()) {
         const d = labelEls.get(c.id);
-        if (!d) continue;
-        const text = categoryLabel(c.id, labelStyle);
+        const pick = picks.get(c.id);
+        if (!d || !pick) continue;
+        const { text } = pick;
+        const size = Math.min(pick.size, common);
         if (d.textContent !== text) d.textContent = text;
-        const mid = (c.angle_start + c.angle_end) / 2;
+        d.style.fontSize = `${size.toFixed(2)}px`;
+        // The layout writes the name along the tangent at the label's own angle.
+        const mid = Math.atan2(c.label_y, c.label_x);
         const p = sigma.graphToViewport({ x: c.label_x, y: c.label_y });
         const dir = sigma.graphToViewport({ x: Math.cos(mid) * 100, y: Math.sin(mid) * 100 });
         // Text runs along the tangent of the outer edge; flipped where it would read upside down.

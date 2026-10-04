@@ -96,3 +96,29 @@ export function categoryLabel(category: AtlasCategory, labelStyle: LabelStyle): 
 export function categoryColor(category: AtlasCategory, theme: GraphTheme): string {
   return theme.node[CATEGORY_META[category].colorType] ?? theme.muted;
 }
+
+/**
+ * Short category names per lens, for small canvases where the full name would have to be
+ * drawn too small to read inside the space the layout reserves for it.
+ */
+export const CATEGORY_SHORT_LABEL: Record<AtlasCategory, Record<LabelStyle, string>> = {
+  researchers: { plain: "Researchers", clinical: "Researchers", technical: "Researchers" },
+  institutions: { plain: "Hospitals", clinical: "Hospitals", technical: "Institutions" },
+  literature: { plain: "Articles", clinical: "Publications", technical: "Literature" },
+  community: { plain: "Patient groups", clinical: "Patient groups", technical: "Community" },
+  pathways: { plain: "Processes", clinical: "Pathways", technical: "Pathways" },
+  genes: { plain: "Genes", clinical: "Genes", technical: "Genes" },
+  diseases: { plain: "Conditions", clinical: "Diseases", technical: "Diseases" },
+  symptoms: { plain: "Symptoms", clinical: "Features", technical: "Phenotypes" },
+  doctors: { plain: "Doctors", clinical: "Clinicians", technical: "Clinicians" },
+};
+
+/** Short category label for the current lens. */
+export function categoryShortLabel(category: AtlasCategory, labelStyle: LabelStyle): string {
+  return CATEGORY_SHORT_LABEL[category][labelStyle];
+}
+
+/** Longest name of a category across lenses, in characters (the layout reserves room for it). */
+export function categoryLabelChars(category: AtlasCategory): number {
+  return Math.max(...Object.values(CATEGORY_META[category].label).map((l) => l.length));
+}
