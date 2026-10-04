@@ -12,11 +12,11 @@ from backend.llm import LLMClient
 
 MESSAGE = "STXBP1 encephalopathy and seizures, my daughter Anna is 4"
 STEP = re.compile(
-    r"^chat step kind=(model|tool|check) name=[a-z_]+(:[A-Za-z0-9_-]+)?"
+    r"^chat step kind=(model|tool|check|prep|budget) name=[a-z_]+(:[A-Za-z0-9_-]+)?"
     r"( model=[A-Za-z0-9._-]+)? duration_ms=\d+ elapsed_ms=\d+( error=[A-Za-z_]+)?$"
 )
 TURN = re.compile(
-    r"^chat turn outcome=(answered|deadline|error|cancelled) total_ms=\d+ model_calls=\d+"
+    r"^chat turn outcome=(answered|partial|deadline|error|cancelled) total_ms=\d+ model_calls=\d+"
     r" tool_calls=\d+( error=[A-Za-z_]+)?$"
 )
 SPEC = Path(__file__).resolve().parents[4] / "docs" / "specs" / "agent.md"
@@ -33,20 +33,25 @@ def timing(caplog):
     return lambda: [r.getMessage() for r in caplog.records if r.name == agent.timing_log.name]
 
 
-async def test_turn_deadline_is_45_seconds(doctor, user_llm, monkeypatch):
-    assert agent.TURN_DEADLINE_S == 45.0
-    assert "8 calls per turn, 45 s wall clock" in SPEC.read_text()
+async def test_turn_budget_and_deadline(doctor, user_llm, monkeypatch):
+    assert agent.TURN_DEADLINE_S == 90.0
+    assert (agent.MAX_TOOL_ROUNDS, agent.TOOL_PHASE_S) == (3, 15.0)
+    assert "3 tool rounds and 15 s of tool work" in SPEC.read_text()
+    assert "90 s deadline" in SPEC.read_text()
     seen = []
     original = LLMClient.run_tools
 
     async def spy(self, **kwargs):
-        seen.append(kwargs["deadline_s"])
+        seen.append(kwargs)
         return await original(self, **kwargs)
 
     monkeypatch.setattr(LLMClient, "run_tools", spy)
     status, events = await post_sse(doctor.client, "/chat", {"message": "STXBP1"})
     assert status == 200 and events[-1]["type"] == "final"
-    assert seen == [45.0]
+    assert len(seen) == 1
+    assert 85.0 < seen[0]["deadline_s"] <= 90.0  # what is left of the turn after the pre-step
+    assert seen[0]["max_rounds"] == 3 and 10.0 < seen[0]["tools_for_s"] <= 15.0
+    assert seen[0]["tool_effort"] == "low"
 
 
 async def test_timing_log_per_step(doctor, user_llm, timing):
@@ -59,10 +64,10 @@ async def test_timing_log_per_step(doctor, user_llm, timing):
     assert turns[0].startswith("chat turn outcome=answered ")
 
     names = [line.split(" name=")[1].split(" ")[0] for line in steps]
-    assert names[0] == "tool_round"
-    assert "structured:Extraction" in names  # the nested call inside extract_entities
-    assert names.index("structured:Extraction") < names.index("extract_entities")
-    assert {"extract_entities", "resolve_to_ids", "search_graph"} <= set(names)
+    # Model list, then extraction and resolution before the first round of the main model.
+    assert names[:4] == ["models", "structured:Extraction", "extract_entities", "resolve_to_ids"]
+    assert names[4] == "tool_round"
+    assert "search_graph" in names
     assert names[-1] == "postcheck"
     model_calls = sum(" kind=model " in line for line in steps)
     tool_calls = sum(" kind=tool " in line for line in steps)

@@ -1,7 +1,9 @@
-"""The orchestrator's six tools as typed Pydantic tools over the backend services.
+"""The orchestrator's tools as typed Pydantic tools over the backend services.
 
-Every tool output the model sees is recorded in TurnState; the post-checks only accept edge and
-node IDs that a tool returned in this turn."""
+`extract_entities` and the first `resolve_to_ids` run in code before the first model round
+(`extract` + `resolve`), so the model starts with resolved chips; the model is offered the
+other five tools. Every tool output the model sees is recorded in TurnState; the post-checks
+only accept edge and node IDs that a tool returned in this turn."""
 
 from collections import Counter
 from dataclasses import dataclass, field
@@ -71,6 +73,7 @@ STATUS_TEXT = {
         "de": "Verlässlichste Verbindung wird gesucht",
     },
     "ask_followup": {"en": "Choosing one question", "de": "Eine Rückfrage wird gewählt"},
+    "answer": {"en": "Writing the answer", "de": "Antwort wird geschrieben"},
     "checks": {
         "en": "Checking citations and safety",
         "de": "Quellen und Sicherheit werden geprüft",
@@ -115,12 +118,6 @@ class Extraction(BaseModel):
     country: str | None = Field(description="ISO 3166-1 alpha-2 country, if stated.")
 
 
-class ExtractIn(BaseModel):
-    text: str | None = Field(
-        None, description="Redacted text to extract from; null = the user's current message."
-    )
-
-
 class MentionIn(BaseModel):
     text: str = Field(description="Mention (prefer the English term).")
     type: ChipType
@@ -129,7 +126,7 @@ class MentionIn(BaseModel):
 
 class ResolveIn(BaseModel):
     mentions: list[MentionIn] = Field(
-        description="Mentions to resolve; empty = everything extract_entities found."
+        description="Mentions to resolve; empty = everything the extraction found."
     )
 
 
@@ -292,79 +289,90 @@ EXTRACT_INSTRUCTIONS = (
 )
 
 
-def build_tools(state: TurnState, llm: LLMClient) -> list[Tool]:
-    lens = state.lens
+async def extract(state: TurnState, llm: LLMClient, text: str | None = None) -> Extraction:
+    """extract_entities: candidate chips, negation, age, onset and country from the redacted
+    message, on the small model at a low reasoning effort when the model offers one."""
+    source = text.strip() if text and text.strip() else state.message
+    extraction = await llm.structured(
+        Extraction, instructions=EXTRACT_INSTRUCTIONS, input=source, kind="small", effort="low"
+    )
+    state.extraction = extraction
+    return extraction
 
-    async def extract_entities(params: ExtractIn) -> dict:
-        source = params.text.strip() if params.text and params.text.strip() else state.message
-        extraction = await llm.structured(
-            Extraction, instructions=EXTRACT_INSTRUCTIONS, input=source, kind="small"
-        )
-        state.extraction = extraction
-        return extraction.model_dump(mode="json")
+
+def extraction_mentions(ex: Extraction) -> list[MentionIn]:
+    mentions: list[MentionIn] = []
+    for chip_type, items in (
+        (ChipType.disease, ex.diseases),
+        (ChipType.gene, ex.genes),
+        (ChipType.variant, ex.variants),
+        (ChipType.symptom, ex.symptoms),
+    ):
+        mentions += [
+            MentionIn(text=m.english or m.text, type=chip_type, negated=m.negated) for m in items
+        ]
+    return mentions
+
+
+async def resolve(state: TurnState, mentions: list[MentionIn]) -> dict:
+    """resolve_to_ids: mentions to stable IDs; every result becomes an unconfirmed chip."""
+    confirmed = state.profile_ids()
+    resolved, unresolved = [], []
+    async with user_transaction(None) as db:
+        for m in mentions[:20]:
+            resp = await search_service.search(db, m.text, types=[CHIP_NODE_TYPES[m.type]], limit=3)
+            if not resp.results:
+                unresolved.append({"text": m.text, "type": m.type.value})
+                state.add_chip(
+                    Chip(
+                        type=m.type,
+                        id=None,
+                        label=m.text[:80],
+                        negated=m.negated,
+                        confirmed=False,
+                    )
+                )
+                continue
+            top = resp.results[0]
+            for r in resp.results:
+                state.node_ids.add(r.id)
+            state.add_chip(
+                Chip(
+                    type=m.type,
+                    id=top.id,
+                    label=top.label,
+                    negated=m.negated,
+                    confirmed=top.id in confirmed,
+                )
+            )
+            resolved.append(
+                {
+                    "mention": m.text,
+                    "type": m.type.value,
+                    "id": top.id,
+                    "label": top.label,
+                    "matched_synonym": top.matched_synonym,
+                    "score": round(top.score, 3),
+                    "negated": m.negated,
+                    "cluster_id": top.cluster_id,
+                    "alternatives": [
+                        {"id": r.id, "label": r.label, "score": round(r.score, 3)}
+                        for r in resp.results[1:]
+                    ],
+                }
+            )
+    return {"resolved": resolved, "unresolved": unresolved, "chips_are_unconfirmed": True}
+
+
+def build_tools(state: TurnState, llm: LLMClient) -> list[Tool]:
+    """The tools offered to the model (extract_entities runs before the loop, see `extract`)."""
+    lens = state.lens
 
     async def resolve_to_ids(params: ResolveIn) -> dict:
         mentions = list(params.mentions)
         if not mentions and state.extraction is not None:
-            ex = state.extraction
-            for chip_type, items in (
-                (ChipType.disease, ex.diseases),
-                (ChipType.gene, ex.genes),
-                (ChipType.variant, ex.variants),
-                (ChipType.symptom, ex.symptoms),
-            ):
-                mentions += [
-                    MentionIn(text=m.english or m.text, type=chip_type, negated=m.negated)
-                    for m in items
-                ]
-        confirmed = state.profile_ids()
-        resolved, unresolved = [], []
-        async with user_transaction(None) as db:
-            for m in mentions[:20]:
-                resp = await search_service.search(
-                    db, m.text, types=[CHIP_NODE_TYPES[m.type]], limit=3
-                )
-                if not resp.results:
-                    unresolved.append({"text": m.text, "type": m.type.value})
-                    state.add_chip(
-                        Chip(
-                            type=m.type,
-                            id=None,
-                            label=m.text[:80],
-                            negated=m.negated,
-                            confirmed=False,
-                        )
-                    )
-                    continue
-                top = resp.results[0]
-                for r in resp.results:
-                    state.node_ids.add(r.id)
-                state.add_chip(
-                    Chip(
-                        type=m.type,
-                        id=top.id,
-                        label=top.label,
-                        negated=m.negated,
-                        confirmed=top.id in confirmed,
-                    )
-                )
-                resolved.append(
-                    {
-                        "mention": m.text,
-                        "type": m.type.value,
-                        "id": top.id,
-                        "label": top.label,
-                        "matched_synonym": top.matched_synonym,
-                        "score": round(top.score, 3),
-                        "negated": m.negated,
-                        "cluster_id": top.cluster_id,
-                        "alternatives": [
-                            {"id": r.id, "label": r.label, "score": round(r.score, 3)}
-                            for r in resp.results[1:]
-                        ],
-                    }
-                )
-        return {"resolved": resolved, "unresolved": unresolved, "chips_are_unconfirmed": True}
+            mentions = extraction_mentions(state.extraction)
+        return await resolve(state, mentions)
 
     async def search_graph(params: SearchIn) -> dict:
         expert = lens.expert_mode if params.expert is None else (params.expert or lens.expert_mode)
@@ -487,16 +495,10 @@ def build_tools(state: TurnState, llm: LLMClient) -> list[Tool]:
 
     return [
         Tool(
-            "extract_entities",
-            "Extract candidate chips (diseases, genes, HGVS variants, symptoms with negation, "
-            "age, onset, country) from the user's redacted message.",
-            ExtractIn,
-            extract_entities,
-        ),
-        Tool(
             "resolve_to_ids",
-            "Resolve mentions to stable IDs with scores: diseases to MONDO, genes to HGNC, "
-            "variants to ClinVar, symptoms to HPO. Results are unconfirmed chips.",
+            "Resolve further mentions to stable IDs with scores: diseases to MONDO, genes to "
+            "HGNC, variants to ClinVar, symptoms to HPO. Results are unconfirmed chips. The "
+            "user's message is already resolved before the first round.",
             ResolveIn,
             resolve_to_ids,
         ),

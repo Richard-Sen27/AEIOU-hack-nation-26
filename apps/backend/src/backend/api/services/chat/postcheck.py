@@ -3,7 +3,9 @@
 Citations, origin and confidence, contradictions, viability, VUS, uncertainty, no supported
 route, medical boundary and the patient-lens reading gate."""
 
+import asyncio
 import re
+import time
 from dataclasses import dataclass, field
 
 from pydantic import BaseModel, Field
@@ -54,6 +56,7 @@ CHILD_AGE_RANGES = {AgeRange.under_1, AgeRange.age_1_5, AgeRange.age_6_12, AgeRa
 _ONSET_HINT = re.compile(r"^(?:HP:\d{7}|[A-Za-z][A-Za-z ,'-]{0,59})$")
 _COUNTRY_HINT = re.compile(r"^[A-Z]{2}$")
 MAX_SIMPLIFY_ATTEMPTS = 2
+MIN_REWRITE_S = 2.0  # no rewrite starts with less of the turn's deadline left
 
 TEXT = {
     "uncertainty": {
@@ -174,7 +177,10 @@ async def check_reply(
     llm: LLMClient | None,
     *,
     asked: set[safety.Category],
+    deadline: float | None = None,
 ) -> tuple[AgentReply, CheckReport]:
+    """`deadline` (monotonic seconds) bounds the reading gate's model calls: past it the
+    summary keeps its best version so far."""
     report = CheckReport()
     lang = state.reply_language
     seen_edges = state.edge_ids
@@ -343,7 +349,9 @@ async def check_reply(
     core = _sentences(filtered.text)[:MAX_SUMMARY_SENTENCES]
     core_text = " ".join(core)
     if llm is not None and core_text and state.lens.role in (Role.patient, Role.guest):
-        core_text, report = await _reading_gate(core_text, state, llm, report, prognosis_asked)
+        core_text, report = await _reading_gate(
+            core_text, state, llm, report, prognosis_asked, deadline
+        )
     no_route = state.paths and all(r.status == PathStatus.no_supported_route for r in state.paths)
     prefix: list[str] = []
     decline = safety.decline_sentence(declined, lang)
@@ -503,6 +511,7 @@ async def _reading_gate(
     llm: LLMClient,
     report: CheckReport,
     prognosis_asked: bool,
+    deadline: float | None = None,
 ) -> tuple[str, CheckReport]:
     grade = reading_grade(text, state.reply_language)
     best, best_grade = text, grade
@@ -511,10 +520,16 @@ async def _reading_gate(
         not passes_grade(best_grade, state.lens.role, state.reply_language)
         and attempts < MAX_SIMPLIFY_ATTEMPTS
     ):
+        left = None if deadline is None else deadline - time.monotonic()
+        if left is not None and left <= MIN_REWRITE_S:
+            break
         attempts += 1
         try:
-            rewritten = await llm.complete_text(instructions=SIMPLIFY, input=best, kind="small")
-        except LLMError:
+            async with asyncio.timeout(left):
+                rewritten = await llm.complete_text(
+                    instructions=SIMPLIFY, input=best, kind="small", effort="low"
+                )
+        except (LLMError, TimeoutError):
             break
         rewritten = safety.filter_sentences(rewritten, prognosis_asked=prognosis_asked).text
         rewritten = " ".join(_sentences(rewritten)[:MAX_SUMMARY_SENTENCES])

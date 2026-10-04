@@ -46,7 +46,10 @@ def action(title, edge_ids, viable=True) -> dict:
 
 
 def neighborhood(node_id: str) -> dict:
-    return {"tool_calls": [{"name": "get_neighborhood", "arguments": {"node_id": node_id}}]}
+    return {
+        "kind": "tools",
+        "tool_calls": [{"name": "get_neighborhood", "arguments": {"node_id": node_id}}],
+    }
 
 
 def observed_edge(node_id: str) -> str:
@@ -121,7 +124,7 @@ async def test_emergency_short_circuit(make_user, mock_openai_env, llm_calls, me
 
 
 async def test_redaction_before_model(doctor, user_llm, llm_calls):
-    user_llm.enqueue({"json": draft()})
+    user_llm.enqueue({"kind": "tools", "json": draft()})
     message = (
         "Patient: Johanna Mustermann, DOB 03.04.2019, MRN 88812345. "
         "She has STXBP1 encephalopathy. Call me at +43 660 1234567."
@@ -144,7 +147,7 @@ async def test_tool_loop_with_mock(doctor, user_llm, llm_calls):
     tools = [e.get("tool") for e in events if e["type"] == "status" and e.get("tool")]
     assert tools[:3] == ["extract_entities", "resolve_to_ids", "search_graph"]
     first_delta = types.index("summary_delta")
-    assert all(t in ("status", "uncertainty") for t in types[:first_delta])
+    assert all(t in ("status", "turn", "uncertainty") for t in types[:first_delta])
     tail = [t for t in types[first_delta:] if t != "summary_delta"]
     assert tail == [t for t in EVENT_ORDER if t in tail]
     reply = final(events)
@@ -166,6 +169,7 @@ async def test_uncited_claim_removed(doctor, user_llm):
     user_llm.enqueue(
         neighborhood(STXBP1),
         {
+            "kind": "tools",
             "json": draft(
                 claims=[
                     claim("Invented link.", ["e_ffffffffffff"]),
@@ -174,7 +178,7 @@ async def test_uncited_claim_removed(doctor, user_llm):
                     claim("Backed by the graph.", [good]),
                 ],
                 contradictions=[{"claim_index": 3, "edge_ids": [good], "note": "x"}],
-            )
+            ),
         },
     )
     reply = final(await turn(doctor, "STXBP1 encephalopathy"))
@@ -186,12 +190,13 @@ async def test_origin_and_confidence_recomputed(doctor, user_llm):
     user_llm.enqueue(
         neighborhood(STXBP1),
         {
+            "kind": "tools",
             "json": draft(
                 claims=[
                     claim("Similar symptoms.", [SIMILAR], "observed", "low"),
                     claim("Shared pathway.", [LOW], "observed", "high"),
                 ]
-            )
+            ),
         },
     )
     reply = final(await turn(doctor, "STXBP1 encephalopathy"))
@@ -205,7 +210,10 @@ async def test_origin_and_confidence_recomputed(doctor, user_llm):
 async def test_contradiction_added(doctor, user_llm):
     user_llm.enqueue(
         neighborhood(SCN2A_LOF),
-        {"json": draft(claims=[claim("Seizures are part of it.", [CONTRADICTED])])},
+        {
+            "kind": "tools",
+            "json": draft(claims=[claim("Seizures are part of it.", [CONTRADICTED])]),
+        },
     )
     reply = final(await turn(doctor, "SCN2A loss of function"))
     assert reply["claims"][0]["edge_ids"] == [CONTRADICTED]
@@ -218,13 +226,14 @@ async def test_action_viability(doctor, user_llm):
     user_llm.enqueue(
         neighborhood(STXBP1),
         {
+            "kind": "tools",
             "json": draft(
                 actions=[
                     action("Join via a hypothesis", [SIMILAR], viable=True),
                     action("Reuse the group's work", [good], viable=True),
                     action("Made up", ["e_ffffffffffff"]),
                 ]
-            )
+            ),
         },
     )
     reply = final(await turn(doctor, "STXBP1 encephalopathy"))
@@ -240,10 +249,11 @@ async def test_diagnosis_declined_with_graph_context(doctor, user_llm, llm_calls
     user_llm.enqueue(
         neighborhood(STXBP1),
         {
+            "kind": "tools",
             "json": draft(
                 summary="Your daughter has STXBP1 encephalopathy. Groups exist.",
                 claims=[claim("A patient group exists.", [good])],
-            )
+            ),
         },
     )
     reply = final(await turn(doctor, "Does my daughter have STXBP1 encephalopathy?"))
@@ -251,7 +261,8 @@ async def test_diagnosis_declined_with_graph_context(doctor, user_llm, llm_calls
     assert "Your daughter has" not in reply["summary"]
     assert reply["claims"]
     assert reply["kind"] == "declined"
-    assert "Do not answer that part" in llm_calls()[0]["instructions"]
+    main = next(b for b in llm_calls() if b.get("tools"))
+    assert "Do not answer that part" in main["instructions"]
 
 
 async def test_treatment_statement_removed(doctor, user_llm):
@@ -259,10 +270,11 @@ async def test_treatment_statement_removed(doctor, user_llm):
     user_llm.enqueue(
         neighborhood(STXBP1),
         {
+            "kind": "tools",
             "json": draft(
                 summary="You should start stiripentol at 50 mg/kg. A group exists.",
                 claims=[claim("A patient group exists.", [good])],
-            )
+            ),
         },
     )
     reply = final(await turn(doctor, "Tell me about STXBP1 encephalopathy"))
@@ -276,8 +288,8 @@ async def test_followup_limited_to_one(doctor, user_llm, llm_calls):
         "arguments": {"candidate_cluster_ids": ["CLUSTER:1", "CLUSTER:2", "CLUSTER:3"]},
     }
     user_llm.enqueue(
-        {"tool_calls": [ask, ask]},
-        {"json": draft()},
+        {"kind": "tools", "tool_calls": [ask, ask]},
+        {"kind": "tools", "json": draft()},
     )
     reply = final(await turn(doctor, "Which cluster fits?"))
     assert reply["follow_up"] is not None
@@ -291,20 +303,129 @@ async def test_followup_limited_to_one(doctor, user_llm, llm_calls):
 
 async def test_followup_dropped_without_tool(doctor, user_llm):
     user_llm.enqueue(
-        {"json": draft(follow_up={"question": "Q?", "quick_replies": ["a"], "skippable": False})}
+        {
+            "kind": "tools",
+            "json": draft(follow_up={"question": "Q?", "quick_replies": ["a"], "skippable": False}),
+        }
     )
     reply = final(await turn(doctor, "Hello"))
     assert reply["follow_up"] is None
 
 
-async def test_tool_call_cap(doctor, user_llm, llm_calls):
-    user_llm.enqueue(*[neighborhood(STXBP1)] * 10, {"json": draft()})
+def outputs_of(body: dict) -> list[str]:
+    return [i["output"] for i in body["input"] if i.get("type") == "function_call_output"]
+
+
+async def test_round_budget_forces_the_final_answer(doctor, user_llm, llm_calls):
+    from backend.api.services.chat import agent
+
+    user_llm.enqueue(*[neighborhood(STXBP1)] * 6)  # a model that always wants one more look
+    events = await turn(doctor, "STXBP1 encephalopathy")
+    reply = final(events)
+    rounds = [b for b in llm_calls() if b.get("tools")]
+    assert len(rounds) == agent.MAX_TOOL_ROUNDS + 1
+    assert all("tool_choice" not in b for b in rounds[:-1])
+    last = rounds[-1]
+    assert last["tool_choice"] == "none"
+    notes = [i["content"] for i in last["input"] if i.get("role") == "developer"]
+    assert any("tool budget for this turn is used up" in n for n in notes)
+    assert any("missing_evidence" in n and "could not check" in n for n in notes)
+    assert len(outputs_of(last)) == agent.MAX_TOOL_ROUNDS
+    assert not any("budget exhausted" in o for o in outputs_of(last))
+    assert reply["summary"] and reply["kind"] == "answer"
+    store = get_graph()
+    assert reply["claims"] and all(e in store.edges for c in reply["claims"] for e in c["edge_ids"])
+    statuses = [e["message"] for e in events if e["type"] == "status"]
+    assert "Writing the answer" in statuses
+
+
+async def test_time_budget_forces_the_final_answer(doctor, user_llm, llm_calls, monkeypatch):
+    from backend.api.services.chat import agent
+
+    monkeypatch.setattr(agent, "TOOL_PHASE_S", 0.0)
+    user_llm.enqueue(*[neighborhood(STXBP1)] * 3)
     final(await turn(doctor, "STXBP1 encephalopathy"))
-    outputs = [
-        i["output"] for i in llm_calls()[-1]["input"] if i.get("type") == "function_call_output"
-    ]
+    rounds = [b for b in llm_calls() if b.get("tools")]
+    assert len(rounds) == 2 and rounds[-1]["tool_choice"] == "none"
+
+
+async def test_tool_call_cap(doctor, user_llm, llm_calls):
+    call = {"name": "get_neighborhood", "arguments": {"node_id": STXBP1}}
+    user_llm.enqueue({"kind": "tools", "tool_calls": [call] * 10})
+    final(await turn(doctor, "STXBP1 encephalopathy"))
+    last = llm_calls()[-1]
+    assert last["tool_choice"] == "none"
+    outputs = outputs_of(last)
     assert len(outputs) == 10
     assert sum("budget exhausted" in o for o in outputs) == 2
+
+
+async def test_standard_turn_starts_with_resolved_entities(doctor, user_llm, llm_calls):
+    """The message is extracted and resolved before the first round, so the first round
+    already uses graph tools: one small call, then at most 3 tool rounds and the answer."""
+    from backend.api.services.chat import agent
+
+    events = await turn(doctor, "STXBP1 encephalopathy and seizures, no feeding problems")
+    reply = final(events)
+    bodies = llm_calls()
+    assert [b.get("text", {}).get("format", {}).get("name") for b in bodies[:1]] == ["Extraction"]
+    rounds = bodies[1:]
+    assert rounds and all(b.get("tools") for b in rounds)
+    assert len(rounds) <= agent.MAX_TOOL_ROUNDS + 1
+    offered = {t["name"] for t in rounds[0]["tools"][0]["tools"]}
+    assert "extract_entities" not in offered and "resolve_to_ids" in offered
+    context = [i["content"] for i in rounds[0]["input"] if i.get("role") == "developer"]
+    assert len(context) == 1 and context[0].startswith('<tool_result name="resolve_to_ids">')
+    assert "STXBP1" in context[0]
+    first_calls = [e["tool"] for e in events if e["type"] == "status" and e.get("tool")][
+        2:
+    ]  # after extract_entities and resolve_to_ids, which run before the first round
+    assert first_calls and first_calls[0] not in ("extract_entities", "resolve_to_ids")
+    feeding = [c for c in reply["chips"] if "feeding" in c["label"].lower()]
+    assert feeding and all(c["negated"] for c in feeding)  # negation kept by the extraction
+    assert reply["chips"] and all(c["confirmed"] is False for c in reply["chips"])
+
+
+async def test_deadline_answers_from_what_was_gathered(doctor, user_llm, monkeypatch):
+    from backend.api.services.chat import agent
+
+    monkeypatch.setattr(agent, "TURN_DEADLINE_S", 1.5)
+    user_llm.enqueue(neighborhood(STXBP1), {"kind": "tools", "json": draft(), "delay_s": 5.0})
+    events = await turn(doctor, "STXBP1 encephalopathy")
+    reply = final(events)
+    assert reply["summary"].startswith("I ran out of time before I could finish checking")
+    assert any("Not checked in time" in m for m in reply["missing_evidence"])
+    store = get_graph()
+    assert reply["claims"]
+    for c in reply["claims"]:
+        assert c["edge_ids"] and all(e in store.edges for e in c["edge_ids"])
+        edge = store.edges[c["edge_ids"][0]]
+        assert c["origin"] == edge.origin.value
+    assert reply["kind"] == "answer"
+    detail = (await doctor.client.get(f"/chat/sessions/{events[-1]['session_id']}")).json()
+    assert detail["messages"][1]["reply"]["summary"] == reply["summary"]
+
+
+async def test_reading_gate_stays_inside_the_deadline(make_user, user_llm, monkeypatch):
+    """The post-check's own model calls stop at the turn's deadline."""
+    import time
+
+    from backend.api.services.chat import agent
+
+    user = await make_user(role="patient", consents=["health_data"])
+    hard = (
+        "Heterogeneous electrophysiological characterization demonstrates pathophysiologically "
+        "distinct neurodevelopmental manifestations across voltage-gated channelopathies."
+    )
+    monkeypatch.setattr(agent, "TURN_DEADLINE_S", 4.0)
+    user_llm.enqueue(
+        {"kind": "tools", "json": draft(summary=hard)},
+        {"kind": "text", "text": "Short words.", "delay_s": 30.0},
+    )
+    started = time.monotonic()
+    reply = final(await turn(user, "Tell me about channel diseases"))
+    assert time.monotonic() - started < 8.0
+    assert reply["summary"] == hard  # the rewrite did not arrive in time; the text stands
 
 
 async def test_turn_timeout(doctor, user_llm, monkeypatch):
@@ -331,11 +452,12 @@ async def test_no_supported_route(doctor, user_llm):
     route = DEMO["no_supported_route"]
     user_llm.enqueue(
         {
+            "kind": "tools",
             "tool_calls": [
                 {"name": "find_path", "arguments": {"from_id": route["from"], "to_id": route["to"]}}
-            ]
+            ],
         },
-        {"json": draft(summary="Here is what I found.")},
+        {"kind": "tools", "json": draft(summary="Here is what I found.")},
     )
     events = await turn(doctor, "How is SYNGAP1 linked to Dravet?")
     reply = final(events)
@@ -357,7 +479,10 @@ async def test_vus_notice(doctor, user_llm):
     )
     user_llm.enqueue(
         neighborhood(DEMO["vus_variant_id"]),
-        {"json": draft(claims=[claim("The variant is in STXBP1.", [vus_edge.id])])},
+        {
+            "kind": "tools",
+            "json": draft(claims=[claim("The variant is in STXBP1.", [vus_edge.id])]),
+        },
     )
     reply = final(await turn(doctor, "What about my STXBP1 variant?"))
     assert VUS_NOTICE in reply["summary"]
@@ -369,7 +494,10 @@ async def test_patient_summary_reading_gate(make_user, user_llm, llm_calls):
         "Heterogeneous electrophysiological characterization demonstrates pathophysiologically "
         "distinct neurodevelopmental manifestations across voltage-gated channelopathies."
     )
-    user_llm.enqueue({"json": draft(summary=hard)}, {"text": "These conditions can look alike."})
+    user_llm.enqueue(
+        {"kind": "tools", "json": draft(summary=hard)},
+        {"kind": "text", "text": "These conditions can look alike."},
+    )
     reply = final(await turn(user, "Tell me about channel diseases"))
     assert reply["summary"] == "These conditions can look alike."
     assert "grade 8" in llm_calls()[-1]["instructions"]
@@ -378,10 +506,10 @@ async def test_patient_summary_reading_gate(make_user, user_llm, llm_calls):
 async def test_sessions_persist_and_are_isolated(make_user, user_llm, llm_calls):
     alice = await make_user(role="doctor", consents=["health_data"])
     bob = await make_user(role="doctor", consents=["health_data"])
-    user_llm.enqueue({"json": draft(summary="First answer.")})
+    user_llm.enqueue({"kind": "tools", "json": draft(summary="First answer.")})
     events = await turn(alice, "STXBP1 encephalopathy")
     sid = events[-1]["session_id"]
-    user_llm.enqueue({"json": draft(summary="Second answer.")})
+    user_llm.enqueue({"kind": "tools", "json": draft(summary="Second answer.")})
     events2 = await turn(alice, "And the registry?", session_id=sid)
     assert events2[-1]["session_id"] == sid
     second_input = llm_calls()[-1]["input"]
@@ -404,7 +532,7 @@ async def test_sessions_persist_and_are_isolated(make_user, user_llm, llm_calls)
 
 
 async def test_session_title_is_redacted(doctor, user_llm):
-    user_llm.enqueue({"json": draft()})
+    user_llm.enqueue({"kind": "tools", "json": draft()})
     events = await turn(doctor, "Johanna Mustermann has STXBP1 encephalopathy")
     final(events)
     sessions = (await doctor.client.get("/chat/sessions")).json()
@@ -423,7 +551,7 @@ async def test_reply_kind_absent_on_old_stored_replies():
 
 def find_path(from_id: str, to_id: str, **extra) -> dict:
     args = {"from_id": from_id, "to_id": to_id, **extra}
-    return {"tool_calls": [{"name": "find_path", "arguments": args}]}
+    return {"kind": "tools", "tool_calls": [{"name": "find_path", "arguments": args}]}
 
 
 async def test_vus_path_only_on_request_and_carries_notice(doctor, user_llm, llm_calls):
@@ -440,13 +568,16 @@ async def test_vus_path_only_on_request_and_carries_notice(doctor, user_llm, llm
         edges = [store.edges[s["edge_id"]] for p in out["paths"] for s in p["steps"]]
         return {n for e in edges for n in (e.source_id, e.target_id)}
 
-    user_llm.enqueue(find_path("HGNC:11444", STXBP1), {"json": draft(summary="Routes found.")})
+    user_llm.enqueue(
+        find_path("HGNC:11444", STXBP1), {"kind": "tools", "json": draft(summary="Routes found.")}
+    )
     default = final(await turn(doctor, "How is STXBP1 linked to its encephalopathy?"))
     assert vus not in routed_nodes()
     assert VUS_NOTICE not in default["summary"]
 
     user_llm.enqueue(
-        find_path("HGNC:11444", STXBP1, include_vus=True), {"json": draft(summary="Routes found.")}
+        find_path("HGNC:11444", STXBP1, include_vus=True),
+        {"kind": "tools", "json": draft(summary="Routes found.")},
     )
     included = final(await turn(doctor, "Include uncertain variants too, please."))
     assert vus in routed_nodes()
@@ -468,14 +599,13 @@ def extraction(**fields) -> dict:
     return {**base, **fields}
 
 
-EXTRACT = {"tool_calls": [{"name": "extract_entities", "arguments": {"text": None}}]}
-
-
 async def test_profile_hints_from_extraction(doctor, user_llm):
     user_llm.enqueue(
-        EXTRACT,
-        {"json": extraction(age_years=34, onset="Infantile onset", country="de")},
-        {"json": draft()},
+        {
+            "kind": "structured",
+            "json": extraction(age_years=34, onset="Infantile onset", country="de"),
+        },
+        {"kind": "tools", "json": draft()},
     )
     reply = final(await turn(doctor, "I am 34, it started in infancy, I live in Germany."))
     assert reply["profile_hints"] == {
@@ -492,16 +622,20 @@ async def test_profile_hints_from_extraction(doctor, user_llm):
     [{"age_years": 4}, {"about_child": True}, {"age_range": "6-12"}],
 )
 async def test_profile_hints_flag_a_child(doctor, user_llm, fields):
-    user_llm.enqueue(EXTRACT, {"json": extraction(**fields)}, {"json": draft()})
+    user_llm.enqueue(
+        {"kind": "structured", "json": extraction(**fields)}, {"kind": "tools", "json": draft()}
+    )
     reply = final(await turn(doctor, "My son has seizures."))
     assert reply["profile_hints"]["about_child_suspected"] is True
 
 
 async def test_profile_hints_drop_invalid_values(doctor, user_llm):
     user_llm.enqueue(
-        EXTRACT,
-        {"json": extraction(country="Germany", onset="since 2019-01-01 @ home")},
-        {"json": draft()},
+        {
+            "kind": "structured",
+            "json": extraction(country="Germany", onset="since 2019-01-01 @ home"),
+        },
+        {"kind": "tools", "json": draft()},
     )
     reply = final(await turn(doctor, "Something without hints."))
     assert reply["profile_hints"] is None
@@ -514,7 +648,7 @@ async def test_patient_summary_reading_gate_german(make_user, user_llm, llm_call
         "unterschiedliche neuroentwicklungsbezogene Manifestationen bei Kanalopathien."
     )
     easy = "Diese Leiden sehen oft gleich aus."
-    user_llm.enqueue({"json": draft(summary=hard)}, {"text": easy})
+    user_llm.enqueue({"kind": "tools", "json": draft(summary=hard)}, {"kind": "text", "text": easy})
     reply = final(await turn(user, "Was ist mit meinen Kanalkrankheiten und wie ist das?"))
     assert reply["summary"] == easy
     assert "grade 8" in llm_calls()[-1]["instructions"]

@@ -62,9 +62,13 @@ async def test_inference_seeds_and_unresolved_labels(
     path.write_text(yaml.safe_dump(spec))
     monkeypatch.setattr(runner, "GOLDEN_PATH", path)
     mock_openai_env.enqueue(
-        {"json": draft([])},
-        {"tool_calls": [{"name": "get_neighborhood", "arguments": {"node_id": DRAVET}}]},
+        {"kind": "tools", "json": draft([])},
         {
+            "kind": "tools",
+            "tool_calls": [{"name": "get_neighborhood", "arguments": {"node_id": DRAVET}}],
+        },
+        {
+            "kind": "tools",
             "json": draft(
                 [
                     {
@@ -74,7 +78,7 @@ async def test_inference_seeds_and_unresolved_labels(
                         "confidence": "high",
                     }
                 ]
-            )
+            ),
         },
     )
     out = io.StringIO()

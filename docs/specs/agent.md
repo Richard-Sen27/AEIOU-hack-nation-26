@@ -74,7 +74,7 @@ The orchestrator has the six tools defined in `system.md`. They wrap the backend
 
 | Tool | Input | Output | Service |
 | --- | --- | --- | --- |
-| `extract_entities` | redacted user text | candidate chips: diseases, genes, variants (HGVS), symptoms, with negation ("no feeding problems" = excluded), age, onset, country | LLM (Structured Outputs) |
+| `extract_entities` | redacted user text | candidate chips: diseases, genes, variants (HGVS), symptoms, with negation ("no feeding problems" = excluded), age, onset, country | LLM (Structured Outputs); run by the orchestrator before the first round, not offered to the model |
 | `resolve_to_ids` | extracted mentions | stable IDs with score: diseases → MONDO, genes → HGNC, variants → ClinVar, symptoms → HPO | Search |
 | `search_graph` | query, node types, limit | typed matches with the matched synonym ("Ohtahara syndrome → STXBP1 encephalopathy"); in expert mode, mechanism queries return ranked clusters | Search (trigram + pgvector + type/centrality boost) |
 | `get_neighborhood` | node id, role | full neighbourhood with positions, edges with evidence summaries, cluster membership, role presentation hints | Graph |
@@ -125,7 +125,7 @@ W1 → W3 → W4 together are the one complete journey the 24h goal asks for.
 **W1 — Chat intake**
 
 1. User types a disease, gene, variant or symptoms ("My daughter is 2, diagnosed with STXBP1 last month. Lots of seizures, not walking yet, no problems with eating.").
-2. Redact, then `extract_entities` → `resolve_to_ids`. The resolved items appear as chips the user confirms, corrects or removes; only confirmed chips enter the `PatientProfile`.
+2. Redact, then `extract_entities` → `resolve_to_ids`, both in code before the first model round, so the model starts from the resolved IDs. The resolved items appear as chips the user confirms, corrects or removes; only confirmed chips enter the `PatientProfile`.
 3. If resolution is ambiguous or several clusters remain, `ask_followup` asks one skippable question with quick replies.
 4. Open the resolved node in the graph view at the lens's starting point (one global search principle).
 5. Reply: two-sentence plain summary, then cards (mini graph, patient group, evidence chips, "Open in Atlas").
@@ -245,10 +245,11 @@ User role: {role}. Expert mode: {expert_mode}. Profile: {confirmed_profile_json}
 
 **Runtime**
 
-- OpenAI Responses API with function calling; tool loop capped at 8 calls per turn, 45 s wall clock.
+- OpenAI Responses API with function calling. Budget per turn, enforced in code: after the extraction and resolution, at most 3 tool rounds and 15 s of tool work (and 8 tool calls); then the final answer is written with tools disabled and names in `missing_evidence` what it could not check. A 90 s deadline is the backstop: when it fires, the turn answers in code from the edges its tools returned (one cited edge per claim, post-checked as usual), or ends with an error if it gathered nothing. The post-check's own model calls stop at the deadline.
+- A turn that ends in an error (deadline, model error, sign-in expired, stream cut) is stored as an assistant message holding only the error code, message and status steps the stream showed; the session view shows it with "Try again", and a retry (`retry_message_id`) replaces it without storing the user's message again.
 - Billing: every agent call runs on the signed-in user's ChatGPT plan usage, using their stored OpenAI token. The team key is used only by the offline pipeline.
 - The gap-search agent uses the OpenAI Agents SDK with its own budgets.
-- Planner/answer model: the strongest OpenAI model on the team's credits; extraction and classification on a smaller, cheaper model; embeddings via OpenAI embeddings into pgvector.
+- Planner/answer model: the strongest OpenAI model on the team's credits; extraction and classification on a smaller, cheaper model; embeddings via OpenAI embeddings into pgvector. On a ChatGPT plan whose model list offers no smaller model, the small calls use the main model. Tool-selection rounds and the extraction ask for low reasoning effort only when the model list advertises it; the final answer keeps the default.
 - Streaming over SSE (`POST /chat`): `summary` streams first, then chips, claims, cards and actions.
 - Path explanations go through the Explanation service (`POST /explain`), which is cached per `(path_id, role, language, data_version)` and gated by textstat per role. With `subject_node_id` the same service writes a summary of one node's connections (the Atlas panel's "Write a summary"), citing only the edges listed for that node.
 
