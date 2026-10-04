@@ -13,6 +13,7 @@ dependencies = [
     "fastembed>=0.8.1",
     "httpx>=0.28.1",
     "langfuse>=4.16.0",
+    "langgraph>=1.2.12",
     "networkx>=3.7",
     "numpy>=2.5.3",
     "openai>=3.24.0",
