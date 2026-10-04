@@ -5366,7 +5366,7 @@ export type SessionInfo = {
     /**
      * Sign In Methods
      *
-     * Sign-in methods this server offers (google only when enabled).
+     * Sign-in methods this server offers: openai only where it can work (loopback or partner mode), google only when enabled. May be empty.
      */
     sign_in_methods?: Array<AuthProvider>;
 };
@@ -6596,6 +6596,10 @@ export type AuthStartData = {
 };
 
 export type AuthStartErrors = {
+    /**
+     * ChatGPT sign-in cannot work on this server.
+     */
+    404: unknown;
     /**
      * Validation Error
      */

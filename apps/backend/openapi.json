@@ -80,6 +80,9 @@
           "302": {
             "description": "Successful Response"
           },
+          "404": {
+            "description": "ChatGPT sign-in cannot work on this server."
+          },
           "422": {
             "description": "Validation Error",
             "content": {
@@ -15374,7 +15377,7 @@
             },
             "type": "array",
             "title": "Sign In Methods",
-            "description": "Sign-in methods this server offers (google only when enabled)."
+            "description": "Sign-in methods this server offers: openai only where it can work (loopback or partner mode), google only when enabled. May be empty."
           }
         },
         "type": "object",
