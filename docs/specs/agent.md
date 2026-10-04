@@ -132,6 +132,8 @@ W1 → W3 → W4 together are the one complete journey the 24h goal asks for.
 
 **In the Atlas: the Dr. Wu dock.** The same chat runs in a dock in the bottom-left corner of the Atlas, under the same sign-in and `health_data` consent. Free text typed into the Atlas search bar is offered to the dock instead of the search. On each final reply, the node IDs from `graph_focus.node_ids`, the cards and the unnegated chips that exist in the Atlas are highlighted and framed on the map, `graph_focus.highlight_path` is drawn, and the nodes are listed as "Dr. Wu found N". The question and these found node IDs are health data: they stay in memory only, never in the URL (no `?focus=`, no links that carry them) and never in browser storage.
 
+**From the chat to the Atlas.** "Show in graph" and the "Open in Atlas" links of a reply on `/chat` point to plain `/atlas` with no query string. Activating one hands the reply's node IDs and `graph_focus.highlight_path` to the Atlas in memory (`components/atlas/atlas-handoff.ts`) and navigates client-side; the Atlas takes the handoff once on load and shows it exactly like the dock's finds. A new tab or a full page load starts without highlights.
+
 **W2 — Documents** (handled by the document service, not by the agent)
 
 1. Upload requires sign-in and an active `health_data` consent (`POST /documents`); guests see the inline sign-in dialog first.

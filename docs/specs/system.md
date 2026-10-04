@@ -412,7 +412,7 @@ Detailed design in [`agent.md`](agent.md).
 - Live entity extraction for chips: diseases → MONDO, genes → HGNC, variants (HGVS) → ClinVar, symptoms → HPO, with negation ("no feeding problems" = excluded), age, onset and country.
 - Maintains the `PatientProfile`; chips are confirmed, corrected or removed by the user before they count.
 - `ask_followup` asks at most one question at a time, chosen by which answer best separates the remaining candidate clusters, with quick-reply options, always skippable.
-- Replies include tool results the frontend renders as cards (mini graph, patient group, evidence chips, "Open in Atlas").
+- Replies include tool results the frontend renders as cards (mini graph, patient group, evidence chips, "Open in Atlas"). Links from a reply to the Atlas go to plain `/atlas` and hand the found node and edge IDs over in memory, never in the URL.
 - Safety rules in the system prompt and a post-check: no diagnosis (symptoms-only input maps to clusters "to discuss with a clinical geneticist"), emergency detection first ("call emergency services"), no prognosis or mortality figures unless asked.
 - Replies in the user's language; an expert mode, open to everyone and the default for researchers, accepts mechanism queries ("AAV gene replacement for loss-of-function") and returns ranked clusters.
 
