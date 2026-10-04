@@ -335,8 +335,8 @@ def symptom_similarity(
         names = [corpus.labels.get(t, t) for t in shared[:3]]
         explanation = (
             f"Similar symptom profile: both list {_join(names)} ({len(shared)} of "
-            f"{len(sa | sb)} specific symptoms shared, weighted by how often they occur). "
-            "Similar experience, possibly different cause."
+            f"{len(sa | sb)} specific recorded symptoms in common; the score weighs how often "
+            "each occurs). Similar experience, possibly different cause."
         )
         score = min(SYM_CONF_BASE + SYM_CONF_SLOPE * s, SYM_CONF_MAX)
         rows.append(

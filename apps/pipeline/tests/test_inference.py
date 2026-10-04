@@ -98,7 +98,8 @@ def test_symptom_similarity_names_only_terms_both_record():
     r = pairs[("MONDO:1", "MONDO:2")]
     f = r["features"]
     assert f["explanation"].startswith(
-        "Similar symptom profile: both list Focal seizure and Infantile spasms (2 of 4 specific"
+        "Similar symptom profile: both list Focal seizure and Infantile spasms (2 of 4 specific "
+        "recorded symptoms in common"
     )
     assert "Nystagmus" not in f["explanation"] and "Ptosis" not in f["explanation"]
     assert f["shared_specific"] == 2 and f["specific_total"] == 4
