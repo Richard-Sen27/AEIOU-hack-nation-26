@@ -585,6 +585,32 @@ async def test_vus_path_only_on_request_and_carries_notice(doctor, user_llm, llm
     assert VUS_NOTICE in included["summary"]
 
 
+async def test_connection_question_carries_the_route_for_the_atlas(doctor, user_llm):
+    """The model names only the nodes; the reply still carries the best supported route the
+    tools found as graph_focus.highlight_path, with its nodes."""
+    user_llm.enqueue(
+        find_path("HGNC:11444", STXBP1),
+        {
+            "kind": "tools",
+            "json": draft(
+                summary="They are connected.",
+                graph_focus={"node_ids": [STXBP1], "highlight_path": []},
+            ),
+        },
+    )
+    focus = final(await turn(doctor, "How is STXBP1 connected to its encephalopathy?"))[
+        "graph_focus"
+    ]
+    assert focus["highlight_path"], focus
+    store = get_graph()
+    ends = {
+        n
+        for e in focus["highlight_path"]
+        for n in (store.edges[e].source_id, store.edges[e].target_id)
+    }
+    assert STXBP1 in focus["node_ids"] and ends <= set(focus["node_ids"])
+
+
 def extraction(**fields) -> dict:
     base = {
         "diseases": [],

@@ -294,6 +294,14 @@ async def check_reply(
         else:
             chip_nodes = [c.id for c in state.chips.values() if c.id and not c.negated]
             focus = GraphFocus(node_ids=chip_nodes, highlight_path=[]) if chip_nodes else None
+    elif best_path is not None and not focus.highlight_path:
+        # A connection question: the Atlas draws the best supported route the tools found, also
+        # when the model named only the nodes.
+        path_nodes = [n for s in best_path.steps for n in (s.from_node.id, s.to_node.id)]
+        focus = GraphFocus(
+            node_ids=list(dict.fromkeys([*focus.node_ids, *path_nodes])),
+            highlight_path=best_path.edge_ids,
+        )
 
     # 6. follow-up: only the one ask_followup chose (the model may translate its wording)
     follow_up = None
