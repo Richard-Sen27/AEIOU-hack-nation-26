@@ -257,7 +257,7 @@ function GuestDock({ index, pendingQuestion, onPendingConsumed, found, onClear, 
           <p className="text-xs text-muted-foreground">
             Dr. Wu runs on your own ChatGPT plan, so he needs you to sign in.
           </p>
-          <ContinueWithChatGPT className="w-full" />
+          <ContinueWithChatGPT />
           <p className="text-[11px] text-muted-foreground">
             You must be 16 or older. Nothing is sold or shared.{" "}
             <Link href="/privacy" className="underline underline-offset-2">
