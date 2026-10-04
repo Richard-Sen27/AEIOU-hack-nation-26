@@ -12,7 +12,7 @@ export default async function WelcomePage(props: PageProps<"/welcome">) {
       <PageHeader
         eyebrow="Welcome"
         title="Welcome to Amber"
-        description="Two quick choices and you are ready. Nothing here is shared, and you can change it later in your profile."
+        description="Two quick choices. Nothing is shared, and you can change them later."
       />
       <div className="mt-8">
         <WelcomeFlow next={typeof next === "string" ? next : undefined} />

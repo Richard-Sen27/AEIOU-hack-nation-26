@@ -147,8 +147,7 @@ function WelcomeForm({ user, next }: { user: SessionUser; next?: string }) {
         <fieldset className="rounded-xl border bg-card p-5 sm:p-6 [&>*:not(legend)]:clear-both">
           <StepHeading n={1} title="How will you use Amber?" done={!!role} />
           <p className="-mt-1 mb-4 text-sm text-muted-foreground">
-            This decides where you start and how things are explained, never what you can see. You can
-            change it at any time.
+            Changes the starting point and wording, never what you can see.
           </p>
           <RadioGroup
             value={role}
@@ -191,8 +190,7 @@ function WelcomeForm({ user, next }: { user: SessionUser; next?: string }) {
             <span>
               I am <strong className="font-semibold">16 or older</strong>.
               <span className="mt-1 block text-muted-foreground">
-                Amber accounts, uploads and Dr. Wu are for people aged 16 and over. Parents and guardians
-                can use Amber on behalf of a child.
+                Accounts, uploads and Dr. Wu are for ages 16 and over. Parents and guardians can use Amber for a child.
               </span>
             </span>
           </label>
