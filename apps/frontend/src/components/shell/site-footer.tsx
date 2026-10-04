@@ -4,7 +4,7 @@ import Link from "next/link";
 import { usePathname } from "next/navigation";
 
 /** Application views get the full height; Privacy and About this data stay in the header menus there. */
-const APP_ROUTES = ["/atlas", "/chat", "/node", "/path", "/clusters", "/documents", "/profile", "/welcome"];
+const APP_ROUTES = ["/atlas", "/chat", "/node", "/path", "/clusters", "/documents", "/profile", "/welcome", "/messages"];
 
 function isAppRoute(pathname: string) {
   return APP_ROUTES.some((r) => pathname === r || pathname.startsWith(`${r}/`));
