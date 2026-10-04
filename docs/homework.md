@@ -2,6 +2,10 @@
 
 Work deliberately left for later. Add an item when you leave something for later; check the area's section before starting work there; remove an item when it is done. One line per item: where, what, and, when known, why it was left and what the fix would be.
 
+## Landing page
+
+- **Networking cards** (`apps/frontend/src/components/landing/landing-config.ts`, `CONNECT_STATUS`): follow, calls and choose are "coming"; switch each to "live" (with its `CONNECT_HREF`) as its networking stage lands, so the card links there and drops "Coming soon".
+
 ## Atlas view
 
 - **Category labels on phones** (`apps/backend/src/backend/api/services/atlas_tree.py`, `LABEL_CHAR_WIDTH = 0.006`): at 390 px the labels are 4.6–7.9 px, because the boxes the backend reserves for them scale with the map. Fix: let labels outgrow their box on phones, or raise `LABEL_CHAR_WIDTH` to about 0.0105 (a layout change).
