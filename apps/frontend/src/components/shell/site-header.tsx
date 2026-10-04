@@ -1,12 +1,14 @@
 "use client";
 
-import { Bell, ChevronDown, Menu, Search } from "lucide-react";
+import { Bell, ChevronDown, Menu, MessageSquare, Search } from "lucide-react";
 import Image from "next/image";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { useState } from "react";
 
 import { HeaderSignIn, SignInButtons } from "@/components/gates/sign-in-buttons";
+import { MessagesLink, MessagesMark, messagesLabel } from "@/components/messages/messages-link";
+import { useMessageCount } from "@/components/messages/use-message-count";
 import { CountBadge, NotificationBell, unreadLabel } from "@/components/notifications/notification-bell";
 import { NotificationList } from "@/components/notifications/notification-list";
 import { useUnreadCount } from "@/components/notifications/use-unread-count";
@@ -59,6 +61,8 @@ export function SiteHeader() {
   const [mobileOpen, setMobileOpen] = useState(false);
   const [mobileList, setMobileList] = useState(false);
   const unread = useUnreadCount();
+  const messages = useMessageCount();
+  const menuMark = (unread.enabled && unread.count > 0) || (messages.enabled && messages.count + messages.requests > 0);
 
   return (
     <header className="sticky top-0 z-40 border-b bg-background/85 backdrop-blur supports-[backdrop-filter]:bg-background/70">
@@ -113,6 +117,9 @@ export function SiteHeader() {
           <div className="hidden shrink-0 items-center gap-1 md:flex">
             {!user && status !== "loading" && <PrivacyMenu />}
             <ThemeToggle />
+            {messages.enabled && (
+              <MessagesLink count={messages.count} requests={messages.requests} active={isActive(pathname, "/messages")} />
+            )}
             {unread.enabled && <NotificationBell count={unread.count} onCount={unread.setCount} />}
           </div>
 
@@ -139,12 +146,18 @@ export function SiteHeader() {
                   variant="ghost"
                   size="icon"
                   className="relative md:hidden"
-                  aria-label={unread.enabled && unread.count > 0 ? `Open menu, ${unread.count} unread` : "Open menu"}
+                  aria-label={
+                    unread.enabled && unread.count > 0
+                      ? `Open menu, ${unread.count} unread`
+                      : menuMark
+                        ? "Open menu, new messages"
+                        : "Open menu"
+                  }
                 />
               }
             >
               <Menu aria-hidden />
-              {unread.enabled && unread.count > 0 && (
+              {menuMark && (
                 <span className="absolute top-1.5 right-1.5 size-2 rounded-full bg-primary" aria-hidden data-testid="menu-unread-dot" />
               )}
             </SheetTrigger>
@@ -173,6 +186,20 @@ export function SiteHeader() {
                 <>
                   <Separator />
                   <div className="px-3 py-2">
+                    {messages.enabled && (
+                      <Link
+                        href="/messages"
+                        onClick={() => setMobileOpen(false)}
+                        aria-label={messagesLabel(messages.count, messages.requests)}
+                        aria-current={isActive(pathname, "/messages") ? "page" : undefined}
+                        className="flex w-full items-center gap-2 rounded-md px-3 py-2.5 text-base text-muted-foreground outline-none hover:bg-muted hover:text-foreground focus-visible:ring-2 focus-visible:ring-ring aria-[current=page]:bg-accent aria-[current=page]:text-accent-foreground"
+                        data-testid="menu-messages"
+                      >
+                        <MessageSquare className="size-4" aria-hidden />
+                        <span className="flex-1 text-left">Messages</span>
+                        <MessagesMark count={messages.count} requests={messages.requests} />
+                      </Link>
+                    )}
                     <button
                       type="button"
                       onClick={() => setMobileList((o) => !o)}
