@@ -2,7 +2,7 @@
 
 import { ArrowUp, Bot, FileUp, Search } from "lucide-react";
 import { useRouter } from "next/navigation";
-import { useEffect, useId, useImperativeHandle, useRef, useState } from "react";
+import { useEffect, useEffectEvent, useId, useImperativeHandle, useRef, useState } from "react";
 import { toast } from "sonner";
 
 import { needsOnboarding } from "@/components/account/onboarding";
@@ -47,7 +47,7 @@ function bestHit(hits: SearchHit[], q: string): SearchHit | undefined {
 export function HeroInput({ ref }: { ref?: React.Ref<HeroInputHandle> }) {
   const router = useRouter();
   const { openSearch } = useSearch();
-  const { user } = useSession();
+  const { user, status } = useSession();
   const { requireSignIn, requireConsent } = useGate();
   const [value, setValue] = useState("");
   const [busy, setBusy] = useState(false);
@@ -56,6 +56,9 @@ export function HeroInput({ ref }: { ref?: React.Ref<HeroInputHandle> }) {
   const fileRef = useRef<HTMLInputElement>(null);
   const dragDepth = useRef(0);
   const hintId = useId();
+  // What the user did while the session was still loading. Signed in or guest
+  // is decided only once the session is known; held files stay in memory only.
+  const heldRef = useRef<{ kind: "files"; files: File[] } | { kind: "text" } | null>(null);
 
   useImperativeHandle(ref, () => ({
     focus: () => textareaRef.current?.focus(),
@@ -95,6 +98,16 @@ export function HeroInput({ ref }: { ref?: React.Ref<HeroInputHandle> }) {
       }
       return;
     }
+    if (status === "loading") {
+      heldRef.current = { kind: "text" };
+      setBusy(true);
+      return;
+    }
+    await toAssistant();
+  }
+
+  async function toAssistant() {
+    if (!trimmed) return;
     if (!user) {
       await requireSignIn(GUEST_REASON, "/chat");
       return;
@@ -107,6 +120,30 @@ export function HeroInput({ ref }: { ref?: React.Ref<HeroInputHandle> }) {
   async function handleFiles(list: FileList | null) {
     const files = list ? Array.from(list) : [];
     if (files.length === 0) return;
+    if (status === "loading") {
+      heldRef.current = { kind: "files", files };
+      return;
+    }
+    await takeFiles(files);
+  }
+
+  const resumeHeld = useEffectEvent(() => {
+    const held = heldRef.current;
+    heldRef.current = null;
+    if (!held) return;
+    if (held.kind === "files") {
+      void takeFiles(held.files);
+    } else {
+      setBusy(false);
+      void toAssistant();
+    }
+  });
+
+  useEffect(() => {
+    if (status !== "loading") resumeHeld();
+  }, [status]);
+
+  async function takeFiles(files: File[]) {
     if (needsOnboarding(user)) {
       // A first sign-in passes the welcome step before anything else; the
       // documents page asks for consent once it is back (files kept in memory).
