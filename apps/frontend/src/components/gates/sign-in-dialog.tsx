@@ -40,7 +40,7 @@ export function SignInDialog({
         : "The atlas stays open to everyone.";
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="gap-0 overflow-hidden p-0 sm:max-w-md" data-testid="sign-in-dialog">
+      <DialogContent className="max-h-[calc(100dvh-2rem)] gap-0 overflow-y-auto overscroll-contain p-0 sm:max-w-md" data-testid="sign-in-dialog">
         <div className="space-y-5 p-6">
           <DialogHeader className="gap-3">
             <span className="flex size-10 items-center justify-center rounded-lg bg-accent text-accent-foreground">

@@ -213,6 +213,22 @@ test("privacy and about this data stay reachable from the phone menu for guests 
   await expect(page).toHaveURL(/\/about-data$/);
 });
 
+test("sign-in dialog fits a short phone screen @mobile", async ({ page }) => {
+  await page.setViewportSize({ width: 360, height: 600 });
+  await mockApi(page, { "GET /auth/session": guestSession });
+  await page.goto("/");
+  await page.getByRole("textbox", { name: /Describe the diagnosis/ }).fill("My son has seizures every night");
+  await page.keyboard.press("Enter");
+  const dialog = page.getByTestId("sign-in-dialog");
+  await expect(dialog).toBeVisible();
+  const box = (await dialog.boundingBox())!;
+  expect(box.y).toBeGreaterThanOrEqual(0);
+  expect(box.y + box.height).toBeLessThanOrEqual(600);
+  const link = dialog.getByRole("link", { name: "Privacy notice" });
+  await link.scrollIntoViewIfNeeded();
+  await expect(link).toBeInViewport();
+});
+
 test("mobile shell @mobile", async ({ page }) => {
   await page.emulateMedia({ reducedMotion: "reduce" });
   await mockApi(page, { "GET /auth/session": guestSession });
