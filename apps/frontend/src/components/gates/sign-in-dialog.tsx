@@ -76,7 +76,7 @@ export function SignInDialog({
               </span>{" "}
               your name, email address and account ID to create your account.
               {chatgpt &&
-                " With ChatGPT also an access token, stored encrypted, so Dr. Wu's requests run on your ChatGPT plan."}
+                " With ChatGPT also an access token, stored encrypted, so Dr. Wu's requests run on your ChatGPT plan."}{" "}
               Doctors and researchers may add work details later, optional and private.
             </li>
             <li>
