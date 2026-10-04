@@ -48,6 +48,9 @@ test.describe("messages, patient", () => {
     await expect(rows.nth(0).getByTestId("thread-unread")).toHaveCount(0);
     await expect(page.getByTestId("messages-count")).toHaveCount(0);
     await expect(page).toHaveTitle(/^Messages/);
+    // An application view: no site footer, and the page itself does not scroll.
+    await expect(page.locator("footer")).toHaveCount(0);
+    expect(await page.evaluate(() => document.documentElement.scrollHeight - window.innerHeight)).toBeLessThanOrEqual(0);
     expect(errors()).toEqual([]);
   });
 
@@ -336,6 +339,8 @@ test.describe("phone", () => {
     await expect(page.getByTestId("composer")).toBeInViewport();
     const scroll = await page.evaluate(() => document.documentElement.scrollWidth - window.innerWidth);
     expect(scroll).toBeLessThanOrEqual(0);
+    await expect(page.locator("footer")).toHaveCount(0);
+    expect(await page.evaluate(() => document.documentElement.scrollHeight - window.innerHeight)).toBeLessThanOrEqual(0);
     await page.getByLabel("All conversations").click();
     await expect(page.getByTestId("thread-list-pane")).toBeVisible();
 
