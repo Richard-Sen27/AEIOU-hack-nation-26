@@ -1,6 +1,9 @@
 """Atlas tree (logo hub with one radial tree per category) and the per-node summary panel."""
 
 from enum import StrEnum
+from typing import Literal
+
+from pydantic import Field
 
 from backend.schemas.common import ApiModel
 from backend.schemas.enums import NodeType
@@ -144,3 +147,11 @@ class AtlasSummary(ApiModel):
     explain_edge_ids: list[str]  # <= 20, ordered: best chain of top items, sections in order
     vus_notice: str | None
     data_version: str | None
+    coverage: Literal["focus", "core"] = Field(
+        description="focus: on the map, with literature, trials and people collected; core: "
+        "findable (genes, symptoms, computed links) but not on the map yet. The tier of a "
+        "disease, gene, phenotype or pathway; focus for every other node type."
+    )
+    focus_disease_count: int = Field(
+        description="How many diseases have the full set of literature, trials and people."
+    )

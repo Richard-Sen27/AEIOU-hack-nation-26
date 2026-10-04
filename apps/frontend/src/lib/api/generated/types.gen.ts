@@ -500,6 +500,18 @@ export type AtlasSummary = {
      * Data Version
      */
     data_version: string | null;
+    /**
+     * Coverage
+     *
+     * focus: on the map, with literature, trials and people collected; core: findable (genes, symptoms, computed links) but not on the map yet. The tier of a disease, gene, phenotype or pathway; focus for every other node type.
+     */
+    coverage: 'focus' | 'core';
+    /**
+     * Focus Disease Count
+     *
+     * How many diseases have the full set of literature, trials and people.
+     */
+    focus_disease_count: number;
 };
 
 /**

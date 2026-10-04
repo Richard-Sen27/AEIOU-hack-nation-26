@@ -155,6 +155,14 @@ async def test_core_disease_summary(client, core_store):
     assert body["node"]["id"] == CORE and body["tree_path"] == []
     keys = {s["key"] for s in body["sections"]}
     assert {"genes", "symptoms"} <= keys
+    focus_diseases = sum(1 for n in core_store.nodes.values() if n.type == "disease") - 1
+    assert body["coverage"] == "core" and body["focus_disease_count"] == focus_diseases
+
+
+async def test_focus_and_untiered_nodes_report_focus_coverage(client, core_store):
+    for nid in ("MONDO:0100135", "HGNC:10585", "CLUSTER:1"):
+        body = (await client.get(f"/atlas/summary/{nid}")).json()
+        assert body["coverage"] == "focus", nid
 
 
 # --- Dr. Wu's symptom matching ----------------------------------------------------------------

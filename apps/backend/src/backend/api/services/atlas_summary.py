@@ -404,7 +404,20 @@ def atlas_summary(node_id: str, lens: Lens) -> AtlasSummary:
         explain_edge_ids=explain_edges(sections),
         vus_notice=VUS_NOTICE if graph.is_vus(node) else None,
         data_version=store.data_version,
+        coverage="focus" if atlas_tree.is_focus(node) else "core",
+        focus_disease_count=focus_disease_count(store),
     )
+
+
+def focus_disease_count(store: graph.GraphStore) -> int:
+    """Diseases on the map (literature, trials and people collected), counted once per store."""
+    count = store.focus_disease_count
+    if count is None:
+        count = sum(
+            1 for n in store.nodes.values() if n.type == NodeType.disease and atlas_tree.is_focus(n)
+        )
+        store.focus_disease_count = count
+    return count
 
 
 def explain_edges(sections: list[SummarySection]) -> list[str]:

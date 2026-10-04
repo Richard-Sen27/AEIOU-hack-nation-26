@@ -127,6 +127,7 @@ class GraphStore:
     atlas_cache: tuple[bytes, str] | None = None
     tree_cache: Any = None  # atlas_tree.TreeCache, reset together with atlas_cache
     phenotype_index: Any = None  # phenotype_match.PhenotypeIndex, built at load (pipeline edges)
+    focus_disease_count: int | None = None  # atlas_summary.focus_disease_count, per store
 
 
 _store = GraphStore()
