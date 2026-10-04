@@ -123,6 +123,72 @@
         }
       }
     },
+    "/auth/google/start": {
+      "get": {
+        "tags": [
+          "auth"
+        ],
+        "summary": "Auth Google Start",
+        "description": "Redirect to Google (OIDC + PKCE). Only when `sign_in_methods` in /auth/session lists\ngoogle; otherwise 404.",
+        "operationId": "authGoogleStart",
+        "parameters": [
+          {
+            "name": "return_to",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "description": "Relative frontend path to return to.",
+              "title": "Return To"
+            },
+            "description": "Relative frontend path to return to."
+          }
+        ],
+        "responses": {
+          "302": {
+            "description": "Successful Response"
+          },
+          "404": {
+            "description": "Google sign-in is not enabled on this server."
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/auth/google/callback": {
+      "get": {
+        "tags": [
+          "auth"
+        ],
+        "summary": "Auth Google Callback",
+        "description": "Google callback: sets the session cookie and redirects back (?auth_error=denied|failed).",
+        "operationId": "authGoogleCallback",
+        "responses": {
+          "302": {
+            "description": "Successful Response"
+          },
+          "404": {
+            "description": "Google sign-in is not enabled on this server."
+          }
+        }
+      }
+    },
     "/auth/logout": {
       "post": {
         "tags": [
@@ -1295,7 +1361,7 @@
           "graph"
         ],
         "summary": "Get Atlas Summary",
-        "description": "A node's connections grouped into sections for the Atlas side panel.",
+        "description": "A node's connections grouped into sections for the Atlas side panel. For signed-in users,\nresearcher and doctor items carry `card_id` when the person has a visible, verified card.",
         "operationId": "getAtlasSummary",
         "parameters": [
           {
@@ -1621,7 +1687,7 @@
           "chat"
         ],
         "summary": "Post Chat",
-        "description": "Send a message to Dr. Wu (an AI system); streams the checked structured reply.\n\nNeeds the health_data consent: the message may carry the user's health data.",
+        "description": "Send a message to Dr. Wu (an AI system); streams the checked structured reply.\n\nThe turn runs on the server and keeps running when this stream is closed; follow it again\nwith streamChatRun. 409 when the session is still answering. Needs the health_data\nconsent: the message may carry the user's health data.",
         "operationId": "chat",
         "requestBody": {
           "content": {
@@ -1635,7 +1701,7 @@
         },
         "responses": {
           "200": {
-            "description": "Stream of ChatEvent (status, turn, summary_delta, ..., final).",
+            "description": "Stream of ChatEvent (status, turn, summary_delta, ..., final); each frame's SSE id is its sequence number in the run.",
             "content": {
               "text/event-stream": {
                 "schema": {
@@ -1852,6 +1918,206 @@
               "type": "string",
               "format": "uuid",
               "title": "Session Id"
+            }
+          }
+        ],
+        "responses": {
+          "204": {
+            "description": "Successful Response"
+          },
+          "401": {
+            "description": "sign_in_required: guest, or the session expired.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "not_found",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "501": {
+            "description": "not_implemented",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/chat/runs": {
+      "get": {
+        "tags": [
+          "chat"
+        ],
+        "summary": "List Runs",
+        "description": "The user's running Dr. Wu turns, newest first (at most one per session).",
+        "operationId": "listChatRuns",
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "items": {
+                    "$ref": "#/components/schemas/ChatRun"
+                  },
+                  "type": "array",
+                  "title": "Response Listchatruns"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "sign_in_required: guest, or the session expired.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "501": {
+            "description": "not_implemented",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/chat/runs/{run_id}/events": {
+      "get": {
+        "tags": [
+          "chat"
+        ],
+        "summary": "Stream Run",
+        "description": "Attach to a running (or just finished) turn: replay, then follow. 404 once it is gone;\nthe session then holds its reply or failed turn.",
+        "operationId": "streamChatRun",
+        "parameters": [
+          {
+            "name": "run_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid",
+              "title": "Run Id"
+            }
+          },
+          {
+            "name": "after",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "integer",
+              "minimum": 0,
+              "description": "Last sequence number already seen; 0 = all.",
+              "default": 0,
+              "title": "After"
+            },
+            "description": "Last sequence number already seen; 0 = all."
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "The run's ChatEvents with a sequence number above `after` (the SSE id), then live ones until final or error.",
+            "content": {
+              "text/event-stream": {
+                "schema": {
+                  "$ref": "#/components/schemas/ChatEvent"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "sign_in_required: guest, or the session expired.",
+            "content": {
+              "text/event-stream": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "not_found",
+            "content": {
+              "text/event-stream": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "501": {
+            "description": "not_implemented",
+            "content": {
+              "text/event-stream": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/chat/runs/{run_id}": {
+      "delete": {
+        "tags": [
+          "chat"
+        ],
+        "summary": "Cancel Run",
+        "description": "Stop a running turn. It is stored as an interrupted turn that can be tried again.",
+        "operationId": "cancelChatRun",
+        "parameters": [
+          {
+            "name": "run_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid",
+              "title": "Run Id"
             }
           }
         ],
@@ -3231,6 +3497,1548 @@
           }
         }
       }
+    },
+    "/me/professional/card": {
+      "get": {
+        "tags": [
+          "people"
+        ],
+        "summary": "Get My Card",
+        "description": "Own verification state, card settings and a preview of exactly what others would see.",
+        "operationId": "getMyCard",
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/MyCard"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "sign_in_required: guest, or the session expired.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          }
+        }
+      },
+      "put": {
+        "tags": [
+          "people"
+        ],
+        "summary": "Put My Card",
+        "description": "Replace the card settings. `visible: true` needs a verified doctor or researcher with a\nname (403 role, 409 not verified or no name); `visible: false` always works and hides the\ncard at once.",
+        "operationId": "putMyCard",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/CardSettingsUpdate"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/MyCard"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "sign_in_required: guest, or the session expired.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "consent_required (no active consent of the needed type) or forbidden.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "conflict",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "validation_error: lists invalid field names only.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "429": {
+            "description": "rate_limited",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/me/professional/orcid/start": {
+      "post": {
+        "tags": [
+          "people"
+        ],
+        "summary": "Start Orcid Confirmation",
+        "description": "URL of the ORCID sign-in (or the local simulated one) that confirms the user's ORCID iD.\n501 when ORCID sign-in is not configured. 403 unless doctor or researcher.",
+        "operationId": "startOrcidConfirmation",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/OrcidStartRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/OrcidStart"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "sign_in_required: guest, or the session expired.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "consent_required (no active consent of the needed type) or forbidden.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "429": {
+            "description": "rate_limited",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "501": {
+            "description": "not_implemented",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/me/professional/orcid/callback": {
+      "get": {
+        "tags": [
+          "people"
+        ],
+        "summary": "Orcid Callback",
+        "description": "ORCID redirect target. Redirects to the frontend path from the start call with\n?orcid=confirmed|denied|failed|already_linked.",
+        "operationId": "orcidCallback",
+        "responses": {
+          "302": {
+            "description": "Successful Response"
+          }
+        }
+      }
+    },
+    "/me/professional/verification-request": {
+      "post": {
+        "tags": [
+          "people"
+        ],
+        "summary": "Request Verification",
+        "description": "Ask the Amber team for a manual check (institutional e-mail and a public profile page).\nReplaces an earlier request. 403 unless doctor or researcher; 409 if already verified.",
+        "operationId": "requestVerification",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/VerificationRequestCreate"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/MyCard"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "sign_in_required: guest, or the session expired.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "consent_required (no active consent of the needed type) or forbidden.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "conflict",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "validation_error: lists invalid field names only.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "429": {
+            "description": "rate_limited",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          }
+        }
+      },
+      "delete": {
+        "tags": [
+          "people"
+        ],
+        "summary": "Withdraw Verification Request",
+        "description": "Withdraw a pending or rejected request (the e-mail and link are deleted).",
+        "operationId": "withdrawVerificationRequest",
+        "responses": {
+          "204": {
+            "description": "Successful Response"
+          },
+          "401": {
+            "description": "sign_in_required: guest, or the session expired.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/people": {
+      "get": {
+        "tags": [
+          "people"
+        ],
+        "summary": "List People",
+        "description": "Visible, verified cards of doctors and researchers whose verified atlas entry is linked to\nthe disease. Professionals only; patients are never listed.",
+        "operationId": "listPeople",
+        "parameters": [
+          {
+            "name": "disease",
+            "in": "query",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "pattern": "^MONDO:\\d{7}$",
+              "description": "Atlas disease ID.",
+              "title": "Disease"
+            },
+            "description": "Atlas disease ID."
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/PeopleList"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "sign_in_required: guest, or the session expired.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "consent_required (no active consent of the needed type) or forbidden.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "not_found",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "validation_error: lists invalid field names only.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "429": {
+            "description": "rate_limited",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/people/{card_id}": {
+      "get": {
+        "tags": [
+          "people"
+        ],
+        "summary": "Get Person Card",
+        "description": "One public card; 404 unless it is visible and verified right now.",
+        "operationId": "getPersonCard",
+        "parameters": [
+          {
+            "name": "card_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid",
+              "title": "Card Id"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/PublicCard"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "sign_in_required: guest, or the session expired.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "consent_required (no active consent of the needed type) or forbidden.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "not_found",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "429": {
+            "description": "rate_limited",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/me/connect": {
+      "get": {
+        "tags": [
+          "connect"
+        ],
+        "summary": "Get Connect Status",
+        "description": "The connect consent state, the stated age group and the texts of the extra checkboxes.",
+        "operationId": "getConnectStatus",
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ConnectStatus"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "sign_in_required: guest, or the session expired.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "consent_required (no active consent of the needed type) or forbidden.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/me/connect/age-group": {
+      "put": {
+        "tags": [
+          "connect"
+        ],
+        "summary": "Set Connect Age Group",
+        "description": "State or correct the age group (needs the connect consent). Self-declared, not checked.",
+        "operationId": "setConnectAgeGroup",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/AgeGroupUpdate"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ConnectStatus"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "sign_in_required: guest, or the session expired.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "consent_required (no active consent of the needed type) or forbidden.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "validation_error: lists invalid field names only.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/me/threads": {
+      "get": {
+        "tags": [
+          "messages"
+        ],
+        "summary": "List Threads",
+        "description": "My conversations with unread counts, most recent first. Hidden ones are left out until a\nnew message arrives. Threads inactive for 12 months are deleted.",
+        "operationId": "listThreads",
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ThreadList"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "sign_in_required: guest, or the session expired.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "consent_required (no active consent of the needed type) or forbidden.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          }
+        }
+      },
+      "post": {
+        "tags": [
+          "messages"
+        ],
+        "summary": "Open Thread",
+        "description": "Send a request (one message) to a professional's card. Patients and caregivers only; the\ncard must be visible, verified and accept messages (404 otherwise). 403 age_group_required\nor guardian_agreement_required, 409 if a conversation with this person exists, 429 after 5\nnew conversations in a day.",
+        "operationId": "openThread",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/OpenThreadRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "201": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ThreadDetail"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "sign_in_required: guest, or the session expired.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "consent_required (no active consent of the needed type) or forbidden.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "not_found",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "conflict",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "validation_error: lists invalid field names only.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "429": {
+            "description": "rate_limited",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "501": {
+            "description": "not_implemented",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/me/threads/unread-count": {
+      "get": {
+        "tags": [
+          "messages"
+        ],
+        "summary": "Get Message Unread Count",
+        "description": "Unread messages and waiting requests, for the header. Cheap enough to poll.",
+        "operationId": "getMessageUnreadCount",
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/MessageUnreadCount"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "sign_in_required: guest, or the session expired.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "consent_required (no active consent of the needed type) or forbidden.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/me/threads/{thread_id}": {
+      "get": {
+        "tags": [
+          "messages"
+        ],
+        "summary": "Get Thread",
+        "description": "A conversation with all its messages, oldest first; marks it read.",
+        "operationId": "getThread",
+        "parameters": [
+          {
+            "name": "thread_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid",
+              "title": "Thread Id"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ThreadDetail"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "sign_in_required: guest, or the session expired.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "consent_required (no active consent of the needed type) or forbidden.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "not_found",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/me/threads/{thread_id}/accept": {
+      "post": {
+        "tags": [
+          "messages"
+        ],
+        "summary": "Accept Thread",
+        "description": "Accept a request addressed to me (409 if there is none).",
+        "operationId": "acceptThread",
+        "parameters": [
+          {
+            "name": "thread_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid",
+              "title": "Thread Id"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ThreadDetail"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "sign_in_required: guest, or the session expired.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "consent_required (no active consent of the needed type) or forbidden.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "not_found",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "conflict",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/me/threads/{thread_id}/decline": {
+      "post": {
+        "tags": [
+          "messages"
+        ],
+        "summary": "Decline Thread",
+        "description": "Decline a request addressed to me (409 if there is none).",
+        "operationId": "declineThread",
+        "parameters": [
+          {
+            "name": "thread_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid",
+              "title": "Thread Id"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ThreadDetail"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "sign_in_required: guest, or the session expired.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "consent_required (no active consent of the needed type) or forbidden.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "not_found",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "conflict",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/me/threads/{thread_id}/messages": {
+      "post": {
+        "tags": [
+          "messages"
+        ],
+        "summary": "Send Message",
+        "description": "Send a plain-text message into an open conversation (409 when it is not open or a block\nexists). 403 age_group_required or guardian_agreement_required.",
+        "operationId": "sendMessage",
+        "parameters": [
+          {
+            "name": "thread_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid",
+              "title": "Thread Id"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/SendMessageRequest"
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Message"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "sign_in_required: guest, or the session expired.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "consent_required (no active consent of the needed type) or forbidden.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "not_found",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "conflict",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "validation_error: lists invalid field names only.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "429": {
+            "description": "rate_limited",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "501": {
+            "description": "not_implemented",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/me/threads/{thread_id}/messages/{message_id}": {
+      "delete": {
+        "tags": [
+          "messages"
+        ],
+        "summary": "Delete Message",
+        "description": "Delete my own message for both sides.",
+        "operationId": "deleteMessage",
+        "parameters": [
+          {
+            "name": "thread_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid",
+              "title": "Thread Id"
+            }
+          },
+          {
+            "name": "message_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid",
+              "title": "Message Id"
+            }
+          }
+        ],
+        "responses": {
+          "204": {
+            "description": "Successful Response"
+          },
+          "401": {
+            "description": "sign_in_required: guest, or the session expired.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "consent_required (no active consent of the needed type) or forbidden.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "not_found",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/me/threads/{thread_id}/hide": {
+      "post": {
+        "tags": [
+          "messages"
+        ],
+        "summary": "Hide Thread",
+        "description": "Hide a conversation from my list until a new message arrives.",
+        "operationId": "hideThread",
+        "parameters": [
+          {
+            "name": "thread_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid",
+              "title": "Thread Id"
+            }
+          }
+        ],
+        "responses": {
+          "204": {
+            "description": "Successful Response"
+          },
+          "401": {
+            "description": "sign_in_required: guest, or the session expired.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "consent_required (no active consent of the needed type) or forbidden.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "not_found",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/me/threads/{thread_id}/block": {
+      "post": {
+        "tags": [
+          "messages"
+        ],
+        "summary": "Block Thread Participant",
+        "description": "Block the other person of this conversation: no messages or new conversations either\nway until unblocked.",
+        "operationId": "blockThreadParticipant",
+        "parameters": [
+          {
+            "name": "thread_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid",
+              "title": "Thread Id"
+            }
+          }
+        ],
+        "responses": {
+          "204": {
+            "description": "Successful Response"
+          },
+          "401": {
+            "description": "sign_in_required: guest, or the session expired.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "consent_required (no active consent of the needed type) or forbidden.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "not_found",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "conflict",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/me/threads/{thread_id}/report": {
+      "post": {
+        "tags": [
+          "messages"
+        ],
+        "summary": "Report Thread",
+        "description": "Report a conversation (optionally one message). This authorizes the Amber team to read\nthe conversation; every access is logged.",
+        "operationId": "reportThread",
+        "parameters": [
+          {
+            "name": "thread_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid",
+              "title": "Thread Id"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ReportRequest"
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Report"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "sign_in_required: guest, or the session expired.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "consent_required (no active consent of the needed type) or forbidden.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "not_found",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "validation_error: lists invalid field names only.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/me/blocks": {
+      "get": {
+        "tags": [
+          "messages"
+        ],
+        "summary": "List Blocks",
+        "description": "The people I blocked.",
+        "operationId": "listBlocks",
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/BlockList"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "sign_in_required: guest, or the session expired.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "consent_required (no active consent of the needed type) or forbidden.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/me/blocks/{block_id}": {
+      "delete": {
+        "tags": [
+          "messages"
+        ],
+        "summary": "Unblock",
+        "description": "Lift a block; conversations it blocked reopen unless the other side blocked me too.",
+        "operationId": "unblock",
+        "parameters": [
+          {
+            "name": "block_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid",
+              "title": "Block Id"
+            }
+          }
+        ],
+        "responses": {
+          "204": {
+            "description": "Successful Response"
+          },
+          "401": {
+            "description": "sign_in_required: guest, or the session expired.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "consent_required (no active consent of the needed type) or forbidden.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "not_found",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
     }
   },
   "components": {
@@ -3263,6 +5071,22 @@
               }
             ],
             "title": "Name"
+          },
+          "auth_provider": {
+            "$ref": "#/components/schemas/AuthProvider",
+            "default": "openai"
+          },
+          "auth_subject": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Auth Subject",
+            "description": "The account ID at the sign-in provider."
           },
           "created_at": {
             "type": "string",
@@ -3363,6 +5187,28 @@
           "fund"
         ],
         "title": "ActionType"
+      },
+      "AgeGroup": {
+        "type": "string",
+        "enum": [
+          "18_plus",
+          "16_17"
+        ],
+        "title": "AgeGroup"
+      },
+      "AgeGroupUpdate": {
+        "properties": {
+          "age_group": {
+            "$ref": "#/components/schemas/AgeGroup",
+            "description": "18_plus or 16_17 (self-declared, correctable)."
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "required": [
+          "age_group"
+        ],
+        "title": "AgeGroupUpdate"
       },
       "AgeRange": {
         "type": "string",
@@ -4336,6 +6182,64 @@
         ],
         "title": "AtlasTreeNode"
       },
+      "AuthProvider": {
+        "type": "string",
+        "enum": [
+          "openai",
+          "google"
+        ],
+        "title": "AuthProvider",
+        "description": "How an account signs in: openai (Sign in with ChatGPT) or google. One account per\nprovider identity; accounts are never merged by e-mail."
+      },
+      "Block": {
+        "properties": {
+          "id": {
+            "type": "string",
+            "format": "uuid",
+            "title": "Id"
+          },
+          "name": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Name",
+            "description": "Name snapshot of the blocked person."
+          },
+          "created_at": {
+            "type": "string",
+            "format": "date-time",
+            "title": "Created At"
+          }
+        },
+        "type": "object",
+        "required": [
+          "id",
+          "name",
+          "created_at"
+        ],
+        "title": "Block"
+      },
+      "BlockList": {
+        "properties": {
+          "items": {
+            "items": {
+              "$ref": "#/components/schemas/Block"
+            },
+            "type": "array",
+            "title": "Items"
+          }
+        },
+        "type": "object",
+        "required": [
+          "items"
+        ],
+        "title": "BlockList"
+      },
       "Body_uploadDocument": {
         "properties": {
           "file": {
@@ -4528,6 +6432,120 @@
         ],
         "title": "Card"
       },
+      "CardInstitution": {
+        "properties": {
+          "node_id": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Node Id",
+            "description": "Atlas institution node, null for free text."
+          },
+          "label": {
+            "type": "string",
+            "title": "Label"
+          }
+        },
+        "type": "object",
+        "required": [
+          "label"
+        ],
+        "title": "CardInstitution"
+      },
+      "CardSettings": {
+        "properties": {
+          "visible": {
+            "type": "boolean",
+            "title": "Visible",
+            "default": false
+          },
+          "visible_since": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "date-time"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Visible Since"
+          },
+          "headline": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Headline"
+          },
+          "accepts_patient_messages": {
+            "type": "boolean",
+            "title": "Accepts Patient Messages",
+            "default": false
+          },
+          "show_institutions": {
+            "type": "boolean",
+            "title": "Show Institutions",
+            "default": true
+          },
+          "show_atlas_entry": {
+            "type": "boolean",
+            "title": "Show Atlas Entry",
+            "default": true
+          }
+        },
+        "type": "object",
+        "title": "CardSettings"
+      },
+      "CardSettingsUpdate": {
+        "properties": {
+          "visible": {
+            "type": "boolean",
+            "title": "Visible",
+            "default": false
+          },
+          "headline": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Headline",
+            "description": "At most 160 characters; no e-mail addresses, links or phone numbers."
+          },
+          "accepts_patient_messages": {
+            "type": "boolean",
+            "title": "Accepts Patient Messages",
+            "default": false
+          },
+          "show_institutions": {
+            "type": "boolean",
+            "title": "Show Institutions",
+            "default": true
+          },
+          "show_atlas_entry": {
+            "type": "boolean",
+            "title": "Show Atlas Entry",
+            "default": true
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "title": "CardSettingsUpdate",
+        "description": "Replaces the card settings (PUT). The card is off by default."
+      },
       "CardType": {
         "type": "string",
         "enum": [
@@ -4537,6 +6555,36 @@
           "open_in_atlas"
         ],
         "title": "CardType"
+      },
+      "CardVerification": {
+        "properties": {
+          "method": {
+            "type": "string",
+            "enum": [
+              "orcid",
+              "orcid_simulated",
+              "institutional_email"
+            ],
+            "title": "Method"
+          },
+          "label": {
+            "type": "string",
+            "title": "Label",
+            "description": "What was checked, ready to show."
+          },
+          "simulated": {
+            "type": "boolean",
+            "title": "Simulated",
+            "description": "True when verified through the local ORCID mock: show the label, which says 'demo, verification simulated'."
+          }
+        },
+        "type": "object",
+        "required": [
+          "method",
+          "label",
+          "simulated"
+        ],
+        "title": "CardVerification"
       },
       "ChatActionsEvent": {
         "properties": {
@@ -4881,6 +6929,92 @@
         ],
         "title": "ChatRole"
       },
+      "ChatRun": {
+        "properties": {
+          "id": {
+            "type": "string",
+            "format": "uuid",
+            "title": "Id"
+          },
+          "session_id": {
+            "type": "string",
+            "format": "uuid",
+            "title": "Session Id"
+          },
+          "message_id": {
+            "type": "string",
+            "format": "uuid",
+            "title": "Message Id",
+            "description": "The stored user message this run answers."
+          },
+          "created_at": {
+            "type": "string",
+            "format": "date-time",
+            "title": "Created At"
+          }
+        },
+        "type": "object",
+        "required": [
+          "id",
+          "session_id",
+          "message_id",
+          "created_at"
+        ],
+        "title": "ChatRun",
+        "description": "A Dr. Wu turn still running on the server (it keeps running without a client)."
+      },
+      "ChatRunExport": {
+        "properties": {
+          "id": {
+            "type": "string",
+            "format": "uuid",
+            "title": "Id"
+          },
+          "session_id": {
+            "type": "string",
+            "format": "uuid",
+            "title": "Session Id"
+          },
+          "message_id": {
+            "type": "string",
+            "format": "uuid",
+            "title": "Message Id"
+          },
+          "created_at": {
+            "type": "string",
+            "format": "date-time",
+            "title": "Created At"
+          },
+          "updated_at": {
+            "type": "string",
+            "format": "date-time",
+            "title": "Updated At"
+          },
+          "state": {
+            "anyOf": [
+              {
+                "additionalProperties": true,
+                "type": "object"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "State",
+            "description": "The turn's last saved state (redacted message, steps so far, draft or checked reply); null before the first step."
+          }
+        },
+        "type": "object",
+        "required": [
+          "id",
+          "session_id",
+          "message_id",
+          "created_at",
+          "updated_at"
+        ],
+        "title": "ChatRunExport",
+        "description": "A turn that was still running at export time, with its latest checkpoint."
+      },
       "ChatSession": {
         "properties": {
           "id": {
@@ -4929,6 +7063,17 @@
             },
             "type": "array",
             "title": "Messages"
+          },
+          "run": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/ChatRun"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "The session's running turn, if any: follow it with streamChatRun (its events replay from the start, so the turn shows as far as it got)."
           }
         },
         "type": "object",
@@ -5043,6 +7188,19 @@
             "format": "uuid",
             "title": "Message Id",
             "description": "The stored user message of this turn: send it as retry_message_id to run the turn again without storing the message twice."
+          },
+          "run_id": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "uuid"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Run Id",
+            "description": "The server-side run of this turn: follow it again with streamChatRun (after a reload or from another view) or stop it with cancelChatRun."
           }
         },
         "type": "object",
@@ -5309,6 +7467,65 @@
         ],
         "title": "ConfidenceTerm"
       },
+      "ConnectStatus": {
+        "properties": {
+          "consent_active": {
+            "type": "boolean",
+            "title": "Consent Active",
+            "description": "An active `connect` consent exists."
+          },
+          "age_group": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/AgeGroup"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "Self-declared at the first connect action; null until stated."
+          },
+          "age_group_set_at": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "date-time"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Age Group Set At"
+          },
+          "guardian_text": {
+            "type": "string",
+            "title": "Guardian Text",
+            "description": "The extra checkbox for users aged 16 or 17; `{recipient}` is replaced by the recipient's name."
+          },
+          "guardian_text_version": {
+            "type": "string",
+            "title": "Guardian Text Version"
+          },
+          "report_authorization_text": {
+            "type": "string",
+            "title": "Report Authorization Text"
+          },
+          "report_authorization_version": {
+            "type": "string",
+            "title": "Report Authorization Version"
+          }
+        },
+        "type": "object",
+        "required": [
+          "consent_active",
+          "age_group",
+          "guardian_text",
+          "guardian_text_version",
+          "report_authorization_text",
+          "report_authorization_version"
+        ],
+        "title": "ConnectStatus"
+      },
       "Consent": {
         "properties": {
           "id": {
@@ -5403,10 +7620,11 @@
         "type": "string",
         "enum": [
           "health_data",
-          "contribute"
+          "contribute",
+          "connect"
         ],
         "title": "ConsentType",
-        "description": "health_data: one consent to process the user's own health and genetic data (chat,\nprofile, documents); contribute: share data with the atlas, a separate purpose."
+        "description": "health_data: one consent to process the user's own health and genetic data (chat,\nprofile, documents); contribute: share data with the atlas, a separate purpose; connect:\nstudies, surveys and contacts with other people (messaging), a separate purpose."
       },
       "Contradiction": {
         "properties": {
@@ -5528,6 +7746,53 @@
         ],
         "title": "ContributionStatus"
       },
+      "Counterpart": {
+        "properties": {
+          "name": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Name",
+            "description": "Name snapshot; null when the account was deleted."
+          },
+          "is_professional": {
+            "type": "boolean",
+            "title": "Is Professional",
+            "description": "The other side is the professional (recipient)."
+          },
+          "card_id": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "uuid"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Card Id",
+            "description": "The professional's public card, for the patient's side only."
+          },
+          "deleted": {
+            "type": "boolean",
+            "title": "Deleted",
+            "description": "The account was deleted: its messages were removed (show a placeholder)."
+          }
+        },
+        "type": "object",
+        "required": [
+          "name",
+          "is_professional",
+          "deleted"
+        ],
+        "title": "Counterpart",
+        "description": "The other person in a thread. Never a user id."
+      },
       "CoverageReport": {
         "properties": {
           "sources_queried": {
@@ -5637,6 +7902,14 @@
             },
             "type": "array",
             "title": "Chat Sessions"
+          },
+          "chat_runs": {
+            "items": {
+              "$ref": "#/components/schemas/ChatRunExport"
+            },
+            "type": "array",
+            "title": "Chat Runs",
+            "description": "Dr. Wu turns still running, with their saved state."
           },
           "documents": {
             "items": {
@@ -6016,6 +8289,8 @@
           "sign_in_required",
           "consent_required",
           "age_confirmation_required",
+          "age_group_required",
+          "guardian_agreement_required",
           "forbidden",
           "not_found",
           "conflict",
@@ -6026,6 +8301,7 @@
           "not_implemented",
           "upstream_error",
           "reauth_required",
+          "assistant_unavailable",
           "internal_error"
         ],
         "title": "ErrorCode"
@@ -7401,6 +9677,64 @@
         ],
         "title": "MatchKind"
       },
+      "Message": {
+        "properties": {
+          "id": {
+            "type": "string",
+            "format": "uuid",
+            "title": "Id"
+          },
+          "mine": {
+            "type": "boolean",
+            "title": "Mine"
+          },
+          "body": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Body",
+            "description": "Plain text; render as text, never as HTML or clickable links. Null if it could not be decrypted."
+          },
+          "created_at": {
+            "type": "string",
+            "format": "date-time",
+            "title": "Created At"
+          }
+        },
+        "type": "object",
+        "required": [
+          "id",
+          "mine",
+          "body",
+          "created_at"
+        ],
+        "title": "Message"
+      },
+      "MessageUnreadCount": {
+        "properties": {
+          "count": {
+            "type": "integer",
+            "title": "Count",
+            "description": "Unread messages in threads that are not hidden."
+          },
+          "requests_waiting": {
+            "type": "integer",
+            "title": "Requests Waiting",
+            "description": "Requests waiting for me to accept or decline."
+          }
+        },
+        "type": "object",
+        "required": [
+          "count",
+          "requests_waiting"
+        ],
+        "title": "MessageUnreadCount"
+      },
       "MissingLink": {
         "properties": {
           "from_id": {
@@ -7424,6 +9758,70 @@
           "description"
         ],
         "title": "MissingLink"
+      },
+      "MyCard": {
+        "properties": {
+          "verification": {
+            "$ref": "#/components/schemas/VerificationState"
+          },
+          "settings": {
+            "$ref": "#/components/schemas/CardSettings"
+          },
+          "card_id": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "uuid"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Card Id",
+            "description": "Set once the card was first switched on."
+          },
+          "can_show": {
+            "type": "boolean",
+            "title": "Can Show",
+            "description": "The card can be switched on now."
+          },
+          "blocked_reason": {
+            "anyOf": [
+              {
+                "type": "string",
+                "enum": [
+                  "role",
+                  "not_verified",
+                  "no_name"
+                ]
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Blocked Reason",
+            "description": "Why it cannot: role (not a doctor or researcher), not_verified, no_name (no name from ORCID and none in the work details)."
+          },
+          "preview": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/PublicCard"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "Exactly what others would see; null while it cannot be shown."
+          }
+        },
+        "type": "object",
+        "required": [
+          "verification",
+          "settings",
+          "can_show"
+        ],
+        "title": "MyCard",
+        "description": "The user's own verification state, card settings and a preview of the card."
       },
       "Neighborhood": {
         "properties": {
@@ -7963,6 +10361,80 @@
         "title": "OpenAIConnection",
         "description": "That a ChatGPT connection exists; the tokens themselves are never exported."
       },
+      "OpenThreadRequest": {
+        "properties": {
+          "card_id": {
+            "type": "string",
+            "format": "uuid",
+            "title": "Card Id",
+            "description": "The professional's public card."
+          },
+          "display_name": {
+            "type": "string",
+            "title": "Display Name",
+            "description": "How the professional sees you (1-60 characters). Your e-mail, account name and profile are never shown."
+          },
+          "body": {
+            "type": "string",
+            "title": "Body",
+            "description": "The request message, plain text, 1-2,000 characters."
+          },
+          "guardian_agreed": {
+            "type": "boolean",
+            "title": "Guardian Agreed",
+            "description": "Required true when the age group is 16_17 (see ConnectStatus).",
+            "default": false
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "required": [
+          "card_id",
+          "display_name",
+          "body"
+        ],
+        "title": "OpenThreadRequest",
+        "description": "A request to a professional's card: one message the professional accepts or declines."
+      },
+      "OrcidStart": {
+        "properties": {
+          "authorize_url": {
+            "type": "string",
+            "title": "Authorize Url",
+            "description": "Open this URL in the browser (top-level navigation)."
+          },
+          "simulated": {
+            "type": "boolean",
+            "title": "Simulated",
+            "description": "True for the local simulated ORCID sign-in."
+          }
+        },
+        "type": "object",
+        "required": [
+          "authorize_url",
+          "simulated"
+        ],
+        "title": "OrcidStart"
+      },
+      "OrcidStartRequest": {
+        "properties": {
+          "return_to": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Return To",
+            "description": "Relative frontend path to return to (default /profile)."
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "title": "OrcidStartRequest"
+      },
       "Origin": {
         "type": "string",
         "enum": [
@@ -8245,6 +10717,28 @@
         "type": "object",
         "title": "PatientProfile"
       },
+      "PeopleList": {
+        "properties": {
+          "disease_id": {
+            "type": "string",
+            "title": "Disease Id"
+          },
+          "items": {
+            "items": {
+              "$ref": "#/components/schemas/PublicCard"
+            },
+            "type": "array",
+            "title": "Items",
+            "description": "Visible verified cards whose verified atlas entry is linked to the disease (through papers, grants or trials in the atlas). Professionals only."
+          }
+        },
+        "type": "object",
+        "required": [
+          "disease_id",
+          "items"
+        ],
+        "title": "PeopleList"
+      },
       "PhenotypeProfileContributionCreate": {
         "properties": {
           "kind": {
@@ -8379,6 +10873,136 @@
               }
             ],
             "title": "Updated At"
+          },
+          "orcid_verified_at": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "date-time"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Orcid Verified At"
+          },
+          "verified_name": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Verified Name"
+          },
+          "verification_method": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Verification Method"
+          },
+          "verified_at": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "date-time"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Verified At"
+          },
+          "verification_reason": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Verification Reason",
+            "description": "The operator's logged reason."
+          },
+          "verification_request": {
+            "anyOf": [
+              {
+                "additionalProperties": true,
+                "type": "object"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Verification Request"
+          },
+          "atlas_link_verified": {
+            "type": "boolean",
+            "title": "Atlas Link Verified",
+            "default": false
+          },
+          "card_id": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "uuid"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Card Id"
+          },
+          "card_visible": {
+            "type": "boolean",
+            "title": "Card Visible",
+            "default": false
+          },
+          "card_visible_since": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "date-time"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Card Visible Since"
+          },
+          "card_headline": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Card Headline"
+          },
+          "card_show_institutions": {
+            "type": "boolean",
+            "title": "Card Show Institutions",
+            "default": true
+          },
+          "card_show_atlas_entry": {
+            "type": "boolean",
+            "title": "Card Show Atlas Entry",
+            "default": true
+          },
+          "accepts_patient_messages": {
+            "type": "boolean",
+            "title": "Accepts Patient Messages",
+            "default": false
           }
         },
         "type": "object",
@@ -8476,7 +11100,7 @@
                 "type": "null"
               }
             ],
-            "description": "Name prefill from the ChatGPT account; null if it has no name."
+            "description": "Name prefill from the sign-in account; null if it has no name."
           }
         },
         "type": "object",
@@ -9030,6 +11654,125 @@
         ],
         "title": "ProposalRequest"
       },
+      "PublicCard": {
+        "properties": {
+          "card_id": {
+            "type": "string",
+            "format": "uuid",
+            "title": "Card Id",
+            "description": "Opaque card ID (never the user ID)."
+          },
+          "role": {
+            "$ref": "#/components/schemas/Role",
+            "description": "doctor or researcher; self-declared, show it as such."
+          },
+          "role_self_declared": {
+            "type": "boolean",
+            "const": true,
+            "title": "Role Self Declared",
+            "default": true
+          },
+          "name": {
+            "type": "string",
+            "title": "Name"
+          },
+          "name_source": {
+            "type": "string",
+            "enum": [
+              "orcid",
+              "reviewed",
+              "self_declared"
+            ],
+            "title": "Name Source",
+            "description": "orcid: from the ORCID record; reviewed: checked by the Amber team; self_declared: from the person's own work details."
+          },
+          "institutions": {
+            "items": {
+              "$ref": "#/components/schemas/CardInstitution"
+            },
+            "type": "array",
+            "title": "Institutions",
+            "description": "Self-declared, at most three; empty if hidden."
+          },
+          "orcid_id": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Orcid Id",
+            "description": "Only when confirmed by ORCID sign-in."
+          },
+          "orcid_url": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Orcid Url"
+          },
+          "atlas_node_id": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Atlas Node Id",
+            "description": "The person's own atlas entry, only when that link is verified (exact ORCID match or manual review) and the person chose to show it."
+          },
+          "atlas_node_label": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Atlas Node Label"
+          },
+          "headline": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Headline",
+            "description": "Optional, at most 160 characters."
+          },
+          "accepts_patient_messages": {
+            "type": "boolean",
+            "title": "Accepts Patient Messages",
+            "description": "The person's setting. Messaging is not built yet; nothing can be sent."
+          },
+          "verification": {
+            "$ref": "#/components/schemas/CardVerification"
+          }
+        },
+        "type": "object",
+        "required": [
+          "card_id",
+          "role",
+          "name",
+          "name_source",
+          "accepts_patient_messages",
+          "verification"
+        ],
+        "title": "PublicCard",
+        "description": "What other signed-in users see. Everything here was chosen by the person."
+      },
       "RankedCluster": {
         "properties": {
           "cluster": {
@@ -9141,6 +11884,117 @@
         ],
         "title": "RelationCount"
       },
+      "Report": {
+        "properties": {
+          "id": {
+            "type": "string",
+            "format": "uuid",
+            "title": "Id"
+          },
+          "thread_id": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "uuid"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Thread Id"
+          },
+          "message_id": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "uuid"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Message Id"
+          },
+          "reason": {
+            "$ref": "#/components/schemas/ReportReason"
+          },
+          "authorization_version": {
+            "type": "string",
+            "title": "Authorization Version"
+          },
+          "created_at": {
+            "type": "string",
+            "format": "date-time",
+            "title": "Created At"
+          },
+          "reviewed_at": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "date-time"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Reviewed At"
+          }
+        },
+        "type": "object",
+        "required": [
+          "id",
+          "thread_id",
+          "message_id",
+          "reason",
+          "authorization_version",
+          "created_at",
+          "reviewed_at"
+        ],
+        "title": "Report"
+      },
+      "ReportReason": {
+        "type": "string",
+        "enum": [
+          "harassment",
+          "spam",
+          "medical_advice",
+          "impersonation",
+          "other"
+        ],
+        "title": "ReportReason"
+      },
+      "ReportRequest": {
+        "properties": {
+          "reason": {
+            "$ref": "#/components/schemas/ReportReason"
+          },
+          "message_id": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "uuid"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Message Id",
+            "description": "The message reported, if one."
+          },
+          "authorize_review": {
+            "type": "boolean",
+            "title": "Authorize Review",
+            "description": "Must be true: the report authorizes the Amber team to read this conversation (REPORT_AUTHORIZATION_TEXT); every access is logged."
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "required": [
+          "reason",
+          "authorize_review"
+        ],
+        "title": "ReportRequest"
+      },
       "Role": {
         "type": "string",
         "enum": [
@@ -9246,6 +12100,27 @@
         ],
         "title": "SearchResult"
       },
+      "SendMessageRequest": {
+        "properties": {
+          "body": {
+            "type": "string",
+            "title": "Body",
+            "description": "Plain text, 1-2,000 characters."
+          },
+          "guardian_agreed": {
+            "type": "boolean",
+            "title": "Guardian Agreed",
+            "description": "Required true on the first message in a thread when the age group is 16_17.",
+            "default": false
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "required": [
+          "body"
+        ],
+        "title": "SendMessageRequest"
+      },
       "SessionInfo": {
         "properties": {
           "user": {
@@ -9281,6 +12156,14 @@
             ],
             "title": "Data Version",
             "description": "Graph data version served."
+          },
+          "sign_in_methods": {
+            "items": {
+              "$ref": "#/components/schemas/AuthProvider"
+            },
+            "type": "array",
+            "title": "Sign In Methods",
+            "description": "Sign-in methods this server offers (google only when enabled)."
           }
         },
         "type": "object",
@@ -9314,6 +12197,11 @@
               }
             ],
             "title": "Email"
+          },
+          "auth_provider": {
+            "$ref": "#/components/schemas/AuthProvider",
+            "description": "How this account signs in.",
+            "default": "openai"
           },
           "role": {
             "anyOf": [
@@ -9477,14 +12365,17 @@
           },
           "source": {
             "type": "string",
-            "const": "chatgpt",
+            "enum": [
+              "chatgpt",
+              "google"
+            ],
             "title": "Source",
             "default": "chatgpt"
           }
         },
         "type": "object",
         "title": "SuggestedName",
-        "description": "Prefill from the ChatGPT account, computed on request and never stored."
+        "description": "Prefill from the sign-in account, computed on request and never stored."
       },
       "SummaryItem": {
         "properties": {
@@ -9547,6 +12438,18 @@
               }
             ],
             "title": "Explanation"
+          },
+          "card_id": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "uuid"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Card Id"
           }
         },
         "type": "object",
@@ -9616,6 +12519,161 @@
           "claims"
         ],
         "title": "SummarySectionKey"
+      },
+      "ThreadDetail": {
+        "properties": {
+          "thread": {
+            "$ref": "#/components/schemas/ThreadSummary"
+          },
+          "messages": {
+            "items": {
+              "$ref": "#/components/schemas/Message"
+            },
+            "type": "array",
+            "title": "Messages",
+            "description": "Oldest first."
+          }
+        },
+        "type": "object",
+        "required": [
+          "thread",
+          "messages"
+        ],
+        "title": "ThreadDetail"
+      },
+      "ThreadList": {
+        "properties": {
+          "items": {
+            "items": {
+              "$ref": "#/components/schemas/ThreadSummary"
+            },
+            "type": "array",
+            "title": "Items",
+            "description": "Most recent activity first; hidden excluded."
+          },
+          "unread_total": {
+            "type": "integer",
+            "title": "Unread Total"
+          },
+          "requests_waiting": {
+            "type": "integer",
+            "title": "Requests Waiting",
+            "description": "Requests waiting for me to accept or decline."
+          }
+        },
+        "type": "object",
+        "required": [
+          "items",
+          "unread_total",
+          "requests_waiting"
+        ],
+        "title": "ThreadList"
+      },
+      "ThreadOrigin": {
+        "type": "string",
+        "enum": [
+          "card",
+          "signup"
+        ],
+        "title": "ThreadOrigin"
+      },
+      "ThreadRole": {
+        "type": "string",
+        "enum": [
+          "opener",
+          "recipient"
+        ],
+        "title": "ThreadRole"
+      },
+      "ThreadStatus": {
+        "type": "string",
+        "enum": [
+          "requested",
+          "open",
+          "declined",
+          "closed",
+          "blocked"
+        ],
+        "title": "ThreadStatus",
+        "description": "requested: waiting for the professional; open; declined; closed (withdrawn consent, a\ndeleted account or a role change); blocked (one side blocked the other)."
+      },
+      "ThreadSummary": {
+        "properties": {
+          "id": {
+            "type": "string",
+            "format": "uuid",
+            "title": "Id"
+          },
+          "origin": {
+            "$ref": "#/components/schemas/ThreadOrigin"
+          },
+          "status": {
+            "$ref": "#/components/schemas/ThreadStatus"
+          },
+          "my_role": {
+            "$ref": "#/components/schemas/ThreadRole"
+          },
+          "counterpart": {
+            "$ref": "#/components/schemas/Counterpart"
+          },
+          "created_at": {
+            "type": "string",
+            "format": "date-time",
+            "title": "Created At"
+          },
+          "last_message_at": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "date-time"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Last Message At"
+          },
+          "unread_count": {
+            "type": "integer",
+            "title": "Unread Count",
+            "description": "Messages from the other side since my last read."
+          },
+          "can_send": {
+            "type": "boolean",
+            "title": "Can Send",
+            "description": "The thread is open and both people are still here."
+          },
+          "can_respond": {
+            "type": "boolean",
+            "title": "Can Respond",
+            "description": "A request waiting for me to accept or decline."
+          },
+          "blocked_by_me": {
+            "type": "boolean",
+            "title": "Blocked By Me"
+          },
+          "guardian_agreement_needed": {
+            "type": "boolean",
+            "title": "Guardian Agreement Needed",
+            "description": "I am 16 or 17 and have not yet ticked the guardian checkbox in this thread: my next message must send `guardian_agreed: true`."
+          }
+        },
+        "type": "object",
+        "required": [
+          "id",
+          "origin",
+          "status",
+          "my_role",
+          "counterpart",
+          "created_at",
+          "last_message_at",
+          "unread_count",
+          "can_send",
+          "can_respond",
+          "blocked_by_me",
+          "guardian_agreement_needed"
+        ],
+        "title": "ThreadSummary"
       },
       "TreeNodeKind": {
         "type": "string",
@@ -9769,6 +12827,179 @@
           "benign"
         ],
         "title": "VariantClassification"
+      },
+      "VerificationRequestCreate": {
+        "properties": {
+          "institutional_email": {
+            "type": "string",
+            "maxLength": 254,
+            "title": "Institutional Email"
+          },
+          "profile_url": {
+            "type": "string",
+            "maxLength": 500,
+            "title": "Profile Url",
+            "description": "https link to a public staff or profile page."
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "required": [
+          "institutional_email",
+          "profile_url"
+        ],
+        "title": "VerificationRequestCreate",
+        "description": "Manual review: the Amber team checks the institutional e-mail and the public profile."
+      },
+      "VerificationRequestState": {
+        "properties": {
+          "status": {
+            "type": "string",
+            "enum": [
+              "pending",
+              "rejected"
+            ],
+            "title": "Status"
+          },
+          "requested_at": {
+            "type": "string",
+            "format": "date-time",
+            "title": "Requested At"
+          },
+          "decided_at": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "date-time"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Decided At"
+          },
+          "institutional_email": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Institutional Email",
+            "description": "While pending only."
+          },
+          "profile_url": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Profile Url",
+            "description": "While pending only."
+          }
+        },
+        "type": "object",
+        "required": [
+          "status",
+          "requested_at"
+        ],
+        "title": "VerificationRequestState"
+      },
+      "VerificationState": {
+        "properties": {
+          "verified": {
+            "type": "boolean",
+            "title": "Verified",
+            "description": "role_verified: identity checked for this role."
+          },
+          "method": {
+            "anyOf": [
+              {
+                "type": "string",
+                "enum": [
+                  "orcid",
+                  "orcid_simulated",
+                  "institutional_email"
+                ]
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Method"
+          },
+          "label": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Label"
+          },
+          "simulated": {
+            "type": "boolean",
+            "title": "Simulated",
+            "default": false
+          },
+          "verified_at": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "date-time"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Verified At"
+          },
+          "orcid_id_confirmed": {
+            "type": "boolean",
+            "title": "Orcid Id Confirmed",
+            "description": "The ORCID iD is confirmed and locked.",
+            "default": false
+          },
+          "atlas_link_verified": {
+            "type": "boolean",
+            "title": "Atlas Link Verified",
+            "default": false
+          },
+          "request": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/VerificationRequestState"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "orcid_available": {
+            "type": "boolean",
+            "title": "Orcid Available",
+            "description": "ORCID sign-in can be started on this server."
+          },
+          "orcid_simulated": {
+            "type": "boolean",
+            "title": "Orcid Simulated",
+            "description": "ORCID sign-in is the local simulated mock."
+          }
+        },
+        "type": "object",
+        "required": [
+          "verified",
+          "orcid_available",
+          "orcid_simulated"
+        ],
+        "title": "VerificationState"
       },
       "Zygosity": {
         "type": "string",

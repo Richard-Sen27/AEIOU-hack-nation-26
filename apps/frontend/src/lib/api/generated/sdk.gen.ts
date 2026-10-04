@@ -2,7 +2,7 @@
 
 import { type Client, type ClientMeta, formDataBodySerializer, type Options as Options2, type RequestResult, type ServerSentEventsResult, type TDataShape } from './client';
 import { client } from './client.gen';
-import type { AuthCallbackData, AuthLoopbackCallbackData, AuthStartData, AuthStartErrors, ChatData, ChatErrors, ChatResponse, ChatResponses, ConfirmFindingData, ConfirmFindingErrors, ConfirmFindingResponses, CreateContributionData, CreateContributionErrors, CreateContributionResponses, CreateProposalData, CreateProposalErrors, CreateProposalResponses, DeleteChatSessionData, DeleteChatSessionErrors, DeleteChatSessionResponses, DeleteContributionData, DeleteContributionErrors, DeleteContributionResponses, DeleteDocumentData, DeleteDocumentErrors, DeleteDocumentResponses, DeleteMeData, DeleteMeErrors, DeleteMeResponses, DeleteProfessionalProfileData, DeleteProfessionalProfileErrors, DeleteProfessionalProfileResponses, ExplainPathData, ExplainPathErrors, ExplainPathResponse, ExplainPathResponses, ExportGraphData, ExportGraphErrors, ExportGraphResponses, ExportMyDataData, ExportMyDataErrors, ExportMyDataResponses, FindPathData, FindPathErrors, FindPathResponses, FlagEdgeData, FlagEdgeErrors, FlagEdgeResponses, FollowDiseaseData, FollowDiseaseErrors, FollowDiseaseResponses, FollowProfileDiseasesData, FollowProfileDiseasesErrors, FollowProfileDiseasesResponses, GapSearchData, GapSearchErrors, GapSearchResponse, GapSearchResponses, GetAtlasData, GetAtlasErrors, GetAtlasResponses, GetAtlasSummaryData, GetAtlasSummaryErrors, GetAtlasSummaryResponses, GetAtlasTreeData, GetAtlasTreeErrors, GetAtlasTreeResponses, GetChatSessionData, GetChatSessionErrors, GetChatSessionResponses, GetEdgeEvidenceData, GetEdgeEvidenceErrors, GetEdgeEvidenceResponses, GetNeighborhoodData, GetNeighborhoodErrors, GetNeighborhoodResponses, GetNodeData, GetNodeErrors, GetNodeResponses, GetProfessionalProfileData, GetProfessionalProfileErrors, GetProfessionalProfileResponses, GetProfileData, GetProfileErrors, GetProfileResponses, GetSessionData, GetSessionResponses, GetStatsData, GetStatsResponses, GetUnreadNotificationCountData, GetUnreadNotificationCountErrors, GetUnreadNotificationCountResponses, GrantConsentData, GrantConsentErrors, GrantConsentResponses, HealthData, HealthResponses, ListChatSessionsData, ListChatSessionsErrors, ListChatSessionsResponses, ListClustersData, ListClustersErrors, ListClustersResponses, ListConsentsData, ListConsentsErrors, ListConsentsResponses, ListContributionsData, ListContributionsErrors, ListContributionsResponses, ListDocumentsData, ListDocumentsErrors, ListDocumentsResponses, ListFindingsData, ListFindingsErrors, ListFindingsResponses, ListFollowsData, ListFollowsErrors, ListFollowsResponses, ListNotificationsData, ListNotificationsErrors, ListNotificationsResponses, LogoutData, LogoutResponses, MarkNotificationsReadData, MarkNotificationsReadErrors, MarkNotificationsReadResponses, MatchAtlasEntryData, MatchAtlasEntryErrors, MatchAtlasEntryResponses, PutProfessionalProfileData, PutProfessionalProfileErrors, PutProfessionalProfileResponses, PutProfileData, PutProfileErrors, PutProfileResponses, RejectFindingData, RejectFindingErrors, RejectFindingResponses, RevokeConsentData, RevokeConsentErrors, RevokeConsentResponses, SearchData, SearchErrors, SearchResponses, StreamJobData, StreamJobErrors, StreamJobResponse, StreamJobResponses, UnfollowDiseaseData, UnfollowDiseaseErrors, UnfollowDiseaseResponses, UpdateSettingsData, UpdateSettingsErrors, UpdateSettingsResponses, UploadDocumentData, UploadDocumentErrors, UploadDocumentResponses } from './types.gen';
+import type { AcceptThreadData, AcceptThreadErrors, AcceptThreadResponses, AuthCallbackData, AuthGoogleCallbackData, AuthGoogleCallbackErrors, AuthGoogleStartData, AuthGoogleStartErrors, AuthLoopbackCallbackData, AuthStartData, AuthStartErrors, BlockThreadParticipantData, BlockThreadParticipantErrors, BlockThreadParticipantResponses, CancelChatRunData, CancelChatRunErrors, CancelChatRunResponses, ChatData, ChatErrors, ChatResponse, ChatResponses, ConfirmFindingData, ConfirmFindingErrors, ConfirmFindingResponses, CreateContributionData, CreateContributionErrors, CreateContributionResponses, CreateProposalData, CreateProposalErrors, CreateProposalResponses, DeclineThreadData, DeclineThreadErrors, DeclineThreadResponses, DeleteChatSessionData, DeleteChatSessionErrors, DeleteChatSessionResponses, DeleteContributionData, DeleteContributionErrors, DeleteContributionResponses, DeleteDocumentData, DeleteDocumentErrors, DeleteDocumentResponses, DeleteMeData, DeleteMeErrors, DeleteMeResponses, DeleteMessageData, DeleteMessageErrors, DeleteMessageResponses, DeleteProfessionalProfileData, DeleteProfessionalProfileErrors, DeleteProfessionalProfileResponses, ExplainPathData, ExplainPathErrors, ExplainPathResponse, ExplainPathResponses, ExportGraphData, ExportGraphErrors, ExportGraphResponses, ExportMyDataData, ExportMyDataErrors, ExportMyDataResponses, FindPathData, FindPathErrors, FindPathResponses, FlagEdgeData, FlagEdgeErrors, FlagEdgeResponses, FollowDiseaseData, FollowDiseaseErrors, FollowDiseaseResponses, FollowProfileDiseasesData, FollowProfileDiseasesErrors, FollowProfileDiseasesResponses, GapSearchData, GapSearchErrors, GapSearchResponse, GapSearchResponses, GetAtlasData, GetAtlasErrors, GetAtlasResponses, GetAtlasSummaryData, GetAtlasSummaryErrors, GetAtlasSummaryResponses, GetAtlasTreeData, GetAtlasTreeErrors, GetAtlasTreeResponses, GetChatSessionData, GetChatSessionErrors, GetChatSessionResponses, GetConnectStatusData, GetConnectStatusErrors, GetConnectStatusResponses, GetEdgeEvidenceData, GetEdgeEvidenceErrors, GetEdgeEvidenceResponses, GetMessageUnreadCountData, GetMessageUnreadCountErrors, GetMessageUnreadCountResponses, GetMyCardData, GetMyCardErrors, GetMyCardResponses, GetNeighborhoodData, GetNeighborhoodErrors, GetNeighborhoodResponses, GetNodeData, GetNodeErrors, GetNodeResponses, GetPersonCardData, GetPersonCardErrors, GetPersonCardResponses, GetProfessionalProfileData, GetProfessionalProfileErrors, GetProfessionalProfileResponses, GetProfileData, GetProfileErrors, GetProfileResponses, GetSessionData, GetSessionResponses, GetStatsData, GetStatsResponses, GetThreadData, GetThreadErrors, GetThreadResponses, GetUnreadNotificationCountData, GetUnreadNotificationCountErrors, GetUnreadNotificationCountResponses, GrantConsentData, GrantConsentErrors, GrantConsentResponses, HealthData, HealthResponses, HideThreadData, HideThreadErrors, HideThreadResponses, ListBlocksData, ListBlocksErrors, ListBlocksResponses, ListChatRunsData, ListChatRunsErrors, ListChatRunsResponses, ListChatSessionsData, ListChatSessionsErrors, ListChatSessionsResponses, ListClustersData, ListClustersErrors, ListClustersResponses, ListConsentsData, ListConsentsErrors, ListConsentsResponses, ListContributionsData, ListContributionsErrors, ListContributionsResponses, ListDocumentsData, ListDocumentsErrors, ListDocumentsResponses, ListFindingsData, ListFindingsErrors, ListFindingsResponses, ListFollowsData, ListFollowsErrors, ListFollowsResponses, ListNotificationsData, ListNotificationsErrors, ListNotificationsResponses, ListPeopleData, ListPeopleErrors, ListPeopleResponses, ListThreadsData, ListThreadsErrors, ListThreadsResponses, LogoutData, LogoutResponses, MarkNotificationsReadData, MarkNotificationsReadErrors, MarkNotificationsReadResponses, MatchAtlasEntryData, MatchAtlasEntryErrors, MatchAtlasEntryResponses, OpenThreadData, OpenThreadErrors, OpenThreadResponses, OrcidCallbackData, PutMyCardData, PutMyCardErrors, PutMyCardResponses, PutProfessionalProfileData, PutProfessionalProfileErrors, PutProfessionalProfileResponses, PutProfileData, PutProfileErrors, PutProfileResponses, RejectFindingData, RejectFindingErrors, RejectFindingResponses, ReportThreadData, ReportThreadErrors, ReportThreadResponses, RequestVerificationData, RequestVerificationErrors, RequestVerificationResponses, RevokeConsentData, RevokeConsentErrors, RevokeConsentResponses, SearchData, SearchErrors, SearchResponses, SendMessageData, SendMessageErrors, SendMessageResponses, SetConnectAgeGroupData, SetConnectAgeGroupErrors, SetConnectAgeGroupResponses, StartOrcidConfirmationData, StartOrcidConfirmationErrors, StartOrcidConfirmationResponses, StreamChatRunData, StreamChatRunErrors, StreamChatRunResponse, StreamChatRunResponses, StreamJobData, StreamJobErrors, StreamJobResponse, StreamJobResponses, UnblockData, UnblockErrors, UnblockResponses, UnfollowDiseaseData, UnfollowDiseaseErrors, UnfollowDiseaseResponses, UpdateSettingsData, UpdateSettingsErrors, UpdateSettingsResponses, UploadDocumentData, UploadDocumentErrors, UploadDocumentResponses, WithdrawVerificationRequestData, WithdrawVerificationRequestErrors, WithdrawVerificationRequestResponses } from './types.gen';
 
 export type Options<TData extends TDataShape = TDataShape, ThrowOnError extends boolean = boolean, TResponse = unknown> = Options2<TData, ThrowOnError, TResponse> & {
     /**
@@ -50,6 +50,21 @@ export const authCallback = <ThrowOnError extends boolean = false>(options?: Opt
  * Same handler on the loopback redirect path the local OAuth flow requires.
  */
 export const authLoopbackCallback = <ThrowOnError extends boolean = false>(options?: Options<AuthLoopbackCallbackData, ThrowOnError>): RequestResult<unknown, unknown, ThrowOnError> => (options?.client ?? client).get<unknown, unknown, ThrowOnError>({ url: '/auth/callback', ...options });
+
+/**
+ * Auth Google Start
+ *
+ * Redirect to Google (OIDC + PKCE). Only when `sign_in_methods` in /auth/session lists
+ * google; otherwise 404.
+ */
+export const authGoogleStart = <ThrowOnError extends boolean = false>(options?: Options<AuthGoogleStartData, ThrowOnError>): RequestResult<unknown, AuthGoogleStartErrors, ThrowOnError> => (options?.client ?? client).get<unknown, AuthGoogleStartErrors, ThrowOnError>({ url: '/auth/google/start', ...options });
+
+/**
+ * Auth Google Callback
+ *
+ * Google callback: sets the session cookie and redirects back (?auth_error=denied|failed).
+ */
+export const authGoogleCallback = <ThrowOnError extends boolean = false>(options?: Options<AuthGoogleCallbackData, ThrowOnError>): RequestResult<unknown, AuthGoogleCallbackErrors, ThrowOnError> => (options?.client ?? client).get<unknown, AuthGoogleCallbackErrors, ThrowOnError>({ url: '/auth/google/callback', ...options });
 
 /**
  * Logout
@@ -240,7 +255,8 @@ export const getAtlasTree = <ThrowOnError extends boolean = false>(options?: Opt
 /**
  * Get Atlas Summary
  *
- * A node's connections grouped into sections for the Atlas side panel.
+ * A node's connections grouped into sections for the Atlas side panel. For signed-in users,
+ * researcher and doctor items carry `card_id` when the person has a visible, verified card.
  */
 export const getAtlasSummary = <ThrowOnError extends boolean = false>(options: Options<GetAtlasSummaryData, ThrowOnError>): RequestResult<GetAtlasSummaryResponses, GetAtlasSummaryErrors, ThrowOnError> => (options.client ?? client).get<GetAtlasSummaryResponses, GetAtlasSummaryErrors, ThrowOnError>({ url: '/atlas/summary/{node_id}', ...options });
 
@@ -280,7 +296,9 @@ export const explainPath = <ThrowOnError extends boolean = false>(options: Optio
  *
  * Send a message to Dr. Wu (an AI system); streams the checked structured reply.
  *
- * Needs the health_data consent: the message may carry the user's health data.
+ * The turn runs on the server and keeps running when this stream is closed; follow it again
+ * with streamChatRun. 409 when the session is still answering. Needs the health_data
+ * consent: the message may carry the user's health data.
  */
 export const chat = <ThrowOnError extends boolean = false>(options: Options<ChatData, ThrowOnError, ChatResponse>): Promise<ServerSentEventsResult<ChatResponses>> => (options.client ?? client).sse.post<ChatResponses, ChatErrors, ThrowOnError>({
     url: '/chat',
@@ -311,6 +329,28 @@ export const deleteChatSession = <ThrowOnError extends boolean = false>(options:
  * One session with its messages.
  */
 export const getChatSession = <ThrowOnError extends boolean = false>(options: Options<GetChatSessionData, ThrowOnError>): RequestResult<GetChatSessionResponses, GetChatSessionErrors, ThrowOnError> => (options.client ?? client).get<GetChatSessionResponses, GetChatSessionErrors, ThrowOnError>({ url: '/chat/sessions/{session_id}', ...options });
+
+/**
+ * List Runs
+ *
+ * The user's running Dr. Wu turns, newest first (at most one per session).
+ */
+export const listChatRuns = <ThrowOnError extends boolean = false>(options?: Options<ListChatRunsData, ThrowOnError>): RequestResult<ListChatRunsResponses, ListChatRunsErrors, ThrowOnError> => (options?.client ?? client).get<ListChatRunsResponses, ListChatRunsErrors, ThrowOnError>({ url: '/chat/runs', ...options });
+
+/**
+ * Stream Run
+ *
+ * Attach to a running (or just finished) turn: replay, then follow. 404 once it is gone;
+ * the session then holds its reply or failed turn.
+ */
+export const streamChatRun = <ThrowOnError extends boolean = false>(options: Options<StreamChatRunData, ThrowOnError, StreamChatRunResponse>): Promise<ServerSentEventsResult<StreamChatRunResponses>> => (options.client ?? client).sse.get<StreamChatRunResponses, StreamChatRunErrors, ThrowOnError>({ url: '/chat/runs/{run_id}/events', ...options });
+
+/**
+ * Cancel Run
+ *
+ * Stop a running turn. It is stored as an interrupted turn that can be tried again.
+ */
+export const cancelChatRun = <ThrowOnError extends boolean = false>(options: Options<CancelChatRunData, ThrowOnError>): RequestResult<CancelChatRunResponses, CancelChatRunErrors, ThrowOnError> => (options.client ?? client).delete<CancelChatRunResponses, CancelChatRunErrors, ThrowOnError>({ url: '/chat/runs/{run_id}', ...options });
 
 /**
  * Post Gap Search
@@ -515,3 +555,226 @@ export const markNotificationsRead = <ThrowOnError extends boolean = false>(opti
         ...options.headers
     }
 });
+
+/**
+ * Get My Card
+ *
+ * Own verification state, card settings and a preview of exactly what others would see.
+ */
+export const getMyCard = <ThrowOnError extends boolean = false>(options?: Options<GetMyCardData, ThrowOnError>): RequestResult<GetMyCardResponses, GetMyCardErrors, ThrowOnError> => (options?.client ?? client).get<GetMyCardResponses, GetMyCardErrors, ThrowOnError>({ url: '/me/professional/card', ...options });
+
+/**
+ * Put My Card
+ *
+ * Replace the card settings. `visible: true` needs a verified doctor or researcher with a
+ * name (403 role, 409 not verified or no name); `visible: false` always works and hides the
+ * card at once.
+ */
+export const putMyCard = <ThrowOnError extends boolean = false>(options: Options<PutMyCardData, ThrowOnError>): RequestResult<PutMyCardResponses, PutMyCardErrors, ThrowOnError> => (options.client ?? client).put<PutMyCardResponses, PutMyCardErrors, ThrowOnError>({
+    url: '/me/professional/card',
+    ...options,
+    headers: {
+        'Content-Type': 'application/json',
+        ...options.headers
+    }
+});
+
+/**
+ * Start Orcid Confirmation
+ *
+ * URL of the ORCID sign-in (or the local simulated one) that confirms the user's ORCID iD.
+ * 501 when ORCID sign-in is not configured. 403 unless doctor or researcher.
+ */
+export const startOrcidConfirmation = <ThrowOnError extends boolean = false>(options: Options<StartOrcidConfirmationData, ThrowOnError>): RequestResult<StartOrcidConfirmationResponses, StartOrcidConfirmationErrors, ThrowOnError> => (options.client ?? client).post<StartOrcidConfirmationResponses, StartOrcidConfirmationErrors, ThrowOnError>({
+    url: '/me/professional/orcid/start',
+    ...options,
+    headers: {
+        'Content-Type': 'application/json',
+        ...options.headers
+    }
+});
+
+/**
+ * Orcid Callback
+ *
+ * ORCID redirect target. Redirects to the frontend path from the start call with
+ * ?orcid=confirmed|denied|failed|already_linked.
+ */
+export const orcidCallback = <ThrowOnError extends boolean = false>(options?: Options<OrcidCallbackData, ThrowOnError>): RequestResult<unknown, unknown, ThrowOnError> => (options?.client ?? client).get<unknown, unknown, ThrowOnError>({ url: '/me/professional/orcid/callback', ...options });
+
+/**
+ * Withdraw Verification Request
+ *
+ * Withdraw a pending or rejected request (the e-mail and link are deleted).
+ */
+export const withdrawVerificationRequest = <ThrowOnError extends boolean = false>(options?: Options<WithdrawVerificationRequestData, ThrowOnError>): RequestResult<WithdrawVerificationRequestResponses, WithdrawVerificationRequestErrors, ThrowOnError> => (options?.client ?? client).delete<WithdrawVerificationRequestResponses, WithdrawVerificationRequestErrors, ThrowOnError>({ url: '/me/professional/verification-request', ...options });
+
+/**
+ * Request Verification
+ *
+ * Ask the Amber team for a manual check (institutional e-mail and a public profile page).
+ * Replaces an earlier request. 403 unless doctor or researcher; 409 if already verified.
+ */
+export const requestVerification = <ThrowOnError extends boolean = false>(options: Options<RequestVerificationData, ThrowOnError>): RequestResult<RequestVerificationResponses, RequestVerificationErrors, ThrowOnError> => (options.client ?? client).post<RequestVerificationResponses, RequestVerificationErrors, ThrowOnError>({
+    url: '/me/professional/verification-request',
+    ...options,
+    headers: {
+        'Content-Type': 'application/json',
+        ...options.headers
+    }
+});
+
+/**
+ * List People
+ *
+ * Visible, verified cards of doctors and researchers whose verified atlas entry is linked to
+ * the disease. Professionals only; patients are never listed.
+ */
+export const listPeople = <ThrowOnError extends boolean = false>(options: Options<ListPeopleData, ThrowOnError>): RequestResult<ListPeopleResponses, ListPeopleErrors, ThrowOnError> => (options.client ?? client).get<ListPeopleResponses, ListPeopleErrors, ThrowOnError>({ url: '/people', ...options });
+
+/**
+ * Get Person Card
+ *
+ * One public card; 404 unless it is visible and verified right now.
+ */
+export const getPersonCard = <ThrowOnError extends boolean = false>(options: Options<GetPersonCardData, ThrowOnError>): RequestResult<GetPersonCardResponses, GetPersonCardErrors, ThrowOnError> => (options.client ?? client).get<GetPersonCardResponses, GetPersonCardErrors, ThrowOnError>({ url: '/people/{card_id}', ...options });
+
+/**
+ * Get Connect Status
+ *
+ * The connect consent state, the stated age group and the texts of the extra checkboxes.
+ */
+export const getConnectStatus = <ThrowOnError extends boolean = false>(options?: Options<GetConnectStatusData, ThrowOnError>): RequestResult<GetConnectStatusResponses, GetConnectStatusErrors, ThrowOnError> => (options?.client ?? client).get<GetConnectStatusResponses, GetConnectStatusErrors, ThrowOnError>({ url: '/me/connect', ...options });
+
+/**
+ * Set Connect Age Group
+ *
+ * State or correct the age group (needs the connect consent). Self-declared, not checked.
+ */
+export const setConnectAgeGroup = <ThrowOnError extends boolean = false>(options: Options<SetConnectAgeGroupData, ThrowOnError>): RequestResult<SetConnectAgeGroupResponses, SetConnectAgeGroupErrors, ThrowOnError> => (options.client ?? client).put<SetConnectAgeGroupResponses, SetConnectAgeGroupErrors, ThrowOnError>({
+    url: '/me/connect/age-group',
+    ...options,
+    headers: {
+        'Content-Type': 'application/json',
+        ...options.headers
+    }
+});
+
+/**
+ * List Threads
+ *
+ * My conversations with unread counts, most recent first. Hidden ones are left out until a
+ * new message arrives. Threads inactive for 12 months are deleted.
+ */
+export const listThreads = <ThrowOnError extends boolean = false>(options?: Options<ListThreadsData, ThrowOnError>): RequestResult<ListThreadsResponses, ListThreadsErrors, ThrowOnError> => (options?.client ?? client).get<ListThreadsResponses, ListThreadsErrors, ThrowOnError>({ url: '/me/threads', ...options });
+
+/**
+ * Open Thread
+ *
+ * Send a request (one message) to a professional's card. Patients and caregivers only; the
+ * card must be visible, verified and accept messages (404 otherwise). 403 age_group_required
+ * or guardian_agreement_required, 409 if a conversation with this person exists, 429 after 5
+ * new conversations in a day.
+ */
+export const openThread = <ThrowOnError extends boolean = false>(options: Options<OpenThreadData, ThrowOnError>): RequestResult<OpenThreadResponses, OpenThreadErrors, ThrowOnError> => (options.client ?? client).post<OpenThreadResponses, OpenThreadErrors, ThrowOnError>({
+    url: '/me/threads',
+    ...options,
+    headers: {
+        'Content-Type': 'application/json',
+        ...options.headers
+    }
+});
+
+/**
+ * Get Message Unread Count
+ *
+ * Unread messages and waiting requests, for the header. Cheap enough to poll.
+ */
+export const getMessageUnreadCount = <ThrowOnError extends boolean = false>(options?: Options<GetMessageUnreadCountData, ThrowOnError>): RequestResult<GetMessageUnreadCountResponses, GetMessageUnreadCountErrors, ThrowOnError> => (options?.client ?? client).get<GetMessageUnreadCountResponses, GetMessageUnreadCountErrors, ThrowOnError>({ url: '/me/threads/unread-count', ...options });
+
+/**
+ * Get Thread
+ *
+ * A conversation with all its messages, oldest first; marks it read.
+ */
+export const getThread = <ThrowOnError extends boolean = false>(options: Options<GetThreadData, ThrowOnError>): RequestResult<GetThreadResponses, GetThreadErrors, ThrowOnError> => (options.client ?? client).get<GetThreadResponses, GetThreadErrors, ThrowOnError>({ url: '/me/threads/{thread_id}', ...options });
+
+/**
+ * Accept Thread
+ *
+ * Accept a request addressed to me (409 if there is none).
+ */
+export const acceptThread = <ThrowOnError extends boolean = false>(options: Options<AcceptThreadData, ThrowOnError>): RequestResult<AcceptThreadResponses, AcceptThreadErrors, ThrowOnError> => (options.client ?? client).post<AcceptThreadResponses, AcceptThreadErrors, ThrowOnError>({ url: '/me/threads/{thread_id}/accept', ...options });
+
+/**
+ * Decline Thread
+ *
+ * Decline a request addressed to me (409 if there is none).
+ */
+export const declineThread = <ThrowOnError extends boolean = false>(options: Options<DeclineThreadData, ThrowOnError>): RequestResult<DeclineThreadResponses, DeclineThreadErrors, ThrowOnError> => (options.client ?? client).post<DeclineThreadResponses, DeclineThreadErrors, ThrowOnError>({ url: '/me/threads/{thread_id}/decline', ...options });
+
+/**
+ * Send Message
+ *
+ * Send a plain-text message into an open conversation (409 when it is not open or a block
+ * exists). 403 age_group_required or guardian_agreement_required.
+ */
+export const sendMessage = <ThrowOnError extends boolean = false>(options: Options<SendMessageData, ThrowOnError>): RequestResult<SendMessageResponses, SendMessageErrors, ThrowOnError> => (options.client ?? client).post<SendMessageResponses, SendMessageErrors, ThrowOnError>({
+    url: '/me/threads/{thread_id}/messages',
+    ...options,
+    headers: {
+        'Content-Type': 'application/json',
+        ...options.headers
+    }
+});
+
+/**
+ * Delete Message
+ *
+ * Delete my own message for both sides.
+ */
+export const deleteMessage = <ThrowOnError extends boolean = false>(options: Options<DeleteMessageData, ThrowOnError>): RequestResult<DeleteMessageResponses, DeleteMessageErrors, ThrowOnError> => (options.client ?? client).delete<DeleteMessageResponses, DeleteMessageErrors, ThrowOnError>({ url: '/me/threads/{thread_id}/messages/{message_id}', ...options });
+
+/**
+ * Hide Thread
+ *
+ * Hide a conversation from my list until a new message arrives.
+ */
+export const hideThread = <ThrowOnError extends boolean = false>(options: Options<HideThreadData, ThrowOnError>): RequestResult<HideThreadResponses, HideThreadErrors, ThrowOnError> => (options.client ?? client).post<HideThreadResponses, HideThreadErrors, ThrowOnError>({ url: '/me/threads/{thread_id}/hide', ...options });
+
+/**
+ * Block Thread Participant
+ *
+ * Block the other person of this conversation: no messages or new conversations either
+ * way until unblocked.
+ */
+export const blockThreadParticipant = <ThrowOnError extends boolean = false>(options: Options<BlockThreadParticipantData, ThrowOnError>): RequestResult<BlockThreadParticipantResponses, BlockThreadParticipantErrors, ThrowOnError> => (options.client ?? client).post<BlockThreadParticipantResponses, BlockThreadParticipantErrors, ThrowOnError>({ url: '/me/threads/{thread_id}/block', ...options });
+
+/**
+ * Report Thread
+ *
+ * Report a conversation (optionally one message). This authorizes the Amber team to read
+ * the conversation; every access is logged.
+ */
+export const reportThread = <ThrowOnError extends boolean = false>(options: Options<ReportThreadData, ThrowOnError>): RequestResult<ReportThreadResponses, ReportThreadErrors, ThrowOnError> => (options.client ?? client).post<ReportThreadResponses, ReportThreadErrors, ThrowOnError>({
+    url: '/me/threads/{thread_id}/report',
+    ...options,
+    headers: {
+        'Content-Type': 'application/json',
+        ...options.headers
+    }
+});
+
+/**
+ * List Blocks
+ *
+ * The people I blocked.
+ */
+export const listBlocks = <ThrowOnError extends boolean = false>(options?: Options<ListBlocksData, ThrowOnError>): RequestResult<ListBlocksResponses, ListBlocksErrors, ThrowOnError> => (options?.client ?? client).get<ListBlocksResponses, ListBlocksErrors, ThrowOnError>({ url: '/me/blocks', ...options });
+
+/**
+ * Unblock
+ *
+ * Lift a block; conversations it blocked reopen unless the other side blocked me too.
+ */
+export const unblock = <ThrowOnError extends boolean = false>(options: Options<UnblockData, ThrowOnError>): RequestResult<UnblockResponses, UnblockErrors, ThrowOnError> => (options.client ?? client).delete<UnblockResponses, UnblockErrors, ThrowOnError>({ url: '/me/blocks/{block_id}', ...options });

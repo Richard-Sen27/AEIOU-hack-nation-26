@@ -20,6 +20,13 @@ export type AccountInfo = {
      * Name
      */
     name?: string | null;
+    auth_provider?: AuthProvider;
+    /**
+     * Auth Subject
+     *
+     * The account ID at the sign-in provider.
+     */
+    auth_subject?: string | null;
     /**
      * Created At
      */
@@ -71,6 +78,21 @@ export type Action = {
  * ActionType
  */
 export type ActionType = 'reuse_asset' | 'contact' | 'join_trial' | 'fund';
+
+/**
+ * AgeGroup
+ */
+export type AgeGroup = '18_plus' | '16_17';
+
+/**
+ * AgeGroupUpdate
+ */
+export type AgeGroupUpdate = {
+    /**
+     * 18_plus or 16_17 (self-declared, correctable).
+     */
+    age_group: AgeGroup;
+};
 
 /**
  * AgeRange
@@ -611,6 +633,44 @@ export type AtlasTreeNode = {
 };
 
 /**
+ * AuthProvider
+ *
+ * How an account signs in: openai (Sign in with ChatGPT) or google. One account per
+ * provider identity; accounts are never merged by e-mail.
+ */
+export type AuthProvider = 'openai' | 'google';
+
+/**
+ * Block
+ */
+export type Block = {
+    /**
+     * Id
+     */
+    id: string;
+    /**
+     * Name
+     *
+     * Name snapshot of the blocked person.
+     */
+    name: string | null;
+    /**
+     * Created At
+     */
+    created_at: string;
+};
+
+/**
+ * BlockList
+ */
+export type BlockList = {
+    /**
+     * Items
+     */
+    items: Array<Block>;
+};
+
+/**
  * Body_uploadDocument
  */
 export type BodyUploadDocument = {
@@ -736,9 +796,107 @@ export type Card = {
 };
 
 /**
+ * CardInstitution
+ */
+export type CardInstitution = {
+    /**
+     * Node Id
+     *
+     * Atlas institution node, null for free text.
+     */
+    node_id?: string | null;
+    /**
+     * Label
+     */
+    label: string;
+};
+
+/**
+ * CardSettings
+ */
+export type CardSettings = {
+    /**
+     * Visible
+     */
+    visible?: boolean;
+    /**
+     * Visible Since
+     */
+    visible_since?: string | null;
+    /**
+     * Headline
+     */
+    headline?: string | null;
+    /**
+     * Accepts Patient Messages
+     */
+    accepts_patient_messages?: boolean;
+    /**
+     * Show Institutions
+     */
+    show_institutions?: boolean;
+    /**
+     * Show Atlas Entry
+     */
+    show_atlas_entry?: boolean;
+};
+
+/**
+ * CardSettingsUpdate
+ *
+ * Replaces the card settings (PUT). The card is off by default.
+ */
+export type CardSettingsUpdate = {
+    /**
+     * Visible
+     */
+    visible?: boolean;
+    /**
+     * Headline
+     *
+     * At most 160 characters; no e-mail addresses, links or phone numbers.
+     */
+    headline?: string | null;
+    /**
+     * Accepts Patient Messages
+     */
+    accepts_patient_messages?: boolean;
+    /**
+     * Show Institutions
+     */
+    show_institutions?: boolean;
+    /**
+     * Show Atlas Entry
+     */
+    show_atlas_entry?: boolean;
+};
+
+/**
  * CardType
  */
 export type CardType = 'mini_graph' | 'patient_group' | 'evidence' | 'open_in_atlas';
+
+/**
+ * CardVerification
+ */
+export type CardVerification = {
+    /**
+     * Method
+     */
+    method: 'orcid' | 'orcid_simulated' | 'institutional_email';
+    /**
+     * Label
+     *
+     * What was checked, ready to show.
+     */
+    label: string;
+    /**
+     * Simulated
+     *
+     * True when verified through the local ORCID mock: show the label, which says 'demo, verification simulated'.
+     */
+    simulated: boolean;
+};
 
 /**
  * ChatActionsEvent
@@ -948,6 +1106,68 @@ export type ChatRequest = {
 export type ChatRole = 'user' | 'assistant';
 
 /**
+ * ChatRun
+ *
+ * A Dr. Wu turn still running on the server (it keeps running without a client).
+ */
+export type ChatRun = {
+    /**
+     * Id
+     */
+    id: string;
+    /**
+     * Session Id
+     */
+    session_id: string;
+    /**
+     * Message Id
+     *
+     * The stored user message this run answers.
+     */
+    message_id: string;
+    /**
+     * Created At
+     */
+    created_at: string;
+};
+
+/**
+ * ChatRunExport
+ *
+ * A turn that was still running at export time, with its latest checkpoint.
+ */
+export type ChatRunExport = {
+    /**
+     * Id
+     */
+    id: string;
+    /**
+     * Session Id
+     */
+    session_id: string;
+    /**
+     * Message Id
+     */
+    message_id: string;
+    /**
+     * Created At
+     */
+    created_at: string;
+    /**
+     * Updated At
+     */
+    updated_at: string;
+    /**
+     * State
+     *
+     * The turn's last saved state (redacted message, steps so far, draft or checked reply); null before the first step.
+     */
+    state?: {
+        [key: string]: unknown;
+    } | null;
+};
+
+/**
  * ChatSession
  */
 export type ChatSession = {
@@ -978,6 +1198,10 @@ export type ChatSessionDetail = {
      * Messages
      */
     messages: Array<ChatMessage>;
+    /**
+     * The session's running turn, if any: follow it with streamChatRun (its events replay from the start, so the turn shows as far as it got).
+     */
+    run?: ChatRun | null;
 };
 
 /**
@@ -1055,6 +1279,12 @@ export type ChatTurnEvent = {
      * The stored user message of this turn: send it as retry_message_id to run the turn again without storing the message twice.
      */
     message_id: string;
+    /**
+     * Run Id
+     *
+     * The server-side run of this turn: follow it again with streamChatRun (after a reload or from another view) or stop it with cancelChatRun.
+     */
+    run_id?: string | null;
 };
 
 /**
@@ -1262,6 +1492,44 @@ export type ConfidenceTerm = {
 };
 
 /**
+ * ConnectStatus
+ */
+export type ConnectStatus = {
+    /**
+     * Consent Active
+     *
+     * An active `connect` consent exists.
+     */
+    consent_active: boolean;
+    /**
+     * Self-declared at the first connect action; null until stated.
+     */
+    age_group: AgeGroup | null;
+    /**
+     * Age Group Set At
+     */
+    age_group_set_at?: string | null;
+    /**
+     * Guardian Text
+     *
+     * The extra checkbox for users aged 16 or 17; `{recipient}` is replaced by the recipient's name.
+     */
+    guardian_text: string;
+    /**
+     * Guardian Text Version
+     */
+    guardian_text_version: string;
+    /**
+     * Report Authorization Text
+     */
+    report_authorization_text: string;
+    /**
+     * Report Authorization Version
+     */
+    report_authorization_version: string;
+};
+
+/**
  * Consent
  */
 export type Consent = {
@@ -1329,9 +1597,10 @@ export type ConsentGrant = {
  * ConsentType
  *
  * health_data: one consent to process the user's own health and genetic data (chat,
- * profile, documents); contribute: share data with the atlas, a separate purpose.
+ * profile, documents); contribute: share data with the atlas, a separate purpose; connect:
+ * studies, surveys and contacts with other people (messaging), a separate purpose.
  */
-export type ConsentType = 'health_data' | 'contribute';
+export type ConsentType = 'health_data' | 'contribute' | 'connect';
 
 /**
  * Contradiction
@@ -1409,6 +1678,38 @@ export type ContributionKind = 'phenotype_profile' | 'asset' | 'candidate_edge';
 export type ContributionStatus = 'pending_review' | 'accepted' | 'rejected';
 
 /**
+ * Counterpart
+ *
+ * The other person in a thread. Never a user id.
+ */
+export type Counterpart = {
+    /**
+     * Name
+     *
+     * Name snapshot; null when the account was deleted.
+     */
+    name: string | null;
+    /**
+     * Is Professional
+     *
+     * The other side is the professional (recipient).
+     */
+    is_professional: boolean;
+    /**
+     * Card Id
+     *
+     * The professional's public card, for the patient's side only.
+     */
+    card_id?: string | null;
+    /**
+     * Deleted
+     *
+     * The account was deleted: its messages were removed (show a placeholder).
+     */
+    deleted: boolean;
+};
+
+/**
  * CoverageReport
  */
 export type CoverageReport = {
@@ -1464,6 +1765,12 @@ export type DataExport = {
      * Chat Sessions
      */
     chat_sessions: Array<ChatSessionExport>;
+    /**
+     * Chat Runs
+     *
+     * Dr. Wu turns still running, with their saved state.
+     */
+    chat_runs?: Array<ChatRunExport>;
     /**
      * Documents
      */
@@ -1697,7 +2004,7 @@ export type EdgeStatus = 'active' | 'pending_review' | 'under_review';
 /**
  * ErrorCode
  */
-export type ErrorCode = 'bad_request' | 'sign_in_required' | 'consent_required' | 'age_confirmation_required' | 'forbidden' | 'not_found' | 'conflict' | 'payload_too_large' | 'unsupported_media_type' | 'validation_error' | 'rate_limited' | 'not_implemented' | 'upstream_error' | 'reauth_required' | 'internal_error';
+export type ErrorCode = 'bad_request' | 'sign_in_required' | 'consent_required' | 'age_confirmation_required' | 'age_group_required' | 'guardian_agreement_required' | 'forbidden' | 'not_found' | 'conflict' | 'payload_too_large' | 'unsupported_media_type' | 'validation_error' | 'rate_limited' | 'not_implemented' | 'upstream_error' | 'reauth_required' | 'assistant_unavailable' | 'internal_error';
 
 /**
  * ErrorDetail
@@ -2583,6 +2890,48 @@ export type MarkRead = {
 export type MatchKind = 'exact' | 'trigram' | 'vector';
 
 /**
+ * Message
+ */
+export type Message = {
+    /**
+     * Id
+     */
+    id: string;
+    /**
+     * Mine
+     */
+    mine: boolean;
+    /**
+     * Body
+     *
+     * Plain text; render as text, never as HTML or clickable links. Null if it could not be decrypted.
+     */
+    body: string | null;
+    /**
+     * Created At
+     */
+    created_at: string;
+};
+
+/**
+ * MessageUnreadCount
+ */
+export type MessageUnreadCount = {
+    /**
+     * Count
+     *
+     * Unread messages in threads that are not hidden.
+     */
+    count: number;
+    /**
+     * Requests Waiting
+     *
+     * Requests waiting for me to accept or decline.
+     */
+    requests_waiting: number;
+};
+
+/**
  * MissingLink
  */
 export type MissingLink = {
@@ -2600,6 +2949,38 @@ export type MissingLink = {
      * What evidence is missing, in plain language.
      */
     description: string;
+};
+
+/**
+ * MyCard
+ *
+ * The user's own verification state, card settings and a preview of the card.
+ */
+export type MyCard = {
+    verification: VerificationState;
+    settings: CardSettings;
+    /**
+     * Card Id
+     *
+     * Set once the card was first switched on.
+     */
+    card_id?: string | null;
+    /**
+     * Can Show
+     *
+     * The card can be switched on now.
+     */
+    can_show: boolean;
+    /**
+     * Blocked Reason
+     *
+     * Why it cannot: role (not a doctor or researcher), not_verified, no_name (no name from ORCID and none in the work details).
+     */
+    blocked_reason?: 'role' | 'not_verified' | 'no_name' | null;
+    /**
+     * Exactly what others would see; null while it cannot be shown.
+     */
+    preview?: PublicCard | null;
 };
 
 /**
@@ -2905,6 +3286,68 @@ export type OpenAiConnection = {
 };
 
 /**
+ * OpenThreadRequest
+ *
+ * A request to a professional's card: one message the professional accepts or declines.
+ */
+export type OpenThreadRequest = {
+    /**
+     * Card Id
+     *
+     * The professional's public card.
+     */
+    card_id: string;
+    /**
+     * Display Name
+     *
+     * How the professional sees you (1-60 characters). Your e-mail, account name and profile are never shown.
+     */
+    display_name: string;
+    /**
+     * Body
+     *
+     * The request message, plain text, 1-2,000 characters.
+     */
+    body: string;
+    /**
+     * Guardian Agreed
+     *
+     * Required true when the age group is 16_17 (see ConnectStatus).
+     */
+    guardian_agreed?: boolean;
+};
+
+/**
+ * OrcidStart
+ */
+export type OrcidStart = {
+    /**
+     * Authorize Url
+     *
+     * Open this URL in the browser (top-level navigation).
+     */
+    authorize_url: string;
+    /**
+     * Simulated
+     *
+     * True for the local simulated ORCID sign-in.
+     */
+    simulated: boolean;
+};
+
+/**
+ * OrcidStartRequest
+ */
+export type OrcidStartRequest = {
+    /**
+     * Return To
+     *
+     * Relative frontend path to return to (default /profile).
+     */
+    return_to?: string | null;
+};
+
+/**
  * Origin
  */
 export type Origin = 'observed' | 'inferred' | 'patient_reported' | 'user_contributed';
@@ -3088,6 +3531,22 @@ export type PatientProfile = {
 };
 
 /**
+ * PeopleList
+ */
+export type PeopleList = {
+    /**
+     * Disease Id
+     */
+    disease_id: string;
+    /**
+     * Items
+     *
+     * Visible verified cards whose verified atlas entry is linked to the disease (through papers, grants or trials in the atlas). Professionals only.
+     */
+    items: Array<PublicCard>;
+};
+
+/**
  * PhenotypeProfileContributionCreate
  */
 export type PhenotypeProfileContributionCreate = {
@@ -3161,6 +3620,66 @@ export type ProfessionalExport = {
      * Updated At
      */
     updated_at?: string | null;
+    /**
+     * Orcid Verified At
+     */
+    orcid_verified_at?: string | null;
+    /**
+     * Verified Name
+     */
+    verified_name?: string | null;
+    /**
+     * Verification Method
+     */
+    verification_method?: string | null;
+    /**
+     * Verified At
+     */
+    verified_at?: string | null;
+    /**
+     * Verification Reason
+     *
+     * The operator's logged reason.
+     */
+    verification_reason?: string | null;
+    /**
+     * Verification Request
+     */
+    verification_request?: {
+        [key: string]: unknown;
+    } | null;
+    /**
+     * Atlas Link Verified
+     */
+    atlas_link_verified?: boolean;
+    /**
+     * Card Id
+     */
+    card_id?: string | null;
+    /**
+     * Card Visible
+     */
+    card_visible?: boolean;
+    /**
+     * Card Visible Since
+     */
+    card_visible_since?: string | null;
+    /**
+     * Card Headline
+     */
+    card_headline?: string | null;
+    /**
+     * Card Show Institutions
+     */
+    card_show_institutions?: boolean;
+    /**
+     * Card Show Atlas Entry
+     */
+    card_show_atlas_entry?: boolean;
+    /**
+     * Accepts Patient Messages
+     */
+    accepts_patient_messages?: boolean;
 };
 
 /**
@@ -3207,7 +3726,7 @@ export type ProfessionalProfile = {
      */
     updated_at?: string | null;
     /**
-     * Name prefill from the ChatGPT account; null if it has no name.
+     * Name prefill from the sign-in account; null if it has no name.
      */
     suggested?: SuggestedName | null;
 };
@@ -3512,6 +4031,77 @@ export type ProposalRequest = {
 };
 
 /**
+ * PublicCard
+ *
+ * What other signed-in users see. Everything here was chosen by the person.
+ */
+export type PublicCard = {
+    /**
+     * Card Id
+     *
+     * Opaque card ID (never the user ID).
+     */
+    card_id: string;
+    /**
+     * doctor or researcher; self-declared, show it as such.
+     */
+    role: Role;
+    /**
+     * Role Self Declared
+     */
+    role_self_declared?: true;
+    /**
+     * Name
+     */
+    name: string;
+    /**
+     * Name Source
+     *
+     * orcid: from the ORCID record; reviewed: checked by the Amber team; self_declared: from the person's own work details.
+     */
+    name_source: 'orcid' | 'reviewed' | 'self_declared';
+    /**
+     * Institutions
+     *
+     * Self-declared, at most three; empty if hidden.
+     */
+    institutions?: Array<CardInstitution>;
+    /**
+     * Orcid Id
+     *
+     * Only when confirmed by ORCID sign-in.
+     */
+    orcid_id?: string | null;
+    /**
+     * Orcid Url
+     */
+    orcid_url?: string | null;
+    /**
+     * Atlas Node Id
+     *
+     * The person's own atlas entry, only when that link is verified (exact ORCID match or manual review) and the person chose to show it.
+     */
+    atlas_node_id?: string | null;
+    /**
+     * Atlas Node Label
+     */
+    atlas_node_label?: string | null;
+    /**
+     * Headline
+     *
+     * Optional, at most 160 characters.
+     */
+    headline?: string | null;
+    /**
+     * Accepts Patient Messages
+     *
+     * The person's setting. Messaging is not built yet; nothing can be sent.
+     */
+    accepts_patient_messages: boolean;
+    verification: CardVerification;
+};
+
+/**
  * RankedCluster
  */
 export type RankedCluster = {
@@ -3575,6 +4165,61 @@ export type RelationCount = {
      * Number of edges of this relation touching the node.
      */
     count: number;
+};
+
+/**
+ * Report
+ */
+export type Report = {
+    /**
+     * Id
+     */
+    id: string;
+    /**
+     * Thread Id
+     */
+    thread_id: string | null;
+    /**
+     * Message Id
+     */
+    message_id: string | null;
+    reason: ReportReason;
+    /**
+     * Authorization Version
+     */
+    authorization_version: string;
+    /**
+     * Created At
+     */
+    created_at: string;
+    /**
+     * Reviewed At
+     */
+    reviewed_at: string | null;
+};
+
+/**
+ * ReportReason
+ */
+export type ReportReason = 'harassment' | 'spam' | 'medical_advice' | 'impersonation' | 'other';
+
+/**
+ * ReportRequest
+ */
+export type ReportRequest = {
+    reason: ReportReason;
+    /**
+     * Message Id
+     *
+     * The message reported, if one.
+     */
+    message_id?: string | null;
+    /**
+     * Authorize Review
+     *
+     * Must be true: the report authorizes the Amber team to read this conversation (REPORT_AUTHORIZATION_TEXT); every access is logged.
+     */
+    authorize_review: boolean;
 };
 
 /**
@@ -3647,6 +4292,24 @@ export type SearchResult = {
 };
 
 /**
+ * SendMessageRequest
+ */
+export type SendMessageRequest = {
+    /**
+     * Body
+     *
+     * Plain text, 1-2,000 characters.
+     */
+    body: string;
+    /**
+     * Guardian Agreed
+     *
+     * Required true on the first message in a thread when the age group is 16_17.
+     */
+    guardian_agreed?: boolean;
+};
+
+/**
  * SessionInfo
  */
 export type SessionInfo = {
@@ -3670,6 +4333,12 @@ export type SessionInfo = {
      * Graph data version served.
      */
     data_version?: string | null;
+    /**
+     * Sign In Methods
+     *
+     * Sign-in methods this server offers (google only when enabled).
+     */
+    sign_in_methods?: Array<AuthProvider>;
 };
 
 /**
@@ -3688,6 +4357,10 @@ export type SessionUser = {
      * Email
      */
     email?: string | null;
+    /**
+     * How this account signs in.
+     */
+    auth_provider?: AuthProvider;
     /**
      * Null until the user picks a role.
      */
@@ -3774,7 +4447,7 @@ export type StartLayout = 'ring' | 'force' | 'hierarchy' | 'cluster' | 'tour';
 /**
  * SuggestedName
  *
- * Prefill from the ChatGPT account, computed on request and never stored.
+ * Prefill from the sign-in account, computed on request and never stored.
  */
 export type SuggestedName = {
     /**
@@ -3788,7 +4461,7 @@ export type SuggestedName = {
     /**
      * Source
      */
-    source?: 'chatgpt';
+    source?: 'chatgpt' | 'google';
 };
 
 /**
@@ -3836,6 +4509,10 @@ export type SummaryItem = {
      * Explanation
      */
     explanation?: string | null;
+    /**
+     * Card Id
+     */
+    card_id?: string | null;
 };
 
 /**
@@ -3858,6 +4535,109 @@ export type SummarySection = {
  * SummarySectionKey
  */
 export type SummarySectionKey = 'clusters' | 'diseases' | 'similar_diseases' | 'genes' | 'variants' | 'mechanisms' | 'pathways' | 'symptoms' | 'researchers' | 'doctors' | 'institutions' | 'papers' | 'trials' | 'grants' | 'patient_orgs' | 'registries' | 'networks' | 'claims';
+
+/**
+ * ThreadDetail
+ */
+export type ThreadDetail = {
+    thread: ThreadSummary;
+    /**
+     * Messages
+     *
+     * Oldest first.
+     */
+    messages: Array<Message>;
+};
+
+/**
+ * ThreadList
+ */
+export type ThreadList = {
+    /**
+     * Items
+     *
+     * Most recent activity first; hidden excluded.
+     */
+    items: Array<ThreadSummary>;
+    /**
+     * Unread Total
+     */
+    unread_total: number;
+    /**
+     * Requests Waiting
+     *
+     * Requests waiting for me to accept or decline.
+     */
+    requests_waiting: number;
+};
+
+/**
+ * ThreadOrigin
+ */
+export type ThreadOrigin = 'card' | 'signup';
+
+/**
+ * ThreadRole
+ */
+export type ThreadRole = 'opener' | 'recipient';
+
+/**
+ * ThreadStatus
+ *
+ * requested: waiting for the professional; open; declined; closed (withdrawn consent, a
+ * deleted account or a role change); blocked (one side blocked the other).
+ */
+export type ThreadStatus = 'requested' | 'open' | 'declined' | 'closed' | 'blocked';
+
+/**
+ * ThreadSummary
+ */
+export type ThreadSummary = {
+    /**
+     * Id
+     */
+    id: string;
+    origin: ThreadOrigin;
+    status: ThreadStatus;
+    my_role: ThreadRole;
+    counterpart: Counterpart;
+    /**
+     * Created At
+     */
+    created_at: string;
+    /**
+     * Last Message At
+     */
+    last_message_at: string | null;
+    /**
+     * Unread Count
+     *
+     * Messages from the other side since my last read.
+     */
+    unread_count: number;
+    /**
+     * Can Send
+     *
+     * The thread is open and both people are still here.
+     */
+    can_send: boolean;
+    /**
+     * Can Respond
+     *
+     * A request waiting for me to accept or decline.
+     */
+    can_respond: boolean;
+    /**
+     * Blocked By Me
+     */
+    blocked_by_me: boolean;
+    /**
+     * Guardian Agreement Needed
+     *
+     * I am 16 or 17 and have not yet ticked the guardian checkbox in this thread: my next message must send `guardian_agreed: true`.
+     */
+    guardian_agreement_needed: boolean;
+};
 
 /**
  * TreeNodeKind
@@ -3969,6 +4749,105 @@ export type ValidationError = {
 export type VariantClassification = 'pathogenic' | 'likely_pathogenic' | 'uncertain_significance' | 'likely_benign' | 'benign';
 
 /**
+ * VerificationRequestCreate
+ *
+ * Manual review: the Amber team checks the institutional e-mail and the public profile.
+ */
+export type VerificationRequestCreate = {
+    /**
+     * Institutional Email
+     */
+    institutional_email: string;
+    /**
+     * Profile Url
+     *
+     * https link to a public staff or profile page.
+     */
+    profile_url: string;
+};
+
+/**
+ * VerificationRequestState
+ */
+export type VerificationRequestState = {
+    /**
+     * Status
+     */
+    status: 'pending' | 'rejected';
+    /**
+     * Requested At
+     */
+    requested_at: string;
+    /**
+     * Decided At
+     */
+    decided_at?: string | null;
+    /**
+     * Institutional Email
+     *
+     * While pending only.
+     */
+    institutional_email?: string | null;
+    /**
+     * Profile Url
+     *
+     * While pending only.
+     */
+    profile_url?: string | null;
+};
+
+/**
+ * VerificationState
+ */
+export type VerificationState = {
+    /**
+     * Verified
+     *
+     * role_verified: identity checked for this role.
+     */
+    verified: boolean;
+    /**
+     * Method
+     */
+    method?: 'orcid' | 'orcid_simulated' | 'institutional_email' | null;
+    /**
+     * Label
+     */
+    label?: string | null;
+    /**
+     * Simulated
+     */
+    simulated?: boolean;
+    /**
+     * Verified At
+     */
+    verified_at?: string | null;
+    /**
+     * Orcid Id Confirmed
+     *
+     * The ORCID iD is confirmed and locked.
+     */
+    orcid_id_confirmed?: boolean;
+    /**
+     * Atlas Link Verified
+     */
+    atlas_link_verified?: boolean;
+    request?: VerificationRequestState | null;
+    /**
+     * Orcid Available
+     *
+     * ORCID sign-in can be started on this server.
+     */
+    orcid_available: boolean;
+    /**
+     * Orcid Simulated
+     *
+     * ORCID sign-in is the local simulated mock.
+     */
+    orcid_simulated: boolean;
+};
+
+/**
  * Zygosity
  */
 export type Zygosity = 'heterozygous' | 'homozygous' | 'hemizygous' | 'compound_heterozygous' | 'mosaic' | 'unknown';
@@ -4040,6 +4919,47 @@ export type AuthLoopbackCallbackData = {
     path?: never;
     query?: never;
     url: '/auth/callback';
+};
+
+export type AuthGoogleStartData = {
+    body?: never;
+    path?: never;
+    query?: {
+        /**
+         * Return To
+         *
+         * Relative frontend path to return to.
+         */
+        return_to?: string | null;
+    };
+    url: '/auth/google/start';
+};
+
+export type AuthGoogleStartErrors = {
+    /**
+     * Google sign-in is not enabled on this server.
+     */
+    404: unknown;
+    /**
+     * Validation Error
+     */
+    422: HttpValidationError;
+};
+
+export type AuthGoogleStartError = AuthGoogleStartErrors[keyof AuthGoogleStartErrors];
+
+export type AuthGoogleCallbackData = {
+    body?: never;
+    path?: never;
+    query?: never;
+    url: '/auth/google/callback';
+};
+
+export type AuthGoogleCallbackErrors = {
+    /**
+     * Google sign-in is not enabled on this server.
+     */
+    404: unknown;
 };
 
 export type LogoutData = {
@@ -4955,7 +5875,7 @@ export type ChatError = ChatErrors[keyof ChatErrors];
 
 export type ChatResponses = {
     /**
-     * Stream of ChatEvent (status, turn, summary_delta, ..., final).
+     * Stream of ChatEvent (status, turn, summary_delta, ..., final); each frame's SSE id is its sequence number in the run.
      */
     200: ChatEvent;
 };
@@ -5076,6 +5996,128 @@ export type GetChatSessionResponses = {
 };
 
 export type GetChatSessionResponse = GetChatSessionResponses[keyof GetChatSessionResponses];
+
+export type ListChatRunsData = {
+    body?: never;
+    path?: never;
+    query?: never;
+    url: '/chat/runs';
+};
+
+export type ListChatRunsErrors = {
+    /**
+     * sign_in_required: guest, or the session expired.
+     */
+    401: ErrorResponse;
+    /**
+     * not_implemented
+     */
+    501: ErrorResponse;
+};
+
+export type ListChatRunsError = ListChatRunsErrors[keyof ListChatRunsErrors];
+
+export type ListChatRunsResponses = {
+    /**
+     * Response Listchatruns
+     *
+     * Successful Response
+     */
+    200: Array<ChatRun>;
+};
+
+export type ListChatRunsResponse = ListChatRunsResponses[keyof ListChatRunsResponses];
+
+export type StreamChatRunData = {
+    body?: never;
+    path: {
+        /**
+         * Run Id
+         */
+        run_id: string;
+    };
+    query?: {
+        /**
+         * After
+         *
+         * Last sequence number already seen; 0 = all.
+         */
+        after?: number;
+    };
+    url: '/chat/runs/{run_id}/events';
+};
+
+export type StreamChatRunErrors = {
+    /**
+     * sign_in_required: guest, or the session expired.
+     */
+    401: ErrorResponse;
+    /**
+     * not_found
+     */
+    404: ErrorResponse;
+    /**
+     * Validation Error
+     */
+    422: HttpValidationError;
+    /**
+     * not_implemented
+     */
+    501: ErrorResponse;
+};
+
+export type StreamChatRunError = StreamChatRunErrors[keyof StreamChatRunErrors];
+
+export type StreamChatRunResponses = {
+    /**
+     * The run's ChatEvents with a sequence number above `after` (the SSE id), then live ones until final or error.
+     */
+    200: ChatEvent;
+};
+
+export type StreamChatRunResponse = StreamChatRunResponses[keyof StreamChatRunResponses];
+
+export type CancelChatRunData = {
+    body?: never;
+    path: {
+        /**
+         * Run Id
+         */
+        run_id: string;
+    };
+    query?: never;
+    url: '/chat/runs/{run_id}';
+};
+
+export type CancelChatRunErrors = {
+    /**
+     * sign_in_required: guest, or the session expired.
+     */
+    401: ErrorResponse;
+    /**
+     * not_found
+     */
+    404: ErrorResponse;
+    /**
+     * Validation Error
+     */
+    422: HttpValidationError;
+    /**
+     * not_implemented
+     */
+    501: ErrorResponse;
+};
+
+export type CancelChatRunError = CancelChatRunErrors[keyof CancelChatRunErrors];
+
+export type CancelChatRunResponses = {
+    /**
+     * Successful Response
+     */
+    204: void;
+};
+
+export type CancelChatRunResponse = CancelChatRunResponses[keyof CancelChatRunResponses];
 
 export type GapSearchData = {
     body: GapSearchRequest;
@@ -5834,3 +6876,881 @@ export type MarkNotificationsReadResponses = {
 };
 
 export type MarkNotificationsReadResponse = MarkNotificationsReadResponses[keyof MarkNotificationsReadResponses];
+
+export type GetMyCardData = {
+    body?: never;
+    path?: never;
+    query?: never;
+    url: '/me/professional/card';
+};
+
+export type GetMyCardErrors = {
+    /**
+     * sign_in_required: guest, or the session expired.
+     */
+    401: ErrorResponse;
+};
+
+export type GetMyCardError = GetMyCardErrors[keyof GetMyCardErrors];
+
+export type GetMyCardResponses = {
+    /**
+     * Successful Response
+     */
+    200: MyCard;
+};
+
+export type GetMyCardResponse = GetMyCardResponses[keyof GetMyCardResponses];
+
+export type PutMyCardData = {
+    body: CardSettingsUpdate;
+    path?: never;
+    query?: never;
+    url: '/me/professional/card';
+};
+
+export type PutMyCardErrors = {
+    /**
+     * sign_in_required: guest, or the session expired.
+     */
+    401: ErrorResponse;
+    /**
+     * consent_required (no active consent of the needed type) or forbidden.
+     */
+    403: ErrorResponse;
+    /**
+     * conflict
+     */
+    409: ErrorResponse;
+    /**
+     * validation_error: lists invalid field names only.
+     */
+    422: ErrorResponse;
+    /**
+     * rate_limited
+     */
+    429: ErrorResponse;
+};
+
+export type PutMyCardError = PutMyCardErrors[keyof PutMyCardErrors];
+
+export type PutMyCardResponses = {
+    /**
+     * Successful Response
+     */
+    200: MyCard;
+};
+
+export type PutMyCardResponse = PutMyCardResponses[keyof PutMyCardResponses];
+
+export type StartOrcidConfirmationData = {
+    body: OrcidStartRequest;
+    path?: never;
+    query?: never;
+    url: '/me/professional/orcid/start';
+};
+
+export type StartOrcidConfirmationErrors = {
+    /**
+     * sign_in_required: guest, or the session expired.
+     */
+    401: ErrorResponse;
+    /**
+     * consent_required (no active consent of the needed type) or forbidden.
+     */
+    403: ErrorResponse;
+    /**
+     * Validation Error
+     */
+    422: HttpValidationError;
+    /**
+     * rate_limited
+     */
+    429: ErrorResponse;
+    /**
+     * not_implemented
+     */
+    501: ErrorResponse;
+};
+
+export type StartOrcidConfirmationError = StartOrcidConfirmationErrors[keyof StartOrcidConfirmationErrors];
+
+export type StartOrcidConfirmationResponses = {
+    /**
+     * Successful Response
+     */
+    200: OrcidStart;
+};
+
+export type StartOrcidConfirmationResponse = StartOrcidConfirmationResponses[keyof StartOrcidConfirmationResponses];
+
+export type OrcidCallbackData = {
+    body?: never;
+    path?: never;
+    query?: never;
+    url: '/me/professional/orcid/callback';
+};
+
+export type WithdrawVerificationRequestData = {
+    body?: never;
+    path?: never;
+    query?: never;
+    url: '/me/professional/verification-request';
+};
+
+export type WithdrawVerificationRequestErrors = {
+    /**
+     * sign_in_required: guest, or the session expired.
+     */
+    401: ErrorResponse;
+};
+
+export type WithdrawVerificationRequestError = WithdrawVerificationRequestErrors[keyof WithdrawVerificationRequestErrors];
+
+export type WithdrawVerificationRequestResponses = {
+    /**
+     * Successful Response
+     */
+    204: void;
+};
+
+export type WithdrawVerificationRequestResponse = WithdrawVerificationRequestResponses[keyof WithdrawVerificationRequestResponses];
+
+export type RequestVerificationData = {
+    body: VerificationRequestCreate;
+    path?: never;
+    query?: never;
+    url: '/me/professional/verification-request';
+};
+
+export type RequestVerificationErrors = {
+    /**
+     * sign_in_required: guest, or the session expired.
+     */
+    401: ErrorResponse;
+    /**
+     * consent_required (no active consent of the needed type) or forbidden.
+     */
+    403: ErrorResponse;
+    /**
+     * conflict
+     */
+    409: ErrorResponse;
+    /**
+     * validation_error: lists invalid field names only.
+     */
+    422: ErrorResponse;
+    /**
+     * rate_limited
+     */
+    429: ErrorResponse;
+};
+
+export type RequestVerificationError = RequestVerificationErrors[keyof RequestVerificationErrors];
+
+export type RequestVerificationResponses = {
+    /**
+     * Successful Response
+     */
+    200: MyCard;
+};
+
+export type RequestVerificationResponse = RequestVerificationResponses[keyof RequestVerificationResponses];
+
+export type ListPeopleData = {
+    body?: never;
+    path?: never;
+    query: {
+        /**
+         * Disease
+         *
+         * Atlas disease ID.
+         */
+        disease: string;
+    };
+    url: '/people';
+};
+
+export type ListPeopleErrors = {
+    /**
+     * sign_in_required: guest, or the session expired.
+     */
+    401: ErrorResponse;
+    /**
+     * consent_required (no active consent of the needed type) or forbidden.
+     */
+    403: ErrorResponse;
+    /**
+     * not_found
+     */
+    404: ErrorResponse;
+    /**
+     * validation_error: lists invalid field names only.
+     */
+    422: ErrorResponse;
+    /**
+     * rate_limited
+     */
+    429: ErrorResponse;
+};
+
+export type ListPeopleError = ListPeopleErrors[keyof ListPeopleErrors];
+
+export type ListPeopleResponses = {
+    /**
+     * Successful Response
+     */
+    200: PeopleList;
+};
+
+export type ListPeopleResponse = ListPeopleResponses[keyof ListPeopleResponses];
+
+export type GetPersonCardData = {
+    body?: never;
+    path: {
+        /**
+         * Card Id
+         */
+        card_id: string;
+    };
+    query?: never;
+    url: '/people/{card_id}';
+};
+
+export type GetPersonCardErrors = {
+    /**
+     * sign_in_required: guest, or the session expired.
+     */
+    401: ErrorResponse;
+    /**
+     * consent_required (no active consent of the needed type) or forbidden.
+     */
+    403: ErrorResponse;
+    /**
+     * not_found
+     */
+    404: ErrorResponse;
+    /**
+     * Validation Error
+     */
+    422: HttpValidationError;
+    /**
+     * rate_limited
+     */
+    429: ErrorResponse;
+};
+
+export type GetPersonCardError = GetPersonCardErrors[keyof GetPersonCardErrors];
+
+export type GetPersonCardResponses = {
+    /**
+     * Successful Response
+     */
+    200: PublicCard;
+};
+
+export type GetPersonCardResponse = GetPersonCardResponses[keyof GetPersonCardResponses];
+
+export type GetConnectStatusData = {
+    body?: never;
+    path?: never;
+    query?: never;
+    url: '/me/connect';
+};
+
+export type GetConnectStatusErrors = {
+    /**
+     * sign_in_required: guest, or the session expired.
+     */
+    401: ErrorResponse;
+    /**
+     * consent_required (no active consent of the needed type) or forbidden.
+     */
+    403: ErrorResponse;
+};
+
+export type GetConnectStatusError = GetConnectStatusErrors[keyof GetConnectStatusErrors];
+
+export type GetConnectStatusResponses = {
+    /**
+     * Successful Response
+     */
+    200: ConnectStatus;
+};
+
+export type GetConnectStatusResponse = GetConnectStatusResponses[keyof GetConnectStatusResponses];
+
+export type SetConnectAgeGroupData = {
+    body: AgeGroupUpdate;
+    path?: never;
+    query?: never;
+    url: '/me/connect/age-group';
+};
+
+export type SetConnectAgeGroupErrors = {
+    /**
+     * sign_in_required: guest, or the session expired.
+     */
+    401: ErrorResponse;
+    /**
+     * consent_required (no active consent of the needed type) or forbidden.
+     */
+    403: ErrorResponse;
+    /**
+     * validation_error: lists invalid field names only.
+     */
+    422: ErrorResponse;
+};
+
+export type SetConnectAgeGroupError = SetConnectAgeGroupErrors[keyof SetConnectAgeGroupErrors];
+
+export type SetConnectAgeGroupResponses = {
+    /**
+     * Successful Response
+     */
+    200: ConnectStatus;
+};
+
+export type SetConnectAgeGroupResponse = SetConnectAgeGroupResponses[keyof SetConnectAgeGroupResponses];
+
+export type ListThreadsData = {
+    body?: never;
+    path?: never;
+    query?: never;
+    url: '/me/threads';
+};
+
+export type ListThreadsErrors = {
+    /**
+     * sign_in_required: guest, or the session expired.
+     */
+    401: ErrorResponse;
+    /**
+     * consent_required (no active consent of the needed type) or forbidden.
+     */
+    403: ErrorResponse;
+};
+
+export type ListThreadsError = ListThreadsErrors[keyof ListThreadsErrors];
+
+export type ListThreadsResponses = {
+    /**
+     * Successful Response
+     */
+    200: ThreadList;
+};
+
+export type ListThreadsResponse = ListThreadsResponses[keyof ListThreadsResponses];
+
+export type OpenThreadData = {
+    body: OpenThreadRequest;
+    path?: never;
+    query?: never;
+    url: '/me/threads';
+};
+
+export type OpenThreadErrors = {
+    /**
+     * sign_in_required: guest, or the session expired.
+     */
+    401: ErrorResponse;
+    /**
+     * consent_required (no active consent of the needed type) or forbidden.
+     */
+    403: ErrorResponse;
+    /**
+     * not_found
+     */
+    404: ErrorResponse;
+    /**
+     * conflict
+     */
+    409: ErrorResponse;
+    /**
+     * validation_error: lists invalid field names only.
+     */
+    422: ErrorResponse;
+    /**
+     * rate_limited
+     */
+    429: ErrorResponse;
+    /**
+     * not_implemented
+     */
+    501: ErrorResponse;
+};
+
+export type OpenThreadError = OpenThreadErrors[keyof OpenThreadErrors];
+
+export type OpenThreadResponses = {
+    /**
+     * Successful Response
+     */
+    201: ThreadDetail;
+};
+
+export type OpenThreadResponse = OpenThreadResponses[keyof OpenThreadResponses];
+
+export type GetMessageUnreadCountData = {
+    body?: never;
+    path?: never;
+    query?: never;
+    url: '/me/threads/unread-count';
+};
+
+export type GetMessageUnreadCountErrors = {
+    /**
+     * sign_in_required: guest, or the session expired.
+     */
+    401: ErrorResponse;
+    /**
+     * consent_required (no active consent of the needed type) or forbidden.
+     */
+    403: ErrorResponse;
+};
+
+export type GetMessageUnreadCountError = GetMessageUnreadCountErrors[keyof GetMessageUnreadCountErrors];
+
+export type GetMessageUnreadCountResponses = {
+    /**
+     * Successful Response
+     */
+    200: MessageUnreadCount;
+};
+
+export type GetMessageUnreadCountResponse = GetMessageUnreadCountResponses[keyof GetMessageUnreadCountResponses];
+
+export type GetThreadData = {
+    body?: never;
+    path: {
+        /**
+         * Thread Id
+         */
+        thread_id: string;
+    };
+    query?: never;
+    url: '/me/threads/{thread_id}';
+};
+
+export type GetThreadErrors = {
+    /**
+     * sign_in_required: guest, or the session expired.
+     */
+    401: ErrorResponse;
+    /**
+     * consent_required (no active consent of the needed type) or forbidden.
+     */
+    403: ErrorResponse;
+    /**
+     * not_found
+     */
+    404: ErrorResponse;
+    /**
+     * Validation Error
+     */
+    422: HttpValidationError;
+};
+
+export type GetThreadError = GetThreadErrors[keyof GetThreadErrors];
+
+export type GetThreadResponses = {
+    /**
+     * Successful Response
+     */
+    200: ThreadDetail;
+};
+
+export type GetThreadResponse = GetThreadResponses[keyof GetThreadResponses];
+
+export type AcceptThreadData = {
+    body?: never;
+    path: {
+        /**
+         * Thread Id
+         */
+        thread_id: string;
+    };
+    query?: never;
+    url: '/me/threads/{thread_id}/accept';
+};
+
+export type AcceptThreadErrors = {
+    /**
+     * sign_in_required: guest, or the session expired.
+     */
+    401: ErrorResponse;
+    /**
+     * consent_required (no active consent of the needed type) or forbidden.
+     */
+    403: ErrorResponse;
+    /**
+     * not_found
+     */
+    404: ErrorResponse;
+    /**
+     * conflict
+     */
+    409: ErrorResponse;
+    /**
+     * Validation Error
+     */
+    422: HttpValidationError;
+};
+
+export type AcceptThreadError = AcceptThreadErrors[keyof AcceptThreadErrors];
+
+export type AcceptThreadResponses = {
+    /**
+     * Successful Response
+     */
+    200: ThreadDetail;
+};
+
+export type AcceptThreadResponse = AcceptThreadResponses[keyof AcceptThreadResponses];
+
+export type DeclineThreadData = {
+    body?: never;
+    path: {
+        /**
+         * Thread Id
+         */
+        thread_id: string;
+    };
+    query?: never;
+    url: '/me/threads/{thread_id}/decline';
+};
+
+export type DeclineThreadErrors = {
+    /**
+     * sign_in_required: guest, or the session expired.
+     */
+    401: ErrorResponse;
+    /**
+     * consent_required (no active consent of the needed type) or forbidden.
+     */
+    403: ErrorResponse;
+    /**
+     * not_found
+     */
+    404: ErrorResponse;
+    /**
+     * conflict
+     */
+    409: ErrorResponse;
+    /**
+     * Validation Error
+     */
+    422: HttpValidationError;
+};
+
+export type DeclineThreadError = DeclineThreadErrors[keyof DeclineThreadErrors];
+
+export type DeclineThreadResponses = {
+    /**
+     * Successful Response
+     */
+    200: ThreadDetail;
+};
+
+export type DeclineThreadResponse = DeclineThreadResponses[keyof DeclineThreadResponses];
+
+export type SendMessageData = {
+    body: SendMessageRequest;
+    path: {
+        /**
+         * Thread Id
+         */
+        thread_id: string;
+    };
+    query?: never;
+    url: '/me/threads/{thread_id}/messages';
+};
+
+export type SendMessageErrors = {
+    /**
+     * sign_in_required: guest, or the session expired.
+     */
+    401: ErrorResponse;
+    /**
+     * consent_required (no active consent of the needed type) or forbidden.
+     */
+    403: ErrorResponse;
+    /**
+     * not_found
+     */
+    404: ErrorResponse;
+    /**
+     * conflict
+     */
+    409: ErrorResponse;
+    /**
+     * validation_error: lists invalid field names only.
+     */
+    422: ErrorResponse;
+    /**
+     * rate_limited
+     */
+    429: ErrorResponse;
+    /**
+     * not_implemented
+     */
+    501: ErrorResponse;
+};
+
+export type SendMessageError = SendMessageErrors[keyof SendMessageErrors];
+
+export type SendMessageResponses = {
+    /**
+     * Successful Response
+     */
+    201: Message;
+};
+
+export type SendMessageResponse = SendMessageResponses[keyof SendMessageResponses];
+
+export type DeleteMessageData = {
+    body?: never;
+    path: {
+        /**
+         * Thread Id
+         */
+        thread_id: string;
+        /**
+         * Message Id
+         */
+        message_id: string;
+    };
+    query?: never;
+    url: '/me/threads/{thread_id}/messages/{message_id}';
+};
+
+export type DeleteMessageErrors = {
+    /**
+     * sign_in_required: guest, or the session expired.
+     */
+    401: ErrorResponse;
+    /**
+     * consent_required (no active consent of the needed type) or forbidden.
+     */
+    403: ErrorResponse;
+    /**
+     * not_found
+     */
+    404: ErrorResponse;
+    /**
+     * Validation Error
+     */
+    422: HttpValidationError;
+};
+
+export type DeleteMessageError = DeleteMessageErrors[keyof DeleteMessageErrors];
+
+export type DeleteMessageResponses = {
+    /**
+     * Successful Response
+     */
+    204: void;
+};
+
+export type DeleteMessageResponse = DeleteMessageResponses[keyof DeleteMessageResponses];
+
+export type HideThreadData = {
+    body?: never;
+    path: {
+        /**
+         * Thread Id
+         */
+        thread_id: string;
+    };
+    query?: never;
+    url: '/me/threads/{thread_id}/hide';
+};
+
+export type HideThreadErrors = {
+    /**
+     * sign_in_required: guest, or the session expired.
+     */
+    401: ErrorResponse;
+    /**
+     * consent_required (no active consent of the needed type) or forbidden.
+     */
+    403: ErrorResponse;
+    /**
+     * not_found
+     */
+    404: ErrorResponse;
+    /**
+     * Validation Error
+     */
+    422: HttpValidationError;
+};
+
+export type HideThreadError = HideThreadErrors[keyof HideThreadErrors];
+
+export type HideThreadResponses = {
+    /**
+     * Successful Response
+     */
+    204: void;
+};
+
+export type HideThreadResponse = HideThreadResponses[keyof HideThreadResponses];
+
+export type BlockThreadParticipantData = {
+    body?: never;
+    path: {
+        /**
+         * Thread Id
+         */
+        thread_id: string;
+    };
+    query?: never;
+    url: '/me/threads/{thread_id}/block';
+};
+
+export type BlockThreadParticipantErrors = {
+    /**
+     * sign_in_required: guest, or the session expired.
+     */
+    401: ErrorResponse;
+    /**
+     * consent_required (no active consent of the needed type) or forbidden.
+     */
+    403: ErrorResponse;
+    /**
+     * not_found
+     */
+    404: ErrorResponse;
+    /**
+     * conflict
+     */
+    409: ErrorResponse;
+    /**
+     * Validation Error
+     */
+    422: HttpValidationError;
+};
+
+export type BlockThreadParticipantError = BlockThreadParticipantErrors[keyof BlockThreadParticipantErrors];
+
+export type BlockThreadParticipantResponses = {
+    /**
+     * Successful Response
+     */
+    204: void;
+};
+
+export type BlockThreadParticipantResponse = BlockThreadParticipantResponses[keyof BlockThreadParticipantResponses];
+
+export type ReportThreadData = {
+    body: ReportRequest;
+    path: {
+        /**
+         * Thread Id
+         */
+        thread_id: string;
+    };
+    query?: never;
+    url: '/me/threads/{thread_id}/report';
+};
+
+export type ReportThreadErrors = {
+    /**
+     * sign_in_required: guest, or the session expired.
+     */
+    401: ErrorResponse;
+    /**
+     * consent_required (no active consent of the needed type) or forbidden.
+     */
+    403: ErrorResponse;
+    /**
+     * not_found
+     */
+    404: ErrorResponse;
+    /**
+     * validation_error: lists invalid field names only.
+     */
+    422: ErrorResponse;
+};
+
+export type ReportThreadError = ReportThreadErrors[keyof ReportThreadErrors];
+
+export type ReportThreadResponses = {
+    /**
+     * Successful Response
+     */
+    201: Report;
+};
+
+export type ReportThreadResponse = ReportThreadResponses[keyof ReportThreadResponses];
+
+export type ListBlocksData = {
+    body?: never;
+    path?: never;
+    query?: never;
+    url: '/me/blocks';
+};
+
+export type ListBlocksErrors = {
+    /**
+     * sign_in_required: guest, or the session expired.
+     */
+    401: ErrorResponse;
+    /**
+     * consent_required (no active consent of the needed type) or forbidden.
+     */
+    403: ErrorResponse;
+};
+
+export type ListBlocksError = ListBlocksErrors[keyof ListBlocksErrors];
+
+export type ListBlocksResponses = {
+    /**
+     * Successful Response
+     */
+    200: BlockList;
+};
+
+export type ListBlocksResponse = ListBlocksResponses[keyof ListBlocksResponses];
+
+export type UnblockData = {
+    body?: never;
+    path: {
+        /**
+         * Block Id
+         */
+        block_id: string;
+    };
+    query?: never;
+    url: '/me/blocks/{block_id}';
+};
+
+export type UnblockErrors = {
+    /**
+     * sign_in_required: guest, or the session expired.
+     */
+    401: ErrorResponse;
+    /**
+     * consent_required (no active consent of the needed type) or forbidden.
+     */
+    403: ErrorResponse;
+    /**
+     * not_found
+     */
+    404: ErrorResponse;
+    /**
+     * Validation Error
+     */
+    422: HttpValidationError;
+};
+
+export type UnblockError = UnblockErrors[keyof UnblockErrors];
+
+export type UnblockResponses = {
+    /**
+     * Successful Response
+     */
+    204: void;
+};
+
+export type UnblockResponse = UnblockResponses[keyof UnblockResponses];
