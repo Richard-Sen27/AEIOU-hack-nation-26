@@ -6,7 +6,7 @@ User tables never reference graph tables (the pipeline truncates and reloads the
 """
 
 import uuid
-from datetime import datetime
+from datetime import date, datetime
 from typing import Any
 
 from pgvector.sqlalchemy import Vector
@@ -14,6 +14,7 @@ from sqlalchemy import (
     BigInteger,
     Boolean,
     CheckConstraint,
+    Date,
     DateTime,
     Float,
     ForeignKey,
@@ -681,6 +682,91 @@ class AdminAccessLogRecord(Base):
 MESSAGING_TABLES = ("threads", "thread_reads", "messages", "blocks", "reports")
 
 
+# --- calls (policies, trigger and functions in migration 247a1157973f) ----------------------
+
+
+class CallRecord(Base):
+    """A survey, study or trial looking for participants, owned by its publisher.
+
+    Owner-only, except that every signed-in user may read published calls. Only the operator
+    publishes or rejects (definer function review_call; the trigger calls_guard enforces it)."""
+
+    __tablename__ = "calls"
+    __table_args__ = (
+        Index("ix_calls_publisher_id", "publisher_id"),
+        Index("ix_calls_status", "status", "published_at"),
+        Index("ix_calls_disease_ids", "disease_ids", postgresql_using="gin"),
+    )
+
+    id: Mapped[uuid.UUID] = _uuid_pk()
+    publisher_id: Mapped[uuid.UUID] = mapped_column(
+        UUID(as_uuid=True), ForeignKey("users.id", ondelete="CASCADE"), nullable=False
+    )
+    kind: Mapped[str] = mapped_column(Text, nullable=False)  # survey | study | trial
+    title: Mapped[str] = mapped_column(Text, nullable=False)
+    summary: Mapped[str] = mapped_column(Text, nullable=False)
+    participation: Mapped[str] = mapped_column(Text, nullable=False)
+    eligibility_text: Mapped[str | None] = mapped_column(Text)
+    disease_ids: Mapped[list[str]] = mapped_column(ARRAY(Text), nullable=False)
+    gene_ids: Mapped[list[str]] = mapped_column(
+        ARRAY(Text), nullable=False, server_default=text("'{}'::text[]")
+    )
+    phenotype_ids: Mapped[list[str]] = mapped_column(
+        ARRAY(Text), nullable=False, server_default=text("'{}'::text[]")
+    )
+    min_age: Mapped[int | None] = mapped_column(Integer)
+    max_age: Mapped[int | None] = mapped_column(Integer)
+    children_ok: Mapped[bool] = mapped_column(Boolean, nullable=False, server_default="false")
+    countries: Mapped[list[str]] = mapped_column(
+        ARRAY(Text), nullable=False, server_default=text("'{}'::text[]")
+    )
+    remote: Mapped[bool] = mapped_column(Boolean, nullable=False, server_default="false")
+    run_by_label: Mapped[str | None] = mapped_column(Text)
+    run_by_node_id: Mapped[str | None] = mapped_column(Text)  # atlas node, not a foreign key
+    ethics_body: Mapped[str | None] = mapped_column(Text)
+    ethics_reference: Mapped[str | None] = mapped_column(Text)
+    registry_id: Mapped[str | None] = mapped_column(Text)
+    external_url: Mapped[str | None] = mapped_column(Text)
+    opens_at: Mapped[date | None] = mapped_column(Date)
+    closes_at: Mapped[date | None] = mapped_column(Date)
+    max_signups: Mapped[int | None] = mapped_column(Integer)
+    requested_fields: Mapped[list[str]] = mapped_column(
+        ARRAY(Text), nullable=False, server_default=text("'{}'::text[]")
+    )
+    status: Mapped[str] = mapped_column(Text, nullable=False, server_default="draft")
+    review_note: Mapped[str | None] = mapped_column(Text)
+    submitted_at: Mapped[datetime | None] = mapped_column()
+    reviewed_at: Mapped[datetime | None] = mapped_column()
+    published_at: Mapped[datetime | None] = mapped_column()
+    closed_at: Mapped[datetime | None] = mapped_column()
+    demo: Mapped[bool] = mapped_column(Boolean, nullable=False, server_default="false")
+    created_at: Mapped[datetime] = _created()
+    updated_at: Mapped[datetime] = _created()
+
+
+class CallReviewRecord(Base):
+    """Operator log of call reviews (viewed, approved, rejected). Written only by the definer
+    functions; the publisher can read the rows about their own calls."""
+
+    __tablename__ = "call_reviews"
+    __table_args__ = (
+        Index("ix_call_reviews_call_id", "call_id"),
+        Index("ix_call_reviews_publisher_id", "publisher_id"),
+    )
+
+    id: Mapped[uuid.UUID] = _uuid_pk()
+    call_id: Mapped[uuid.UUID] = mapped_column(
+        UUID(as_uuid=True), ForeignKey("calls.id", ondelete="CASCADE"), nullable=False
+    )
+    publisher_id: Mapped[uuid.UUID] = mapped_column(
+        UUID(as_uuid=True), ForeignKey("users.id", ondelete="CASCADE"), nullable=False
+    )
+    action: Mapped[str] = mapped_column(Text, nullable=False)
+    note: Mapped[str | None] = mapped_column(Text)
+    operator: Mapped[str] = mapped_column(Text, nullable=False)
+    created_at: Mapped[datetime] = _created()
+
+
 USER_TABLES = (
     "users",
     "openai_tokens",
@@ -697,4 +783,5 @@ USER_TABLES = (
     "jobs",
     "follows",
     "notifications",
+    "calls",
 )
