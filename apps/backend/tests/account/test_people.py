@@ -476,6 +476,31 @@ async def test_manual_review_flow(make_user, superuser):
     assert_error(await viewer.client.get(f"/people/{card['card_id']}"), 404, "not_found")
 
 
+async def test_demo_auto_approves_manual_request(make_user, orcid_mock, superuser):
+    """Local demo (ORCID_MOCK on, loopback): a doctor without ORCID gets verified at once."""
+    user = await make_user(role="doctor")
+    await user.client.put("/me/professional", json=WORK)
+    body = {"institutional_email": "ada@uni.test", "profile_url": "https://uni.test/ada"}
+    me = (await user.client.post("/me/professional/verification-request", json=body)).json()
+    assert me["verification"]["verified"] and me["verification"]["method"] == "manual_simulated"
+    card = (await _show(user))["preview"]
+    assert card["verification"]["simulated"] is True
+    assert "verification simulated" in card["verification"]["label"].lower()
+    assert card["name_source"] == "self_declared"
+    req = await superuser.fetchval(
+        "SELECT verification_request FROM profiles WHERE user_id = $1", user.id
+    )
+    assert req is None  # the e-mail and link are not kept
+
+
+async def test_manual_request_waits_without_demo_settings(make_user):
+    user = await make_user(role="doctor")
+    body = {"institutional_email": "ada@uni.test", "profile_url": "https://uni.test/ada"}
+    me = (await user.client.post("/me/professional/verification-request", json=body)).json()
+    assert me["verification"]["verified"] is False
+    assert me["verification"]["request"]["status"] == "pending"
+
+
 async def test_manual_review_reject_and_withdraw(make_user, superuser):
     from backend.cli import verify_professional
 
@@ -499,7 +524,7 @@ async def test_manual_review_reject_and_withdraw(make_user, superuser):
         assert_error(r, 422, "validation_error")
 
 
-async def test_rate_limits(make_user, orcid_mock):
+async def test_rate_limits(make_user):
     user = await make_user(role="researcher")
     body = {"institutional_email": "x@uni.test", "profile_url": "https://uni.test/x"}
     for _ in range(3):
@@ -508,7 +533,8 @@ async def test_rate_limits(make_user, orcid_mock):
     r = await user.client.post("/me/professional/verification-request", json=body)
     assert_error(r, 429, "rate_limited")
     for _ in range(10):
-        assert (await user.client.post("/me/professional/orcid/start", json={})).status_code == 200
+        r = await user.client.post("/me/professional/orcid/start", json={})
+        assert r.status_code == 501  # counted even when ORCID is not configured
     assert_error(
         await user.client.post("/me/professional/orcid/start", json={}), 429, "rate_limited"
     )

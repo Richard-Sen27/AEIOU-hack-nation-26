@@ -21,7 +21,7 @@ MAX_HEADLINE = 160
 MAX_EMAIL = 254
 MAX_URL = 500
 
-VerificationMethod = Literal["orcid", "orcid_simulated", "institutional_email"]
+VerificationMethod = Literal["orcid", "orcid_simulated", "institutional_email", "manual_simulated"]
 NameSource = Literal["orcid", "reviewed", "self_declared"]
 
 # What each method checked; never "licensed physician".
@@ -29,7 +29,9 @@ VERIFICATION_LABELS: dict[str, str] = {
     "orcid": "ORCID iD confirmed",
     "orcid_simulated": "Demo, verification simulated (no real ORCID check)",
     "institutional_email": "Identity checked by the Amber team (institutional e-mail)",
+    "manual_simulated": "Demo, verification simulated (no real identity check)",
 }
+SIMULATED_METHODS = frozenset({"orcid_simulated", "manual_simulated"})
 
 _EMAIL = re.compile(r"^[^@\s]+@[^@\s]+\.[^@\s]+$")
 _URLISH = re.compile(r"://|www\.", re.IGNORECASE)
@@ -48,8 +50,8 @@ class CardVerification(ApiModel):
     method: VerificationMethod
     label: str = Field(description="What was checked, ready to show.")
     simulated: bool = Field(
-        description="True when verified through the local ORCID mock: show the label, which says "
-        "'demo, verification simulated'."
+        description="True when verified by a local demo shortcut (ORCID mock or auto-approved "
+        "manual request): show the label, which says 'demo, verification simulated'."
     )
 
 

@@ -34,6 +34,7 @@ from backend.schemas.account import CurrentUser
 from backend.schemas.atlas import AtlasSummary, SummarySectionKey
 from backend.schemas.enums import ErrorCode, NodeType, Role
 from backend.schemas.people import (
+    SIMULATED_METHODS,
     VERIFICATION_LABELS,
     CardInstitution,
     CardSettings,
@@ -81,7 +82,7 @@ def _institutions(value: Any) -> list[CardInstitution]:
 
 
 def _name_source(method: str, name_verified: bool) -> str:
-    if not name_verified:
+    if not name_verified or method == "manual_simulated":
         return "self_declared"
     return "reviewed" if method == "institutional_email" else "orcid"
 
@@ -105,7 +106,7 @@ def card_from_row(row: Any) -> PublicCard:
         verification=CardVerification(
             method=method,
             label=VERIFICATION_LABELS[method],
-            simulated=method == "orcid_simulated",
+            simulated=method in SIMULATED_METHODS,
         ),
     )
 
@@ -305,7 +306,7 @@ def _my_card(row: Any) -> MyCard:
             verified=bool(row["role_verified"] and method),
             method=method,
             label=VERIFICATION_LABELS.get(method) if method else None,
-            simulated=method == "orcid_simulated",
+            simulated=method in SIMULATED_METHODS,
             verified_at=row["verified_at"] if method else None,
             orcid_id_confirmed=row["orcid_verified_at"] is not None,
             atlas_link_verified=row["atlas_link_verified"],
@@ -386,6 +387,20 @@ async def request_verification(
         "profile_url": body.profile_url,
         "requested_at": datetime.now(UTC).isoformat(),
     }
+    if orcid.mock_enabled():
+        # Local demo only (ORCID_MOCK on, loopback): approve at once, labelled as simulated.
+        # The e-mail and link are not kept. In production the request waits for the operator.
+        await db.execute(
+            text(
+                "UPDATE profiles SET role_verified = true,"
+                " verification_method = 'manual_simulated', verified_at = now(),"
+                " verification_reason = 'demo: approved automatically',"
+                " verification_request = NULL, updated_at = now() WHERE user_id = :uid"
+            ),
+            {"uid": user.id},
+        )
+        await refresh_cards(db)
+        return await get_my_card(db, user)
     await db.execute(
         text(
             "UPDATE profiles SET verification_request = CAST(:req AS jsonb), updated_at = now()"
