@@ -28,6 +28,7 @@ SECTION_TYPES: dict[SummarySectionKey, NodeType] = {
     SummarySectionKey.clusters: NodeType.cluster,
     SummarySectionKey.diseases: NodeType.disease,
     SummarySectionKey.similar_diseases: NodeType.disease,
+    SummarySectionKey.shared_gene_diseases: NodeType.disease,
     SummarySectionKey.genes: NodeType.gene,
     SummarySectionKey.variants: NodeType.variant,
     SummarySectionKey.mechanisms: NodeType.mechanism,
@@ -45,8 +46,19 @@ SECTION_TYPES: dict[SummarySectionKey, NodeType] = {
     SummarySectionKey.claims: NodeType.claim,
 }
 _TYPE_SECTION: dict[NodeType, SummarySectionKey] = {
-    t: k for k, t in SECTION_TYPES.items() if k != SummarySectionKey.similar_diseases
+    t: k
+    for k, t in SECTION_TYPES.items()
+    if k not in (SummarySectionKey.similar_diseases, SummarySectionKey.shared_gene_diseases)
 }
+
+# Computed disease-disease links that say "both are linked to variants in the same gene".
+SHARED_GENE_RELATIONS = frozenset(
+    {
+        Relation.shared_gene,
+        Relation.same_gene_same_mechanism,
+        Relation.same_gene_different_mechanism,
+    }
+)
 
 # Cluster membership is a stored attribute, not an edge (plan section I point 3).
 CLUSTER_OF_LABEL = "grouped in this cluster by the atlas, not a direct link"
@@ -188,6 +200,7 @@ class _Target:
     label_nodes: dict[NodeType, set[str]] = field(default_factory=dict)
     label_best: dict[NodeType, tuple[_Key, str]] = field(default_factory=dict)
     noun_order: list[NodeType] = field(default_factory=list)
+    section: SummarySectionKey | None = None  # fixed section (disease-disease links)
 
     def add(
         self,
@@ -232,6 +245,24 @@ class _Target:
 
     def item(self, store: graph.GraphStore) -> SummaryItem:
         edges = self.best_edges
+        frequency, frequency_label, sources = None, None, []
+        via_label = self.via_label()
+        if len(edges) == 1:
+            edge = edges[0]
+            features = edge.features or {}
+            if edge.relation == Relation.has_phenotype:
+                raw, label = features.get("frequency"), features.get("frequency_label")
+                if isinstance(raw, int | float) and not isinstance(raw, bool):
+                    frequency = float(raw)
+                if isinstance(label, str) and label.strip():
+                    frequency_label = label.strip()
+            elif edge.relation == Relation.caused_by_variant_in:
+                counts = store.edge_sources.get(edge.id, {})
+                sources = sorted(counts, key=lambda s: (-counts[s], s))
+            elif edge.relation in SHARED_GENE_RELATIONS and via_label is None:
+                symbol = features.get("gene_symbol")
+                if isinstance(symbol, str) and symbol:
+                    via_label = f"gene {symbol}"
         return SummaryItem(
             id=self.node.id,
             label=self.node.label,
@@ -242,8 +273,11 @@ class _Target:
             inferred=any(e.origin != Origin.observed for e in edges),
             under_review=any(not graph.edge_is_active(store, e) for e in edges),
             via=[e.id for e in edges],
-            via_label=self.via_label(),
+            via_label=via_label,
             explanation=_single_inferred_explanation(edges),
+            frequency=frequency,
+            frequency_label=frequency_label,
+            sources=sources,
         )
 
 
@@ -330,6 +364,11 @@ def _rank(item: SummaryItem) -> tuple[int, float, str, str]:
     return (-item.score, -item.best_confidence, item.label.casefold(), item.id)
 
 
+def _frequency_rank(item: SummaryItem) -> tuple[bool, float, tuple[int, float, str, str]]:
+    """Symptoms: most frequent first, unknown frequency last, then the usual rank."""
+    return (item.frequency is None, -(item.frequency or 0.0), _rank(item))
+
+
 def atlas_summary(node_id: str, lens: Lens) -> AtlasSummary:
     """Connections of an entity grouped into sections; 404 for unknown and ``T:`` ids."""
     if node_id.startswith("T:"):
@@ -342,11 +381,24 @@ def atlas_summary(node_id: str, lens: Lens) -> AtlasSummary:
     adj = _Adjacency(store)
     targets: dict[str, _Target] = {}
     neighbor_types: Counter[NodeType] = Counter()
+    counted: set[str] = set()
     for edge, other in adj(node.id):
-        if other.id not in targets:
-            targets[other.id] = _Target(other)
+        tkey, section = other.id, None
+        if node.type == NodeType.disease and other.type == NodeType.disease:
+            # A disease can be both similar and share a gene: one item in each section.
+            shared = edge.relation in SHARED_GENE_RELATIONS
+            section = (
+                SummarySectionKey.shared_gene_diseases
+                if shared
+                else SummarySectionKey.similar_diseases
+            )
+            tkey = f"{section.value}|{other.id}"
+        if tkey not in targets:
+            targets[tkey] = _Target(other, section=section)
+        if other.id not in counted:
+            counted.add(other.id)
             neighbor_types[other.type] += 1
-        targets[other.id].add((edge,), store)
+        targets[tkey].add((edge,), store)
 
     for chain in CHAINS.get(node.type, ()):
         for edges, nodes in _walk(node, chain, adj):
@@ -358,7 +410,7 @@ def atlas_summary(node_id: str, lens: Lens) -> AtlasSummary:
 
     grouped: dict[SummarySectionKey, list[SummaryItem]] = {}
     for target in targets.values():
-        key = section_for(node, target.node, len(target.best_edges))
+        key = target.section or section_for(node, target.node, len(target.best_edges))
         if key is not None:
             grouped.setdefault(key, []).append(target.item(store))
 
@@ -388,7 +440,10 @@ def atlas_summary(node_id: str, lens: Lens) -> AtlasSummary:
             key=key,
             node_type=SECTION_TYPES[key],
             total=len(grouped[key]),
-            items=sorted(grouped[key], key=_rank)[:MAX_ITEMS],
+            items=sorted(
+                grouped[key],
+                key=_frequency_rank if key == SummarySectionKey.symptoms else _rank,
+            )[:MAX_ITEMS],
         )
         for key in SummarySectionKey
         if grouped.get(key)

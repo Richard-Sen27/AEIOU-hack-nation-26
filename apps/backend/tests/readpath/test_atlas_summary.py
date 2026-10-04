@@ -110,9 +110,10 @@ async def test_open_flags_mark_items_under_review(client, restore_graph):
 async def test_no_node_listed_twice(client):
     for node_id in [DRAVET, SCN2A_DEE, "HP:0001250", "HGNC:10588", "INST:fx-neuro", "CLUSTER:1"]:
         summary = await _summary(client, node_id)
-        ids = [i.id for s in summary.sections for i in s.items]
-        assert len(ids) == len(set(ids)), node_id
-        assert node_id not in ids
+        for s in summary.sections:  # a disease may be both similar and share a gene
+            ids = [i.id for i in s.items]
+            assert len(ids) == len(set(ids)), (node_id, s.key)
+            assert node_id not in ids
 
 
 async def test_cluster_items(client):
@@ -252,3 +253,128 @@ def test_synthetic_ranking_dedup_and_explain_spread(synthetic_store):
     flat = [e for via in tops for e in dict.fromkeys(via)]
     assert explain[: len(dict.fromkeys(flat))] == list(dict.fromkeys(flat))
     assert all(store.edges[e] for e in explain)
+
+
+def _computed(source: str, relation: str, target: str, conf: float, **features) -> dict:
+    return {
+        **_edge(source, relation, target, "dna" if "gene" in relation else "symptoms", conf),
+        "origin": "inferred",
+        "features": features,
+    }
+
+
+@pytest.fixture
+def core_store(restore_graph, monkeypatch):
+    """A core-only disease (no literature, trials or people): genes with evidence sources,
+    symptoms with frequencies, and computed links to two other diseases."""
+    nodes = [
+        _node("D:core", "disease", "Core disease"),
+        _node("D:twin", "disease", "Twin disease"),
+        _node("D:alike", "disease", "Alike disease"),
+        _node("G:A", "gene", "GENEA"),
+        *(_node(f"HP:{i}", "phenotype", f"Symptom {i}") for i in range(4)),
+    ]
+    for n in nodes:
+        n["attrs"] = {"tier": "core"}
+    gene_edge = _edge("D:core", "caused_by_variant_in", "G:A", "dna")
+    freqs = [(0.17, "Occasional"), (None, None), (0.9, "Very frequent"), (0.5, "Frequent")]
+    symptom_edges = []
+    for i, (f, label) in enumerate(freqs):
+        edge = _edge("D:core", "has_phenotype", f"HP:{i}", "symptoms")
+        edge["features"] = {"frequency": f, "frequency_label": label} if f else {}
+        symptom_edges.append(edge)
+    shared = _computed(
+        "D:core",
+        "shared_gene",
+        "D:twin",
+        0.77,
+        gene_symbol="GENEA",
+        explanation="Both are linked to variants in GENEA; whether they share a mechanism "
+        "is not established.",
+    )
+    similar_twin = _computed(
+        "D:twin", "similar_symptoms", "D:core", 0.6, explanation="Similar symptom profile."
+    )
+    similar = _computed(
+        "D:alike", "similar_symptoms", "D:core", 0.55, explanation="Similar symptom profile."
+    )
+    evidence = [
+        {"edge_id": gene_edge["id"], "source_type": "orphanet", "polarity": "supports", "n": 1},
+        {"edge_id": gene_edge["id"], "source_type": "clinvar", "polarity": "supports", "n": 3},
+    ]
+    store = graph_service.build_store(
+        nodes=nodes,
+        edges=[gene_edge, *symptom_edges, shared, similar_twin, similar],
+        evidence=evidence,
+    )
+    graph_service.set_graph(store)
+    monkeypatch.setattr(atlas_tree, "ancestors", lambda node_id: [])
+    return store
+
+
+def _core_summary() -> AtlasSummary:
+    return summary_service.atlas_summary("D:core", Lens(role=Role.guest))
+
+
+def test_symptoms_sorted_by_frequency_with_label(core_store):
+    items = _section(_core_summary(), SummarySectionKey.symptoms).items
+    assert [i.id for i in items] == ["HP:2", "HP:3", "HP:0", "HP:1"]
+    assert [i.frequency_label for i in items] == ["Very frequent", "Frequent", "Occasional", None]
+    assert items[0].frequency == 0.9 and items[-1].frequency is None
+
+
+def test_gene_items_carry_the_link_sources(core_store):
+    genes = _section(_core_summary(), SummarySectionKey.genes).items
+    assert [(g.id, g.sources) for g in genes] == [("G:A", ["clinvar", "orphanet"])]
+    symptoms = _section(_core_summary(), SummarySectionKey.symptoms).items
+    assert all(s.sources == [] for s in symptoms)
+
+
+def test_shared_gene_diseases_have_their_own_section(core_store):
+    summary = _core_summary()
+    keys = [s.key for s in summary.sections]
+    assert keys.index(SummarySectionKey.similar_diseases) < keys.index(
+        SummarySectionKey.shared_gene_diseases
+    )
+    shared = _section(summary, SummarySectionKey.shared_gene_diseases).items
+    assert [i.id for i in shared] == ["D:twin"]
+    # the twin is also similar by symptoms: listed there too, with that link
+    similar = _section(summary, SummarySectionKey.similar_diseases).items
+    assert [i.id for i in similar] == ["D:twin", "D:alike"]
+    assert similar[0].via != shared[0].via
+
+
+def test_computed_links_are_hypotheses_not_facts(core_store):
+    summary = _core_summary()
+    for key in (SummarySectionKey.similar_diseases, SummarySectionKey.shared_gene_diseases):
+        for item in _section(summary, key).items:
+            assert item.inferred and item.hops == 1 and item.explanation
+            assert item.best_confidence < 0.79
+            assert "direct" not in (item.via_label or "").lower()
+    shared = _section(summary, SummarySectionKey.shared_gene_diseases).items[0]
+    assert shared.via_label == "gene GENEA"
+    assert "not established" in shared.explanation
+
+
+def test_core_only_disease_summary(core_store):
+    summary = _core_summary()
+    assert summary.coverage == "core" and summary.focus_disease_count == 0
+    assert {s.key for s in summary.sections} == {
+        SummarySectionKey.genes,
+        SummarySectionKey.symptoms,
+        SummarySectionKey.similar_diseases,
+        SummarySectionKey.shared_gene_diseases,
+    }
+
+
+async def test_focus_disease_shared_gene_section(client):
+    summary = await _summary(client, DRAVET)
+    assert summary.coverage == "focus"
+    shared = [s for s in summary.sections if s.key == SummarySectionKey.shared_gene_diseases]
+    similar = _section(summary, SummarySectionKey.similar_diseases).items
+    for item in similar:
+        edge = graph_service.get_edge(item.via[0])
+        assert edge.relation.value not in summary_service.SHARED_GENE_RELATIONS
+    for item in shared[0].items if shared else []:
+        edge = graph_service.get_edge(item.via[0])
+        assert edge.relation in summary_service.SHARED_GENE_RELATIONS

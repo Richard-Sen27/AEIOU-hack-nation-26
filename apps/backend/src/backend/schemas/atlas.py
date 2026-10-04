@@ -101,6 +101,7 @@ class SummarySectionKey(StrEnum):
     clusters = "clusters"
     diseases = "diseases"
     similar_diseases = "similar_diseases"
+    shared_gene_diseases = "shared_gene_diseases"  # disease subject: computed same-gene links
     genes = "genes"
     variants = "variants"
     mechanisms = "mechanisms"
@@ -131,6 +132,13 @@ class SummaryItem(ApiModel):
     via_label: str | None  # e.g. "via 4 papers", "via gene SCN1A"
     # Why the link exists, when the best chain is a single inferred edge carrying one.
     explanation: str | None = None
+    # Symptom items of a disease (and disease items of a symptom), from the direct has_phenotype
+    # link: numeric frequency 0-1 for sorting and the label as the source gives it.
+    frequency: float | None = None
+    frequency_label: str | None = None
+    # Gene items of a disease (and disease items of a gene): evidence source types of the direct
+    # caused_by_variant_in link, most evidence first (e.g. "clinvar", "orphanet").
+    sources: list[str] = Field(default_factory=list)
     # Researcher and doctor items only, for signed-in users: the person's public card in Amber
     # (verified, switched on, linked to this entry by a verified link). Null otherwise.
     card_id: UUID | None = None
