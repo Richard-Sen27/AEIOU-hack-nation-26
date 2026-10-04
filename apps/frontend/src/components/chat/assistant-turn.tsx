@@ -19,7 +19,6 @@ import { useState } from "react";
 
 import { atlasHandoffClick } from "@/components/atlas/atlas-handoff";
 import { useGate } from "@/components/providers/gate-provider";
-import { AiDisclosure } from "@/components/shell/ai-disclosure";
 import { Button, buttonVariants } from "@/components/ui/button";
 import { Spinner } from "@/components/ui/spinner";
 import type { SearchHit } from "@/lib/api/types";
@@ -254,8 +253,8 @@ export function AssistantTurnView({
           <Bot className="size-4" aria-hidden />
         </span>
         <span className="text-sm font-semibold">Dr. Wu</span>
-        <AiDisclosure variant="inline" />
-        {r.ai_notice && <span className="text-xs text-muted-foreground" data-testid="ai-notice">{r.ai_notice}</span>}
+        {/* The AI notice is shown once per conversation (chat view); here only for screen readers. */}
+        {r.ai_notice && <span className="sr-only" data-testid="ai-notice">{r.ai_notice}</span>}
       </header>
 
       <div className="space-y-3.5 sm:pl-9">

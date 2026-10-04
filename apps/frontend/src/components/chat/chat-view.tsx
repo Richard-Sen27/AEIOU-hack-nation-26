@@ -137,10 +137,9 @@ export function ChatView() {
             <History aria-hidden /> Conversations
           </Button>
         </div>
-        <AiDisclosure className="hidden sm:flex" />
-        <AiDisclosure variant="inline" className="self-start sm:hidden" />
-
-        <div ref={logRef} className="relative -mx-1 min-h-0 flex-1 overflow-y-auto px-1 py-5" data-testid="chat-log">
+        <div ref={logRef} className="relative -mx-1 min-h-0 flex-1 overflow-y-auto px-1 pt-1 pb-5" data-testid="chat-log">
+          {/* Once, at the start of the conversation; it scrolls away with the content. */}
+          <AiDisclosure variant="line" className="mx-auto mb-5 max-w-3xl" />
           {chat.loadingSession ? (
             <p className="flex items-center gap-2 text-sm text-muted-foreground">
               <Spinner className="size-4" /> Opening the conversation…

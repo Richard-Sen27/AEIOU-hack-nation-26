@@ -30,7 +30,7 @@ export function ChatGuest({ offline }: { offline?: boolean }) {
       <p className="mt-3 text-[15px] leading-relaxed text-pretty text-muted-foreground">
         {google ? "An AI assistant. Sign in to start." : "An AI assistant on your own ChatGPT plan. Sign in to start."}
       </p>
-      <AiDisclosure className="mt-6" />
+      <AiDisclosure variant="line" className="mt-4" />
       {offline && (
         <p className="mt-4 flex items-center gap-2 text-sm text-muted-foreground" role="status">
           <WifiOff className="size-4" aria-hidden /> Amber&apos;s server can&apos;t be reached, so sign-in is unavailable.

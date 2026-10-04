@@ -4,19 +4,37 @@ import { cn } from "@/lib/utils";
 
 /**
  * "You are talking to an AI system" (EU AI Act Art. 50). Put it on every
- * assistant surface (chat, explanations, gap search), visible before and
- * while the user interacts. Not dismissible.
+ * assistant surface (chat, explanations, gap search), shown clearly at the
+ * latest at the first interaction. Not dismissible.
  *
  * - `banner` (default): full-width strip at the top of an assistant panel.
  * - `inline`: compact pill, e.g. next to a streamed explanation.
+ * - `line`: one quiet line at the start of a conversation (Dr. Wu chat and
+ *   dock); it scrolls away with the content and is not repeated per turn.
  */
 export function AiDisclosure({
   variant = "banner",
   className,
 }: {
-  variant?: "banner" | "inline";
+  variant?: "banner" | "inline" | "line";
   className?: string;
 }) {
+  if (variant === "line") {
+    return (
+      <p
+        role="note"
+        aria-label="AI system disclosure"
+        data-testid="ai-disclosure"
+        className={cn("flex items-center gap-1.5 text-xs text-muted-foreground", className)}
+      >
+        <Bot className="size-3.5 shrink-0 text-primary" aria-hidden />
+        <span>
+          <span className="font-medium text-foreground">Dr. Wu is an AI, not a doctor.</span> It can be wrong and never
+          diagnoses.
+        </span>
+      </p>
+    );
+  }
   if (variant === "inline") {
     return (
       <span

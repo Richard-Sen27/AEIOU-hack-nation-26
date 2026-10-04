@@ -138,7 +138,6 @@ function DockFrame({
         <Bot className="size-4" aria-hidden />
       </span>
       <h2 className="text-sm font-semibold">Dr. Wu</h2>
-      <AiDisclosure variant="inline" />
       {!mobile && (
         <Button variant="ghost" size="icon-sm" className="ml-auto" onClick={() => onOpenChange(false)} aria-label="Collapse Dr. Wu">
           <ChevronDown aria-hidden />
@@ -150,6 +149,8 @@ function DockFrame({
   const content = (
     <>
       <div id={bodyId} className="min-h-0 flex-1 space-y-3 overflow-y-auto overscroll-contain px-3 py-3" data-testid="atlas-wu-body">
+        {/* The AI notice, once at the top of the conversation; it scrolls away with it. */}
+        <AiDisclosure variant="line" />
         {count > 0 && <FoundList items={items} onClear={onClear} onSelect={onSelect} />}
         {body}
       </div>
@@ -263,20 +264,6 @@ function FoundList({
   );
 }
 
-/**
- * The shortest AI disclosure (EU AI Act Art. 50, docs/compliance.md): an AI
- * system, not a doctor, can be wrong, never diagnoses. The header's
- * "AI-generated · Dr. Wu" pill stays visible in every state as well.
- */
-function AiNote() {
-  return (
-    <p role="note" aria-label="AI system disclosure" className="flex items-center gap-1.5 text-xs text-muted-foreground" data-testid="atlas-wu-ai-note">
-      <Bot className="size-3.5 shrink-0 text-primary" aria-hidden />
-      AI, not a doctor. Can be wrong, never diagnoses.
-    </p>
-  );
-}
-
 // ---------------------------------------------------------------------------
 // Guests: the sign-in offer
 
@@ -302,7 +289,6 @@ function GuestDock({ index, pendingQuestion, onPendingConsumed, found, onClear, 
       body={
         <div className="space-y-3" data-testid="atlas-wu-guest">
           <p className="text-sm">Describe the problem, Dr. Wu finds the dots.</p>
-          <AiNote />
           <SignInButtons />
           <p className="text-[11px] text-muted-foreground">
             16+ only · nothing sold or shared ·{" "}
@@ -406,9 +392,7 @@ function SignedInDock({
       className={className}
       body={
         <div className="space-y-3" data-testid="atlas-wu-chat">
-          {!lastAssistant ? (
-            <AiNote />
-          ) : (
+          {!lastAssistant ? null : (
             <>
               {lastUser && lastUser.kind === "user" && (
                 <p className="line-clamp-2 rounded-xl rounded-br-md bg-secondary px-3 py-1.5 text-[13px] text-secondary-foreground" dir="auto" data-testid="atlas-wu-question">
