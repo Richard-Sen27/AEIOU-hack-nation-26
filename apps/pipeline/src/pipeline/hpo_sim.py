@@ -1,4 +1,8 @@
-"""Phenotype similarity on top of pyhpo.
+"""Phenotype information content and similarity inputs.
+
+Analytics uses the corpus information content below (every disease in phenotype.hpoa) and the
+shared similarity function in ``backend.phenotype_similarity``. Scope selection still uses
+pyhpo's OMIM-based IC (``ic``), so the scope stays as it was.
 
 pyhpo 4 cannot parse the axiom annotations that current hp.obo releases put on ``is_a`` lines,
 so a sanitized copy of the fetched release is prepared in data/cache/pyhpo/.
@@ -10,13 +14,17 @@ import logging
 import math
 import re
 import shutil
+from collections import Counter
+from collections.abc import Callable, Iterable, Mapping
+from dataclasses import dataclass
 from functools import cache
 
 import numpy as np
 import polars as pl
+from backend.phenotype_similarity import closure, frequency_weight
 from scipy import sparse
 
-from pipeline import bio
+from pipeline import bio, taxonomy
 from pipeline.paths import CACHE, RAW
 
 log = logging.getLogger(__name__)
@@ -82,24 +90,21 @@ def disease_terms() -> dict[str, frozenset[str]]:
     return {k: frozenset(v) for k, v in out.items()}
 
 
-def hposet(terms):
-    from pyhpo import HPOSet
+def cosine_matrix(
+    rows: list[str],
+    cols: list[str],
+    terms: Mapping[str, Iterable[str]] | None = None,
+    ic_fn: Callable[[str], float] | None = None,
+    ancestors_fn: Callable[[str], Iterable[str]] | None = None,
+) -> np.ndarray:
+    """Cheap IC-weighted cosine on ancestor-expanded term sets (pre-filter for similarity).
 
-    return HPOSet.from_queries(sorted(terms))
-
-
-def bma(terms_a, terms_b, method: str = "lin") -> float:
-    """pyhpo best-match-average similarity between two term sets."""
-    if not terms_a or not terms_b:
-        return 0.0
-    return float(
-        hposet(terms_a).similarity(hposet(terms_b), kind=IC_KIND, method=method, combine="BMA")
-    )
-
-
-def cosine_matrix(rows: list[str], cols: list[str]) -> np.ndarray:
-    """Cheap IC-weighted cosine on ancestor-expanded term sets (pre-filter at scope time)."""
-    dt = disease_terms()
+    Defaults: all HPO / Orphanet annotations and pyhpo's IC (as used at scope time); analytics
+    passes the graph's annotations and the corpus IC instead.
+    """
+    dt = terms if terms is not None else disease_terms()
+    ic_fn = ic_fn or ic
+    ancestors_fn = ancestors_fn or ancestors
     vocab: dict[str, int] = {}
     min_ic = 0.5  # ignore near-root terms
 
@@ -108,9 +113,10 @@ def cosine_matrix(rows: list[str], cols: list[str]) -> np.ndarray:
         for mid in ids:
             expanded = set()
             for t in dt.get(mid, ()):
-                expanded |= ancestors(t)
+                expanded.add(t)
+                expanded |= set(ancestors_fn(t))
             for t in expanded:
-                w = ic(t)
+                w = ic_fn(t)
                 if w >= min_ic:
                     ind.append(vocab.setdefault(t, len(vocab)))
                     data.append(w)
@@ -131,38 +137,58 @@ def cosine_matrix(rows: list[str], cols: list[str]) -> np.ndarray:
     return (norm(ma) @ norm(mb).T).toarray()
 
 
-def shared_terms(terms_a, terms_b, limit: int = 12) -> list[dict]:
-    """The most specific HPO terms (or common ancestors) shared by two diseases."""
-    exact = set(terms_a) & set(terms_b)
-    anc_a = set().union(*(ancestors(t) for t in terms_a)) if terms_a else set()
-    anc_b = set().union(*(ancestors(t) for t in terms_b)) if terms_b else set()
-    common = (anc_a & anc_b) - exact
-    # Keep only the most specific common ancestors (drop those that are ancestors of others).
-    covered = set()
-    for t in exact | common:
-        covered |= ancestors(t) - {t}
-    candidates = [t for t in exact | common if t not in covered]
-    ranked = sorted(candidates, key=lambda t: (-ic(t), t))[:limit]
-    out = []
-    for t in ranked:
-        obj = term(t)
-        out.append(
-            {
-                "hpo_id": t,
-                "label": obj.name if obj else t,
-                "ic": round(ic(t), 3),
-                "exact": t in exact,
-            }
-        )
-    return out
-
-
-def specificity(hpo_id: str) -> float:
-    """IC rescaled to 0-1 by the maximum possible IC (a single annotated disease)."""
-    n = max(1, len(ontology().omim_diseases))
-    return min(1.0, ic(hpo_id) / math.log(n))
-
-
 def frame_for(ids: list[str]) -> pl.DataFrame:
     dt = disease_terms()
     return pl.DataFrame({"mondo_id": ids, "n_terms": [len(dt.get(i, ())) for i in ids]})
+
+
+# ---------------------------------------------------------------- corpus information content
+
+
+@dataclass(frozen=True)
+class Corpus:
+    """Information content over an annotation corpus: IC(t) = -ln(n_t / N), n_t = diseases
+    annotated to t or a descendant. Terms never annotated get the IC of a single disease."""
+
+    n_diseases: int
+    counts: dict[str, int]
+    ic: dict[str, float]
+    ancestors: Callable[[str], frozenset[str]]
+    labels: dict[str, str]
+    annotations: dict[str, dict[str, float]]  # corpus disease -> HPO term -> frequency weight
+
+
+def corpus_from(
+    annotations: Mapping[str, Mapping[str, float | None]],
+    parents: dict[str, list[str]],
+    labels: dict[str, str] | None = None,
+) -> Corpus:
+    anc = taxonomy.ancestor_fn(parents)
+    counts: Counter[str] = Counter()
+    for terms in annotations.values():
+        counts.update(closure(terms, anc))
+    n = len(annotations)
+    ic = {t: max(0.0, -math.log(c / n)) for t, c in counts.items()}
+    single = math.log(n) if n else 0.0
+    for t in parents:
+        ic.setdefault(t, single)
+    weights = {
+        d: {t: frequency_weight(f) for t, f in terms.items()} for d, terms in annotations.items()
+    }
+    return Corpus(n, dict(counts), ic, anc, labels or {}, weights)
+
+
+@cache
+def corpus() -> Corpus:
+    """Corpus IC over every disease in phenotype.hpoa (OMIM, ORPHA, DECIPHER; aspect P; NOT and
+    excluded (0%) annotations left out)."""
+    parents, labels = taxonomy.hpo()
+    a = bio.hpoa().filter(~pl.col("negated") & (pl.col("frequency") != 0).fill_null(True))
+    per: dict[str, dict[str, float | None]] = {}
+    for d, t, f in a.select("disease_id", "hpo_id", "frequency").iter_rows():
+        terms = per.setdefault(d, {})
+        cur = terms.get(t)
+        terms[t] = f if cur is None else (cur if f is None else max(cur, f))
+    c = corpus_from(per, parents, labels)
+    log.info("corpus IC: %d diseases, %d annotated terms", c.n_diseases, len(c.counts))
+    return c
