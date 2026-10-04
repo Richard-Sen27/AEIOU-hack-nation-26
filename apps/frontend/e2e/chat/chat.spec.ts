@@ -407,6 +407,77 @@ test.describe("chat", () => {
     await expect(page.getByTestId("assistant-turn")).toHaveCount(1);
   });
 
+  test("a stored failed turn shows its steps, error and Try again; the retry reruns it in place", async ({ page }) => {
+    const bodies: Array<Record<string, unknown>> = [];
+    const steps = [
+      { tool: null, message: "Checking your message" },
+      { tool: "extract_entities", message: "Reading your message" },
+      { tool: "get_neighborhood", message: "Looking at connected diseases" },
+    ];
+    await signedIn(page, {
+      "GET /chat/sessions": [sessions[0]],
+      "GET /chat/sessions/*": {
+        session: sessions[0],
+        messages: [
+          { id: "m1", session_id: SESSION_ID, role: "user", content: STORY, reply: null, error: null, created_at: "2026-10-03T10:00:00Z" },
+          {
+            id: "m2",
+            session_id: SESSION_ID,
+            role: "assistant",
+            content: "Dr. Wu took too long to answer. Please try again.",
+            reply: null,
+            error: { code: "upstream_error", message: "Dr. Wu took too long to answer. Please try again.", steps },
+            created_at: "2026-10-03T10:01:30Z",
+          },
+        ],
+      },
+      "POST /chat": (req: Req) => {
+        bodies.push(req.body as Record<string, unknown>);
+        return turnBody();
+      },
+    });
+    await page.goto("/chat");
+    await page.getByTestId("session-list").first().getByRole("button", { name: /^STXBP1 and related communities/ }).click();
+    await expect(page.getByTestId("user-message")).toHaveCount(1);
+    const err = turn(page).getByTestId("turn-error");
+    await expect(err).toContainText("took too long");
+    await expect(turn(page).getByRole("button", { name: "Checked the atlas in 3 steps" })).toBeVisible();
+    await err.getByRole("button", { name: "Try again" }).click();
+    await expect(turn(page)).toHaveAttribute("data-phase", "done");
+    await expect(turn(page).getByTestId("summary")).toHaveText(reply.summary);
+    expect(bodies).toHaveLength(1);
+    expect(bodies[0]).toMatchObject({ message: STORY, session_id: SESSION_ID, retry_message_id: "m1" });
+    await expect(page.getByTestId("user-message")).toHaveCount(1);
+    await expect(page.getByTestId("assistant-turn")).toHaveCount(1);
+  });
+
+  test("a live failed turn is retried with its stored message id", async ({ page }) => {
+    const bodies: Array<Record<string, unknown>> = [];
+    await signedIn(page, {
+      "POST /chat": (req: Req) => {
+        bodies.push(req.body as Record<string, unknown>);
+        return bodies.length === 1
+          ? sseBody([
+              { type: "status", message: "Checking your message" },
+              { type: "turn", session_id: SESSION_ID, message_id: "44444444-4444-4444-8444-444444444444" },
+              { type: "error", code: "upstream_error", message: "Dr. Wu took too long to answer. Please try again." },
+            ])
+          : turnBody();
+      },
+    });
+    await page.goto("/chat");
+    await ask(page);
+    await turn(page).getByTestId("turn-error").getByRole("button", { name: "Try again" }).click();
+    await expect(turn(page)).toHaveAttribute("data-phase", "done");
+    expect(bodies[0]).not.toHaveProperty("retry_message_id");
+    expect(bodies[1]).toMatchObject({
+      message: STORY,
+      session_id: SESSION_ID,
+      retry_message_id: "44444444-4444-4444-8444-444444444444",
+    });
+    await expect(page.getByTestId("user-message")).toHaveCount(1);
+  });
+
   test("501 from the API degrades gracefully", async ({ page }) => {
     await signedIn(page, { "POST /chat": errorEnvelope(501, "not_implemented", "Not implemented") });
     const errors = trackConsoleErrors(page);

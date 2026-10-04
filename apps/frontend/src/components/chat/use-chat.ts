@@ -23,8 +23,12 @@ import {
   type TurnError,
 } from "./types";
 
-/** No event for this long means the turn is stuck (the server caps a turn at 30 s). */
-export const STREAM_IDLE_TIMEOUT_MS = 60_000;
+/**
+ * No event for this long means the turn is stuck. The server answers within its 90 s turn
+ * deadline (a normal turn takes about 30 s) and the longest silent stretch is one model call,
+ * so this waits past that deadline: the server's own answer or error always arrives first.
+ */
+export const STREAM_IDLE_TIMEOUT_MS = 100_000;
 
 let seq = 0;
 const nextId = (p: string) => `${p}-${Date.now().toString(36)}-${(seq++).toString(36)}`;
@@ -103,8 +107,24 @@ function isEmptyProfile(p: PatientProfile) {
 }
 
 function turnsFromHistory(messages: Schemas.ChatMessage[]): Turn[] {
-  return messages.map((m): Turn => {
+  return messages.map((m, i): Turn => {
     if (m.role === "user") return { id: m.id, kind: "user", text: m.content };
+    if (m.error) {
+      // A stored failed turn: shown as the live view showed it (steps, error, "Try again").
+      const asked = messages[i - 1]?.role === "user" ? messages[i - 1] : undefined;
+      return {
+        id: m.id,
+        kind: "assistant",
+        phase: "error",
+        statuses: m.error.steps.map((s) => ({ tool: s.tool, message: s.message })),
+        final: false,
+        followUpDone: true,
+        reply: emptyReply(),
+        error: { code: m.error.code, message: m.error.message },
+        request: asked?.content,
+        userMessageId: asked?.id,
+      };
+    }
     const reply = m.reply;
     return {
       id: m.id,
@@ -180,6 +200,14 @@ export function useChat({ expertMode }: { expertMode: boolean }) {
         case "status":
           updateTurn(turnId, (t) => ({ ...t, statuses: [...t.statuses, { tool: e.tool, message: e.message }] }));
           return;
+        case "turn":
+          // The message is stored: a retry from now on reruns it instead of storing it again.
+          updateTurn(turnId, (t) => ({ ...t, userMessageId: e.message_id }));
+          if (e.session_id !== sessionRef.current) {
+            sessionRef.current = e.session_id;
+            setSessionId(e.session_id);
+          }
+          return;
         case "uncertainty":
           // Sent before the summary so the uncertainty line leads the reply.
           updateTurn(turnId, (t) => ({ ...t, reply: { ...t.reply, uncertainty: e.text } }));
@@ -227,6 +255,7 @@ export function useChat({ expertMode }: { expertMode: boolean }) {
             openSignIn("Your ChatGPT sign-in has expired. Sign in again to continue the conversation.");
           }
           announce(`Dr. Wu could not finish: ${e.message}`, "assertive");
+          void refreshSessions();
           return;
       }
     },
@@ -234,7 +263,7 @@ export function useChat({ expertMode }: { expertMode: boolean }) {
   );
 
   const run = useCallback(
-    async (turnId: string, text: string) => {
+    async (turnId: string, text: string, retryOf?: string) => {
       ctrlRef.current?.abort();
       const ctrl = new AbortController();
       ctrlRef.current = ctrl;
@@ -251,7 +280,12 @@ export function useChat({ expertMode }: { expertMode: boolean }) {
       announce("Dr. Wu is working on your question.");
       try {
         await streamSSE<ChatEvent>("/chat", {
-          json: { message: text, session_id: sessionRef.current, expert_mode: expertMode },
+          json: {
+            message: text,
+            session_id: sessionRef.current,
+            expert_mode: expertMode,
+            ...(retryOf && sessionRef.current ? { retry_message_id: retryOf } : {}),
+          },
           signal: ctrl.signal,
           quiet: true,
           onEvent: (e) => {
@@ -307,7 +341,7 @@ export function useChat({ expertMode }: { expertMode: boolean }) {
       const turn = turns.find((t) => t.id === turnId);
       if (!turn || turn.kind !== "assistant" || !turn.request) return;
       updateTurn(turnId, (t) => ({ ...t, phase: "streaming", statuses: [], reply: emptyReply(), final: false, error: undefined }));
-      void run(turnId, turn.request);
+      void run(turnId, turn.request, turn.userMessageId);
     },
     [turns, run, updateTurn],
   );

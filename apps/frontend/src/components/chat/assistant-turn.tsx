@@ -111,6 +111,12 @@ const ERROR_COPY: Record<string, { icon: typeof CircleAlert; title: string; hint
     hint: "What arrived is kept.",
     retry: true,
   },
+  interrupted: {
+    icon: WifiOff,
+    title: "This answer was interrupted",
+    hint: "",
+    retry: true,
+  },
   not_implemented: {
     icon: CircleAlert,
     title: "Dr. Wu is not available yet",

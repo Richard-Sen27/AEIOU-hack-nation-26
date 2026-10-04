@@ -28,6 +28,7 @@ export type TurnErrorCode =
   | "sign_in_required"
   | "timeout"
   | "network_error"
+  | "interrupted"
   | "not_implemented"
   | (string & {});
 
@@ -49,8 +50,10 @@ export type AssistantTurn = {
   /** True once the authoritative `final` reply arrived (or it was loaded from history). */
   final: boolean;
   error?: TurnError;
-  /** In-memory copy of the question, for "Try again". Never persisted. */
+  /** The question, for "Try again": an in-memory copy, or the stored (redacted) message. */
   request?: string;
+  /** The stored user message of this turn (from the `turn` event or history): a retry sends it as `retry_message_id`, so the message is not stored twice. */
+  userMessageId?: string;
   followUpDone?: boolean;
   /** What the user decided about each `profile_hints` item of this reply. */
   hintState?: Partial<Record<HintKey, HintDecision>>;

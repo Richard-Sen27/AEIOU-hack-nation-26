@@ -130,6 +130,31 @@ test.describe("atlas Dr. Wu dock", () => {
     await expect(dock(page).getByTestId("turn-error")).toContainText("usage limit");
   });
 
+  test("retry reruns the failed turn without sending the message as new", async ({ page }) => {
+    const bodies: Array<Record<string, unknown>> = [];
+    const mid = "44444444-4444-4444-8444-444444444444";
+    await atlas(
+      page,
+      {
+        "POST /chat": (req: { body: unknown }) => {
+          bodies.push(req.body as Record<string, unknown>);
+          return bodies.length === 1
+            ? sseBody([
+                { type: "turn", session_id: "11111111-1111-4111-8111-111111111111", message_id: mid },
+                { type: "error", code: "upstream_error", message: "Dr. Wu took too long to answer. Please try again." },
+              ])
+            : turnBody;
+        },
+      },
+      signedInSession({ consents: ["health_data"] }),
+    );
+    await page.goto("/atlas");
+    await ask(page);
+    await dock(page).getByTestId("turn-error").getByRole("button", { name: "Retry" }).click();
+    await expect(dock(page).getByTestId("atlas-wu-turn")).toHaveAttribute("data-phase", "done");
+    expect(bodies[1]).toMatchObject({ session_id: "11111111-1111-4111-8111-111111111111", retry_message_id: mid });
+  });
+
   for (const theme of ["light", "dark"] as const) {
     test(`screenshot dock ${theme}`, async ({ page }, info) => {
       await setTheme(page, theme);
