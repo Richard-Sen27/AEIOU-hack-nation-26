@@ -343,6 +343,12 @@ function SignedInDock({
     requestAnimationFrame(() => boxRef.current?.focus());
   }, [pendingQuestion, onPendingConsumed]);
 
+  // A turn still running on the server was picked up (reload or view switch): show it.
+  useEffect(() => {
+    // eslint-disable-next-line react-hooks/set-state-in-effect -- reveal a resumed turn
+    if (chat.resumed) setOpen(true);
+  }, [chat.resumed]);
+
   // The first message is the first use of health information: ask for the
   // health-data consent just in time. Declining sends nothing and keeps the text.
   const { send } = chat;

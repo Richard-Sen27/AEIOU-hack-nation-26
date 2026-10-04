@@ -18,8 +18,8 @@ export type StreamSSEOptions<E extends SSEEvent> = {
   json?: unknown;
   query?: ApiFetchOptions["query"];
   signal?: AbortSignal;
-  /** Called for every parsed event, in order. */
-  onEvent: (event: E) => void;
+  /** Called for every parsed event, in order, with the frame's SSE `id` (if any). */
+  onEvent: (event: E, id?: string) => void;
   /** Called once the response is accepted (2xx) and streaming starts. */
   onOpen?: () => void;
   /** Do not route errors to the global dialogs / toast. */
@@ -161,7 +161,7 @@ export async function streamSSE<E extends SSEEvent = SSEEvent>(
       } catch {
         payload = { type: frame.event, data: frame.data };
       }
-      onEvent(payload as E);
+      onEvent(payload as E, frame.id);
     }
   } catch (cause) {
     const err = networkError(cause);

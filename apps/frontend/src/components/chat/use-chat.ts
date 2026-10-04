@@ -4,9 +4,20 @@ import { useCallback, useEffect, useRef, useState } from "react";
 import { toast } from "sonner";
 
 import { useGate } from "@/components/providers/gate-provider";
+import { useSession } from "@/components/providers/session-provider";
 import { announce } from "@/lib/a11y";
 import { ApiError, reportApiError } from "@/lib/api/errors";
-import { deleteChatSession, getChatSession, getProfile, listChatSessions, listConsents, putProfile, unwrap } from "@/lib/api";
+import {
+  cancelChatRun,
+  deleteChatSession,
+  getChatSession,
+  getProfile,
+  listChatRuns,
+  listChatSessions,
+  listConsents,
+  putProfile,
+  unwrap,
+} from "@/lib/api";
 import { streamSSE } from "@/lib/api/sse";
 
 import {
@@ -32,6 +43,22 @@ export const STREAM_IDLE_TIMEOUT_MS = 100_000;
 
 let seq = 0;
 const nextId = (p: string) => `${p}-${Date.now().toString(36)}-${(seq++).toString(36)}`;
+
+/**
+ * The conversation this tab used last, so the dock and the full page (and a remount) pick up
+ * the same one, including a turn still running on the server. In memory only, never in a URL
+ * or browser storage (docs/compliance.md); a reload finds a running turn via `listChatRuns`.
+ */
+let lastConversation: { userId: string; sessionId: string } | null = null;
+
+/** Why a follow stream was aborted: the user stopped the turn, the view let go, or no event came. */
+type AbortReason = "stop" | "detach" | "timeout";
+/** A follow stream may end early (network, server restart) this often per turn before giving up. */
+const MAX_RECOVERIES = 2;
+
+type Source =
+  | { kind: "send"; text: string; retryOf?: string }
+  | { kind: "attach"; runId: string; after: number };
 
 type SessionsState = { status: "loading" | "ready" | "unavailable"; items: ChatSession[] };
 
@@ -147,18 +174,27 @@ function errorFrom(e: unknown): TurnError {
 
 export function useChat({ expertMode }: { expertMode: boolean }) {
   const { openSignIn } = useGate();
+  const userId = useSession().user?.id ?? null;
   const [turns, setTurns] = useState<Turn[]>([]);
   const [sessionId, setSessionId] = useState<string | null>(null);
   const [sessions, setSessions] = useState<SessionsState>({ status: "loading", items: [] });
   const [loadingSession, setLoadingSession] = useState(false);
   const ctrlRef = useRef<AbortController | null>(null);
-  const timedOut = useRef(false);
   const sessionRef = useRef<string | null>(null);
   const profileRef = useRef<PatientProfile | null>(null);
+  /** The server run of the turn on screen; stopping cancels it there. */
+  const runRef = useRef<{ runId: string | null; turnId: string; stopRequested?: boolean } | null>(null);
+  const cancelling = useRef<Promise<unknown> | null>(null);
+  const recoveries = useRef(0);
+  /** The user acted (sent, opened, started anew) before the automatic resume finished. */
+  const touched = useRef(false);
+  /** Counts resumes of a turn still running, so a view can reveal it (the dock opens). */
+  const [resumed, setResumed] = useState(0);
 
   useEffect(() => {
     sessionRef.current = sessionId;
-  }, [sessionId]);
+    if (sessionId && userId) lastConversation = { userId, sessionId };
+  }, [sessionId, userId]);
 
   const streaming = turns.some((t) => t.kind === "assistant" && t.phase === "streaming");
 
@@ -181,17 +217,25 @@ export function useChat({ expertMode }: { expertMode: boolean }) {
     void refreshSessions();
   }, [refreshSessions]);
 
-  // Abort a running answer when the chat really unmounts. Deferred, because
-  // Strict Mode's simulated unmount/remount must not cancel the first turn.
+  // Stop following when the chat really unmounts. Deferred, because Strict Mode's simulated
+  // unmount/remount must not drop the first turn. The turn itself keeps running on the server.
   const mounted = useRef(false);
   useEffect(() => {
     mounted.current = true;
     return () => {
       mounted.current = false;
       setTimeout(() => {
-        if (!mounted.current) ctrlRef.current?.abort();
+        if (!mounted.current) ctrlRef.current?.abort("detach");
       }, 0);
     };
+  }, []);
+
+  const cancelRun = useCallback((runId: string) => {
+    cancelling.current = unwrap(cancelChatRun({ path: { run_id: runId }, meta: { quiet: true } }))
+      .catch(() => undefined)
+      .finally(() => {
+        cancelling.current = null;
+      });
   }, []);
 
   const handleEvent = useCallback(
@@ -206,6 +250,14 @@ export function useChat({ expertMode }: { expertMode: boolean }) {
           if (e.session_id !== sessionRef.current) {
             sessionRef.current = e.session_id;
             setSessionId(e.session_id);
+          }
+          if (runRef.current?.turnId === turnId && e.run_id) {
+            runRef.current.runId = e.run_id;
+            if (runRef.current.stopRequested) {
+              // Stop was pressed before the run was known: cancel it now, stop following.
+              cancelRun(e.run_id);
+              ctrlRef.current?.abort("stop");
+            }
           }
           return;
         case "uncertainty":
@@ -235,6 +287,7 @@ export function useChat({ expertMode }: { expertMode: boolean }) {
           return;
         case "final": {
           const r = e.reply;
+          recoveries.current = 0;
           updateTurn(turnId, (t) => ({
             ...t,
             phase: "done",
@@ -250,6 +303,7 @@ export function useChat({ expertMode }: { expertMode: boolean }) {
           return;
         }
         case "error":
+          recoveries.current = 0;
           updateTurn(turnId, (t) => ({ ...t, phase: "error", error: { code: e.code, message: e.message } }));
           if (e.code === "reauth_required" || e.code === "sign_in_required") {
             openSignIn("Your ChatGPT sign-in has expired. Sign in again to continue the conversation.");
@@ -259,52 +313,95 @@ export function useChat({ expertMode }: { expertMode: boolean }) {
           return;
       }
     },
-    [updateTurn, refreshSessions, openSignIn],
+    [updateTurn, refreshSessions, openSignIn, cancelRun],
   );
 
-  const run = useCallback(
-    async (turnId: string, text: string, retryOf?: string) => {
-      ctrlRef.current?.abort();
+  /** Set by `openSession` below; a cut stream calls it to show the turn as far as it got. */
+  const recoverRef = useRef<(turnId: string) => void>(() => {});
+
+  /**
+   * Follow a turn: send a message (POST /chat starts a run and streams it) or attach to a run
+   * (replays its events after `after`, then live). Attaching never sends the message again.
+   */
+  const follow = useCallback(
+    async (turnId: string, source: Source) => {
+      ctrlRef.current?.abort("detach");
       const ctrl = new AbortController();
       ctrlRef.current = ctrl;
-      timedOut.current = false;
       let watchdog: ReturnType<typeof setTimeout> | undefined;
       const arm = () => {
         clearTimeout(watchdog);
-        watchdog = setTimeout(() => {
-          timedOut.current = true;
-          ctrl.abort();
-        }, STREAM_IDLE_TIMEOUT_MS);
+        watchdog = setTimeout(() => ctrl.abort("timeout"), STREAM_IDLE_TIMEOUT_MS);
       };
       arm();
-      announce("Dr. Wu is working on your question.");
+      let ended = false;
       try {
-        await streamSSE<ChatEvent>("/chat", {
-          json: {
-            message: text,
-            session_id: sessionRef.current,
-            expert_mode: expertMode,
-            ...(retryOf && sessionRef.current ? { retry_message_id: retryOf } : {}),
-          },
-          signal: ctrl.signal,
-          quiet: true,
-          onEvent: (e) => {
-            arm();
-            handleEvent(turnId, e);
-          },
-        });
-        // Stream ended. Without `final` or `error` the turn was cut short.
-        updateTurn(turnId, (t) => {
-          if (t.phase !== "streaming") return t;
-          if (ctrl.signal.aborted) {
-            return timedOut.current
-              ? { ...t, phase: "error", error: { code: "timeout", message: "No answer arrived in time." } }
-              : { ...t, phase: "stopped" };
-          }
-          return { ...t, phase: "error", error: { code: "network_error", message: "The answer stopped before it was complete." } };
-        });
+        if (source.kind === "send") {
+          announce("Dr. Wu is working on your question.");
+          if (cancelling.current) await cancelling.current;
+          runRef.current = { runId: null, turnId };
+          await streamSSE<ChatEvent>("/chat", {
+            json: {
+              message: source.text,
+              session_id: sessionRef.current,
+              expert_mode: expertMode,
+              ...(source.retryOf && sessionRef.current ? { retry_message_id: source.retryOf } : {}),
+            },
+            signal: ctrl.signal,
+            quiet: true,
+            onEvent: (e) => {
+              arm();
+              // Stopped before the run was known: only the `turn` event (to cancel it) counts.
+              if (runRef.current?.turnId === turnId && runRef.current.stopRequested && e.type !== "turn") return;
+              if (e.type === "final" || e.type === "error") ended = true;
+              handleEvent(turnId, e);
+            },
+          });
+        } else {
+          runRef.current = { runId: source.runId, turnId };
+          await streamSSE<ChatEvent>(`/chat/runs/${source.runId}/events`, {
+            method: "GET",
+            query: { after: source.after },
+            signal: ctrl.signal,
+            quiet: true,
+            onEvent: (e) => {
+              arm();
+              if (e.type === "final" || e.type === "error") ended = true;
+              handleEvent(turnId, e);
+            },
+          });
+        }
+        if (ended) return;
+        const reason = ctrl.signal.aborted ? (ctrl.signal.reason as AbortReason) : null;
+        if (reason === "detach") return; // another view or conversation took over
+        if (reason === "stop") {
+          updateTurn(turnId, (t) => (t.phase === "streaming" ? { ...t, phase: "stopped" } : t));
+          return;
+        }
+        if (reason === "timeout") {
+          updateTurn(turnId, (t) =>
+            t.phase === "streaming" ? { ...t, phase: "error", error: { code: "timeout", message: "No answer arrived in time." } } : t,
+          );
+          return;
+        }
+        // The stream was cut while the turn runs on: pick it up again from the server.
+        if (sessionRef.current && recoveries.current < MAX_RECOVERIES) {
+          recoveries.current += 1;
+          recoverRef.current(turnId);
+          return;
+        }
+        updateTurn(turnId, (t) =>
+          t.phase === "streaming"
+            ? { ...t, phase: "error", error: { code: "network_error", message: "The answer stopped before it was complete." } }
+            : t,
+        );
       } catch (e) {
         const err = errorFrom(e);
+        if (source.kind === "attach" && err.code === "not_found" && sessionRef.current) {
+          // The run is over: the session holds its reply or failed turn.
+          recoverRef.current(turnId);
+          return;
+        }
         updateTurn(turnId, (t) => ({ ...t, phase: "error", error: err }));
         if (err.code === "sign_in_required" || err.code === "reauth_required") {
           openSignIn("Sign in again to continue the conversation with Dr. Wu.");
@@ -331,9 +428,11 @@ export function useChat({ expertMode }: { expertMode: boolean }) {
         { id: nextId("u"), kind: "user", text },
         { id: assistantId, kind: "assistant", phase: "streaming", statuses: [], reply: emptyReply(), final: false, request: text },
       ]);
-      void run(assistantId, text);
+      touched.current = true;
+      recoveries.current = 0;
+      void follow(assistantId, { kind: "send", text });
     },
-    [run],
+    [follow],
   );
 
   const retry = useCallback(
@@ -341,37 +440,126 @@ export function useChat({ expertMode }: { expertMode: boolean }) {
       const turn = turns.find((t) => t.id === turnId);
       if (!turn || turn.kind !== "assistant" || !turn.request) return;
       updateTurn(turnId, (t) => ({ ...t, phase: "streaming", statuses: [], reply: emptyReply(), final: false, error: undefined }));
-      void run(turnId, turn.request, turn.userMessageId);
+      recoveries.current = 0;
+      void follow(turnId, { kind: "send", text: turn.request, retryOf: turn.userMessageId });
     },
-    [turns, run, updateTurn],
+    [turns, follow, updateTurn],
   );
 
+  /** Stop the answer: the run is cancelled on the server (stored as an interrupted turn). */
   const stop = useCallback(() => {
-    ctrlRef.current?.abort();
-  }, []);
+    const run = runRef.current;
+    if (run?.runId) {
+      cancelRun(run.runId);
+      ctrlRef.current?.abort("stop");
+    } else if (run) {
+      // The run id arrives with the `turn` event; cancel it then.
+      run.stopRequested = true;
+      updateTurn(run.turnId, (t) => (t.phase === "streaming" ? { ...t, phase: "stopped" } : t));
+    }
+  }, [cancelRun, updateTurn]);
 
   const newConversation = useCallback(() => {
-    ctrlRef.current?.abort();
+    // A running turn goes on in its own conversation on the server.
+    ctrlRef.current?.abort("detach");
+    touched.current = true;
+    runRef.current = null;
+    lastConversation = null;
     setTurns([]);
     setSessionId(null);
     sessionRef.current = null;
   }, []);
 
-  const openSession = useCallback(async (id: string) => {
-    ctrlRef.current?.abort();
-    setLoadingSession(true);
-    try {
-      const detail = await unwrap(getChatSession({ path: { session_id: id }, meta: { quiet: true }, cache: "no-store" }));
-      setTurns(turnsFromHistory(detail.messages ?? []));
-      setSessionId(id);
-      sessionRef.current = id;
-      announce("Conversation opened.");
-    } catch {
-      toast("That conversation could not be opened", { description: "Please try again in a moment." });
-    } finally {
-      setLoadingSession(false);
-    }
-  }, []);
+  /**
+   * Show a stored conversation and, if a turn is still running in it, attach to that run: its
+   * events replay from the start into a fresh turn, so it shows as far as it got.
+   */
+  const loadSession = useCallback(
+    async (id: string, opts: { auto?: boolean; recoverTurn?: string } = {}) => {
+      ctrlRef.current?.abort("detach");
+      if (!opts.auto && !opts.recoverTurn) touched.current = true;
+      setLoadingSession(true);
+      try {
+        const detail = await unwrap(getChatSession({ path: { session_id: id }, meta: { quiet: true }, cache: "no-store" }));
+        if (opts.auto && touched.current) return; // the user moved on meanwhile
+        const history = turnsFromHistory(detail.messages ?? []);
+        const run = detail.run;
+        let attach: { turnId: string; runId: string } | null = null;
+        if (run) {
+          const asked = [...(detail.messages ?? [])].reverse().find((m) => m.id === run.message_id);
+          const turnId = nextId("a");
+          history.forEach((t) => {
+            if (t.kind === "assistant") t.followUpDone = true;
+          });
+          history.push({
+            id: turnId,
+            kind: "assistant",
+            phase: "streaming",
+            statuses: [],
+            reply: emptyReply(),
+            final: false,
+            request: asked?.content,
+            userMessageId: run.message_id,
+          });
+          attach = { turnId, runId: run.id };
+        }
+        setTurns(history);
+        setSessionId(id);
+        sessionRef.current = id;
+        if (attach) {
+          void follow(attach.turnId, { kind: "attach", runId: attach.runId, after: 0 });
+          if (opts.auto) setResumed((n) => n + 1);
+        }
+        if (!opts.auto && !opts.recoverTurn) announce("Conversation opened.");
+      } catch {
+        if (opts.recoverTurn) {
+          updateTurn(opts.recoverTurn, (t) =>
+            t.phase === "streaming"
+              ? { ...t, phase: "error", error: { code: "network_error", message: "The answer stopped before it was complete." } }
+              : t,
+          );
+        } else if (opts.auto) {
+          if (lastConversation?.sessionId === id) lastConversation = null;
+        } else {
+          toast("That conversation could not be opened", { description: "Please try again in a moment." });
+        }
+      } finally {
+        setLoadingSession(false);
+      }
+    },
+    [follow, updateTurn],
+  );
+
+  useEffect(() => {
+    recoverRef.current = (turnId: string) => {
+      if (sessionRef.current) void loadSession(sessionRef.current, { recoverTurn: turnId });
+    };
+  }, [loadSession]);
+
+  const openSession = useCallback((id: string) => loadSession(id), [loadSession]);
+
+  // On mount: pick up this tab's conversation (a view switch), else a turn still running on
+  // the server (a reload). Nothing is sent again.
+  useEffect(() => {
+    if (!userId) return;
+    let cancelled = false;
+    void (async () => {
+      let id = lastConversation?.userId === userId ? lastConversation.sessionId : null;
+      if (!id) {
+        try {
+          const running = await unwrap(listChatRuns({ meta: { quiet: true }, cache: "no-store" }));
+          id = Array.isArray(running) && running.length ? running[0].session_id : null;
+        } catch {
+          id = null;
+        }
+      }
+      if (!id || cancelled || touched.current) return;
+      await loadSession(id, { auto: true });
+    })();
+    return () => {
+      cancelled = true;
+    };
+  }, [userId, loadSession]);
 
   const deleteSession = useCallback(
     async (id: string) => {
@@ -629,6 +817,7 @@ export function useChat({ expertMode }: { expertMode: boolean }) {
     sessionId,
     sessions,
     streaming,
+    resumed,
     loadingSession,
     send,
     stop,
