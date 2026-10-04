@@ -53,6 +53,11 @@ class MockConfig:
     allow_top_level_functions: bool = False
     reject_json_schema: bool = False
     reject_include: bool = False
+    # The docs list text, image and file input as supported; this switch is opt-in.
+    reject_file_inputs: bool = False
+    # Fail only the Nth /v1/responses call since the last reset (1-based), with a fail_mode.
+    fail_on_request: int | None = None
+    fail_on_request_mode: str = "usage_limit"
     fail_refresh: bool = False
     deny_all: bool = False
     stream_delay_s: float = 0.0
@@ -110,6 +115,7 @@ class MockState:
             self.revoked_families: set[str] = set()
             self.queue: deque[dict[str, Any]] = deque()
             self.requests: list[dict[str, Any]] = []
+            self.request_count = 0
 
     # ---- scripting ------------------------------------------------------------------------
 
@@ -123,13 +129,33 @@ class MockState:
     def enqueue(self, *responses: dict[str, Any]) -> None:
         """Queue exact responses for the next /v1/responses calls, e.g. {"text": "..."},
         {"json": {...}}, {"tool_calls": [{"name": ..., "arguments": {...}}]},
-        {"error": {"status": 429, "code": "..."}}, {"fail": "<code>"}, {"incomplete": True}."""
+        {"error": {"status": 429, "code": "..."}}, {"fail": "<code>"}, {"incomplete": True}.
+
+        An entry may carry "kind": "tools" (requests offering tools), "structured"
+        (json_schema / JSON-only requests without tools) or "text"; it is then only used by a
+        request of that kind, so e.g. a structured() call made inside a tool handler does not
+        consume the tool loop's scripted answer. Entries without "kind" match any request."""
         with self.lock:
             self.queue.extend(responses)
 
-    def pop_scripted(self) -> dict[str, Any] | None:
+    def pop_scripted(self, kind: str | None = None) -> dict[str, Any] | None:
         with self.lock:
-            return self.queue.popleft() if self.queue else None
+            for i, entry in enumerate(self.queue):
+                if entry.get("kind") in (None, "any", kind):
+                    del self.queue[i]
+                    return entry
+            return None
+
+    def next_request_number(self) -> int:
+        with self.lock:
+            self.request_count += 1
+            return self.request_count
+
+    def clear_requests(self) -> None:
+        """Forget recorded requests (and the request counter); keep clients and tokens."""
+        with self.lock:
+            self.requests = []
+            self.request_count = 0
 
     def record(self, kind: str, payload: dict[str, Any]) -> None:
         with self.lock:

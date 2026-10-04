@@ -18,6 +18,7 @@ def create_app(state: MockState | None = None) -> FastAPI:
         response = await call_next(request)
         response.headers["connection"] = "close"
         return response
+
     app.include_router(issuer.build_router(state))
     app.include_router(api.build_router(state))
 
@@ -40,6 +41,11 @@ def create_app(state: MockState | None = None) -> FastAPI:
     @app.get("/_mock/requests")
     async def requests(kind: str | None = None):
         return state.recorded(kind)
+
+    @app.delete("/_mock/requests")
+    async def clear_requests():
+        state.clear_requests()
+        return {"ok": True}
 
     @app.get("/_mock/users")
     async def users():

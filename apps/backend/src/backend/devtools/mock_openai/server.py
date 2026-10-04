@@ -89,6 +89,9 @@ class MockOpenAIServer:
     def enqueue(self, *responses) -> None:
         self.state.enqueue(*responses)
 
+    def clear_requests(self) -> None:
+        self.state.clear_requests()
+
     def __enter__(self) -> "MockOpenAIServer":
         return self.start()
 

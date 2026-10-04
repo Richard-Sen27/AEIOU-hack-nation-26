@@ -103,6 +103,17 @@ def validate_request(state: MockState, body: dict[str, Any]) -> JSONResponse | N
                 code=None,
                 param=f"input[{i}]",
             )
+    if cfg.reject_file_inputs:
+        for i, item in enumerate(body["input"]):
+            content = item.get("content") if isinstance(item, dict) else None
+            for part in content if isinstance(content, list) else []:
+                if isinstance(part, dict) and part.get("type") in ("input_image", "input_file"):
+                    return api_error(
+                        400,
+                        f"{part['type']} is not supported",
+                        code=UNSUPPORTED,
+                        param=f"input[{i}].content",
+                    )
     if "include" in body and cfg.reject_include:
         return api_error(400, "include is not supported", code=UNSUPPORTED, param="include")
     tools = list(body.get("tools") or [])
@@ -181,7 +192,43 @@ def _plan_from_script(script: dict[str, Any], body: dict[str, Any]) -> Plan:
     return Plan(text=str(script.get("text", "")))
 
 
-async def _sse(state: MockState, body: dict[str, Any], plan: Plan, script: dict | None):
+def request_kind(body: dict[str, Any]) -> str:
+    if body.get("tools") or any(
+        isinstance(i, dict) and i.get("type") == "additional_tools" for i in body["input"]
+    ):
+        return "tools"
+    instructions = body.get("instructions") or ""
+    if "<tools>[" in instructions:
+        return "tools"
+    fmt = (body.get("text") or {}).get("format") or {}
+    if fmt.get("type") == "json_schema" or "<json_schema>{" in instructions:
+        return "structured"
+    return "text"
+
+
+def _usage(body: dict[str, Any], output: list[dict[str, Any]]) -> dict[str, Any]:
+    """Rough tokenizer: ~4 characters per token, as for English text."""
+    prompt = json.dumps([body.get("instructions"), body.get("input"), body.get("tools")])
+    in_tokens = max(8, len(prompt) // 4)
+    visible = [o for o in output if o.get("type") != "reasoning"]
+    reasoning = 0 if len(visible) == len(output) else 32 + 8 * len(visible)
+    out_tokens = max(1, len(json.dumps(visible)) // 4) + reasoning
+    return {
+        "input_tokens": in_tokens,
+        "input_tokens_details": {"cached_tokens": 0},
+        "output_tokens": out_tokens,
+        "output_tokens_details": {"reasoning_tokens": reasoning},
+        "total_tokens": in_tokens + out_tokens,
+    }
+
+
+async def _sse(
+    state: MockState,
+    body: dict[str, Any],
+    plan: Plan,
+    script: dict | None,
+    mode: str | None = None,
+):
     rid = f"resp_{secrets.token_hex(12)}"
     seq = 0
     output: list[dict[str, Any]] = []
@@ -214,7 +261,7 @@ async def _sse(state: MockState, body: dict[str, Any], plan: Plan, script: dict 
                 "response.failed", response=_response_obj(rid, body, "failed", output, error=error)
             )
             return
-        if state.config.fail_mode == "usage_limit_stream":
+        if mode == "usage_limit_stream":
             error = {"code": "subscription_sharing_usage_limit_exceeded", "message": "Limit"}
             yield ev(
                 "response.failed", response=_response_obj(rid, body, "failed", output, error=error)
@@ -303,15 +350,7 @@ async def _sse(state: MockState, body: dict[str, Any], plan: Plan, script: dict 
         if script and script.get("incomplete"):
             yield ev("response.incomplete", response=_response_obj(rid, body, "incomplete", output))
             return
-        in_tokens = max(1, len(json.dumps(body.get("input"))) // 4)
-        out_tokens = max(1, len(json.dumps(output)) // 4)
-        usage = {
-            "input_tokens": in_tokens,
-            "input_tokens_details": {"cached_tokens": 0},
-            "output_tokens": out_tokens,
-            "output_tokens_details": {"reasoning_tokens": 0},
-            "total_tokens": in_tokens + out_tokens,
-        }
+        usage = _usage(body, output)
         yield ev(
             "response.completed",
             response=_response_obj(rid, body, "completed", output, usage=usage),
@@ -337,10 +376,13 @@ def build_router(state: MockState) -> APIRouter:
         except ValueError:
             return api_error(400, "invalid JSON body", code=None)
         state.record("responses", {"body": body})
+        number = state.next_request_number()
         _, err = _auth(state, request)
         if err:
             return err
         mode = state.config.fail_mode
+        if state.config.fail_on_request == number:
+            mode = state.config.fail_on_request_mode
         if mode == "usage_limit":
             return api_error(
                 429, "Usage limit reached", code="subscription_sharing_usage_limit_exceeded"
@@ -352,7 +394,7 @@ def build_router(state: MockState) -> APIRouter:
         invalid = validate_request(state, body)
         if invalid is not None:
             return invalid
-        script = state.pop_scripted()
+        script = state.pop_scripted(request_kind(body))
         if script and "error" in script:
             e = script["error"]
             return api_error(
@@ -367,6 +409,6 @@ def build_router(state: MockState) -> APIRouter:
             plan = _plan_from_script(script, body)
         else:
             plan = plan_response(body)
-        return await _sse(state, body, plan, script)
+        return await _sse(state, body, plan, script, mode)
 
     return router
