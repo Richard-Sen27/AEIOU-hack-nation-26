@@ -54,6 +54,10 @@ type Props = {
   found: WuFound | null;
   /** Where the camera starts when nothing is focused: the whole map or one category. */
   startCategory: AtlasCategory | null;
+  /** Pixels on the right covered by a floating panel; framing centres in the rest. */
+  insetRight?: number;
+  /** Share of the canvas height covered by a bottom sheet (mobile panel); framing keeps above it. */
+  insetBottomShare?: number;
   onSelect: (id: string | null) => void;
   onError?: () => void;
   reducedMotion: boolean;
@@ -148,7 +152,7 @@ function computeEmphasis(p: Props): Emphasis {
         if (!e.keep.has(other)) near.push(other);
         e.keep.add(other);
       }
-      if (near.length <= 40) near.forEach((n) => e.labelled.add(n));
+      if (near.length <= 12) near.forEach((n) => e.labelled.add(n));
     } else {
       for (const d of descendantIds(index, sel.id)) {
         e.keep.add(d);
@@ -204,6 +208,17 @@ export const AtlasCanvas = forwardRef<AtlasCanvasHandle, Props>(function AtlasCa
     else void camera.animate(state, { duration: 450 });
   };
 
+  /** Whole map, centred in the part of the canvas not covered by the panel. */
+  const home = () => {
+    const el = container.current;
+    const w = el?.clientWidth ?? 1;
+    const h = el?.clientHeight ?? 1;
+    const inset = Math.min(propsRef.current.insetRight ?? 0, w * 0.5);
+    const room = Math.min(w - inset, h) / Math.max(1, Math.min(w, h));
+    const ratio = 1 / Math.max(0.5, room);
+    return { x: 0.5 + ((inset / 2) * ratio) / Math.max(1, Math.min(w, h)), y: 0.5, ratio };
+  };
+
   useImperativeHandle(ref, () => ({
     zoomIn: () => {
       const c = sigmaRef.current?.getCamera();
@@ -213,12 +228,12 @@ export const AtlasCanvas = forwardRef<AtlasCanvasHandle, Props>(function AtlasCa
       const c = sigmaRef.current?.getCamera();
       if (c) animate({ ratio: Math.min(c.getState().ratio * 1.6, 1.6) });
     },
-    reset: () => animate({ x: 0.5, y: 0.5, ratio: 1 }),
+    reset: () => animate(home()),
     focusNode: (id: string) => {
       const { index } = propsRef.current;
       const n = index.nodes.get(id);
       if (!n) return;
-      if (n.kind === "root") animate({ x: 0.5, y: 0.5, ratio: 1 });
+      if (n.kind === "root") animate(home());
       else if (n.kind === "entity") frameRef.current([id], true);
       else frameRef.current([id, ...descendantIds(index, id)]);
     },
@@ -471,8 +486,15 @@ export const AtlasCanvas = forwardRef<AtlasCanvasHandle, Props>(function AtlasCa
       }
       if (!Number.isFinite(minX)) return;
       const extent = Math.max(maxX - minX, maxY - minY);
-      const ratio = close && extent === 0 ? 0.12 : Math.min(1, Math.max(0.05, extent * 1.35));
-      animate({ x: (minX + maxX) / 2, y: (minY + maxY) / 2, ratio });
+      // Keep the framed nodes clear of a floating panel on the right.
+      const w = el.clientWidth;
+      const h = el.clientHeight;
+      const inset = Math.min(propsRef.current.insetRight ?? 0, w * 0.5);
+      const below = Math.min(propsRef.current.insetBottomShare ?? 0, 0.7) * h;
+      const fit = Math.min(w, h) / Math.max(1, Math.min(w - inset, h - below));
+      const ratio = close && extent === 0 ? 0.12 : Math.min(1.2, Math.max(0.05, extent * 1.35 * fit));
+      const unit = ratio / Math.max(1, Math.min(w, h));
+      animate({ x: (minX + maxX) / 2 + (inset / 2) * unit, y: (minY + maxY) / 2 - (below / 2) * unit, ratio });
     };
     frameRef.current = frame;
 
@@ -500,7 +522,7 @@ export const AtlasCanvas = forwardRef<AtlasCanvasHandle, Props>(function AtlasCa
       else if (p.startCategory) {
         const node = index.categories.get(p.startCategory)?.node_id;
         if (node) set(() => frame([node, ...descendantIds(index, node)]));
-      }
+      } else sigma.getCamera().setState(home());
     }
 
     // Hover: emphasise the ancestor path only (partial refresh, no re-index).
@@ -534,7 +556,7 @@ export const AtlasCanvas = forwardRef<AtlasCanvasHandle, Props>(function AtlasCa
     sigma.on("clickNode", ({ node }) => {
       if (index.nodes.get(node)?.kind === "root") {
         propsRef.current.onSelect(null);
-        animate({ x: 0.5, y: 0.5, ratio: 1 });
+        animate(home());
         return;
       }
       propsRef.current.onSelect(node);
@@ -549,7 +571,7 @@ export const AtlasCanvas = forwardRef<AtlasCanvasHandle, Props>(function AtlasCa
       .map((n) => n.id);
     const widths = new Map<string, number>();
     const GROUP_FONT_PX = 11;
-    const drawGroupLabels = (ctx: CanvasRenderingContext2D, w: number, h: number) => {
+    const drawGroupLabels = (ctx: CanvasRenderingContext2D, w: number, h: number, blocked: Array<[number, number, number, number]>) => {
       const { theme: t } = propsRef.current;
       const em = emphasis.current;
       const ratio = ratioNow();
@@ -557,7 +579,7 @@ export const AtlasCanvas = forwardRef<AtlasCanvasHandle, Props>(function AtlasCa
       ctx.font = `600 ${GROUP_FONT_PX}px ${font}`;
       ctx.lineJoin = "round";
       ctx.textBaseline = "middle";
-      const placed: Array<[number, number, number, number]> = [];
+      const placed: Array<[number, number, number, number]> = [...blocked];
       const hits = (x0: number, y0: number, x1: number, y1: number) =>
         placed.some(([a, b, c, d]) => x0 < c && x1 > a && y0 < d && y1 > b);
       // Selection-related names first, then the rest by priority.
@@ -655,7 +677,14 @@ export const AtlasCanvas = forwardRef<AtlasCanvasHandle, Props>(function AtlasCa
       if (!ctx) return;
       ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
       ctx.clearRect(0, 0, w, h);
-      drawGroupLabels(ctx, w, h);
+      // Category names are never covered by group names.
+      const host = el.getBoundingClientRect();
+      const blocked: Array<[number, number, number, number]> = [];
+      for (const d of labelEls.values()) {
+        const r = d.getBoundingClientRect();
+        blocked.push([r.left - host.left, r.top - host.top, r.right - host.left, r.bottom - host.top]);
+      }
+      drawGroupLabels(ctx, w, h, blocked);
       const { theme: t, found, selectedId } = propsRef.current;
       const foundSet = new Set(found?.nodeIds ?? []);
       for (const id of emphasis.current.rings) {
@@ -718,7 +747,7 @@ export const AtlasCanvas = forwardRef<AtlasCanvasHandle, Props>(function AtlasCa
       "+": { ratio: s.ratio / 1.4 },
       "=": { ratio: s.ratio / 1.4 },
       "-": { ratio: Math.min(s.ratio * 1.4, 1.6) },
-      "0": { x: 0.5, y: 0.5, ratio: 1 },
+      "0": home(),
     };
     if (move[e.key]) {
       e.preventDefault();
@@ -747,7 +776,7 @@ export const AtlasCanvas = forwardRef<AtlasCanvasHandle, Props>(function AtlasCa
         type="button"
         onClick={() => {
           props.onSelect(null);
-          animate({ x: 0.5, y: 0.5, ratio: 1 });
+          animate(home());
         }}
         aria-label="Show the whole map"
         title="Show the whole map"

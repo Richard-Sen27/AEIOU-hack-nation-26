@@ -80,6 +80,15 @@ export function AtlasView() {
   const [canvasFailed, setCanvasFailed] = useState(false);
   const [tourOpen, setTourOpen] = useState(tourParam);
   const [startCategory] = useState(() => lensStartCategory(role));
+  // The panel floats over the right of the canvas from lg up; framing keeps clear of it.
+  const [wide, setWide] = useState(false);
+  useEffect(() => {
+    const mq = window.matchMedia("(min-width: 1024px)");
+    const sync = () => setWide(mq.matches);
+    sync();
+    mq.addEventListener("change", sync);
+    return () => mq.removeEventListener("change", sync);
+  }, []);
 
   useEffect(() => {
     let alive = true;
@@ -168,7 +177,8 @@ export function AtlasView() {
     [index, labelStyle],
   );
 
-  // `/` focuses the search from anywhere in the view (not while typing).
+  // `/` focuses the map search from anywhere in the view (not while typing). Capture phase,
+  // so the site-wide search palette (also on `/`) does not open over the Atlas.
   useEffect(() => {
     const onKey = (e: KeyboardEvent) => {
       if (e.key !== "/" || e.metaKey || e.ctrlKey || e.altKey) return;
@@ -177,10 +187,11 @@ export function AtlasView() {
       const input = document.querySelector<HTMLInputElement>('[data-testid="atlas-search"] input');
       if (!input) return;
       e.preventDefault();
+      e.stopPropagation();
       input.focus();
     };
-    window.addEventListener("keydown", onKey);
-    return () => window.removeEventListener("keydown", onKey);
+    window.addEventListener("keydown", onKey, true);
+    return () => window.removeEventListener("keydown", onKey, true);
   }, []);
 
   const visibleFamilies = useMemo(
@@ -207,10 +218,10 @@ export function AtlasView() {
   );
 
   const header = (
-    <div className="flex shrink-0 flex-wrap items-center gap-x-4 gap-y-2 border-b bg-background/80 px-4 py-2 backdrop-blur sm:px-6">
+    <div className="flex shrink-0 items-center gap-x-3 border-b bg-background/80 px-3 py-2 backdrop-blur sm:gap-x-4 sm:px-6">
       <div className="mr-auto min-w-0">
         <h1 className="text-base font-semibold tracking-tight">Atlas</h1>
-        <p className="text-xs text-muted-foreground" id="atlas-desc">
+        <p className="truncate text-xs text-muted-foreground" id="atlas-desc">
           {index ? (
             <span data-testid="atlas-counts">
               {index.entityCount.toLocaleString("en")} items · {index.connectionCount.toLocaleString("en")} connections
@@ -221,16 +232,23 @@ export function AtlasView() {
         </p>
       </div>
       {index && facets && (
-        <div className="flex flex-wrap items-center gap-2">
+        <div className="flex shrink-0 items-center gap-1.5 sm:gap-2">
           <ViewToggle value={view} onChange={setView} graphLabel="Map" />
           <Popover>
             <PopoverTrigger
               render={
-                <Button variant="outline" size="sm" data-testid="atlas-filters" data-tour="filters" className={TOUR_SPOT} />
+                <Button
+                  variant="outline"
+                  size="sm"
+                  aria-label="Filters"
+                  data-testid="atlas-filters"
+                  data-tour="filters"
+                  className={TOUR_SPOT}
+                />
               }
             >
               <SlidersHorizontal data-icon="inline-start" aria-hidden />
-              Filters
+              <span className="max-sm:sr-only">Filters</span>
               {hiddenFamilies.size > 0 && (
                 <span className="rounded-full bg-primary px-1.5 text-[10px] text-primary-foreground">{hiddenFamilies.size}</span>
               )}
@@ -270,10 +288,11 @@ export function AtlasView() {
             variant={role === "guest" ? "secondary" : "ghost"}
             size="sm"
             onClick={() => setTourOpen(true)}
+            aria-label="Tour"
             data-testid="tour-start"
           >
             <Compass data-icon="inline-start" aria-hidden />
-            Tour
+            <span className="max-sm:sr-only">Tour</span>
           </Button>
         </div>
       )}
@@ -360,6 +379,8 @@ export function AtlasView() {
               chainEdgeIds={chainEdgeIds}
               found={found}
               startCategory={startCategory}
+              insetRight={wide ? 376 : 0}
+              insetBottomShare={!wide && selected && idx.nodes.has(selected) ? 0.62 : 0}
               onSelect={(id) => {
                 setPanelChain([]);
                 select(id);
