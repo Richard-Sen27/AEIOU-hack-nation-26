@@ -125,7 +125,11 @@ function WelcomeForm({ user, next }: { user: SessionUser; next?: string }) {
     try {
       await unwrap(updateSettings({ body, meta: { quiet: true } }));
       await refresh();
-      toast("You're all set", { description: `${ROLE_COPY[role].label} view. Change it any time in your profile.` });
+      toast("You're all set", {
+        description: `${ROLE_COPY[role].label} view. Change it any time in your profile.`,
+        action: { label: "Getting started", onClick: () => router.push("/guide") },
+        duration: 8000,
+      });
       // Doctors and researchers get one optional extra screen; skipping never blocks.
       if (role === "doctor" || role === "researcher") {
         setBusy(false);
@@ -249,6 +253,13 @@ function WelcomeForm({ user, next }: { user: SessionUser; next?: string }) {
             <Link href="/privacy" className="font-medium text-foreground underline underline-offset-2">
               privacy notice
             </Link>
+            <span aria-hidden className="hidden sm:inline"> · </span>
+            <span className="block sm:inline">
+              New here?{" "}
+              <Link href="/guide" className="font-medium text-foreground underline underline-offset-2" data-testid="welcome-guide">
+                See what Amber can do
+              </Link>
+            </span>
           </p>
           <Button type="submit" size="lg" disabled={busy} className="px-4">
             {busy ? <Loader2 className="animate-spin" aria-hidden /> : null}

@@ -1,6 +1,6 @@
 "use client";
 
-import { Database, LogOut, ShieldCheck, UserRound } from "lucide-react";
+import { BookOpen, Database, LogOut, ShieldCheck, UserRound } from "lucide-react";
 import Link from "next/link";
 
 import { ROLE_LABELS } from "@/components/providers/lens-provider";
@@ -59,6 +59,9 @@ export function UserMenu() {
         <DropdownMenuSeparator />
         <DropdownMenuItem render={<Link href="/profile" />}>
           <UserRound aria-hidden /> Profile
+        </DropdownMenuItem>
+        <DropdownMenuItem render={<Link href="/guide" />} data-testid="user-menu-guide">
+          <BookOpen aria-hidden /> Getting started
         </DropdownMenuItem>
         <DropdownMenuItem render={<Link href="/privacy" />}>
           <ShieldCheck aria-hidden /> Privacy and data

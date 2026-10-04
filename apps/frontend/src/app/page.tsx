@@ -1,4 +1,5 @@
 import Image from "next/image";
+import Link from "next/link";
 
 import { ConnectSection } from "@/components/landing/connect-section";
 import { DemoJourney } from "@/components/landing/demo-journey";
@@ -37,6 +38,12 @@ export default function Home() {
       <GraphSection />
       <PrepSection />
       <ConnectSection />
+      <p className="px-4 pb-12 text-center text-sm text-muted-foreground">
+        New here?{" "}
+        <Link href="/guide" className="font-medium text-foreground underline underline-offset-4 hover:text-primary" data-testid="landing-guide">
+          See everything Amber does
+        </Link>
+      </p>
       <DemoJourney />
     </div>
   );

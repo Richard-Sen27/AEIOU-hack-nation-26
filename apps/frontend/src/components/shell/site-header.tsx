@@ -1,6 +1,6 @@
 "use client";
 
-import { Bell, ChevronDown, Menu, MessageSquare, Search } from "lucide-react";
+import { Bell, BookOpen, ChevronDown, Menu, MessageSquare, Search } from "lucide-react";
 import Image from "next/image";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
@@ -181,6 +181,16 @@ export function SiteHeader() {
                     </li>
                   ))}
                 </ul>
+                <Link
+                  href="/guide"
+                  onClick={() => setMobileOpen(false)}
+                  aria-current={isActive(pathname, "/guide") ? "page" : undefined}
+                  className="mt-1 flex items-center gap-2 rounded-md px-3 py-2.5 text-sm text-muted-foreground hover:bg-muted hover:text-foreground aria-[current=page]:bg-accent aria-[current=page]:text-accent-foreground"
+                  data-testid="menu-guide"
+                >
+                  <BookOpen className="size-4" aria-hidden />
+                  Getting started
+                </Link>
               </nav>
               {unread.enabled && (
                 <>

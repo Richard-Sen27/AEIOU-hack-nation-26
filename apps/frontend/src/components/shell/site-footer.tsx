@@ -23,6 +23,11 @@ export function SiteFooter() {
         <nav aria-label="Footer">
           <ul className="flex flex-wrap items-center gap-x-5 gap-y-2">
             <li>
+              <Link href="/guide" className="hover:text-foreground hover:underline underline-offset-2">
+                Guide
+              </Link>
+            </li>
+            <li>
               <Link href="/privacy" className="hover:text-foreground hover:underline underline-offset-2">
                 Privacy
               </Link>
