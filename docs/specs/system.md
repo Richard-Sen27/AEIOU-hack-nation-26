@@ -106,7 +106,7 @@ Every node is visible to every user, and you can follow any connection from anyw
 - **Researchers** start with mechanism clusters, with variants, pathways, papers and funding highlighted, explained technically with IDs shown.
 - **Guests** start with a guided tour in very simple language. They can explore everything but have no agent features (see Sign-in).
 
-In the Atlas, patients and researchers start framed on the Diseases tree, doctors on the Symptoms tree, guests on the whole map.
+In the Atlas, patients and researchers start framed on the Diseases tree, doctors on the Symptoms tree, guests on the whole map. The role comes from the user's settings; a role change there applies on the next opening of the Atlas.
 
 ### Atlas view
 
@@ -372,6 +372,8 @@ Guests never trigger an LLM call, so there is no team key for guests; the team's
 ### Role lenses
 
 The role travels with every request and selects a lens: starting view, label style, explanation template and reading-level target. A lens never hides a node, edge or source.
+
+The lens is the role in the user's settings (picked at first sign-in, changed on the profile page), never a separate choice; there is no "view as" switcher. Guests always get the guest lens.
 
 ## Backend services
 
