@@ -126,6 +126,14 @@ def _id_candidates(raw: str) -> list[str]:
     return list(dict.fromkeys(out))
 
 
+_ID_QUERY = re.compile(r"^[A-Z][A-Z0-9.-]*[:_]\s*[A-Z0-9][A-Z0-9._-]*$")
+
+
+def _is_id_query(q: str) -> bool:
+    """A prefixed identifier ("MONDO:0007606", "HP_0001263", "ORPHA:337", "PMID:2317429")."""
+    return bool(_ID_QUERY.match(q.strip().upper()))
+
+
 def _exact_hits(store: GraphStore, q: str) -> list[_Hit]:
     hits: list[_Hit] = []
     raw = q.strip().upper()
@@ -298,9 +306,14 @@ async def search(
     types = list(types) if types else None
 
     merged: dict[str, _Hit] = {}
-    lexical = _exact_hits(store, query) + _phrase_hits(store, query)
-    lexical += await _trigram_hits(db, query, None if expert else types)
-    vector = await _vector_hits(db, query, None if expert else types)
+    exact = _exact_hits(store, query)
+    if _is_id_query(query):
+        # An identifier is looked up, not matched: no trigram or vector look-alikes.
+        lexical, vector = exact, []
+    else:
+        lexical = exact + _phrase_hits(store, query)
+        lexical += await _trigram_hits(db, query, None if expert else types)
+        vector = await _vector_hits(db, query, None if expert else types)
     for hit in lexical + vector:
         merged[hit.node_id] = _better(merged.get(hit.node_id), hit)
 

@@ -28,6 +28,14 @@ async def test_exact_id_first(client, q):
     assert first["id"] == "MONDO:0100135" and first["match_kind"] == "exact"
 
 
+@pytest.mark.parametrize("q", ["MONDO:0100135", "HP:0001250", "MONDO:0000000"])
+async def test_id_query_returns_only_id_matches(client, q):
+    """No trigram or vector look-alikes after (or instead of) the exact hit."""
+    results = (await _search(client, q))["results"]
+    assert [r["id"] for r in results] == ([q] if q != "MONDO:0000000" else [])
+    assert all(r["match_kind"] == "exact" for r in results)
+
+
 @pytest.mark.parametrize("q", ["HP:0001250", "HGNC:11444", "NCT99000001"])
 async def test_other_exact_ids(client, q):
     assert (await _search(client, q))["results"][0]["id"] == q
