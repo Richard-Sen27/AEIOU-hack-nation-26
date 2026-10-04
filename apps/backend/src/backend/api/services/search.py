@@ -5,6 +5,7 @@ Queries may contain health terms: they are never logged and never echoed in erro
 
 import asyncio
 import logging
+import re
 import threading
 from collections.abc import Sequence
 from dataclasses import dataclass
@@ -113,10 +114,22 @@ def _store_hit(
     )
 
 
+_CURIE = re.compile(r"^([A-Z]+)[:_ ]+0*(\d+)$")
+PADDED_PREFIXES = {"MONDO": 7, "HP": 7}  # "MONDO:7606" -> "MONDO:0007606"
+
+
+def _id_candidates(raw: str) -> list[str]:
+    out = [raw, raw.replace("_", ":", 1)]
+    if m := _CURIE.match(raw):
+        prefix, number = m.groups()
+        out.append(f"{prefix}:{number.zfill(PADDED_PREFIXES.get(prefix, 0))}")
+    return list(dict.fromkeys(out))
+
+
 def _exact_hits(store: GraphStore, q: str) -> list[_Hit]:
     hits: list[_Hit] = []
     raw = q.strip().upper()
-    for candidate in (raw, raw.replace("_", ":", 1)):
+    for candidate in _id_candidates(raw):
         if (nid := store.id_index.get(candidate)) and (
             hit := _store_hit(store, nid, EXACT_ID_SCORE, MatchKind.exact, None)
         ):

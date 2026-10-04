@@ -88,6 +88,8 @@ PATH_FAMILIES: dict[PathFamily, frozenset[EdgeFamily]] = {
     PathFamily.all: frozenset(EdgeFamily),
 }
 
+ID_ATTRS = ("orpha_ids", "omim_ids")  # disease cross-references, searchable like synonyms
+
 CONTRIB_NODE_PREFIX = "CONTRIB:"
 CONTRIB_EDGE_PREFIX = "c_"
 PATIENT_TIER_WEIGHT = TIER_WEIGHTS[EvidenceTier.patient_reported]
@@ -419,6 +421,10 @@ def _build_indexes(store: GraphStore) -> None:
         if isinstance(symbol, str) and symbol != node.label:
             names.append((symbol, None))
         names += [(s, s) for s in store.synonyms.get(node.id, ())]
+        for key in ID_ATTRS:  # cross-reference ids ("ORPHA:337"), also when not a synonym row
+            refs = node.attrs.get(key)
+            if isinstance(refs, list):
+                names += [(r, r) for r in refs if isinstance(r, str)]
         seen: set[str] = set()
         for name, synonym in names:
             key = normalize_name(name)
