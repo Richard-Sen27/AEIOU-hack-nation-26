@@ -34,7 +34,7 @@ from backend.schemas.atlas import (
 from backend.schemas.enums import NodeType, Relation
 from backend.schemas.graph import Node
 
-LAYOUT_VERSION = 2
+LAYOUT_VERSION = 3
 ROOT_ID = "T:root"
 MAX_LEAVES = 30
 
@@ -99,6 +99,7 @@ class _Draft:
     children: list["_Draft"] = field(default_factory=list)
     ordered: bool = False  # children keep their given order (ranges, years, chromosomes)
     count: int = 0  # entities in subtree, filled by _count
+    need: float | None = None  # layout: estimated area of the subtree, see _need
 
 
 def _sort_key(node: Node) -> tuple[str, str]:
@@ -307,7 +308,7 @@ _CLINICAL = re.compile(
 )
 _ACADEMIC = re.compile(
     r"universit|univ\.|college|school|faculty|institut|istituto|instituto|academ|"
-    r"research|recherche|laborator|\binserm\b|\bcnrs\b|\bnih\b|national institutes|"
+    r"research|recherche|laborator|\blabs?\b|\binserm\b|\bcnrs\b|\bnih\b|national institutes|"
     r"centre for|center for|centro de|consortium|max-planck|riken|broad",
     re.IGNORECASE,
 )
@@ -366,6 +367,7 @@ _COUNTRY_ALIASES = {
     "türkiye": "Turkey",
     "dianalund": "Denmark",
     "bron": "France",
+    "sakyo-ku": "Japan",
 }
 
 # US states (names and two-letter codes) that the source stored as the "country".
@@ -1121,7 +1123,8 @@ R_CATEGORY = 260.0  # radius of the category (trunk) nodes
 BRANCH_LENGTHS = (0.0, 0.0, 300.0, 210.0, 160.0, 130.0)  # base branch length by depth
 FAN_R0 = 3.0 * SPACING  # distance from a node to its first row of leaves
 FAN_ROW = SPACING  # distance between rows of leaves
-GAP = math.radians(7)  # empty wedge between two sectors
+GAP = math.radians(4)  # empty wedge between two sectors
+INNER_MARGIN = math.radians(3)  # branches are shared out over the sector minus this per side
 MIN_SECTOR = math.radians(16)
 SECTOR_EXPONENT = 0.95
 WEDGE_EXPONENT = 0.85
@@ -1135,10 +1138,20 @@ def _h(key: str, salt: str = "") -> float:
     return int(hashlib.sha1(f"{salt}:{key}".encode()).hexdigest()[:8], 16) / 0x100000000
 
 
+def _need(d: _Draft) -> float:
+    """Estimated area a subtree takes: its node, its leaf fan's disc, and its branches."""
+    if d.need is None:
+        n = sum(1 for c in d.children if not c.children)
+        fan = _fan_disc(n)
+        own = math.pi * (fan.r if fan else SPACING) ** 2
+        d.need = own + sum(_need(c) for c in d.children if c.children)
+    return d.need
+
+
 def _sectors(drafts: list[_Draft]) -> list[tuple[float, float]]:
     """(start, end) per category, clockwise from 12 o'clock (start > end)."""
     total = 2 * math.pi - GAP * len(drafts)
-    weights = [max(d.count, 1) ** SECTOR_EXPONENT for d in drafts]
+    weights = [max(_need(d), 1.0) ** SECTOR_EXPONENT for d in drafts]
     widths = [0.0] * len(drafts)
     fixed: set[int] = set()
     while True:  # give small categories the minimum, share the rest by weight
@@ -1328,13 +1341,16 @@ class _Grower:
         """Depth-first, but a node's branch children are all placed (next to it) before any
         of their own subtrees, so siblings stay together and subtrees grow behind them."""
         r = self.place(root, self.lo, self.hi, 0.0, 1)
-        stack = [(root, self.lo, self.hi, r, 1)]
+        lo, hi = self.lo + INNER_MARGIN, self.hi - INNER_MARGIN
+        if lo >= hi:
+            lo = hi = (self.lo + self.hi) / 2
+        stack = [(root, lo, hi, r, 1)]
         while stack:
             d, lo, hi, r, depth = stack.pop()
             branches = _arrange([c for c in d.children if c.children], d.ordered)
             if not branches:
                 continue
-            weights = [c.count**WEDGE_EXPONENT for c in branches]
+            weights = [_need(c) ** WEDGE_EXPONENT for c in branches]
             total = sum(weights)
             wedges, cursor = [], hi  # clockwise: first child at the high-angle side
             for w in weights:
@@ -1404,24 +1420,31 @@ def _pull_forks(drafts: list[_Draft], pos: dict[str, _Placed]) -> None:
         p, me = pos[parent.id], pos[node.id]
         r_parent, r_me = math.hypot(p.x, p.y), math.hypot(me.x, me.y)
         kids = [pos[c.id] for c in branches]
-        r_kid = min(math.hypot(k.x, k.y) for k in kids)
+        radii = sorted(math.hypot(k.x, k.y) for k in kids)
+        r_kid = radii[len(radii) // 2]  # median child: the limb runs out into its branches
         vx = sum(k.x * c.count for k, c in zip(kids, branches, strict=True)) + me.x * len(group)
         vy = sum(k.y * c.count for k, c in zip(kids, branches, strict=True)) + me.y * len(group)
-        theta = math.atan2(vy, vx)
-        f = 0.45 + 0.25 * _h(node.id, "f")
-        for _ in range(6):
+        theta0 = math.atan2(vy, vx)
+        f = 0.5 + 0.25 * _h(node.id, "f")
+        done = False
+        for _ in range(8):
             r = r_parent + f * (r_kid - r_parent)
             if r <= r_me + SPACING:
                 break
-            dx, dy = r * math.cos(theta) - me.x, r * math.sin(theta) - me.y
-            if all(free(pos[i].x + dx, pos[i].y + dy, moving) for i in group):
-                for i in group:
-                    old = pos[i]
-                    grid[key(old)].discard(i)
-                    pos[i] = _Placed(old.x + dx, old.y + dy)
-                    grid[key(pos[i])].add(i)
+            for da in (0.0, 0.5, -0.5, 1.0, -1.0):
+                theta = theta0 + da * SPACING * 2 / r
+                dx, dy = r * math.cos(theta) - me.x, r * math.sin(theta) - me.y
+                if all(free(pos[i].x + dx, pos[i].y + dy, moving) for i in group):
+                    for i in group:
+                        old = pos[i]
+                        grid[key(old)].discard(i)
+                        pos[i] = _Placed(old.x + dx, old.y + dy)
+                        grid[key(pos[i])].add(i)
+                    done = True
+                    break
+            if done:
                 break
-            f *= 0.8
+            f *= 0.85
 
 
 # --- assembly -------------------------------------------------------------------------------
@@ -1476,7 +1499,9 @@ def build_tree(store: graph.GraphStore) -> AtlasTree:
                 entity_count=d.count,
                 child_count=len(d.children),
                 cluster_id=d.cluster_id,
-                centrality=entity.centrality if entity else None,
+                centrality=round(entity.centrality, 4)
+                if entity and entity.centrality is not None
+                else None,
                 contributed=bool(entity and entity.id.startswith(graph.CONTRIB_NODE_PREFIX)),
             )
         )
