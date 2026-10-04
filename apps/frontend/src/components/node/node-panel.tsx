@@ -250,7 +250,7 @@ export function NodePanel({
           </p>
           <ul className="flex flex-wrap gap-1.5">
             {members.map((n) => (
-              <li key={n.id}>
+              <li key={n.id} className="max-w-full min-w-0">
                 <NodeChip id={n.id} type={n.type} label={n.label} size="sm" />
               </li>
             ))}
