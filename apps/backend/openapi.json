@@ -1307,7 +1307,7 @@
           "explain"
         ],
         "summary": "Explain",
-        "description": "Role-specific explanation with citation IDs. Cached: anyone; new: signed in.",
+        "description": "Role-specific explanation with citation IDs. Cached: anyone; new: signed in.\n\nWith `subject_node_id` the edges are that node's connections (the Atlas summary), not an\nordered path; it has its own cache key.",
         "operationId": "explainPath",
         "requestBody": {
           "content": {
@@ -3090,6 +3090,18 @@
           },
           "status": {
             "$ref": "#/components/schemas/EdgeStatus"
+          },
+          "explanation": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Explanation",
+            "description": "Why an inferred link exists (one line, a hypothesis); null if absent."
           }
         },
         "type": "object",
@@ -4936,6 +4948,18 @@
             "title": "Flagged",
             "description": "True when the edge has open user flags.",
             "default": false
+          },
+          "explanation": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Explanation",
+            "description": "One line on why an inferred (computed) link exists, from features.explanation. A hypothesis, never an established fact; null when absent."
           }
         },
         "type": "object",
@@ -5218,7 +5242,8 @@
           "review",
           "preprint",
           "llm_inferred",
-          "patient_reported"
+          "patient_reported",
+          "computed"
         ],
         "title": "EvidenceTier"
       },
@@ -7425,6 +7450,10 @@
           "shared_pathway",
           "similar_symptoms",
           "shared_researcher",
+          "shared_gene",
+          "near_on_chromosome",
+          "candidate_phenotype",
+          "suggested_by_neighbour",
           "asserts",
           "authored",
           "pi_of",
@@ -7823,6 +7852,17 @@
               }
             ],
             "title": "Via Label"
+          },
+          "explanation": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Explanation"
           }
         },
         "type": "object",

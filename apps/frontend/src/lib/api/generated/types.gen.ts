@@ -252,6 +252,12 @@ export type AtlasEdge = {
     confidence: number;
     origin: Origin;
     status: EdgeStatus;
+    /**
+     * Explanation
+     *
+     * Why an inferred link exists (one line, a hypothesis); null if absent.
+     */
+    explanation?: string | null;
 };
 
 /**
@@ -1395,6 +1401,12 @@ export type Edge = {
      * True when the edge has open user flags.
      */
     flagged?: boolean;
+    /**
+     * Explanation
+     *
+     * One line on why an inferred (computed) link exists, from features.explanation. A hypothesis, never an established fact; null when absent.
+     */
+    explanation?: string | null;
 };
 
 /**
@@ -1563,7 +1575,7 @@ export type Evidence = {
 /**
  * EvidenceTier
  */
-export type EvidenceTier = 'curated_db' | 'peer_reviewed' | 'review' | 'preprint' | 'llm_inferred' | 'patient_reported';
+export type EvidenceTier = 'curated_db' | 'peer_reviewed' | 'review' | 'preprint' | 'llm_inferred' | 'patient_reported' | 'computed';
 
 /**
  * ExplainDeltaEvent
@@ -2907,7 +2919,7 @@ export type RankedCluster = {
 /**
  * Relation
  */
-export type Relation = 'caused_by_variant_in' | 'acts_via' | 'participates_in' | 'has_phenotype' | 'same_gene_same_mechanism' | 'same_gene_different_mechanism' | 'shared_pathway' | 'similar_symptoms' | 'shared_researcher' | 'asserts' | 'authored' | 'pi_of' | 'funds_research_on' | 'serves' | 'runs' | 'studies' | 'investigator_of' | 'affiliated_with' | 'variant_of' | 'observed_in' | 'member_of' | 'about';
+export type Relation = 'caused_by_variant_in' | 'acts_via' | 'participates_in' | 'has_phenotype' | 'same_gene_same_mechanism' | 'same_gene_different_mechanism' | 'shared_pathway' | 'similar_symptoms' | 'shared_researcher' | 'shared_gene' | 'near_on_chromosome' | 'candidate_phenotype' | 'suggested_by_neighbour' | 'asserts' | 'authored' | 'pi_of' | 'funds_research_on' | 'serves' | 'runs' | 'studies' | 'investigator_of' | 'affiliated_with' | 'variant_of' | 'observed_in' | 'member_of' | 'about';
 
 /**
  * RelationCount
@@ -3158,6 +3170,10 @@ export type SummaryItem = {
      * Via Label
      */
     via_label: string | null;
+    /**
+     * Explanation
+     */
+    explanation?: string | null;
 };
 
 /**
