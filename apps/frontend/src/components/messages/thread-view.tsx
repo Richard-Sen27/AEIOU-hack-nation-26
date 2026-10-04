@@ -220,7 +220,7 @@ export function ThreadView({ id }: { id: string }) {
                     <span className="sr-only">{m.mine ? "You: " : `${name}: `}</span>
                     {m.body ?? <span className="text-muted-foreground italic">This message can&apos;t be shown.</span>}
                   </p>
-                  <p className={cn("mt-0.5 text-[11px] text-muted-foreground tabular", m.mine && "text-right")}>{formatWhen(m.created_at)}</p>
+                  <p className={cn("mt-0.5 text-[11px] tabular", m.mine ? "text-right text-secondary-foreground/75" : "text-muted-foreground")}>{formatWhen(m.created_at)}</p>
                 </div>
                 <Button
                   variant="ghost"
