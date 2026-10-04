@@ -24,7 +24,7 @@ import numpy as np
 import polars as pl
 from pydantic import BaseModel
 
-from pipeline import bio, hpo_sim
+from pipeline import bio, hpo_sim, taxonomy
 from pipeline.build import (
     FINAL,
     STAGE4,
@@ -971,13 +971,19 @@ async def run() -> dict[str, Any]:
         .replace_strict(emb, default=None, return_dtype=pl.List(pl.Float64))
         .alias("embedding"),
     )
-    # Degree goes into attrs so the API can penalize hubs in path search.
+    # Degree goes into attrs so the API can penalize hubs in path search; phenotypes also get
+    # their HPO lineage (organ system .. primary parent) for the Atlas symptom tree.
+    lineage = taxonomy.hpo_lineages(n.filter(pl.col("type") == "phenotype")["id"].to_list())
+
+    def _attrs(s: dict) -> str:
+        a = {**json.loads(s["attrs"]), "degree": s["degree"]}
+        if s["id"] in lineage:
+            a["hpo_lineage"] = lineage[s["id"]]
+        return json.dumps(a, sort_keys=True)
+
     n = n.with_columns(
-        pl.struct("attrs", "degree")
-        .map_elements(
-            lambda s: json.dumps({**json.loads(s["attrs"]), "degree": s["degree"]}, sort_keys=True),
-            return_dtype=pl.String,
-        )
+        pl.struct("id", "attrs", "degree")
+        .map_elements(_attrs, return_dtype=pl.String)
         .alias("attrs")
     ).drop("degree")
     tables["nodes"] = n
