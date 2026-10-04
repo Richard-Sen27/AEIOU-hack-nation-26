@@ -1,0 +1,75 @@
+# Homework
+
+Work deliberately left for later. Add an item when you leave something for later; check the area's section before starting work there; remove an item when it is done. One line per item: where, what, and, when known, why it was left and what the fix would be.
+
+## Atlas view
+
+- **Category labels on phones** (`apps/backend/src/backend/api/services/atlas_tree.py`, `LABEL_CHAR_WIDTH = 0.006`): at 390 px the labels are 4.6–7.9 px, because the boxes the backend reserves for them scale with the map. Fix: let labels outgrow their box on phones, or raise `LABEL_CHAR_WIDTH` to about 0.0105 (a layout change).
+- **Label under the search bar:** at 1024 px in the doctor lens, the "Clinical features" label sits partly under the map search bar.
+- **Group names at 390 px:** some are drawn under the logo or cut off at the canvas edge.
+- **Portrait phones:** the landscape-shaped map leaves empty space above and below.
+- **Busy trunks:** Genes is the busiest, with long chromosome branches and some crossing lines; Literature has long spokes.
+- **Selecting the busiest node** costs one frame of 100–150 ms in dev mode, mostly the panel mounting.
+- **"Other organisations"** still holds 29 institutions after the name keyword rule (`institution_kind` in `atlas_tree.py`).
+- **`GET /atlas.json`** (`api/routes/graph.py`, `graph.atlas_payload`) is no longer used by the frontend and can be removed, together with its mock in `apps/frontend/e2e/graph/fixtures.ts`.
+
+## Node, path and panels
+
+- **Nested edge features** (`apps/frontend/src/components/node/edge-panel.tsx`, `FeatureValue`): objects such as `basis` and `mechanisms` fall through to `String(value)` and print "[object Object]".
+- **Path flow labels** (`components/path/path-flow.tsx`): the compact edge labels do not show a computed link's explanation; the steps list and the evidence sheet do.
+- **"Write a summary" template** (`api/services/explanation/templates.py`): the template text does not quote a computed link's explanation.
+- **Trailing periods** (`relation_sentence` in `templates.py`): paper titles that end in a period produce "…syndrome. is about". Fix: strip a trailing period from labels before formatting.
+- **Sign-in from `/path?from=…&to=…`** drops the pair: `signIn` in `components/providers/session-provider.tsx` keeps only the path, because query strings could carry user input.
+- **Profile variants** (`components/account/profile-editor.tsx`): a variant whose gene is not in the gene list shows its raw HGNC id in the gene select.
+
+## Chat (Dr. Wu)
+
+- **Speed:** `extract_entities` could also resolve its own mentions, removing one main-model round per turn, or the extraction could run concurrently with the first round.
+- **Post-check outside the deadline** (`api/services/chat/agent.py`): `check_reply` runs after the 45 s `TURN_DEADLINE_S` and can make up to two more model calls, each bounded only by the 90 s HTTP timeout (`llm/client.py`).
+- **Deadline keeps nothing:** when the deadline fires there is no partial answer.
+- **Stale comment** (`apps/frontend/src/components/chat/use-chat.ts`, line 26): still says the server caps a turn at 30 s.
+- **No log handlers:** the backend configures none, so INFO lines from `backend.*` (for example "chat turn failed") never reach the server log; only the chat timing logger has its own handler.
+- **Ids in chat links:** links from a chat answer to a node page (`/node/<id>`, `components/chat/cards.tsx`, `mini-graph.tsx`) and to `/path?from=…&to=…` (`assistant-turn.tsx`) still carry an id in the URL; the Atlas links were moved to an in-memory handoff. A decision on these is open.
+- **Real model untested:** answer quality, document extraction, the gap-search agent, written explanations and summaries were covered only by the mock.
+
+## Data and pipeline
+
+- **"UCB Cares"** (`DOC:2b11f0e39516`), a sponsor contact, is stored as a doctor and ranks first among Dravet syndrome's doctors.
+- **Paper ranking:** every paper `about` edge has confidence 0.70, so paper lists cannot be ranked; several papers are titled just "[Dravet syndrome]."
+- **Dravet syndrome** (`MONDO:0100135`) has no ORPHA or OMIM id: Orphanet maps ORPHA:33069 to `MONDO:0011794`, which is not in scope.
+- **Multi-gene copy-number variants:** the cached ClinVar file holds single-gene rows only, so they are missing and the copy-number boost for `near_on_chromosome` fires for 2 pairs only. Fix: a coordinate-based re-filter of ClinVar.
+- **`shared_gene` density:** links are dense per gene (SCN1A links 64 disease pairs); a per-disease cap may be worth adding.
+- **MT-TL2 coordinates:** MANE has no mitochondrial genes (`sources/mane.py`), so MT-TL2 has none.
+- **Onset** is recorded on only 48 `has_phenotype` edges.
+- **Scope selection** (`scope.py` via `hpo_sim.ic`, `IC_KIND = "omim"`) still uses pyhpo's OMIM-only information content, not the corpus-wide one.
+- **Unused constant:** `PHENOTYPES_PER_DISEASE = 40` in `bio.py`; the real cap is `phenotypes_per_disease` in `seeds.yaml`.
+- **Model steps never run:** abstract extraction, cluster labels and model-written explanations need `make pipeline-login` and a run with `PIPELINE_LLM_MAX_CALLS`.
+- **Docker run:** a full pipeline run inside Docker is unverified.
+- **Stale graph after a load:** the API keeps serving the old graph until it is restarted. Fix: a reload hook.
+
+## Privacy and compliance
+
+- **Missing documents:** `docs/incident.md`, `docs/dpia.md`, `docs/ropa.md`.
+- **`/privacy` placeholders** (`apps/frontend/src/app/privacy/page.tsx`, `ToBeCompleted`): controller name and address, `NEXT_PUBLIC_PRIVACY_EMAIL`, hosting provider and region, supervisory authority.
+- **Privacy notices** are English only.
+- **Redaction** misses a bare first name in unlabelled prose (worse in German).
+- **Test addresses** (`apps/backend/tests/platform/test_redaction.py`): two invented addresses at real mail domains (gmail.com, outlook.com); switch to example domains.
+- **Graph backup** `apps/pipeline/data/backups/atlas-graph-2026-10-04.9.dump` falls under the 30-day backup rule in [`retention.md`](retention.md) and must be deleted by 2026-11-03.
+- **Second read** for texts shortened next to compliance wording: the contribute-consent note on suggested links, the age line, the export text, the delete text.
+
+## Documents
+
+- **OCR** is basic (clean scans, English); HEIC decoding is untested.
+- **Drop zone** has empty space because the panel next to it sets its height.
+
+## Landing page
+
+- **Sign-in dialog** opened from the landing input (`components/landing/hero-input.tsx`) starts with a sentence that repeats the landing copy.
+- **Hero input** has empty space under its placeholder on desktop (its `min-h`).
+
+## Tests and tooling
+
+- **Flaky spec:** `apps/frontend/e2e/account/documents.spec.ts` "pending uploads from the landing page are picked up" fails intermittently.
+- **Dev-only error** "Router action dispatched before initialization" has made specs fail and pass on rerun.
+- **GPU:** the Atlas needs a real GPU; software rendering is too slow for e2e.
+- **Auto-reload** (`make backend`, `--reload`): the dev API restarts on every saved backend file and cuts open chat streams.
