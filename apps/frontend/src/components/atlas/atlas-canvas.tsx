@@ -97,7 +97,10 @@ type EdgeAttrs = {
 type Emphasis = {
   active: boolean;
   keep: Set<string>;
+  /** Labelled first (in this order) where there is room. */
   labelled: Set<string>;
+  /** Labelled even when crowded: the selection's tree ancestors. */
+  must: Set<string>;
   treeEdges: Set<string>;
   real: Set<string>;
   chain: Set<string>;
@@ -108,6 +111,7 @@ const EMPTY: Emphasis = {
   active: false,
   keep: new Set(),
   labelled: new Set(),
+  must: new Set(),
   treeEdges: new Set(),
   real: new Set(),
   chain: new Set(),
@@ -129,6 +133,7 @@ function computeEmphasis(p: Props): Emphasis {
     active: false,
     keep: new Set(),
     labelled: new Set(),
+    must: new Set(),
     treeEdges: new Set(),
     real: new Set(),
     chain: new Set(),
@@ -141,7 +146,10 @@ function computeEmphasis(p: Props): Emphasis {
     e.labelled.add(sel.id);
     e.rings.add(sel.id);
     treePathEdges(index, sel.id, e.treeEdges, e.keep);
-    for (const a of ancestorsOf(index, sel.id)) e.labelled.add(a.id);
+    for (const a of ancestorsOf(index, sel.id)) {
+      e.labelled.add(a.id);
+      e.must.add(a.id);
+    }
     if (sel.kind === "entity") {
       const near: string[] = [];
       for (const id of index.incident.get(sel.id) ?? []) {
@@ -154,6 +162,8 @@ function computeEmphasis(p: Props): Emphasis {
       }
       if (near.length <= 12) near.forEach((n) => e.labelled.add(n));
     } else {
+      // A group: its direct children are named first.
+      for (const c of index.children.get(sel.id) ?? []) e.labelled.add(c);
       for (const d of descendantIds(index, sel.id)) {
         e.keep.add(d);
         e.treeEdges.add(`tree:${d}`);
@@ -266,9 +276,9 @@ export const AtlasCanvas = forwardRef<AtlasCanvasHandle, Props>(function AtlasCa
     for (const n of index.tree.nodes) {
       let size: number;
       if (n.kind === "root") size = 4;
-      else if (n.kind === "category") size = 9;
-      else if (n.kind === "group") size = 3.5 + 4.5 * Math.sqrt(n.entity_count / (catMax.get(n.category ?? "") ?? 1));
-      else size = 2 + 3 * Math.sqrt((n.centrality ?? 0) / (maxCentrality || 1));
+      else if (n.kind === "category") size = 8;
+      else if (n.kind === "group") size = 2.6 + 4 * Math.sqrt(n.entity_count / (catMax.get(n.category ?? "") ?? 1));
+      else size = 1.3 + 2.7 * Math.sqrt((n.centrality ?? 0) / (maxCentrality || 1));
       graph.addNode(n.id, {
         x: n.x,
         y: n.y,
@@ -355,7 +365,7 @@ export const AtlasCanvas = forwardRef<AtlasCanvasHandle, Props>(function AtlasCa
       const pal = palette(data.category);
       res.color =
         data.kind === "entity" && data.entityType ? (t.node[data.entityType] ?? pal.solid) : data.kind === "group" ? pal.group : pal.solid;
-      // Category names are HTML; group names are drawn on the overlay with collision avoidance.
+      // Names are drawn on the overlay (categories as HTML); Sigma keeps a label only for the hover box.
       if (data.kind === "category" || (data.kind === "group" && node !== hovered.current)) res.label = null;
       const onHover = hoverPath.current.has(node);
       if (em.active && !em.keep.has(node) && !onHover) {
@@ -366,7 +376,6 @@ export const AtlasCanvas = forwardRef<AtlasCanvasHandle, Props>(function AtlasCa
         return res;
       }
       res.zIndex = em.active ? 2 : data.kind === "entity" ? 1 : 2;
-      if ((em.labelled.has(node) || node === hovered.current) && data.kind === "entity") res.forceLabel = true;
       if (node === propsRef.current.selectedId || node === hovered.current) res.highlighted = true;
       return res;
     }
@@ -396,33 +405,15 @@ export const AtlasCanvas = forwardRef<AtlasCanvasHandle, Props>(function AtlasCa
         defaultEdgeType: "dash",
         edgeProgramClasses: { dash: EdgeDashProgram as unknown as EdgeProgramType<NodeAttrs, EdgeAttrs> },
         renderEdgeLabels: false,
+        renderLabels: false,
         labelFont: font,
         labelSize: 12,
         labelWeight: "500",
         labelColor: { color: propsRef.current.theme.label },
-        labelRenderedSizeThreshold: 6,
-        labelDensity: 0.5,
-        labelGridCellSize: 120,
         zIndex: true,
         minCameraRatio: 0.008,
         maxCameraRatio: 1.6,
         stagePadding: 16,
-        defaultDrawNodeLabel: (ctx, data, settings) => {
-          if (!data.label) return;
-          const t = propsRef.current.theme;
-          const group = (data as unknown as NodeAttrs).kind === "group";
-          const left = (data as unknown as NodeAttrs).left;
-          ctx.font = `${group ? 600 : settings.labelWeight} ${group ? 11.5 : settings.labelSize}px ${settings.labelFont}`;
-          const w = ctx.measureText(data.label).width;
-          const x = left ? data.x - data.size - 4 - w : data.x + data.size + 4;
-          const y = data.y + settings.labelSize / 3;
-          ctx.lineJoin = "round";
-          ctx.lineWidth = 3;
-          ctx.strokeStyle = withAlpha(t.background, 0.88);
-          ctx.strokeText(data.label, x, y);
-          ctx.fillStyle = group ? withAlpha(t.label, 0.78) : t.label;
-          ctx.fillText(data.label, x, y);
-        },
         defaultDrawNodeHover: (ctx, data, settings) => {
           const t = propsRef.current.theme;
           const size = settings.labelSize;
@@ -563,53 +554,97 @@ export const AtlasCanvas = forwardRef<AtlasCanvasHandle, Props>(function AtlasCa
     });
     sigma.on("clickStage", () => propsRef.current.onSelect(null));
 
-    // Group names: shallow groups first, larger first; a name that would overlap one already
-    // placed is skipped, so labels never pile up. Deeper groups join when zoomed in.
-    const groupOrder = index.tree.nodes
-      .filter((n) => n.kind === "group")
-      .sort((a, b) => a.depth - b.depth || b.entity_count - a.entity_count)
+    // Names of groups and entities, drawn on the overlay with collision avoidance so labels
+    // never pile up: selection-related names first, then groups (shallow and large first),
+    // then entities (larger dots first) once they are big enough on screen. Deeper groups
+    // join when zoomed in. Sigma's own label layer is off; it only draws the hover label.
+    const labelOrder = index.tree.nodes
+      .filter((n) => n.kind === "group" || n.kind === "entity")
+      .sort((a, b) =>
+        a.kind !== b.kind
+          ? a.kind === "group" ? -1 : 1
+          : a.kind === "group"
+            ? a.depth - b.depth || b.entity_count - a.entity_count
+            : graph.getNodeAttribute(b.id, "size") - graph.getNodeAttribute(a.id, "size"),
+      )
       .map((n) => n.id);
     const widths = new Map<string, number>();
-    const GROUP_FONT_PX = 11;
-    const drawGroupLabels = (ctx: CanvasRenderingContext2D, w: number, h: number, blocked: Array<[number, number, number, number]>) => {
+    const LABEL_FONT_PX = 11.5;
+    const ENTITY_LABEL_MIN_PX = 4.2;
+    const MAX_LABELS = 320;
+    const CELL = 48;
+    const drawLabels = (ctx: CanvasRenderingContext2D, w: number, h: number, blocked: Array<[number, number, number, number]>) => {
       const { theme: t } = propsRef.current;
       const em = emphasis.current;
       const ratio = ratioNow();
       const font = getComputedStyle(document.body).fontFamily || "sans-serif";
-      ctx.font = `600 ${GROUP_FONT_PX}px ${font}`;
       ctx.lineJoin = "round";
       ctx.textBaseline = "middle";
-      const placed: Array<[number, number, number, number]> = [...blocked];
-      const hits = (x0: number, y0: number, x1: number, y1: number) =>
-        placed.some(([a, b, c, d]) => x0 < c && x1 > a && y0 < d && y1 > b);
-      // Selection-related names first, then the rest by priority.
-      const order = em.active ? [...em.labelled, ...groupOrder] : groupOrder;
+      ctx.lineWidth = 3;
+      // Grid hash of placed boxes, for cheap overlap tests.
+      const grid = new Map<number, Array<[number, number, number, number]>>();
+      const cells = (b: [number, number, number, number], fn: (k: number) => boolean | void) => {
+        for (let cx = Math.floor(b[0] / CELL); cx <= Math.floor(b[2] / CELL); cx++)
+          for (let cy = Math.floor(b[1] / CELL); cy <= Math.floor(b[3] / CELL); cy++) if (fn(cx * 4096 + cy)) return true;
+        return false;
+      };
+      const hits = (b: [number, number, number, number]) =>
+        cells(b, (k) => grid.get(k)?.some(([a, c, d, e]) => b[0] < d && b[2] > a && b[1] < e && b[3] > c));
+      const place = (b: [number, number, number, number]) =>
+        void cells(b, (k) => {
+          let list = grid.get(k);
+          if (!list) grid.set(k, (list = []));
+          list.push(b);
+        });
+      blocked.forEach(place);
+      let currentFont = "";
+      // Keep room for Sigma's label box on the selected and the hovered dot.
+      for (const id of [propsRef.current.selectedId, hovered.current]) {
+        const n = id ? index.nodes.get(id) : undefined;
+        const d = id ? sigma.getNodeDisplayData(id) : undefined;
+        if (!id || !n || !d) continue;
+        ctx.font = currentFont = `600 12px ${font}`;
+        const tw = ctx.measureText(n.label).width;
+        const p = sigma.framedGraphToViewport(d);
+        const r = sigma.scaleSize(d.size);
+        const x0 = graph.getNodeAttribute(id, "left") ? p.x - r - 12 - tw : p.x + r + 2;
+        place([x0, p.y - 11, x0 + tw + 12, p.y + 11]);
+      }
+      const order = em.active ? [...em.labelled, ...labelOrder] : labelOrder;
       const seen = new Set<string>();
+      let count = 0;
       for (const id of order) {
+        if (count >= MAX_LABELS) break;
         if (seen.has(id)) continue;
         seen.add(id);
-        if (id === hovered.current) continue;
+        // The hovered and the selected dot get Sigma's label box instead.
+        if (id === hovered.current || id === propsRef.current.selectedId) continue;
         const n = index.nodes.get(id);
-        if (!n || n.kind !== "group") continue;
+        if (!n || (n.kind !== "group" && n.kind !== "entity")) continue;
         const forced = em.labelled.has(id);
         if (em.active && !forced && !em.keep.has(id)) continue;
-        if (!forced && n.depth > 2 && ratio >= DEEP_LABEL_RATIO) continue;
-        const a = graph.getNodeAttributes(id);
+        const group = n.kind === "group";
+        if (!forced && group && n.depth > 2 && ratio >= DEEP_LABEL_RATIO) continue;
         const d = sigma.getNodeDisplayData(id);
-        if (!d) continue;
-        const p = sigma.graphToViewport({ x: a.x, y: a.y });
-        if (p.x < -200 || p.y < -20 || p.x > w + 200 || p.y > h + 20) continue;
+        if (!d || d.hidden) continue;
+        const r = sigma.scaleSize(d.size);
+        if (!forced && !group && r < ENTITY_LABEL_MIN_PX) continue;
+        const p = sigma.framedGraphToViewport(d);
+        if (p.x < -300 || p.y < -20 || p.x > w + 300 || p.y > h + 20) continue;
+        const f = `${group ? 600 : 500} ${LABEL_FONT_PX}px ${font}`;
+        if (f !== currentFont) ctx.font = currentFont = f;
         let tw = widths.get(id);
         if (tw === undefined) widths.set(id, (tw = ctx.measureText(n.label).width));
-        const r = sigma.scaleSize(d.size) + 3;
-        const x0 = a.left ? p.x - r - tw : p.x + r;
+        const left = graph.getNodeAttribute(id, "left");
+        const x0 = left ? p.x - r - 4 - tw : p.x + r + 4;
         const box: [number, number, number, number] = [x0 - 2, p.y - 7, x0 + tw + 2, p.y + 7];
-        if (!forced && hits(...box)) continue;
-        placed.push(box);
-        ctx.lineWidth = 3;
+        if (box[2] < 0 || box[0] > w) continue;
+        if (!em.must.has(id) && hits(box)) continue;
+        place(box);
+        count += 1;
         ctx.strokeStyle = t.background;
         ctx.strokeText(n.label, x0, p.y);
-        ctx.fillStyle = palette(a.category).text;
+        ctx.fillStyle = group ? palette(n.category).text : t.label;
         ctx.fillText(n.label, x0, p.y);
       }
     };
@@ -684,7 +719,7 @@ export const AtlasCanvas = forwardRef<AtlasCanvasHandle, Props>(function AtlasCa
         const r = d.getBoundingClientRect();
         blocked.push([r.left - host.left, r.top - host.top, r.right - host.left, r.bottom - host.top]);
       }
-      drawGroupLabels(ctx, w, h, blocked);
+      drawLabels(ctx, w, h, blocked);
       const { theme: t, found, selectedId } = propsRef.current;
       const foundSet = new Set(found?.nodeIds ?? []);
       for (const id of emphasis.current.rings) {
