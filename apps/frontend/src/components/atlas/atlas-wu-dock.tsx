@@ -23,6 +23,7 @@ import { cn } from "@/lib/utils";
 
 import { OffMapMark } from "./atlas-offmap";
 import type { AtlasSelect, AtlasWuDockProps, WuFound } from "./atlas-props";
+import { resolveRoute, type Route } from "./atlas-wu-path";
 import type { TreeIndex } from "./tree-model";
 
 /*
@@ -69,6 +70,31 @@ function collectFound(reply: PartialReply, index: TreeIndex): WuFound {
   reply.chips.forEach((c) => !c.negated && c.state !== "removed" && add(c.id));
   const edgeIds = (reply.graph_focus?.highlight_path ?? []).filter((id) => index.edges.has(id));
   return { nodeIds, edgeIds, allIds, names: replyNames(reply) };
+}
+
+/** The finds plus a resolved route: its drawable links, its nodes ringed or listed by name. */
+function withRoute(found: WuFound, route: Route, index: TreeIndex): WuFound {
+  const all = [...(found.allIds ?? found.nodeIds)];
+  const nodeIds = [...found.nodeIds];
+  const names = { ...found.names };
+  for (const n of route.nodes) {
+    if (!all.includes(n.id)) all.push(n.id);
+    if (index.nodes.get(n.id)?.kind === "entity" && !nodeIds.includes(n.id)) nodeIds.push(n.id);
+    if (!names[n.id]) names[n.id] = { label: n.label, type: n.type };
+  }
+  return { nodeIds, edgeIds: route.edgeIds, allIds: all, names };
+}
+
+/**
+ * The one node a reply is about, if it resolves to exactly one: the single id in
+ * `graph_focus.node_ids` (else the single find). Null for several finds or a route.
+ */
+function singleFind(reply: PartialReply, found: WuFound): string | null {
+  if (reply.graph_focus?.highlight_path.length) return null;
+  const focus = [...new Set(reply.graph_focus?.node_ids ?? [])].filter((id) => (found.allIds ?? found.nodeIds).includes(id));
+  if (focus.length === 1) return focus[0];
+  if (focus.length === 0 && (found.allIds ?? found.nodeIds).length === 1) return (found.allIds ?? found.nodeIds)[0];
+  return null;
 }
 
 type FoundItem = { id: string; label: string; type: string; onMap: boolean };
@@ -366,14 +392,29 @@ function SignedInDock({
     if (!lastAssistant || !lastAssistant.final || lastAssistant.phase !== "done") return;
     if (reported.current === lastAssistant.reply) return;
     reported.current = lastAssistant.reply;
-    const next: WuFound = isEmergencyReply(lastAssistant)
-      ? { nodeIds: [], edgeIds: [], allIds: [] }
-      : collectFound(lastAssistant.reply, index);
+    const reply = lastAssistant.reply;
+    const emergency = isEmergencyReply(lastAssistant);
+    const next: WuFound = emergency ? { nodeIds: [], edgeIds: [], allIds: [] } : collectFound(reply, index);
     const total = next.allIds?.length ?? next.nodeIds.length;
     setLastCount(total);
     if (total > 0) onFound(next);
     else onClear();
-  }, [lastAssistant, index, onFound, onClear]);
+    const path = emergency ? [] : (reply.graph_focus?.highlight_path ?? []);
+    if (path.length > 0) {
+      // A found connection: draw the whole route (also links outside the tree) and list the
+      // route's nodes that are not on the map by name.
+      void resolveRoute(index, path).then((route) => {
+        if (reported.current !== reply) return;
+        const merged = withRoute(next, route, index);
+        setLastCount(merged.allIds?.length ?? merged.nodeIds.length);
+        onFound(merged);
+      });
+      return;
+    }
+    // One clear find: select it (centred, its panel open); a node off the map shows its summary.
+    const one = singleFind(reply, next);
+    if (one) onSelect(one, { center: true, persist: false });
+  }, [lastAssistant, index, onFound, onClear, onSelect]);
 
   const submit = () => {
     const text = draft.trim();
