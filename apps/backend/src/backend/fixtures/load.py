@@ -29,6 +29,8 @@ GRAPH_TABLES = (
     "clusters",
     "explanations_cache",
     "ingestion_runs",
+    "hpo_terms",  # the fixture has no term table: symptom matching falls back to its nodes
+    "graph_changes",
 )
 
 

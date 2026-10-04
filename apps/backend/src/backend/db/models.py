@@ -164,6 +164,40 @@ class IngestionRun(Base):
     created_at: Mapped[datetime] = _created()
 
 
+class HpoTerm(Base):
+    """One HPO term under HP:0000118 (graph nodes or not): read into memory at startup to
+    resolve symptom mentions and to rank diseases by symptom overlap."""
+
+    __tablename__ = "hpo_terms"
+
+    id: Mapped[str] = mapped_column(Text, primary_key=True)
+    label: Mapped[str] = mapped_column(Text, nullable=False)
+    synonyms: Mapped[list[str]] = mapped_column(
+        ARRAY(Text), nullable=False, server_default=text("'{}'")
+    )
+    parents: Mapped[list[str]] = mapped_column(
+        ARRAY(Text), nullable=False, server_default=text("'{}'")
+    )  # direct is_a parents
+    ic: Mapped[float | None] = mapped_column(Float)  # null: annotates nothing in the corpus
+
+
+class GraphChange(Base):
+    """What a pipeline load added around a disease (for later in-app notifications). Written by
+    the pipeline, read-only for the API; nothing reads it yet."""
+
+    __tablename__ = "graph_changes"
+    __table_args__ = (PrimaryKeyConstraint("data_version", "disease_id", "node_id", "change"),)
+
+    data_version: Mapped[str] = mapped_column(Text)
+    previous_version: Mapped[str | None] = mapped_column(Text)
+    disease_id: Mapped[str] = mapped_column(Text)
+    node_id: Mapped[str] = mapped_column(Text)
+    node_type: Mapped[str] = mapped_column(Text, nullable=False)
+    change: Mapped[str] = mapped_column(Text)
+    edge_id: Mapped[str | None] = mapped_column(Text)
+    created_at: Mapped[datetime] = _created()
+
+
 GRAPH_TABLES = (
     "clusters",
     "nodes",
@@ -172,6 +206,8 @@ GRAPH_TABLES = (
     "evidence",
     "explanations_cache",
     "ingestion_runs",
+    "hpo_terms",
+    "graph_changes",
 )
 
 
