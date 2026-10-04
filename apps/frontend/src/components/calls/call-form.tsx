@@ -540,7 +540,7 @@ function CallFormBody({ initial, review }: { initial: OwnCall | null; review: bo
         </Field>
         <Field id={id("run_by_label")} label="Run by" optional hint="Institution or patient organisation." error={err("run_by_label") ?? err("run_by_node_id")}>
           {d.run_by ? (
-            <div className="flex max-w-full items-center gap-1.5 self-start rounded-lg border bg-background py-0.5 pr-0.5 pl-2 text-sm" data-testid="chip-run-by">
+            <div className="flex w-fit max-w-full items-center gap-1.5 rounded-lg border bg-background py-0.5 pr-0.5 pl-2 text-sm" data-testid="chip-run-by">
               <span className="truncate">{d.run_by.label}</span>
               <Button variant="ghost" size="icon-xs" onClick={() => update({ run_by: null })} aria-label={`Remove ${d.run_by.label}`}>
                 <X aria-hidden />

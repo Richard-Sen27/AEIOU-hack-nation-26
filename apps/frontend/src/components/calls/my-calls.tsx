@@ -144,7 +144,7 @@ function OwnCallItem({
             {call.wording_issues.map((w, i) => (
               <span key={`${w.field}-${w.term}`}>
                 {i > 0 && ", "}
-                {fieldLabel(w.field)} (&ldquo;{w.term}&rdquo;)
+                {`${fieldLabel(w.field)} ("${w.term}")`}
               </span>
             ))}
           </span>
