@@ -38,6 +38,8 @@ const LABELLED_CELL = { x: LABEL_WIDTH + 20, y: 54 };
 const CAPTION_GAP = 26;
 const CAPTION_WIDTH = 190;
 const BLOCK_GAP = 64;
+/** Room under the centre node for its label, before a lone block's caption. */
+const CENTER_LABEL_ROOM = 40;
 
 /** Distance between neighbours on a ring: one label width while labels fit, tighter for big hubs. */
 export function ringArc(count: number) {
@@ -124,9 +126,13 @@ function blocksAround(blocks: Block[], inner: number, positions: Record<string, 
   const radii = blocks.map((b) => Math.hypot(b.w / 2, b.h / 2));
   const maxb = Math.max(...radii);
   if (k === 1) {
-    // One block: below the centre, so the few other neighbours stand out above it.
+    // One block: below the centre, so the few other neighbours stand out above it. A tall
+    // block is shown zoomed out, where the centre's label grows (it keeps a readable size on
+    // screen): keep about a sixth of the block's height free under the centre for it, so the
+    // label does not cover the block's caption.
     const b = blocks[0];
-    return [placeBlock(b, 0, inner + BLOCK_GAP / 2 + b.h / 2, positions)];
+    const gap = Math.max(inner + BLOCK_GAP / 2, CENTER_LABEL_ROOM + b.h / 6);
+    return [placeBlock(b, 0, gap + b.h / 2, positions)];
   }
   const R = Math.max(inner + BLOCK_GAP / 2 + maxb, (2 * maxb + BLOCK_GAP) / (2 * Math.sin(Math.PI / k)));
   return blocks.map((b, i) => {
