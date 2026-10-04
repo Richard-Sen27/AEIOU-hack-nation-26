@@ -108,7 +108,9 @@ export function NodeList({
             )}
           </div>
         ) : (
-          <p className="p-6 text-center text-sm text-muted-foreground">No connections of the selected kinds.</p>
+          <p className="p-6 text-center text-sm text-muted-foreground">
+            {edges.length === 0 ? "No connections in this view." : "No connections of the selected kinds."}
+          </p>
         ))}
     </div>
   );

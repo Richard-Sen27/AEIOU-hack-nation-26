@@ -325,7 +325,9 @@ export function NodeView({ nodeId }: { nodeId: string }) {
           </p>
           {hoodData && hoodTotal != null && hoodTotal > hoodData.nodes.length - 1 && (
             <p className="text-xs text-muted-foreground" data-testid="node-truncated">
-              Showing the {(hoodData.nodes.length - 1).toLocaleString("en")} strongest of {hoodTotal.toLocaleString("en")} links
+              {center.type === "cluster"
+                ? `Showing ${(hoodData.nodes.length - 1).toLocaleString("en")} of ${hoodTotal.toLocaleString("en")} members`
+                : `Showing the ${(hoodData.nodes.length - 1).toLocaleString("en")} strongest of ${hoodTotal.toLocaleString("en")} links`}
             </p>
           )}
         </div>
@@ -340,9 +342,12 @@ export function NodeView({ nodeId }: { nodeId: string }) {
           <Button variant="outline" size="sm" onClick={() => setPathOpen(true)} data-testid="find-path">
             <Route data-icon="inline-start" aria-hidden /> Find a path to…
           </Button>
-          <Link href={`/atlas?focus=${encodeURIComponent(center.id)}`} className={buttonVariants({ variant: "outline", size: "sm" })} data-testid="open-in-atlas">
-            <MapIcon data-icon="inline-start" aria-hidden /> Open in Atlas
-          </Link>
+          {/* A cluster without focus diseases is not drawn on the Atlas: no link to a "not on the map" notice. */}
+          {!(center.type === "cluster" && (hoodData?.cluster ?? detailData?.cluster)?.on_map === false) && (
+            <Link href={`/atlas?focus=${encodeURIComponent(center.id)}`} className={buttonVariants({ variant: "outline", size: "sm" })} data-testid="open-in-atlas">
+              <MapIcon data-icon="inline-start" aria-hidden /> Open in Atlas
+            </Link>
+          )}
           <Popover>
             <PopoverTrigger render={<Button variant="outline" size="sm" data-testid="export" />}>
               <Download data-icon="inline-start" aria-hidden /> Export
