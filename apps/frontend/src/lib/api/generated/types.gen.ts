@@ -450,6 +450,22 @@ export type AtlasNode = {
 };
 
 /**
+ * AtlasRef
+ */
+export type AtlasRef = {
+    /**
+     * Id
+     */
+    id: string;
+    /**
+     * Label
+     *
+     * From the current atlas; null if it left the atlas.
+     */
+    label: string | null;
+};
+
+/**
  * AtlasStats
  *
  * Headline counts of the loaded graph, computed once per data version.
@@ -683,6 +699,463 @@ export type BodyUploadDocument = {
 };
 
 /**
+ * Call
+ *
+ * A published call as every signed-in user sees it.
+ */
+export type Call = {
+    /**
+     * Id
+     */
+    id: string;
+    kind: CallKind;
+    /**
+     * Title
+     */
+    title: string;
+    /**
+     * Summary
+     */
+    summary: string;
+    /**
+     * Participation
+     */
+    participation: string;
+    /**
+     * Eligibility Text
+     */
+    eligibility_text: string | null;
+    /**
+     * Diseases
+     */
+    diseases: Array<AtlasRef>;
+    /**
+     * Genes
+     */
+    genes: Array<AtlasRef>;
+    /**
+     * Phenotypes
+     */
+    phenotypes: Array<AtlasRef>;
+    /**
+     * Min Age
+     */
+    min_age: number | null;
+    /**
+     * Max Age
+     */
+    max_age: number | null;
+    /**
+     * Adults Only
+     *
+     * min_age is 18 or more: show 'for adults'.
+     */
+    adults_only: boolean;
+    /**
+     * Children Ok
+     */
+    children_ok: boolean;
+    /**
+     * Countries
+     */
+    countries: Array<string>;
+    /**
+     * Remote
+     */
+    remote: boolean;
+    /**
+     * Run By Label
+     */
+    run_by_label: string | null;
+    run_by_node: AtlasRef | null;
+    /**
+     * Ethics Body
+     */
+    ethics_body: string | null;
+    /**
+     * Ethics Reference
+     */
+    ethics_reference: string | null;
+    /**
+     * Registry Id
+     */
+    registry_id: string | null;
+    /**
+     * Registry Url
+     *
+     * Link to the public registry entry.
+     */
+    registry_url: string | null;
+    /**
+     * External Url
+     */
+    external_url: string | null;
+    /**
+     * Opens At
+     */
+    opens_at: string | null;
+    /**
+     * Closes At
+     */
+    closes_at: string | null;
+    /**
+     * Max Signups
+     */
+    max_signups: number | null;
+    /**
+     * Requested Fields
+     */
+    requested_fields: Array<RequestedField>;
+    /**
+     * The publisher's public card ('run by [name], [institution]'). Always set on published calls in the list; null on the publisher's own view while their card is hidden.
+     */
+    publisher: PublicCard | null;
+    /**
+     * Published At
+     */
+    published_at: string | null;
+    /**
+     * Demo
+     *
+     * Seeded demo data: label it 'Demo, not a real study'.
+     */
+    demo: boolean;
+    /**
+     * Review Badge
+     *
+     * Show on every published call.
+     */
+    review_badge?: string;
+    /**
+     * Notice
+     *
+     * Show on every call.
+     */
+    notice?: string;
+};
+
+/**
+ * CallExport
+ */
+export type CallExport = {
+    /**
+     * Id
+     */
+    id: string;
+    /**
+     * Kind
+     */
+    kind: string;
+    /**
+     * Title
+     */
+    title: string;
+    /**
+     * Summary
+     */
+    summary: string;
+    /**
+     * Participation
+     */
+    participation: string;
+    /**
+     * Eligibility Text
+     */
+    eligibility_text?: string | null;
+    /**
+     * Disease Ids
+     */
+    disease_ids: Array<string>;
+    /**
+     * Gene Ids
+     */
+    gene_ids: Array<string>;
+    /**
+     * Phenotype Ids
+     */
+    phenotype_ids: Array<string>;
+    /**
+     * Min Age
+     */
+    min_age?: number | null;
+    /**
+     * Max Age
+     */
+    max_age?: number | null;
+    /**
+     * Children Ok
+     */
+    children_ok: boolean;
+    /**
+     * Countries
+     */
+    countries: Array<string>;
+    /**
+     * Remote
+     */
+    remote: boolean;
+    /**
+     * Run By Label
+     */
+    run_by_label?: string | null;
+    /**
+     * Run By Node Id
+     */
+    run_by_node_id?: string | null;
+    /**
+     * Ethics Body
+     */
+    ethics_body?: string | null;
+    /**
+     * Ethics Reference
+     */
+    ethics_reference?: string | null;
+    /**
+     * Registry Id
+     */
+    registry_id?: string | null;
+    /**
+     * External Url
+     */
+    external_url?: string | null;
+    /**
+     * Opens At
+     */
+    opens_at?: string | null;
+    /**
+     * Closes At
+     */
+    closes_at?: string | null;
+    /**
+     * Max Signups
+     */
+    max_signups?: number | null;
+    /**
+     * Requested Fields
+     */
+    requested_fields: Array<string>;
+    /**
+     * Status
+     */
+    status: string;
+    /**
+     * Review Note
+     */
+    review_note?: string | null;
+    /**
+     * Submitted At
+     */
+    submitted_at?: string | null;
+    /**
+     * Reviewed At
+     */
+    reviewed_at?: string | null;
+    /**
+     * Published At
+     */
+    published_at?: string | null;
+    /**
+     * Closed At
+     */
+    closed_at?: string | null;
+    /**
+     * Demo
+     */
+    demo: boolean;
+    /**
+     * Created At
+     */
+    created_at: string;
+    /**
+     * Updated At
+     */
+    updated_at: string;
+};
+
+/**
+ * CallInput
+ *
+ * A call as the publisher writes it (create or full replace). Atlas IDs must exist in the
+ * current atlas; a study or trial needs its ethics approval reference, a trial its registry ID
+ * (NCT, EU CT / EudraCT or DRKS).
+ */
+export type CallInput = {
+    kind: CallKind;
+    /**
+     * Title
+     */
+    title: string;
+    /**
+     * Summary
+     *
+     * What the research is about and what it wants to find out.
+     */
+    summary: string;
+    /**
+     * Participation
+     *
+     * What taking part involves (time, visits, remote, compensation for costs).
+     */
+    participation: string;
+    /**
+     * Eligibility Text
+     *
+     * Who can take part, in the study team's words.
+     */
+    eligibility_text?: string | null;
+    /**
+     * Disease Ids
+     *
+     * Atlas diseases (MONDO IDs).
+     */
+    disease_ids: Array<string>;
+    /**
+     * Gene Ids
+     *
+     * Atlas genes (HGNC IDs).
+     */
+    gene_ids?: Array<string>;
+    /**
+     * Phenotype Ids
+     *
+     * Atlas symptoms (HP IDs).
+     */
+    phenotype_ids?: Array<string>;
+    /**
+     * Min Age
+     *
+     * Shown as information.
+     */
+    min_age?: number | null;
+    /**
+     * Max Age
+     *
+     * Shown as information.
+     */
+    max_age?: number | null;
+    /**
+     * Children Ok
+     *
+     * Children can take part (with their parents).
+     */
+    children_ok?: boolean;
+    /**
+     * Countries
+     *
+     * ISO 3166-1 alpha-2 codes where it runs; shown as information.
+     */
+    countries?: Array<string>;
+    /**
+     * Remote
+     *
+     * Can be done without visiting a site.
+     */
+    remote?: boolean;
+    /**
+     * Run By Label
+     *
+     * Institution or team that runs it, as text.
+     */
+    run_by_label?: string | null;
+    /**
+     * Run By Node Id
+     *
+     * Atlas institution or patient organisation that runs it.
+     */
+    run_by_node_id?: string | null;
+    /**
+     * Ethics Body
+     *
+     * Ethics committee that approved it.
+     */
+    ethics_body?: string | null;
+    /**
+     * Ethics Reference
+     *
+     * Approval reference. Required for studies and trials.
+     */
+    ethics_reference?: string | null;
+    /**
+     * Registry Id
+     *
+     * NCT, EU CT / EudraCT or DRKS number. Required for trials.
+     */
+    registry_id?: string | null;
+    /**
+     * External Url
+     *
+     * https link to the study's own page or registry entry.
+     */
+    external_url?: string | null;
+    /**
+     * Opens At
+     */
+    opens_at?: string | null;
+    /**
+     * Closes At
+     */
+    closes_at?: string | null;
+    /**
+     * Max Signups
+     */
+    max_signups?: number | null;
+    /**
+     * Requested Fields
+     *
+     * What a sign-up may offer to share (fixed menu; used by sign-ups later).
+     */
+    requested_fields?: Array<RequestedField>;
+};
+
+/**
+ * CallKind
+ */
+export type CallKind = 'survey' | 'study' | 'trial';
+
+/**
+ * CallList
+ */
+export type CallList = {
+    /**
+     * Heading
+     */
+    heading?: string;
+    /**
+     * Items
+     *
+     * Every published call that is not past its closing date and whose publisher still has a visible, verified card; newest first.
+     */
+    items: Array<Call>;
+};
+
+/**
+ * CallReviewExport
+ */
+export type CallReviewExport = {
+    /**
+     * Call Id
+     */
+    call_id: string;
+    /**
+     * Action
+     */
+    action: string;
+    /**
+     * Note
+     */
+    note: string | null;
+    /**
+     * Created At
+     */
+    created_at: string;
+};
+
+/**
+ * CallStatus
+ */
+export type CallStatus = 'draft' | 'pending_review' | 'published' | 'closed' | 'withdrawn' | 'rejected';
+
+/**
  * CandidateEdge
  *
  * A candidate edge found by the gap-search agent. Never promoted automatically.
@@ -883,7 +1356,7 @@ export type CardVerification = {
     /**
      * Method
      */
-    method: 'orcid' | 'orcid_simulated' | 'institutional_email';
+    method: 'orcid' | 'orcid_simulated' | 'institutional_email' | 'manual_simulated';
     /**
      * Label
      *
@@ -893,7 +1366,7 @@ export type CardVerification = {
     /**
      * Simulated
      *
-     * True when verified through the local ORCID mock: show the label, which says 'demo, verification simulated'.
+     * True when verified by a local demo shortcut (ORCID mock or auto-approved manual request): show the label, which says 'demo, verification simulated'.
      */
     simulated: boolean;
 };
@@ -1492,6 +1965,29 @@ export type ConfidenceTerm = {
 };
 
 /**
+ * ConnectExport
+ */
+export type ConnectExport = {
+    age_group: AgeGroup | null;
+    /**
+     * Age Group Set At
+     */
+    age_group_set_at: string | null;
+    /**
+     * Threads
+     */
+    threads: Array<ThreadExport>;
+    /**
+     * Blocks
+     */
+    blocks: Array<Block>;
+    /**
+     * Reports
+     */
+    reports: Array<Report>;
+};
+
+/**
  * ConnectStatus
  */
 export type ConnectStatus = {
@@ -1576,7 +2072,7 @@ export type ConsentGrant = {
     /**
      * Version
      *
-     * Consent text version shown; must be the current version for the type (health_data: health-data-2026-10-04, contribute: contribute-2026-10-04).
+     * Consent text version shown; must be the current version for the type (health_data: health-data-2026-10-04, contribute: contribute-2026-10-04, connect: connect-2026-10-04).
      */
     version: string;
     /**
@@ -1803,6 +2299,22 @@ export type DataExport = {
      * In-app notifications (no stored text).
      */
     notifications: Array<NotificationExport>;
+    /**
+     * Age group, conversations with the user's own messages, blocks and reports.
+     */
+    connect?: ConnectExport | null;
+    /**
+     * Calls
+     *
+     * Calls the user wrote as a publisher.
+     */
+    calls?: Array<CallExport>;
+    /**
+     * Call Reviews
+     *
+     * Review decisions about the user's calls.
+     */
+    call_reviews?: Array<CallReviewExport>;
 };
 
 /**
@@ -2914,6 +3426,24 @@ export type Message = {
 };
 
 /**
+ * MessageExport
+ */
+export type MessageExport = {
+    /**
+     * Id
+     */
+    id: string;
+    /**
+     * Body
+     */
+    body: string | null;
+    /**
+     * Created At
+     */
+    created_at: string;
+};
+
+/**
  * MessageUnreadCount
  */
 export type MessageUnreadCount = {
@@ -3351,6 +3881,211 @@ export type OrcidStartRequest = {
  * Origin
  */
 export type Origin = 'observed' | 'inferred' | 'patient_reported' | 'user_contributed';
+
+/**
+ * OwnCall
+ *
+ * The publisher's own call, in any status.
+ */
+export type OwnCall = {
+    /**
+     * Id
+     */
+    id: string;
+    kind: CallKind;
+    /**
+     * Title
+     */
+    title: string;
+    /**
+     * Summary
+     */
+    summary: string;
+    /**
+     * Participation
+     */
+    participation: string;
+    /**
+     * Eligibility Text
+     */
+    eligibility_text: string | null;
+    /**
+     * Diseases
+     */
+    diseases: Array<AtlasRef>;
+    /**
+     * Genes
+     */
+    genes: Array<AtlasRef>;
+    /**
+     * Phenotypes
+     */
+    phenotypes: Array<AtlasRef>;
+    /**
+     * Min Age
+     */
+    min_age: number | null;
+    /**
+     * Max Age
+     */
+    max_age: number | null;
+    /**
+     * Adults Only
+     *
+     * min_age is 18 or more: show 'for adults'.
+     */
+    adults_only: boolean;
+    /**
+     * Children Ok
+     */
+    children_ok: boolean;
+    /**
+     * Countries
+     */
+    countries: Array<string>;
+    /**
+     * Remote
+     */
+    remote: boolean;
+    /**
+     * Run By Label
+     */
+    run_by_label: string | null;
+    run_by_node: AtlasRef | null;
+    /**
+     * Ethics Body
+     */
+    ethics_body: string | null;
+    /**
+     * Ethics Reference
+     */
+    ethics_reference: string | null;
+    /**
+     * Registry Id
+     */
+    registry_id: string | null;
+    /**
+     * Registry Url
+     *
+     * Link to the public registry entry.
+     */
+    registry_url: string | null;
+    /**
+     * External Url
+     */
+    external_url: string | null;
+    /**
+     * Opens At
+     */
+    opens_at: string | null;
+    /**
+     * Closes At
+     */
+    closes_at: string | null;
+    /**
+     * Max Signups
+     */
+    max_signups: number | null;
+    /**
+     * Requested Fields
+     */
+    requested_fields: Array<RequestedField>;
+    /**
+     * The publisher's public card ('run by [name], [institution]'). Always set on published calls in the list; null on the publisher's own view while their card is hidden.
+     */
+    publisher: PublicCard | null;
+    /**
+     * Published At
+     */
+    published_at: string | null;
+    /**
+     * Demo
+     *
+     * Seeded demo data: label it 'Demo, not a real study'.
+     */
+    demo: boolean;
+    /**
+     * Review Badge
+     *
+     * Show on every published call.
+     */
+    review_badge?: string;
+    /**
+     * Notice
+     *
+     * Show on every call.
+     */
+    notice?: string;
+    status: CallStatus;
+    /**
+     * Review Note
+     *
+     * The reviewer's note (always set on rejection).
+     */
+    review_note: string | null;
+    /**
+     * Submitted At
+     */
+    submitted_at: string | null;
+    /**
+     * Reviewed At
+     */
+    reviewed_at: string | null;
+    /**
+     * Closed At
+     */
+    closed_at: string | null;
+    /**
+     * Created At
+     */
+    created_at: string;
+    /**
+     * Updated At
+     */
+    updated_at: string;
+    /**
+     * Expired
+     *
+     * Published but past its closing date: no longer listed.
+     */
+    expired: boolean;
+    /**
+     * Editable
+     *
+     * Draft, pending review or rejected: PUT is allowed.
+     */
+    editable: boolean;
+    /**
+     * Wording Issues
+     *
+     * What the wording check would refuse on submit.
+     */
+    wording_issues: Array<WordingIssue>;
+};
+
+/**
+ * OwnCallList
+ */
+export type OwnCallList = {
+    /**
+     * Items
+     *
+     * Newest first.
+     */
+    items: Array<OwnCall>;
+    /**
+     * Can Publish
+     *
+     * The user is a verified doctor or researcher with a visible card.
+     */
+    can_publish: boolean;
+    /**
+     * Open Limit
+     *
+     * Most draft, pending and published calls at a time.
+     */
+    open_limit?: number;
+};
 
 /**
  * Path
@@ -4223,6 +4958,13 @@ export type ReportRequest = {
 };
 
 /**
+ * RequestedField
+ *
+ * What a sign-up (connect stage 4) may offer to share, chosen from a fixed menu.
+ */
+export type RequestedField = 'diagnosis' | 'genetic_findings' | 'symptoms' | 'age_range' | 'country';
+
+/**
  * Role
  */
 export type Role = 'guest' | 'patient' | 'doctor' | 'researcher';
@@ -4510,6 +5252,18 @@ export type SummaryItem = {
      */
     explanation?: string | null;
     /**
+     * Frequency
+     */
+    frequency?: number | null;
+    /**
+     * Frequency Label
+     */
+    frequency_label?: string | null;
+    /**
+     * Sources
+     */
+    sources?: Array<string>;
+    /**
      * Card Id
      */
     card_id?: string | null;
@@ -4534,7 +5288,7 @@ export type SummarySection = {
 /**
  * SummarySectionKey
  */
-export type SummarySectionKey = 'clusters' | 'diseases' | 'similar_diseases' | 'genes' | 'variants' | 'mechanisms' | 'pathways' | 'symptoms' | 'researchers' | 'doctors' | 'institutions' | 'papers' | 'trials' | 'grants' | 'patient_orgs' | 'registries' | 'networks' | 'claims';
+export type SummarySectionKey = 'clusters' | 'diseases' | 'similar_diseases' | 'shared_gene_diseases' | 'genes' | 'variants' | 'mechanisms' | 'pathways' | 'symptoms' | 'researchers' | 'doctors' | 'institutions' | 'papers' | 'trials' | 'grants' | 'patient_orgs' | 'registries' | 'networks' | 'claims';
 
 /**
  * ThreadDetail
@@ -4547,6 +5301,65 @@ export type ThreadDetail = {
      * Oldest first.
      */
     messages: Array<Message>;
+};
+
+/**
+ * ThreadExport
+ *
+ * A thread I take part in, with my own messages only (the other side's are theirs).
+ */
+export type ThreadExport = {
+    /**
+     * Id
+     */
+    id: string;
+    origin: ThreadOrigin;
+    status: ThreadStatus;
+    my_role: ThreadRole;
+    /**
+     * Counterpart Name
+     */
+    counterpart_name: string | null;
+    /**
+     * My Display Name
+     */
+    my_display_name: string | null;
+    /**
+     * Created At
+     */
+    created_at: string;
+    /**
+     * Accepted At
+     */
+    accepted_at: string | null;
+    /**
+     * Closed At
+     */
+    closed_at: string | null;
+    /**
+     * Last Message At
+     */
+    last_message_at: string | null;
+    /**
+     * Last Read At
+     */
+    last_read_at: string | null;
+    /**
+     * Hidden At
+     */
+    hidden_at: string | null;
+    /**
+     * Guardian Agreed At
+     */
+    guardian_agreed_at: string | null;
+    /**
+     * Guardian Text Version
+     */
+    guardian_text_version: string | null;
+    /**
+     * My Messages
+     */
+    my_messages: Array<MessageExport>;
 };
 
 /**
@@ -4809,7 +5622,7 @@ export type VerificationState = {
     /**
      * Method
      */
-    method?: 'orcid' | 'orcid_simulated' | 'institutional_email' | null;
+    method?: 'orcid' | 'orcid_simulated' | 'institutional_email' | 'manual_simulated' | null;
     /**
      * Label
      */
@@ -4845,6 +5658,24 @@ export type VerificationState = {
      * ORCID sign-in is the local simulated mock.
      */
     orcid_simulated: boolean;
+};
+
+/**
+ * WordingIssue
+ *
+ * A phrase the wording check does not allow (offers, promises or prices of a treatment).
+ */
+export type WordingIssue = {
+    /**
+     * Field
+     */
+    field: string;
+    /**
+     * Term
+     *
+     * The rule that matched, e.g. 'cure' or 'free medication'.
+     */
+    term: string;
 };
 
 /**
@@ -7754,3 +8585,373 @@ export type UnblockResponses = {
 };
 
 export type UnblockResponse = UnblockResponses[keyof UnblockResponses];
+
+export type ListCallsData = {
+    body?: never;
+    path?: never;
+    query?: {
+        /**
+         * Kind
+         *
+         * Only this kind.
+         */
+        kind?: CallKind | null;
+    };
+    url: '/calls';
+};
+
+export type ListCallsErrors = {
+    /**
+     * sign_in_required: guest, or the session expired.
+     */
+    401: ErrorResponse;
+    /**
+     * consent_required (no active consent of the needed type) or forbidden.
+     */
+    403: ErrorResponse;
+    /**
+     * validation_error: lists invalid field names only.
+     */
+    422: ErrorResponse;
+    /**
+     * rate_limited
+     */
+    429: ErrorResponse;
+};
+
+export type ListCallsError = ListCallsErrors[keyof ListCallsErrors];
+
+export type ListCallsResponses = {
+    /**
+     * Successful Response
+     */
+    200: CallList;
+};
+
+export type ListCallsResponse = ListCallsResponses[keyof ListCallsResponses];
+
+export type GetCallData = {
+    body?: never;
+    path: {
+        /**
+         * Call Id
+         */
+        call_id: string;
+    };
+    query?: never;
+    url: '/calls/{call_id}';
+};
+
+export type GetCallErrors = {
+    /**
+     * sign_in_required: guest, or the session expired.
+     */
+    401: ErrorResponse;
+    /**
+     * consent_required (no active consent of the needed type) or forbidden.
+     */
+    403: ErrorResponse;
+    /**
+     * not_found
+     */
+    404: ErrorResponse;
+    /**
+     * Validation Error
+     */
+    422: HttpValidationError;
+    /**
+     * rate_limited
+     */
+    429: ErrorResponse;
+};
+
+export type GetCallError = GetCallErrors[keyof GetCallErrors];
+
+export type GetCallResponses = {
+    /**
+     * Successful Response
+     */
+    200: Call;
+};
+
+export type GetCallResponse = GetCallResponses[keyof GetCallResponses];
+
+export type ListMyCallsData = {
+    body?: never;
+    path?: never;
+    query?: never;
+    url: '/me/calls';
+};
+
+export type ListMyCallsErrors = {
+    /**
+     * sign_in_required: guest, or the session expired.
+     */
+    401: ErrorResponse;
+};
+
+export type ListMyCallsError = ListMyCallsErrors[keyof ListMyCallsErrors];
+
+export type ListMyCallsResponses = {
+    /**
+     * Successful Response
+     */
+    200: OwnCallList;
+};
+
+export type ListMyCallsResponse = ListMyCallsResponses[keyof ListMyCallsResponses];
+
+export type CreateCallData = {
+    body: CallInput;
+    path?: never;
+    query?: never;
+    url: '/me/calls';
+};
+
+export type CreateCallErrors = {
+    /**
+     * sign_in_required: guest, or the session expired.
+     */
+    401: ErrorResponse;
+    /**
+     * consent_required (no active consent of the needed type) or forbidden.
+     */
+    403: ErrorResponse;
+    /**
+     * conflict
+     */
+    409: ErrorResponse;
+    /**
+     * validation_error: lists invalid field names only.
+     */
+    422: ErrorResponse;
+    /**
+     * rate_limited
+     */
+    429: ErrorResponse;
+};
+
+export type CreateCallError = CreateCallErrors[keyof CreateCallErrors];
+
+export type CreateCallResponses = {
+    /**
+     * Successful Response
+     */
+    201: OwnCall;
+};
+
+export type CreateCallResponse = CreateCallResponses[keyof CreateCallResponses];
+
+export type DeleteCallData = {
+    body?: never;
+    path: {
+        /**
+         * Call Id
+         */
+        call_id: string;
+    };
+    query?: never;
+    url: '/me/calls/{call_id}';
+};
+
+export type DeleteCallErrors = {
+    /**
+     * sign_in_required: guest, or the session expired.
+     */
+    401: ErrorResponse;
+    /**
+     * not_found
+     */
+    404: ErrorResponse;
+    /**
+     * Validation Error
+     */
+    422: HttpValidationError;
+};
+
+export type DeleteCallError = DeleteCallErrors[keyof DeleteCallErrors];
+
+export type DeleteCallResponses = {
+    /**
+     * Successful Response
+     */
+    204: void;
+};
+
+export type DeleteCallResponse = DeleteCallResponses[keyof DeleteCallResponses];
+
+export type GetMyCallData = {
+    body?: never;
+    path: {
+        /**
+         * Call Id
+         */
+        call_id: string;
+    };
+    query?: never;
+    url: '/me/calls/{call_id}';
+};
+
+export type GetMyCallErrors = {
+    /**
+     * sign_in_required: guest, or the session expired.
+     */
+    401: ErrorResponse;
+    /**
+     * not_found
+     */
+    404: ErrorResponse;
+    /**
+     * Validation Error
+     */
+    422: HttpValidationError;
+};
+
+export type GetMyCallError = GetMyCallErrors[keyof GetMyCallErrors];
+
+export type GetMyCallResponses = {
+    /**
+     * Successful Response
+     */
+    200: OwnCall;
+};
+
+export type GetMyCallResponse = GetMyCallResponses[keyof GetMyCallResponses];
+
+export type UpdateCallData = {
+    body: CallInput;
+    path: {
+        /**
+         * Call Id
+         */
+        call_id: string;
+    };
+    query?: never;
+    url: '/me/calls/{call_id}';
+};
+
+export type UpdateCallErrors = {
+    /**
+     * sign_in_required: guest, or the session expired.
+     */
+    401: ErrorResponse;
+    /**
+     * consent_required (no active consent of the needed type) or forbidden.
+     */
+    403: ErrorResponse;
+    /**
+     * not_found
+     */
+    404: ErrorResponse;
+    /**
+     * conflict
+     */
+    409: ErrorResponse;
+    /**
+     * validation_error: lists invalid field names only.
+     */
+    422: ErrorResponse;
+    /**
+     * rate_limited
+     */
+    429: ErrorResponse;
+};
+
+export type UpdateCallError = UpdateCallErrors[keyof UpdateCallErrors];
+
+export type UpdateCallResponses = {
+    /**
+     * Successful Response
+     */
+    200: OwnCall;
+};
+
+export type UpdateCallResponse = UpdateCallResponses[keyof UpdateCallResponses];
+
+export type SubmitCallData = {
+    body?: never;
+    path: {
+        /**
+         * Call Id
+         */
+        call_id: string;
+    };
+    query?: never;
+    url: '/me/calls/{call_id}/submit';
+};
+
+export type SubmitCallErrors = {
+    /**
+     * sign_in_required: guest, or the session expired.
+     */
+    401: ErrorResponse;
+    /**
+     * consent_required (no active consent of the needed type) or forbidden.
+     */
+    403: ErrorResponse;
+    /**
+     * not_found
+     */
+    404: ErrorResponse;
+    /**
+     * conflict
+     */
+    409: ErrorResponse;
+    /**
+     * validation_error: lists invalid field names only.
+     */
+    422: ErrorResponse;
+    /**
+     * rate_limited
+     */
+    429: ErrorResponse;
+};
+
+export type SubmitCallError = SubmitCallErrors[keyof SubmitCallErrors];
+
+export type SubmitCallResponses = {
+    /**
+     * Successful Response
+     */
+    200: OwnCall;
+};
+
+export type SubmitCallResponse = SubmitCallResponses[keyof SubmitCallResponses];
+
+export type CloseCallData = {
+    body?: never;
+    path: {
+        /**
+         * Call Id
+         */
+        call_id: string;
+    };
+    query?: never;
+    url: '/me/calls/{call_id}/close';
+};
+
+export type CloseCallErrors = {
+    /**
+     * sign_in_required: guest, or the session expired.
+     */
+    401: ErrorResponse;
+    /**
+     * not_found
+     */
+    404: ErrorResponse;
+    /**
+     * Validation Error
+     */
+    422: HttpValidationError;
+};
+
+export type CloseCallError = CloseCallErrors[keyof CloseCallErrors];
+
+export type CloseCallResponses = {
+    /**
+     * Successful Response
+     */
+    200: OwnCall;
+};
+
+export type CloseCallResponse = CloseCallResponses[keyof CloseCallResponses];

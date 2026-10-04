@@ -5039,6 +5039,663 @@
           }
         }
       }
+    },
+    "/calls": {
+      "get": {
+        "tags": [
+          "calls"
+        ],
+        "summary": "List Calls",
+        "description": "Every published call that is still open, newest first, with its publisher's card. The\nlist is the same for every user (filter by disease in the client: disease IDs are health\ndata and stay out of URLs).",
+        "operationId": "listCalls",
+        "parameters": [
+          {
+            "name": "kind",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "$ref": "#/components/schemas/CallKind"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "description": "Only this kind.",
+              "title": "Kind"
+            },
+            "description": "Only this kind."
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/CallList"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "sign_in_required: guest, or the session expired.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "consent_required (no active consent of the needed type) or forbidden.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "validation_error: lists invalid field names only.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "429": {
+            "description": "rate_limited",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/calls/{call_id}": {
+      "get": {
+        "tags": [
+          "calls"
+        ],
+        "summary": "Get Call",
+        "description": "One published, still open call. 404 for anything else (own drafts: GET /me/calls/{id}).",
+        "operationId": "getCall",
+        "parameters": [
+          {
+            "name": "call_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid",
+              "title": "Call Id"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Call"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "sign_in_required: guest, or the session expired.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "consent_required (no active consent of the needed type) or forbidden.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "not_found",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "429": {
+            "description": "rate_limited",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/me/calls": {
+      "get": {
+        "tags": [
+          "calls"
+        ],
+        "summary": "List My Calls",
+        "description": "The user's own calls in every status, and whether they may publish.",
+        "operationId": "listMyCalls",
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/OwnCallList"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "sign_in_required: guest, or the session expired.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          }
+        }
+      },
+      "post": {
+        "tags": [
+          "calls"
+        ],
+        "summary": "Create Call",
+        "description": "Write a call as a draft. 403 unless the user is a verified doctor or researcher with a\nvisible card; 409 at 10 draft, pending and published calls; 422 names the invalid field\n(atlas IDs must exist; studies and trials need `ethics_reference`, trials `registry_id`).",
+        "operationId": "createCall",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/CallInput"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "201": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/OwnCall"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "sign_in_required: guest, or the session expired.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "consent_required (no active consent of the needed type) or forbidden.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "conflict",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "validation_error: lists invalid field names only.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "429": {
+            "description": "rate_limited",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/me/calls/{call_id}": {
+      "get": {
+        "tags": [
+          "calls"
+        ],
+        "summary": "Get My Call",
+        "description": "One of the user's own calls, with the review note and the wording check result.",
+        "operationId": "getMyCall",
+        "parameters": [
+          {
+            "name": "call_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid",
+              "title": "Call Id"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/OwnCall"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "sign_in_required: guest, or the session expired.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "not_found",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      },
+      "put": {
+        "tags": [
+          "calls"
+        ],
+        "summary": "Update Call",
+        "description": "Replace a draft, rejected or pending call; it becomes a draft and must be submitted again.\n409 for published, closed and withdrawn calls.",
+        "operationId": "updateCall",
+        "parameters": [
+          {
+            "name": "call_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid",
+              "title": "Call Id"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/CallInput"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/OwnCall"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "sign_in_required: guest, or the session expired.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "consent_required (no active consent of the needed type) or forbidden.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "not_found",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "conflict",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "validation_error: lists invalid field names only.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "429": {
+            "description": "rate_limited",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          }
+        }
+      },
+      "delete": {
+        "tags": [
+          "calls"
+        ],
+        "summary": "Delete Call",
+        "description": "Delete one of the user's calls in any status, with its review log.",
+        "operationId": "deleteCall",
+        "parameters": [
+          {
+            "name": "call_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid",
+              "title": "Call Id"
+            }
+          }
+        ],
+        "responses": {
+          "204": {
+            "description": "Successful Response"
+          },
+          "401": {
+            "description": "sign_in_required: guest, or the session expired.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "not_found",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/me/calls/{call_id}/submit": {
+      "post": {
+        "tags": [
+          "calls"
+        ],
+        "summary": "Submit Call",
+        "description": "Send the call to the Amber team for review (status pending_review). 422 when the wording\ncheck finds an offer, promise or price of a treatment (the message names field and rule) or\nan atlas ID has left the atlas.",
+        "operationId": "submitCall",
+        "parameters": [
+          {
+            "name": "call_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid",
+              "title": "Call Id"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/OwnCall"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "sign_in_required: guest, or the session expired.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "consent_required (no active consent of the needed type) or forbidden.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "not_found",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "conflict",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "validation_error: lists invalid field names only.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "429": {
+            "description": "rate_limited",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/me/calls/{call_id}/close": {
+      "post": {
+        "tags": [
+          "calls"
+        ],
+        "summary": "Close Call",
+        "description": "End a published call (closed) or pull an unpublished one (withdrawn). Idempotent.",
+        "operationId": "closeCall",
+        "parameters": [
+          {
+            "name": "call_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid",
+              "title": "Call Id"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/OwnCall"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "sign_in_required: guest, or the session expired.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "not_found",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
     }
   },
   "components": {
@@ -5849,6 +6506,32 @@
         ],
         "title": "AtlasNode"
       },
+      "AtlasRef": {
+        "properties": {
+          "id": {
+            "type": "string",
+            "title": "Id"
+          },
+          "label": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Label",
+            "description": "From the current atlas; null if it left the atlas."
+          }
+        },
+        "type": "object",
+        "required": [
+          "id",
+          "label"
+        ],
+        "title": "AtlasRef"
+      },
       "AtlasStats": {
         "properties": {
           "data_version": {
@@ -6255,6 +6938,929 @@
         ],
         "title": "Body_uploadDocument"
       },
+      "Call": {
+        "properties": {
+          "id": {
+            "type": "string",
+            "format": "uuid",
+            "title": "Id"
+          },
+          "kind": {
+            "$ref": "#/components/schemas/CallKind"
+          },
+          "title": {
+            "type": "string",
+            "title": "Title"
+          },
+          "summary": {
+            "type": "string",
+            "title": "Summary"
+          },
+          "participation": {
+            "type": "string",
+            "title": "Participation"
+          },
+          "eligibility_text": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Eligibility Text"
+          },
+          "diseases": {
+            "items": {
+              "$ref": "#/components/schemas/AtlasRef"
+            },
+            "type": "array",
+            "title": "Diseases"
+          },
+          "genes": {
+            "items": {
+              "$ref": "#/components/schemas/AtlasRef"
+            },
+            "type": "array",
+            "title": "Genes"
+          },
+          "phenotypes": {
+            "items": {
+              "$ref": "#/components/schemas/AtlasRef"
+            },
+            "type": "array",
+            "title": "Phenotypes"
+          },
+          "min_age": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Min Age"
+          },
+          "max_age": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Max Age"
+          },
+          "adults_only": {
+            "type": "boolean",
+            "title": "Adults Only",
+            "description": "min_age is 18 or more: show 'for adults'."
+          },
+          "children_ok": {
+            "type": "boolean",
+            "title": "Children Ok"
+          },
+          "countries": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array",
+            "title": "Countries"
+          },
+          "remote": {
+            "type": "boolean",
+            "title": "Remote"
+          },
+          "run_by_label": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Run By Label"
+          },
+          "run_by_node": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/AtlasRef"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "ethics_body": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Ethics Body"
+          },
+          "ethics_reference": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Ethics Reference"
+          },
+          "registry_id": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Registry Id"
+          },
+          "registry_url": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Registry Url",
+            "description": "Link to the public registry entry."
+          },
+          "external_url": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "External Url"
+          },
+          "opens_at": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "date"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Opens At"
+          },
+          "closes_at": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "date"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Closes At"
+          },
+          "max_signups": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Max Signups"
+          },
+          "requested_fields": {
+            "items": {
+              "$ref": "#/components/schemas/RequestedField"
+            },
+            "type": "array",
+            "title": "Requested Fields"
+          },
+          "publisher": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/PublicCard"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "The publisher's public card ('run by [name], [institution]'). Always set on published calls in the list; null on the publisher's own view while their card is hidden."
+          },
+          "published_at": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "date-time"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Published At"
+          },
+          "demo": {
+            "type": "boolean",
+            "title": "Demo",
+            "description": "Seeded demo data: label it 'Demo, not a real study'."
+          },
+          "review_badge": {
+            "type": "string",
+            "title": "Review Badge",
+            "description": "Show on every published call.",
+            "default": "Reviewed by the Amber team for wording, ethics and registry numbers, not for scientific quality"
+          },
+          "notice": {
+            "type": "string",
+            "title": "Notice",
+            "description": "Show on every call.",
+            "default": "Ask your doctor whether this trial or study could apply to you. This is not an eligibility check: only the study team decides who can take part."
+          }
+        },
+        "type": "object",
+        "required": [
+          "id",
+          "kind",
+          "title",
+          "summary",
+          "participation",
+          "eligibility_text",
+          "diseases",
+          "genes",
+          "phenotypes",
+          "min_age",
+          "max_age",
+          "adults_only",
+          "children_ok",
+          "countries",
+          "remote",
+          "run_by_label",
+          "run_by_node",
+          "ethics_body",
+          "ethics_reference",
+          "registry_id",
+          "registry_url",
+          "external_url",
+          "opens_at",
+          "closes_at",
+          "max_signups",
+          "requested_fields",
+          "publisher",
+          "published_at",
+          "demo"
+        ],
+        "title": "Call",
+        "description": "A published call as every signed-in user sees it."
+      },
+      "CallExport": {
+        "properties": {
+          "id": {
+            "type": "string",
+            "format": "uuid",
+            "title": "Id"
+          },
+          "kind": {
+            "type": "string",
+            "title": "Kind"
+          },
+          "title": {
+            "type": "string",
+            "title": "Title"
+          },
+          "summary": {
+            "type": "string",
+            "title": "Summary"
+          },
+          "participation": {
+            "type": "string",
+            "title": "Participation"
+          },
+          "eligibility_text": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Eligibility Text"
+          },
+          "disease_ids": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array",
+            "title": "Disease Ids"
+          },
+          "gene_ids": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array",
+            "title": "Gene Ids"
+          },
+          "phenotype_ids": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array",
+            "title": "Phenotype Ids"
+          },
+          "min_age": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Min Age"
+          },
+          "max_age": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Max Age"
+          },
+          "children_ok": {
+            "type": "boolean",
+            "title": "Children Ok"
+          },
+          "countries": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array",
+            "title": "Countries"
+          },
+          "remote": {
+            "type": "boolean",
+            "title": "Remote"
+          },
+          "run_by_label": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Run By Label"
+          },
+          "run_by_node_id": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Run By Node Id"
+          },
+          "ethics_body": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Ethics Body"
+          },
+          "ethics_reference": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Ethics Reference"
+          },
+          "registry_id": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Registry Id"
+          },
+          "external_url": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "External Url"
+          },
+          "opens_at": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "date"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Opens At"
+          },
+          "closes_at": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "date"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Closes At"
+          },
+          "max_signups": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Max Signups"
+          },
+          "requested_fields": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array",
+            "title": "Requested Fields"
+          },
+          "status": {
+            "type": "string",
+            "title": "Status"
+          },
+          "review_note": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Review Note"
+          },
+          "submitted_at": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "date-time"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Submitted At"
+          },
+          "reviewed_at": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "date-time"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Reviewed At"
+          },
+          "published_at": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "date-time"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Published At"
+          },
+          "closed_at": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "date-time"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Closed At"
+          },
+          "demo": {
+            "type": "boolean",
+            "title": "Demo"
+          },
+          "created_at": {
+            "type": "string",
+            "format": "date-time",
+            "title": "Created At"
+          },
+          "updated_at": {
+            "type": "string",
+            "format": "date-time",
+            "title": "Updated At"
+          }
+        },
+        "type": "object",
+        "required": [
+          "id",
+          "kind",
+          "title",
+          "summary",
+          "participation",
+          "disease_ids",
+          "gene_ids",
+          "phenotype_ids",
+          "children_ok",
+          "countries",
+          "remote",
+          "requested_fields",
+          "status",
+          "demo",
+          "created_at",
+          "updated_at"
+        ],
+        "title": "CallExport"
+      },
+      "CallInput": {
+        "properties": {
+          "kind": {
+            "$ref": "#/components/schemas/CallKind"
+          },
+          "title": {
+            "type": "string",
+            "maxLength": 140,
+            "title": "Title"
+          },
+          "summary": {
+            "type": "string",
+            "maxLength": 1000,
+            "title": "Summary",
+            "description": "What the research is about and what it wants to find out."
+          },
+          "participation": {
+            "type": "string",
+            "maxLength": 1000,
+            "title": "Participation",
+            "description": "What taking part involves (time, visits, remote, compensation for costs)."
+          },
+          "eligibility_text": {
+            "anyOf": [
+              {
+                "type": "string",
+                "maxLength": 1500
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Eligibility Text",
+            "description": "Who can take part, in the study team's words."
+          },
+          "disease_ids": {
+            "items": {
+              "type": "string",
+              "pattern": "^MONDO:\\d{7}$"
+            },
+            "type": "array",
+            "maxItems": 10,
+            "minItems": 1,
+            "title": "Disease Ids",
+            "description": "Atlas diseases (MONDO IDs)."
+          },
+          "gene_ids": {
+            "items": {
+              "type": "string",
+              "pattern": "^HGNC:\\d{1,9}$"
+            },
+            "type": "array",
+            "maxItems": 20,
+            "title": "Gene Ids",
+            "description": "Atlas genes (HGNC IDs)."
+          },
+          "phenotype_ids": {
+            "items": {
+              "type": "string",
+              "pattern": "^HP:\\d{7}$"
+            },
+            "type": "array",
+            "maxItems": 30,
+            "title": "Phenotype Ids",
+            "description": "Atlas symptoms (HP IDs)."
+          },
+          "min_age": {
+            "anyOf": [
+              {
+                "type": "integer",
+                "maximum": 120.0,
+                "minimum": 0.0
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Min Age",
+            "description": "Shown as information."
+          },
+          "max_age": {
+            "anyOf": [
+              {
+                "type": "integer",
+                "maximum": 120.0,
+                "minimum": 0.0
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Max Age",
+            "description": "Shown as information."
+          },
+          "children_ok": {
+            "type": "boolean",
+            "title": "Children Ok",
+            "description": "Children can take part (with their parents).",
+            "default": false
+          },
+          "countries": {
+            "items": {
+              "type": "string",
+              "pattern": "^[A-Z]{2}$"
+            },
+            "type": "array",
+            "maxItems": 60,
+            "title": "Countries",
+            "description": "ISO 3166-1 alpha-2 codes where it runs; shown as information."
+          },
+          "remote": {
+            "type": "boolean",
+            "title": "Remote",
+            "description": "Can be done without visiting a site.",
+            "default": false
+          },
+          "run_by_label": {
+            "anyOf": [
+              {
+                "type": "string",
+                "maxLength": 200
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Run By Label",
+            "description": "Institution or team that runs it, as text."
+          },
+          "run_by_node_id": {
+            "anyOf": [
+              {
+                "type": "string",
+                "maxLength": 100
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Run By Node Id",
+            "description": "Atlas institution or patient organisation that runs it."
+          },
+          "ethics_body": {
+            "anyOf": [
+              {
+                "type": "string",
+                "maxLength": 200
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Ethics Body",
+            "description": "Ethics committee that approved it."
+          },
+          "ethics_reference": {
+            "anyOf": [
+              {
+                "type": "string",
+                "maxLength": 100
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Ethics Reference",
+            "description": "Approval reference. Required for studies and trials."
+          },
+          "registry_id": {
+            "anyOf": [
+              {
+                "type": "string",
+                "pattern": "^(NCT\\d{8}|DRKS\\d{8}|\\d{4}-\\d{6}-\\d{2}(-\\d{2})?)$"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Registry Id",
+            "description": "NCT, EU CT / EudraCT or DRKS number. Required for trials."
+          },
+          "external_url": {
+            "anyOf": [
+              {
+                "type": "string",
+                "maxLength": 500
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "External Url",
+            "description": "https link to the study's own page or registry entry."
+          },
+          "opens_at": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "date"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Opens At"
+          },
+          "closes_at": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "date"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Closes At"
+          },
+          "max_signups": {
+            "anyOf": [
+              {
+                "type": "integer",
+                "maximum": 10000.0,
+                "minimum": 1.0
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Max Signups"
+          },
+          "requested_fields": {
+            "items": {
+              "$ref": "#/components/schemas/RequestedField"
+            },
+            "type": "array",
+            "maxItems": 5,
+            "title": "Requested Fields",
+            "description": "What a sign-up may offer to share (fixed menu; used by sign-ups later)."
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "required": [
+          "kind",
+          "title",
+          "summary",
+          "participation",
+          "disease_ids"
+        ],
+        "title": "CallInput",
+        "description": "A call as the publisher writes it (create or full replace). Atlas IDs must exist in the\ncurrent atlas; a study or trial needs its ethics approval reference, a trial its registry ID\n(NCT, EU CT / EudraCT or DRKS)."
+      },
+      "CallKind": {
+        "type": "string",
+        "enum": [
+          "survey",
+          "study",
+          "trial"
+        ],
+        "title": "CallKind"
+      },
+      "CallList": {
+        "properties": {
+          "heading": {
+            "type": "string",
+            "title": "Heading",
+            "default": "Find trials and studies looking for participants"
+          },
+          "items": {
+            "items": {
+              "$ref": "#/components/schemas/Call"
+            },
+            "type": "array",
+            "title": "Items",
+            "description": "Every published call that is not past its closing date and whose publisher still has a visible, verified card; newest first."
+          }
+        },
+        "type": "object",
+        "required": [
+          "items"
+        ],
+        "title": "CallList"
+      },
+      "CallReviewExport": {
+        "properties": {
+          "call_id": {
+            "type": "string",
+            "format": "uuid",
+            "title": "Call Id"
+          },
+          "action": {
+            "type": "string",
+            "title": "Action"
+          },
+          "note": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Note"
+          },
+          "created_at": {
+            "type": "string",
+            "format": "date-time",
+            "title": "Created At"
+          }
+        },
+        "type": "object",
+        "required": [
+          "call_id",
+          "action",
+          "note",
+          "created_at"
+        ],
+        "title": "CallReviewExport"
+      },
+      "CallStatus": {
+        "type": "string",
+        "enum": [
+          "draft",
+          "pending_review",
+          "published",
+          "closed",
+          "withdrawn",
+          "rejected"
+        ],
+        "title": "CallStatus"
+      },
       "CandidateEdge": {
         "properties": {
           "source_id": {
@@ -6563,7 +8169,8 @@
             "enum": [
               "orcid",
               "orcid_simulated",
-              "institutional_email"
+              "institutional_email",
+              "manual_simulated"
             ],
             "title": "Method"
           },
@@ -6575,7 +8182,7 @@
           "simulated": {
             "type": "boolean",
             "title": "Simulated",
-            "description": "True when verified through the local ORCID mock: show the label, which says 'demo, verification simulated'."
+            "description": "True when verified by a local demo shortcut (ORCID mock or auto-approved manual request): show the label, which says 'demo, verification simulated'."
           }
         },
         "type": "object",
@@ -7467,6 +9074,62 @@
         ],
         "title": "ConfidenceTerm"
       },
+      "ConnectExport": {
+        "properties": {
+          "age_group": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/AgeGroup"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "age_group_set_at": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "date-time"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Age Group Set At"
+          },
+          "threads": {
+            "items": {
+              "$ref": "#/components/schemas/ThreadExport"
+            },
+            "type": "array",
+            "title": "Threads"
+          },
+          "blocks": {
+            "items": {
+              "$ref": "#/components/schemas/Block"
+            },
+            "type": "array",
+            "title": "Blocks"
+          },
+          "reports": {
+            "items": {
+              "$ref": "#/components/schemas/Report"
+            },
+            "type": "array",
+            "title": "Reports"
+          }
+        },
+        "type": "object",
+        "required": [
+          "age_group",
+          "age_group_set_at",
+          "threads",
+          "blocks",
+          "reports"
+        ],
+        "title": "ConnectExport"
+      },
       "ConnectStatus": {
         "properties": {
           "consent_active": {
@@ -7594,7 +9257,7 @@
             "maxLength": 40,
             "minLength": 1,
             "title": "Version",
-            "description": "Consent text version shown; must be the current version for the type (health_data: health-data-2026-10-04, contribute: contribute-2026-10-04)."
+            "description": "Consent text version shown; must be the current version for the type (health_data: health-data-2026-10-04, contribute: contribute-2026-10-04, connect: connect-2026-10-04)."
           },
           "about_child": {
             "type": "boolean",
@@ -7961,6 +9624,33 @@
             "type": "array",
             "title": "Notifications",
             "description": "In-app notifications (no stored text)."
+          },
+          "connect": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/ConnectExport"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "Age group, conversations with the user's own messages, blocks and reports."
+          },
+          "calls": {
+            "items": {
+              "$ref": "#/components/schemas/CallExport"
+            },
+            "type": "array",
+            "title": "Calls",
+            "description": "Calls the user wrote as a publisher."
+          },
+          "call_reviews": {
+            "items": {
+              "$ref": "#/components/schemas/CallReviewExport"
+            },
+            "type": "array",
+            "title": "Call Reviews",
+            "description": "Review decisions about the user's calls."
           }
         },
         "type": "object",
@@ -9715,6 +11405,38 @@
         ],
         "title": "Message"
       },
+      "MessageExport": {
+        "properties": {
+          "id": {
+            "type": "string",
+            "format": "uuid",
+            "title": "Id"
+          },
+          "body": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Body"
+          },
+          "created_at": {
+            "type": "string",
+            "format": "date-time",
+            "title": "Created At"
+          }
+        },
+        "type": "object",
+        "required": [
+          "id",
+          "body",
+          "created_at"
+        ],
+        "title": "MessageExport"
+      },
       "MessageUnreadCount": {
         "properties": {
           "count": {
@@ -10444,6 +12166,415 @@
           "user_contributed"
         ],
         "title": "Origin"
+      },
+      "OwnCall": {
+        "properties": {
+          "id": {
+            "type": "string",
+            "format": "uuid",
+            "title": "Id"
+          },
+          "kind": {
+            "$ref": "#/components/schemas/CallKind"
+          },
+          "title": {
+            "type": "string",
+            "title": "Title"
+          },
+          "summary": {
+            "type": "string",
+            "title": "Summary"
+          },
+          "participation": {
+            "type": "string",
+            "title": "Participation"
+          },
+          "eligibility_text": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Eligibility Text"
+          },
+          "diseases": {
+            "items": {
+              "$ref": "#/components/schemas/AtlasRef"
+            },
+            "type": "array",
+            "title": "Diseases"
+          },
+          "genes": {
+            "items": {
+              "$ref": "#/components/schemas/AtlasRef"
+            },
+            "type": "array",
+            "title": "Genes"
+          },
+          "phenotypes": {
+            "items": {
+              "$ref": "#/components/schemas/AtlasRef"
+            },
+            "type": "array",
+            "title": "Phenotypes"
+          },
+          "min_age": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Min Age"
+          },
+          "max_age": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Max Age"
+          },
+          "adults_only": {
+            "type": "boolean",
+            "title": "Adults Only",
+            "description": "min_age is 18 or more: show 'for adults'."
+          },
+          "children_ok": {
+            "type": "boolean",
+            "title": "Children Ok"
+          },
+          "countries": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array",
+            "title": "Countries"
+          },
+          "remote": {
+            "type": "boolean",
+            "title": "Remote"
+          },
+          "run_by_label": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Run By Label"
+          },
+          "run_by_node": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/AtlasRef"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "ethics_body": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Ethics Body"
+          },
+          "ethics_reference": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Ethics Reference"
+          },
+          "registry_id": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Registry Id"
+          },
+          "registry_url": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Registry Url",
+            "description": "Link to the public registry entry."
+          },
+          "external_url": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "External Url"
+          },
+          "opens_at": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "date"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Opens At"
+          },
+          "closes_at": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "date"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Closes At"
+          },
+          "max_signups": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Max Signups"
+          },
+          "requested_fields": {
+            "items": {
+              "$ref": "#/components/schemas/RequestedField"
+            },
+            "type": "array",
+            "title": "Requested Fields"
+          },
+          "publisher": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/PublicCard"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "The publisher's public card ('run by [name], [institution]'). Always set on published calls in the list; null on the publisher's own view while their card is hidden."
+          },
+          "published_at": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "date-time"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Published At"
+          },
+          "demo": {
+            "type": "boolean",
+            "title": "Demo",
+            "description": "Seeded demo data: label it 'Demo, not a real study'."
+          },
+          "review_badge": {
+            "type": "string",
+            "title": "Review Badge",
+            "description": "Show on every published call.",
+            "default": "Reviewed by the Amber team for wording, ethics and registry numbers, not for scientific quality"
+          },
+          "notice": {
+            "type": "string",
+            "title": "Notice",
+            "description": "Show on every call.",
+            "default": "Ask your doctor whether this trial or study could apply to you. This is not an eligibility check: only the study team decides who can take part."
+          },
+          "status": {
+            "$ref": "#/components/schemas/CallStatus"
+          },
+          "review_note": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Review Note",
+            "description": "The reviewer's note (always set on rejection)."
+          },
+          "submitted_at": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "date-time"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Submitted At"
+          },
+          "reviewed_at": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "date-time"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Reviewed At"
+          },
+          "closed_at": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "date-time"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Closed At"
+          },
+          "created_at": {
+            "type": "string",
+            "format": "date-time",
+            "title": "Created At"
+          },
+          "updated_at": {
+            "type": "string",
+            "format": "date-time",
+            "title": "Updated At"
+          },
+          "expired": {
+            "type": "boolean",
+            "title": "Expired",
+            "description": "Published but past its closing date: no longer listed."
+          },
+          "editable": {
+            "type": "boolean",
+            "title": "Editable",
+            "description": "Draft, pending review or rejected: PUT is allowed."
+          },
+          "wording_issues": {
+            "items": {
+              "$ref": "#/components/schemas/WordingIssue"
+            },
+            "type": "array",
+            "title": "Wording Issues",
+            "description": "What the wording check would refuse on submit."
+          }
+        },
+        "type": "object",
+        "required": [
+          "id",
+          "kind",
+          "title",
+          "summary",
+          "participation",
+          "eligibility_text",
+          "diseases",
+          "genes",
+          "phenotypes",
+          "min_age",
+          "max_age",
+          "adults_only",
+          "children_ok",
+          "countries",
+          "remote",
+          "run_by_label",
+          "run_by_node",
+          "ethics_body",
+          "ethics_reference",
+          "registry_id",
+          "registry_url",
+          "external_url",
+          "opens_at",
+          "closes_at",
+          "max_signups",
+          "requested_fields",
+          "publisher",
+          "published_at",
+          "demo",
+          "status",
+          "review_note",
+          "submitted_at",
+          "reviewed_at",
+          "closed_at",
+          "created_at",
+          "updated_at",
+          "expired",
+          "editable",
+          "wording_issues"
+        ],
+        "title": "OwnCall",
+        "description": "The publisher's own call, in any status."
+      },
+      "OwnCallList": {
+        "properties": {
+          "items": {
+            "items": {
+              "$ref": "#/components/schemas/OwnCall"
+            },
+            "type": "array",
+            "title": "Items",
+            "description": "Newest first."
+          },
+          "can_publish": {
+            "type": "boolean",
+            "title": "Can Publish",
+            "description": "The user is a verified doctor or researcher with a visible card."
+          },
+          "open_limit": {
+            "type": "integer",
+            "title": "Open Limit",
+            "description": "Most draft, pending and published calls at a time.",
+            "default": 10
+          }
+        },
+        "type": "object",
+        "required": [
+          "items",
+          "can_publish"
+        ],
+        "title": "OwnCallList"
       },
       "Path": {
         "properties": {
@@ -11995,6 +14126,18 @@
         ],
         "title": "ReportRequest"
       },
+      "RequestedField": {
+        "type": "string",
+        "enum": [
+          "diagnosis",
+          "genetic_findings",
+          "symptoms",
+          "age_range",
+          "country"
+        ],
+        "title": "RequestedField",
+        "description": "What a sign-up (connect stage 4) may offer to share, chosen from a fixed menu."
+      },
       "Role": {
         "type": "string",
         "enum": [
@@ -12439,6 +14582,35 @@
             ],
             "title": "Explanation"
           },
+          "frequency": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Frequency"
+          },
+          "frequency_label": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Frequency Label"
+          },
+          "sources": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array",
+            "title": "Sources"
+          },
           "card_id": {
             "anyOf": [
               {
@@ -12502,6 +14674,7 @@
           "clusters",
           "diseases",
           "similar_diseases",
+          "shared_gene_diseases",
           "genes",
           "variants",
           "mechanisms",
@@ -12540,6 +14713,161 @@
           "messages"
         ],
         "title": "ThreadDetail"
+      },
+      "ThreadExport": {
+        "properties": {
+          "id": {
+            "type": "string",
+            "format": "uuid",
+            "title": "Id"
+          },
+          "origin": {
+            "$ref": "#/components/schemas/ThreadOrigin"
+          },
+          "status": {
+            "$ref": "#/components/schemas/ThreadStatus"
+          },
+          "my_role": {
+            "$ref": "#/components/schemas/ThreadRole"
+          },
+          "counterpart_name": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Counterpart Name"
+          },
+          "my_display_name": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "My Display Name"
+          },
+          "created_at": {
+            "type": "string",
+            "format": "date-time",
+            "title": "Created At"
+          },
+          "accepted_at": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "date-time"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Accepted At"
+          },
+          "closed_at": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "date-time"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Closed At"
+          },
+          "last_message_at": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "date-time"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Last Message At"
+          },
+          "last_read_at": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "date-time"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Last Read At"
+          },
+          "hidden_at": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "date-time"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Hidden At"
+          },
+          "guardian_agreed_at": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "date-time"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Guardian Agreed At"
+          },
+          "guardian_text_version": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Guardian Text Version"
+          },
+          "my_messages": {
+            "items": {
+              "$ref": "#/components/schemas/MessageExport"
+            },
+            "type": "array",
+            "title": "My Messages"
+          }
+        },
+        "type": "object",
+        "required": [
+          "id",
+          "origin",
+          "status",
+          "my_role",
+          "counterpart_name",
+          "my_display_name",
+          "created_at",
+          "accepted_at",
+          "closed_at",
+          "last_message_at",
+          "last_read_at",
+          "hidden_at",
+          "guardian_agreed_at",
+          "guardian_text_version",
+          "my_messages"
+        ],
+        "title": "ThreadExport",
+        "description": "A thread I take part in, with my own messages only (the other side's are theirs)."
       },
       "ThreadList": {
         "properties": {
@@ -12924,7 +15252,8 @@
                 "enum": [
                   "orcid",
                   "orcid_simulated",
-                  "institutional_email"
+                  "institutional_email",
+                  "manual_simulated"
                 ]
               },
               {
@@ -13000,6 +15329,26 @@
           "orcid_simulated"
         ],
         "title": "VerificationState"
+      },
+      "WordingIssue": {
+        "properties": {
+          "field": {
+            "type": "string",
+            "title": "Field"
+          },
+          "term": {
+            "type": "string",
+            "title": "Term",
+            "description": "The rule that matched, e.g. 'cure' or 'free medication'."
+          }
+        },
+        "type": "object",
+        "required": [
+          "field",
+          "term"
+        ],
+        "title": "WordingIssue",
+        "description": "A phrase the wording check does not allow (offers, promises or prices of a treatment)."
       },
       "Zygosity": {
         "type": "string",

@@ -2,7 +2,7 @@
 
 import { type Client, type ClientMeta, formDataBodySerializer, type Options as Options2, type RequestResult, type ServerSentEventsResult, type TDataShape } from './client';
 import { client } from './client.gen';
-import type { AcceptThreadData, AcceptThreadErrors, AcceptThreadResponses, AuthCallbackData, AuthGoogleCallbackData, AuthGoogleCallbackErrors, AuthGoogleStartData, AuthGoogleStartErrors, AuthLoopbackCallbackData, AuthStartData, AuthStartErrors, BlockThreadParticipantData, BlockThreadParticipantErrors, BlockThreadParticipantResponses, CancelChatRunData, CancelChatRunErrors, CancelChatRunResponses, ChatData, ChatErrors, ChatResponse, ChatResponses, ConfirmFindingData, ConfirmFindingErrors, ConfirmFindingResponses, CreateContributionData, CreateContributionErrors, CreateContributionResponses, CreateProposalData, CreateProposalErrors, CreateProposalResponses, DeclineThreadData, DeclineThreadErrors, DeclineThreadResponses, DeleteChatSessionData, DeleteChatSessionErrors, DeleteChatSessionResponses, DeleteContributionData, DeleteContributionErrors, DeleteContributionResponses, DeleteDocumentData, DeleteDocumentErrors, DeleteDocumentResponses, DeleteMeData, DeleteMeErrors, DeleteMeResponses, DeleteMessageData, DeleteMessageErrors, DeleteMessageResponses, DeleteProfessionalProfileData, DeleteProfessionalProfileErrors, DeleteProfessionalProfileResponses, ExplainPathData, ExplainPathErrors, ExplainPathResponse, ExplainPathResponses, ExportGraphData, ExportGraphErrors, ExportGraphResponses, ExportMyDataData, ExportMyDataErrors, ExportMyDataResponses, FindPathData, FindPathErrors, FindPathResponses, FlagEdgeData, FlagEdgeErrors, FlagEdgeResponses, FollowDiseaseData, FollowDiseaseErrors, FollowDiseaseResponses, FollowProfileDiseasesData, FollowProfileDiseasesErrors, FollowProfileDiseasesResponses, GapSearchData, GapSearchErrors, GapSearchResponse, GapSearchResponses, GetAtlasData, GetAtlasErrors, GetAtlasResponses, GetAtlasSummaryData, GetAtlasSummaryErrors, GetAtlasSummaryResponses, GetAtlasTreeData, GetAtlasTreeErrors, GetAtlasTreeResponses, GetChatSessionData, GetChatSessionErrors, GetChatSessionResponses, GetConnectStatusData, GetConnectStatusErrors, GetConnectStatusResponses, GetEdgeEvidenceData, GetEdgeEvidenceErrors, GetEdgeEvidenceResponses, GetMessageUnreadCountData, GetMessageUnreadCountErrors, GetMessageUnreadCountResponses, GetMyCardData, GetMyCardErrors, GetMyCardResponses, GetNeighborhoodData, GetNeighborhoodErrors, GetNeighborhoodResponses, GetNodeData, GetNodeErrors, GetNodeResponses, GetPersonCardData, GetPersonCardErrors, GetPersonCardResponses, GetProfessionalProfileData, GetProfessionalProfileErrors, GetProfessionalProfileResponses, GetProfileData, GetProfileErrors, GetProfileResponses, GetSessionData, GetSessionResponses, GetStatsData, GetStatsResponses, GetThreadData, GetThreadErrors, GetThreadResponses, GetUnreadNotificationCountData, GetUnreadNotificationCountErrors, GetUnreadNotificationCountResponses, GrantConsentData, GrantConsentErrors, GrantConsentResponses, HealthData, HealthResponses, HideThreadData, HideThreadErrors, HideThreadResponses, ListBlocksData, ListBlocksErrors, ListBlocksResponses, ListChatRunsData, ListChatRunsErrors, ListChatRunsResponses, ListChatSessionsData, ListChatSessionsErrors, ListChatSessionsResponses, ListClustersData, ListClustersErrors, ListClustersResponses, ListConsentsData, ListConsentsErrors, ListConsentsResponses, ListContributionsData, ListContributionsErrors, ListContributionsResponses, ListDocumentsData, ListDocumentsErrors, ListDocumentsResponses, ListFindingsData, ListFindingsErrors, ListFindingsResponses, ListFollowsData, ListFollowsErrors, ListFollowsResponses, ListNotificationsData, ListNotificationsErrors, ListNotificationsResponses, ListPeopleData, ListPeopleErrors, ListPeopleResponses, ListThreadsData, ListThreadsErrors, ListThreadsResponses, LogoutData, LogoutResponses, MarkNotificationsReadData, MarkNotificationsReadErrors, MarkNotificationsReadResponses, MatchAtlasEntryData, MatchAtlasEntryErrors, MatchAtlasEntryResponses, OpenThreadData, OpenThreadErrors, OpenThreadResponses, OrcidCallbackData, PutMyCardData, PutMyCardErrors, PutMyCardResponses, PutProfessionalProfileData, PutProfessionalProfileErrors, PutProfessionalProfileResponses, PutProfileData, PutProfileErrors, PutProfileResponses, RejectFindingData, RejectFindingErrors, RejectFindingResponses, ReportThreadData, ReportThreadErrors, ReportThreadResponses, RequestVerificationData, RequestVerificationErrors, RequestVerificationResponses, RevokeConsentData, RevokeConsentErrors, RevokeConsentResponses, SearchData, SearchErrors, SearchResponses, SendMessageData, SendMessageErrors, SendMessageResponses, SetConnectAgeGroupData, SetConnectAgeGroupErrors, SetConnectAgeGroupResponses, StartOrcidConfirmationData, StartOrcidConfirmationErrors, StartOrcidConfirmationResponses, StreamChatRunData, StreamChatRunErrors, StreamChatRunResponse, StreamChatRunResponses, StreamJobData, StreamJobErrors, StreamJobResponse, StreamJobResponses, UnblockData, UnblockErrors, UnblockResponses, UnfollowDiseaseData, UnfollowDiseaseErrors, UnfollowDiseaseResponses, UpdateSettingsData, UpdateSettingsErrors, UpdateSettingsResponses, UploadDocumentData, UploadDocumentErrors, UploadDocumentResponses, WithdrawVerificationRequestData, WithdrawVerificationRequestErrors, WithdrawVerificationRequestResponses } from './types.gen';
+import type { AcceptThreadData, AcceptThreadErrors, AcceptThreadResponses, AuthCallbackData, AuthGoogleCallbackData, AuthGoogleCallbackErrors, AuthGoogleStartData, AuthGoogleStartErrors, AuthLoopbackCallbackData, AuthStartData, AuthStartErrors, BlockThreadParticipantData, BlockThreadParticipantErrors, BlockThreadParticipantResponses, CancelChatRunData, CancelChatRunErrors, CancelChatRunResponses, ChatData, ChatErrors, ChatResponse, ChatResponses, CloseCallData, CloseCallErrors, CloseCallResponses, ConfirmFindingData, ConfirmFindingErrors, ConfirmFindingResponses, CreateCallData, CreateCallErrors, CreateCallResponses, CreateContributionData, CreateContributionErrors, CreateContributionResponses, CreateProposalData, CreateProposalErrors, CreateProposalResponses, DeclineThreadData, DeclineThreadErrors, DeclineThreadResponses, DeleteCallData, DeleteCallErrors, DeleteCallResponses, DeleteChatSessionData, DeleteChatSessionErrors, DeleteChatSessionResponses, DeleteContributionData, DeleteContributionErrors, DeleteContributionResponses, DeleteDocumentData, DeleteDocumentErrors, DeleteDocumentResponses, DeleteMeData, DeleteMeErrors, DeleteMeResponses, DeleteMessageData, DeleteMessageErrors, DeleteMessageResponses, DeleteProfessionalProfileData, DeleteProfessionalProfileErrors, DeleteProfessionalProfileResponses, ExplainPathData, ExplainPathErrors, ExplainPathResponse, ExplainPathResponses, ExportGraphData, ExportGraphErrors, ExportGraphResponses, ExportMyDataData, ExportMyDataErrors, ExportMyDataResponses, FindPathData, FindPathErrors, FindPathResponses, FlagEdgeData, FlagEdgeErrors, FlagEdgeResponses, FollowDiseaseData, FollowDiseaseErrors, FollowDiseaseResponses, FollowProfileDiseasesData, FollowProfileDiseasesErrors, FollowProfileDiseasesResponses, GapSearchData, GapSearchErrors, GapSearchResponse, GapSearchResponses, GetAtlasData, GetAtlasErrors, GetAtlasResponses, GetAtlasSummaryData, GetAtlasSummaryErrors, GetAtlasSummaryResponses, GetAtlasTreeData, GetAtlasTreeErrors, GetAtlasTreeResponses, GetCallData, GetCallErrors, GetCallResponses, GetChatSessionData, GetChatSessionErrors, GetChatSessionResponses, GetConnectStatusData, GetConnectStatusErrors, GetConnectStatusResponses, GetEdgeEvidenceData, GetEdgeEvidenceErrors, GetEdgeEvidenceResponses, GetMessageUnreadCountData, GetMessageUnreadCountErrors, GetMessageUnreadCountResponses, GetMyCallData, GetMyCallErrors, GetMyCallResponses, GetMyCardData, GetMyCardErrors, GetMyCardResponses, GetNeighborhoodData, GetNeighborhoodErrors, GetNeighborhoodResponses, GetNodeData, GetNodeErrors, GetNodeResponses, GetPersonCardData, GetPersonCardErrors, GetPersonCardResponses, GetProfessionalProfileData, GetProfessionalProfileErrors, GetProfessionalProfileResponses, GetProfileData, GetProfileErrors, GetProfileResponses, GetSessionData, GetSessionResponses, GetStatsData, GetStatsResponses, GetThreadData, GetThreadErrors, GetThreadResponses, GetUnreadNotificationCountData, GetUnreadNotificationCountErrors, GetUnreadNotificationCountResponses, GrantConsentData, GrantConsentErrors, GrantConsentResponses, HealthData, HealthResponses, HideThreadData, HideThreadErrors, HideThreadResponses, ListBlocksData, ListBlocksErrors, ListBlocksResponses, ListCallsData, ListCallsErrors, ListCallsResponses, ListChatRunsData, ListChatRunsErrors, ListChatRunsResponses, ListChatSessionsData, ListChatSessionsErrors, ListChatSessionsResponses, ListClustersData, ListClustersErrors, ListClustersResponses, ListConsentsData, ListConsentsErrors, ListConsentsResponses, ListContributionsData, ListContributionsErrors, ListContributionsResponses, ListDocumentsData, ListDocumentsErrors, ListDocumentsResponses, ListFindingsData, ListFindingsErrors, ListFindingsResponses, ListFollowsData, ListFollowsErrors, ListFollowsResponses, ListMyCallsData, ListMyCallsErrors, ListMyCallsResponses, ListNotificationsData, ListNotificationsErrors, ListNotificationsResponses, ListPeopleData, ListPeopleErrors, ListPeopleResponses, ListThreadsData, ListThreadsErrors, ListThreadsResponses, LogoutData, LogoutResponses, MarkNotificationsReadData, MarkNotificationsReadErrors, MarkNotificationsReadResponses, MatchAtlasEntryData, MatchAtlasEntryErrors, MatchAtlasEntryResponses, OpenThreadData, OpenThreadErrors, OpenThreadResponses, OrcidCallbackData, PutMyCardData, PutMyCardErrors, PutMyCardResponses, PutProfessionalProfileData, PutProfessionalProfileErrors, PutProfessionalProfileResponses, PutProfileData, PutProfileErrors, PutProfileResponses, RejectFindingData, RejectFindingErrors, RejectFindingResponses, ReportThreadData, ReportThreadErrors, ReportThreadResponses, RequestVerificationData, RequestVerificationErrors, RequestVerificationResponses, RevokeConsentData, RevokeConsentErrors, RevokeConsentResponses, SearchData, SearchErrors, SearchResponses, SendMessageData, SendMessageErrors, SendMessageResponses, SetConnectAgeGroupData, SetConnectAgeGroupErrors, SetConnectAgeGroupResponses, StartOrcidConfirmationData, StartOrcidConfirmationErrors, StartOrcidConfirmationResponses, StreamChatRunData, StreamChatRunErrors, StreamChatRunResponse, StreamChatRunResponses, StreamJobData, StreamJobErrors, StreamJobResponse, StreamJobResponses, SubmitCallData, SubmitCallErrors, SubmitCallResponses, UnblockData, UnblockErrors, UnblockResponses, UnfollowDiseaseData, UnfollowDiseaseErrors, UnfollowDiseaseResponses, UpdateCallData, UpdateCallErrors, UpdateCallResponses, UpdateSettingsData, UpdateSettingsErrors, UpdateSettingsResponses, UploadDocumentData, UploadDocumentErrors, UploadDocumentResponses, WithdrawVerificationRequestData, WithdrawVerificationRequestErrors, WithdrawVerificationRequestResponses } from './types.gen';
 
 export type Options<TData extends TDataShape = TDataShape, ThrowOnError extends boolean = boolean, TResponse = unknown> = Options2<TData, ThrowOnError, TResponse> & {
     /**
@@ -778,3 +778,87 @@ export const listBlocks = <ThrowOnError extends boolean = false>(options?: Optio
  * Lift a block; conversations it blocked reopen unless the other side blocked me too.
  */
 export const unblock = <ThrowOnError extends boolean = false>(options: Options<UnblockData, ThrowOnError>): RequestResult<UnblockResponses, UnblockErrors, ThrowOnError> => (options.client ?? client).delete<UnblockResponses, UnblockErrors, ThrowOnError>({ url: '/me/blocks/{block_id}', ...options });
+
+/**
+ * List Calls
+ *
+ * Every published call that is still open, newest first, with its publisher's card. The
+ * list is the same for every user (filter by disease in the client: disease IDs are health
+ * data and stay out of URLs).
+ */
+export const listCalls = <ThrowOnError extends boolean = false>(options?: Options<ListCallsData, ThrowOnError>): RequestResult<ListCallsResponses, ListCallsErrors, ThrowOnError> => (options?.client ?? client).get<ListCallsResponses, ListCallsErrors, ThrowOnError>({ url: '/calls', ...options });
+
+/**
+ * Get Call
+ *
+ * One published, still open call. 404 for anything else (own drafts: GET /me/calls/{id}).
+ */
+export const getCall = <ThrowOnError extends boolean = false>(options: Options<GetCallData, ThrowOnError>): RequestResult<GetCallResponses, GetCallErrors, ThrowOnError> => (options.client ?? client).get<GetCallResponses, GetCallErrors, ThrowOnError>({ url: '/calls/{call_id}', ...options });
+
+/**
+ * List My Calls
+ *
+ * The user's own calls in every status, and whether they may publish.
+ */
+export const listMyCalls = <ThrowOnError extends boolean = false>(options?: Options<ListMyCallsData, ThrowOnError>): RequestResult<ListMyCallsResponses, ListMyCallsErrors, ThrowOnError> => (options?.client ?? client).get<ListMyCallsResponses, ListMyCallsErrors, ThrowOnError>({ url: '/me/calls', ...options });
+
+/**
+ * Create Call
+ *
+ * Write a call as a draft. 403 unless the user is a verified doctor or researcher with a
+ * visible card; 409 at 10 draft, pending and published calls; 422 names the invalid field
+ * (atlas IDs must exist; studies and trials need `ethics_reference`, trials `registry_id`).
+ */
+export const createCall = <ThrowOnError extends boolean = false>(options: Options<CreateCallData, ThrowOnError>): RequestResult<CreateCallResponses, CreateCallErrors, ThrowOnError> => (options.client ?? client).post<CreateCallResponses, CreateCallErrors, ThrowOnError>({
+    url: '/me/calls',
+    ...options,
+    headers: {
+        'Content-Type': 'application/json',
+        ...options.headers
+    }
+});
+
+/**
+ * Delete Call
+ *
+ * Delete one of the user's calls in any status, with its review log.
+ */
+export const deleteCall = <ThrowOnError extends boolean = false>(options: Options<DeleteCallData, ThrowOnError>): RequestResult<DeleteCallResponses, DeleteCallErrors, ThrowOnError> => (options.client ?? client).delete<DeleteCallResponses, DeleteCallErrors, ThrowOnError>({ url: '/me/calls/{call_id}', ...options });
+
+/**
+ * Get My Call
+ *
+ * One of the user's own calls, with the review note and the wording check result.
+ */
+export const getMyCall = <ThrowOnError extends boolean = false>(options: Options<GetMyCallData, ThrowOnError>): RequestResult<GetMyCallResponses, GetMyCallErrors, ThrowOnError> => (options.client ?? client).get<GetMyCallResponses, GetMyCallErrors, ThrowOnError>({ url: '/me/calls/{call_id}', ...options });
+
+/**
+ * Update Call
+ *
+ * Replace a draft, rejected or pending call; it becomes a draft and must be submitted again.
+ * 409 for published, closed and withdrawn calls.
+ */
+export const updateCall = <ThrowOnError extends boolean = false>(options: Options<UpdateCallData, ThrowOnError>): RequestResult<UpdateCallResponses, UpdateCallErrors, ThrowOnError> => (options.client ?? client).put<UpdateCallResponses, UpdateCallErrors, ThrowOnError>({
+    url: '/me/calls/{call_id}',
+    ...options,
+    headers: {
+        'Content-Type': 'application/json',
+        ...options.headers
+    }
+});
+
+/**
+ * Submit Call
+ *
+ * Send the call to the Amber team for review (status pending_review). 422 when the wording
+ * check finds an offer, promise or price of a treatment (the message names field and rule) or
+ * an atlas ID has left the atlas.
+ */
+export const submitCall = <ThrowOnError extends boolean = false>(options: Options<SubmitCallData, ThrowOnError>): RequestResult<SubmitCallResponses, SubmitCallErrors, ThrowOnError> => (options.client ?? client).post<SubmitCallResponses, SubmitCallErrors, ThrowOnError>({ url: '/me/calls/{call_id}/submit', ...options });
+
+/**
+ * Close Call
+ *
+ * End a published call (closed) or pull an unpublished one (withdrawn). Idempotent.
+ */
+export const closeCall = <ThrowOnError extends boolean = false>(options: Options<CloseCallData, ThrowOnError>): RequestResult<CloseCallResponses, CloseCallErrors, ThrowOnError> => (options.client ?? client).post<CloseCallResponses, CloseCallErrors, ThrowOnError>({ url: '/me/calls/{call_id}/close', ...options });
