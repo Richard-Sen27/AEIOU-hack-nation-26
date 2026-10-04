@@ -7,6 +7,7 @@ import { cn } from "@/lib/utils";
 
 import { ConsentsSection } from "./consents-section";
 import { ContributionsSection } from "./contributions-section";
+import { FollowingSection } from "./following-section";
 import { DataRights, GpcStatus } from "./privacy-choices";
 import { ProfileEditor } from "./profile-editor";
 import { SettingsSection } from "./settings-section";
@@ -15,6 +16,7 @@ import { WORK_DETAILS_NOTE, WorkDetailsForm } from "./work-details";
 
 const SECTIONS = [
   { id: "health-profile", title: "Health profile" },
+  { id: "following", title: "Following" },
   { id: "your-work", title: "Your work" },
   { id: "settings", title: "Settings" },
   { id: "consents", title: "Consents" },
@@ -93,6 +95,9 @@ export function ProfilePage() {
           }
         >
           <ProfileEditor />
+        </Panel>
+        <Panel id="following" title="Following" description="Diseases you follow. New atlas entries show under the bell.">
+          <FollowingSection />
         </Panel>
         {professional && (
           <Panel id="your-work" title="Your work" description={WORK_DETAILS_NOTE}>
