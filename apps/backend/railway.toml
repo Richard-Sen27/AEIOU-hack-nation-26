@@ -10,8 +10,9 @@ watchPatterns = ["/apps/backend/**"]
 [deploy]
 # Schema first, as atlas_owner (MIGRATION_DATABASE_URL); a failure keeps the old deployment.
 preDeployCommand = ["alembic upgrade head"]
-# "::" also accepts IPv4 and serves Railway's private network (IPv6) for the frontend's proxy.
-startCommand = "uvicorn backend.main:app --host :: --port 8000 --no-access-log"
+# An empty host binds IPv4 and IPv6: the health check arrives over IPv4, the frontend's proxy over
+# the private network. With uvicorn, "::" listens on IPv6 only and the health check never passes.
+startCommand = "python -c \"import uvicorn; uvicorn.run('backend.main:app', host='', port=8000, access_log=False)\""
 # /health answers only after the graph is loaded into memory at start-up.
 healthcheckPath = "/health"
 healthcheckTimeout = 300
