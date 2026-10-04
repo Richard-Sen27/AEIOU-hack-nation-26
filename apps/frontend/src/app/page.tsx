@@ -8,18 +8,18 @@ import { FlipWords } from "@/components/ui/flip-words";
 const QUESTIONS = [
   {
     icon: Users,
-    title: "Who shares our disease characteristics?",
-    body: "Conditions with the same cause in the body or similar symptoms, even under another name.",
+    title: "Who is like us?",
+    body: "Same cause or symptoms, any name.",
   },
   {
     icon: Network,
-    title: "What useful work already exists?",
-    body: "Registries, natural history studies, models and trials you could reuse instead of rebuilding.",
+    title: "What already exists?",
+    body: "Registries, studies and trials to reuse.",
   },
   {
     icon: ShieldCheck,
-    title: "What should we do together next?",
-    body: "Shared researchers and funders, and one concrete next step. Every link shows its source.",
+    title: "What do we do next?",
+    body: "Shared experts, funders and one next step.",
   },
 ];
 
@@ -48,8 +48,7 @@ export default function Home() {
               <br className="hidden sm:block" /> and find who you have in common.
             </h1>
             <p className="mt-4 max-w-xl text-base leading-relaxed text-pretty text-muted-foreground sm:text-lg">
-              A map of rare diseases where every connection shows its source, how sure we are, and
-              whether it is data or a hypothesis.
+              A rare disease map. Every link shows its source.
             </p>
           </>
         }
@@ -60,13 +59,13 @@ export default function Home() {
             </h2>
             <ol className="grid gap-px overflow-hidden rounded-xl border bg-border sm:grid-cols-3">
               {QUESTIONS.map((q, i) => (
-                <li key={q.title} className="bg-card p-5">
+                <li key={q.title} className="bg-card p-4">
                   <div className="flex items-center gap-2 text-muted-foreground">
                     <span className="font-mono text-[11px] tabular">0{i + 1}</span>
                     <q.icon className="size-4 text-primary" aria-hidden />
                   </div>
-                  <h3 className="mt-3 text-[15px] font-semibold tracking-tight">{q.title}</h3>
-                  <p className="mt-1.5 text-sm leading-relaxed text-muted-foreground">{q.body}</p>
+                  <h3 className="mt-2 text-[15px] font-semibold tracking-tight">{q.title}</h3>
+                  <p className="mt-1 text-sm leading-relaxed text-muted-foreground">{q.body}</p>
                 </li>
               ))}
             </ol>
