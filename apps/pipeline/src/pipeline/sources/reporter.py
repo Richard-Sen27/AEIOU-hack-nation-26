@@ -28,6 +28,9 @@ from pipeline.extract.common import (
     person_name_key,
     request,
     researcher_id,
+    reusable_searches,
+    settings_key,
+    split_searches,
     write_fingerprint,
 )
 from pipeline.http import get_client
@@ -70,20 +73,29 @@ def _searches(scope: Scope) -> list[dict[str, Any]]:
     return out
 
 
+SEARCH_KEY = ("target_id", "text", "cap")
+
+
 async def fetch(scope: Scope | None) -> None:
     if scope is None:
         log.warning("reporter: no scope; nothing to fetch")
         return
+    scope = scope.focus()
     out = RAW / NAME
     out.mkdir(parents=True, exist_ok=True)
+    skey = settings_key(cfg.model_dump())
     fingerprint = fetch_fingerprint(scope, cfg.model_dump())
+    previous = reusable_searches(out, NAME, skey)
     if fetch_is_current(out, NAME, fingerprint, ["projects.json", "searches.json"]):
         log.info("%s: raw data is current for this scope and settings; skipping fetch", NAME)
         return
-    projects: dict[str, dict[str, Any]] = {}
-    searches = _searches(scope)
+    reused, todo = split_searches(_searches(scope), previous, SEARCH_KEY)
+    log.info("reporter: %d searches reused, %d to run", len(reused), len(todo))
+    projects: dict[str, dict[str, Any]] = (
+        json.loads((out / "projects.json").read_text()) if reused else {}
+    )
     async with get_client(NAME) as client:
-        for s in searches:
+        for s in todo:
             ids: list[str] = []
             offset = 0
             while len(ids) < s["cap"]:
@@ -111,11 +123,16 @@ async def fetch(scope: Scope | None) -> None:
                 if not results or offset >= data.get("meta", {}).get("total", 0):
                     break
             s["appl_ids"] = ids[: s["cap"]]
+    order = {s["target_id"]: i for i, s in enumerate(_searches(scope))}
+    searches = sorted(reused + todo, key=lambda s: order[s["target_id"]])
+    # Keep exactly the projects the current searches found (as a fresh fetch would).
+    wanted = {a for s in searches for a in s.get("appl_ids", [])}
+    projects = {k: v for k, v in projects.items() if k in wanted}
     (out / "projects.json").write_text(json.dumps(projects, ensure_ascii=False))
     (out / "searches.json").write_text(json.dumps(searches, indent=1))
     record_raw(NAME, API, out / "projects.json", "v2", projects=len(projects))
     record_raw(NAME, API, out / "searches.json", "v2")
-    write_fingerprint(out, fingerprint)
+    write_fingerprint(out, fingerprint, skey)
     log.info("reporter: %d searches, %d project-years", len(searches), len(projects))
 
 
@@ -138,6 +155,7 @@ def _title_case(name: str | None) -> str:
 
 
 def normalize(scope: Scope) -> None:
+    scope = scope.focus()
     raw = RAW / NAME
     if not (raw / "projects.json").exists():
         log.warning("reporter: no raw data; writing empty tables")

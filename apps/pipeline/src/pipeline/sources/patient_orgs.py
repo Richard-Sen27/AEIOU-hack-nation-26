@@ -163,6 +163,7 @@ async def _discover(client, scope: Scope) -> list[str]:
 
 async def fetch(scope: Scope | None) -> None:
     data = load_curated()
+    scope = scope.focus() if scope is not None else None
     out = RAW / NAME
     out.mkdir(parents=True, exist_ok=True)
     discovery = bool(settings.brightdata_api_key and bd.serp_zone)
@@ -204,6 +205,7 @@ def load_pages() -> list[dict[str, Any]]:
 
 
 def normalize(scope: Scope) -> None:
+    scope = scope.focus()
     data = load_curated()
     pages = {p["url"]: p for p in load_pages()}
     in_scope = scope.disease_ids

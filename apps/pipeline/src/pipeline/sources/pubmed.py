@@ -15,6 +15,7 @@ import re
 import xml.etree.ElementTree as ET
 from collections import defaultdict
 from dataclasses import dataclass, field
+from pathlib import Path
 from typing import Any
 
 import polars as pl
@@ -34,7 +35,10 @@ from pipeline.extract.common import (
     person_name_key,
     request,
     researcher_id,
+    reusable_searches,
     scrub_contacts,
+    settings_key,
+    split_searches,
     write_fingerprint,
 )
 from pipeline.http import get_client
@@ -132,41 +136,59 @@ async def _esearch(client, term: str, retmax: int) -> list[str]:
     return r.json()["esearchresult"].get("idlist", [])
 
 
+SEARCH_KEY = ("target_id", "kind", "query", "cap")
+
+
+def fetched_pmids(raw: Path) -> set[str]:
+    """PMIDs already present in the efetch files of earlier fetches."""
+    found: set[str] = set()
+    for f in raw.glob("efetch_*.xml"):
+        found |= {a["pmid"] for a in parse_articles(f.read_bytes())}
+    return found
+
+
 async def fetch(scope: Scope | None) -> None:
     if scope is None:
         log.warning("pubmed: no scope; nothing to fetch")
         return
+    scope = scope.focus()
     out = RAW / NAME
     out.mkdir(parents=True, exist_ok=True)
+    skey = settings_key(cfg.model_dump())
     fingerprint = fetch_fingerprint(scope, cfg.model_dump())
+    previous = reusable_searches(out, NAME, skey)
     if fetch_is_current(out, NAME, fingerprint, ["searches.json"]):
         log.info("%s: raw data is current for this scope and settings; skipping fetch", NAME)
         return
     specs = build_searches(scope)
+    reused, todo = split_searches([s.__dict__ for s in specs], previous, SEARCH_KEY)
+    log.info("pubmed: %d searches reused, %d to run", len(reused), len(todo))
+    have = fetched_pmids(out) if reused else set()
+    if not reused:
+        for p in out.glob("efetch_*.xml"):
+            p.unlink()
     async with get_client(NAME) as client:
-        for spec in specs:
-            n_reviews = max(1, round(spec.cap * cfg.review_share))
-            reviews = await _esearch(client, f"{spec.query} AND review[pt]", n_reviews)
-            ranked = await _esearch(client, spec.query, spec.cap)
-            merged = list(dict.fromkeys(reviews + ranked))[: spec.cap]
-            spec.pmids = merged
-        searches = [spec.__dict__ for spec in specs]
+        for spec in todo:
+            n_reviews = max(1, round(spec["cap"] * cfg.review_share))
+            reviews = await _esearch(client, f"{spec['query']} AND review[pt]", n_reviews)
+            ranked = await _esearch(client, spec["query"], spec["cap"])
+            spec["pmids"] = list(dict.fromkeys(reviews + ranked))[: spec["cap"]]
+        by_target = {(s["target_id"], s["kind"]): s for s in reused + todo}
+        searches = [by_target[(s.target_id, s.kind)] for s in specs]
         (out / "searches.json").write_text(json.dumps(searches, indent=1))
         record_raw(NAME, f"{EUTILS}/esearch.fcgi", out / "searches.json", "esearch")
 
-        pmids = sorted({p for s in specs for p in s.pmids}, key=int)
-        log.info("pubmed: %d searches, %d unique PMIDs", len(specs), len(pmids))
-        old = [p for p in out.glob("efetch_*.xml")]
-        for p in old:
-            p.unlink()
+        pmids = sorted({p for s in searches for p in s["pmids"]} - have, key=int)
+        log.info("pubmed: %d searches, %d PMIDs to fetch", len(searches), len(pmids))
+        start = 1 + max((int(p.stem.split("_")[1]) for p in out.glob("efetch_*.xml")), default=-1)
         for i in range(0, len(pmids), EFETCH_BATCH):
             batch = pmids[i : i + EFETCH_BATCH]
             data = {"db": "pubmed", "id": ",".join(batch), "retmode": "xml", **_identity_params()}
             r = await request(client, "POST", f"{EUTILS}/efetch.fcgi", data=data, pace=PACE)
-            path = out / f"efetch_{i // EFETCH_BATCH:04d}.xml"
+            path = out / f"efetch_{start + i // EFETCH_BATCH:04d}.xml"
             path.write_bytes(r.content)
             record_raw(NAME, f"{EUTILS}/efetch.fcgi", path, "efetch", pmids=len(batch))
-    write_fingerprint(out, fingerprint)
+    write_fingerprint(out, fingerprint, skey)
 
 
 # ---------------------------------------------------------------------------------------------
@@ -265,6 +287,7 @@ def supporting_sentence(paper: dict[str, Any], terms: list[str], kind: str) -> s
 
 
 def normalize(scope: Scope) -> None:
+    scope = scope.focus()
     raw = RAW / NAME
     searches_file = raw / "searches.json"
     if not searches_file.exists():

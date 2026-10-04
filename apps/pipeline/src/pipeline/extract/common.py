@@ -400,7 +400,9 @@ async def request(client, method: str, url: str, *, pace: float = 0.0, attempts:
 
 def fetch_fingerprint(scope: Scope | None, *parts: Any) -> str:
     """Hash of everything a scoped fetch depends on: the scope's genes and diseases (ids, names,
-    seed flags) plus source-specific settings."""
+    seed flags) plus source-specific settings. Only focus entries count: growing the core of
+    the atlas never invalidates literature, trials or grants already fetched."""
+    scope = scope.focus() if scope is not None else None
     genes = sorted(
         (g["hgnc_id"], g.get("symbol"), sorted(g.get("aliases") or []), bool(g.get("seed")))
         for g in (scope.genes if scope else [])
@@ -437,12 +439,52 @@ def fetch_is_current(raw_dir: Path, source: str, fingerprint: str, outputs: list
     return current
 
 
-def write_fingerprint(raw_dir: Path, fingerprint: str) -> None:
+def write_fingerprint(raw_dir: Path, fingerprint: str, settings_key: str | None = None) -> None:
     from datetime import UTC, datetime
 
-    (raw_dir / "_fingerprint.json").write_text(
-        json.dumps({"fingerprint": fingerprint, "written_at": datetime.now(UTC).isoformat()})
-    )
+    body = {"fingerprint": fingerprint, "written_at": datetime.now(UTC).isoformat()}
+    if settings_key is not None:
+        body["settings"] = settings_key
+    (raw_dir / "_fingerprint.json").write_text(json.dumps(body))
+
+
+def settings_key(settings: Any) -> str:
+    """Hash of a source's fetch settings (stored next to the fingerprint)."""
+    return hashlib.sha256(json.dumps(settings, sort_keys=True, default=str).encode()).hexdigest()
+
+
+def reusable_searches(raw_dir: Path, source: str, key: str, file: str = "searches.json"):
+    """Searches of the last complete fetch that may be reused, or [].
+
+    Read before ``fetch_is_current`` (which removes a stale marker). Reuse needs a complete
+    earlier fetch (its marker), no ``PIPELINE_REFRESH`` for the source and the same fetch
+    settings (markers written before settings were recorded are accepted: every reused search
+    is also matched on its exact query and cap). A grown focus set then fetches only its new
+    entries."""
+    marker = raw_dir / "_fingerprint.json"
+    if refresh_requested(source) or not marker.exists() or not (raw_dir / file).exists():
+        return []
+    try:
+        meta = json.loads(marker.read_text())
+        searches = json.loads((raw_dir / file).read_text())
+    except ValueError:
+        return []
+    if meta.get("settings") not in (None, key):
+        return []
+    return searches if isinstance(searches, list) else []
+
+
+def split_searches(
+    wanted: list[dict[str, Any]], previous: list[dict[str, Any]], key_fields: tuple[str, ...]
+) -> tuple[list[dict[str, Any]], list[dict[str, Any]]]:
+    """(reused, todo): each wanted search either takes the result of an identical previous
+    search (same values for ``key_fields``) or still has to be run."""
+    done = {tuple(p.get(k) for k in key_fields): p for p in previous}
+    reused, todo = [], []
+    for w in wanted:
+        hit = done.get(tuple(w.get(k) for k in key_fields))
+        (reused.append({**w, **hit}) if hit is not None else todo.append(w))
+    return reused, todo
 
 
 def json_attrs(**kwargs: Any) -> str:

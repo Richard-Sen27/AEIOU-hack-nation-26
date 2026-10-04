@@ -8,7 +8,7 @@ async def run(scope=None) -> None:
     from pipeline.extract import abstracts, patient_orgs
     from pipeline.llm import LLMRun
 
-    scope = scope or load_scope()
+    scope = (scope or load_scope()).focus()
     llm_run = LLMRun.start()
     await abstracts.run(scope, llm_run)
     await patient_orgs.run(scope, llm_run)

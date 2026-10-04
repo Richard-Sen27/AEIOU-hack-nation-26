@@ -26,6 +26,9 @@ from pipeline.extract.common import (
     json_attrs,
     person_name_key,
     request,
+    reusable_searches,
+    settings_key,
+    split_searches,
     write_fingerprint,
 )
 from pipeline.http import get_client
@@ -108,20 +111,30 @@ def _searches(scope: Scope) -> list[dict[str, Any]]:
     return out
 
 
+SEARCH_KEY = ("target_id", "param", "value", "cap")
+
+
 async def fetch(scope: Scope | None) -> None:
     if scope is None:
         log.warning("clinicaltrials: no scope; nothing to fetch")
         return
+    scope = scope.focus()
     out = RAW / NAME
     out.mkdir(parents=True, exist_ok=True)
+    skey = settings_key(cfg.model_dump())
     fingerprint = fetch_fingerprint(scope, cfg.model_dump())
+    previous = reusable_searches(out, NAME, skey)
     if fetch_is_current(out, NAME, fingerprint, ["studies.json", "searches.json"]):
         log.info("%s: raw data is current for this scope and settings; skipping fetch", NAME)
         return
-    studies: dict[str, dict[str, Any]] = {}
-    searches = _searches(scope)
+    reused, todo = split_searches(_searches(scope), previous, SEARCH_KEY)
+    log.info("clinicaltrials: %d searches reused, %d to run", len(reused), len(todo))
+    studies: dict[str, dict[str, Any]] = (
+        json.loads((out / "studies.json").read_text()) if reused else {}
+    )
+    version = (raw_record(NAME, "studies.json") or {}).get("source_version") if reused else None
     async with get_client(NAME) as client:
-        for s in searches:
+        for s in todo:
             ids: list[str] = []
             token = None
             while len(ids) < s["cap"]:
@@ -133,6 +146,7 @@ async def fetch(scope: Scope | None) -> None:
                 if token:
                     params["pageToken"] = token
                 r = await request(client, "GET", API, params=params, pace=0.2)
+                version = r.headers.get("x-api-version") or version
                 data = r.json()
                 for st in data.get("studies", []):
                     nct = st["protocolSection"]["identificationModule"]["nctId"]
@@ -142,12 +156,16 @@ async def fetch(scope: Scope | None) -> None:
                 if not token:
                     break
             s["nct_ids"] = ids[: s["cap"]]
+    order = {s["target_id"]: i for i, s in enumerate(_searches(scope))}
+    searches = sorted(reused + todo, key=lambda s: order[s["target_id"]])
+    # Keep exactly the studies the current searches found (as a fresh fetch would).
+    wanted = {n for s in searches for n in s.get("nct_ids", [])}
+    studies = {k: v for k, v in studies.items() if k in wanted}
     (out / "studies.json").write_text(json.dumps(studies, ensure_ascii=False))
     (out / "searches.json").write_text(json.dumps(searches, indent=1))
-    version = r.headers.get("x-api-version") if searches else None
     record_raw(NAME, API, out / "studies.json", version, studies=len(studies))
     record_raw(NAME, API, out / "searches.json", version)
-    write_fingerprint(out, fingerprint)
+    write_fingerprint(out, fingerprint, skey)
     log.info("clinicaltrials: %d searches, %d unique studies", len(searches), len(studies))
 
 
@@ -218,6 +236,7 @@ def _trial_attrs(ps: dict[str, Any]) -> str:
 
 
 def normalize(scope: Scope) -> None:
+    scope = scope.focus()
     raw = RAW / NAME
     if not (raw / "studies.json").exists():
         log.warning("clinicaltrials: no raw data; writing empty tables")

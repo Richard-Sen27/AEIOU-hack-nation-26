@@ -106,6 +106,7 @@ def _embedder():
 
 
 async def run(scope: Scope) -> None:
+    scope = scope.focus()  # model-assisted linking stays with the focus set
     items = leftovers(scope)
     LOGS.mkdir(parents=True, exist_ok=True)
     log_path = LOGS / "linking.jsonl"

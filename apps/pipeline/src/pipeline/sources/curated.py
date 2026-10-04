@@ -83,6 +83,7 @@ def _disease(name: str, scope: Scope, diseases: dict[str, str]) -> str | None:
 
 
 def normalize(scope: Scope) -> None:
+    scope = scope.focus()  # curated facts are about focus diseases and genes
     summaries = json.loads((RAW / "curated" / "esummary.json").read_text())["result"]
     retrieved = raw_record("curated", "esummary.json")["retrieved_at"]
     diseases: dict[str, str] = {}
