@@ -27,7 +27,7 @@ type SessionContextValue = {
   dataVersion: string | null;
   /** `offline`: the API could not be reached; the app runs as a guest. */
   status: SessionStatus;
-  /** Sign-in methods the API offers (`google` only when the server enables it). */
+  /** Sign-in methods the API offers (`openai` only where it can work, `google` only when enabled; may be empty). */
   signInMethods: AuthProvider[];
   /**
    * Navigate to the ChatGPT (default) or Google sign-in. `returnTo` must be a
@@ -118,7 +118,7 @@ export function SessionProvider({ children }: { children: React.ReactNode }) {
       demoMode: !!session.demo_mode,
       dataVersion: session.data_version ?? null,
       status,
-      signInMethods: session.sign_in_methods?.length ? session.sign_in_methods : ["openai"],
+      signInMethods: session.sign_in_methods ?? ["openai"],
       signIn,
       signOut,
       refresh,

@@ -3,7 +3,7 @@
 import { BadgeCheck, Bot, FileSearch, ListChecks, MessageCircleQuestion, WifiOff } from "lucide-react";
 import Link from "next/link";
 
-import { SignInButtons, useGoogleSignIn } from "@/components/gates/sign-in-buttons";
+import { SignInButtons, useChatGPTSignIn, useGoogleSignIn } from "@/components/gates/sign-in-buttons";
 import { AiDisclosure } from "@/components/shell/ai-disclosure";
 import { buttonVariants } from "@/components/ui/button";
 import { cn } from "@/lib/utils";
@@ -18,6 +18,7 @@ const POINTS = [
 /** What Dr. Wu does, for guests, with the sign-in affordance. No broken chat. */
 export function ChatGuest({ offline }: { offline?: boolean }) {
   const google = useGoogleSignIn();
+  const chatgpt = useChatGPTSignIn();
   return (
     <div className="mx-auto w-full max-w-3xl px-4 py-10 sm:px-6 sm:py-14" data-testid="chat-guest">
       <span className="flex size-11 items-center justify-center rounded-full bg-primary/15 text-primary">
@@ -28,7 +29,11 @@ export function ChatGuest({ offline }: { offline?: boolean }) {
         Describe it in your own words, get cited connections back
       </h1>
       <p className="mt-3 text-[15px] leading-relaxed text-pretty text-muted-foreground">
-        {google ? "An AI assistant. Sign in to start." : "An AI assistant on your own ChatGPT plan. Sign in to start."}
+        {chatgpt && !google
+          ? "An AI assistant on your own ChatGPT plan. Sign in to start."
+          : google
+            ? "An AI assistant. Sign in to start."
+            : "An AI assistant."}
       </p>
       <AiDisclosure variant="line" className="mt-4" />
       {offline && (

@@ -11,7 +11,7 @@ import {
   DialogTitle,
 } from "@/components/ui/dialog";
 
-import { SignInButtons, useGoogleSignIn } from "./sign-in-buttons";
+import { SignInButtons, useChatGPTSignIn, useGoogleSignIn } from "./sign-in-buttons";
 
 /**
  * The inline sign-in dialog (system spec, Sign-in → Flow, step 2) with the
@@ -31,6 +31,13 @@ export function SignInDialog({
   onOpenChange: (open: boolean) => void;
 }) {
   const google = useGoogleSignIn();
+  const chatgpt = useChatGPTSignIn();
+  const intro =
+    chatgpt && google
+      ? "With ChatGPT, Dr. Wu runs on your own plan. The atlas stays open to everyone."
+      : chatgpt
+        ? "Dr. Wu, the AI assistant, runs on your own ChatGPT plan. The atlas stays open to everyone."
+        : "The atlas stays open to everyone.";
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogContent className="gap-0 overflow-hidden p-0 sm:max-w-md" data-testid="sign-in-dialog">
@@ -44,9 +51,7 @@ export function SignInDialog({
             </DialogTitle>
             <DialogDescription className="text-sm leading-relaxed text-muted-foreground">
               {reason ? `${reason} ` : ""}
-              {google
-                ? "With ChatGPT, Dr. Wu runs on your own plan. The atlas stays open to everyone."
-                : "Dr. Wu, the AI assistant, runs on your own ChatGPT plan. The atlas stays open to everyone."}
+              {intro}
             </DialogDescription>
           </DialogHeader>
 
@@ -66,9 +71,12 @@ export function SignInDialog({
           </h3>
           <ul className="list-disc space-y-1 pl-4">
             <li>
-              <span className="text-foreground">{google ? "From OpenAI or Google:" : "From OpenAI:"}</span>{" "}
-              your name, email address and account ID to create your account. With ChatGPT also an
-              access token, stored encrypted, so Dr. Wu&apos;s requests run on your ChatGPT plan.
+              <span className="text-foreground">
+                {chatgpt && google ? "From OpenAI or Google:" : google ? "From Google:" : "From OpenAI:"}
+              </span>{" "}
+              your name, email address and account ID to create your account.
+              {chatgpt &&
+                " With ChatGPT also an access token, stored encrypted, so Dr. Wu's requests run on your ChatGPT plan."}
               Doctors and researchers may add work details later, optional and private.
             </li>
             <li>
