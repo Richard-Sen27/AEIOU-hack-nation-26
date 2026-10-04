@@ -345,8 +345,8 @@ One database: Postgres (with pgvector) holds the pipeline's staging schema, the 
 | --- | --- |
 | `users` | `id` (UUID), `chatgpt_sub` (unique), `email`, `name`, `created_at`, `last_login_at` |
 | `openai_tokens` | `user_id`, encrypted access and refresh token, `expires_at`, `scopes` (used to bill LLM calls to the user's ChatGPT plan) |
-| `profiles` | `user_id`, `role` (patient / doctor / researcher), `role_verified`, `orcid_id`, `language`, `gpc_opt_out`; work details of doctors and researchers: `first_name`, `last_name`, `institutions` (JSON, at most 3), `atlas_node_id`, `professional_updated_at`; verification: `orcid_verified_at`, `verified_name`, `verification_method` (orcid / institutional_email, or orcid_simulated / manual_simulated in local demos), `verified_at`, `verification_reason`, `verification_request` (JSON), `atlas_link_verified`; public card (off by default): `card_id`, `card_visible`, `card_visible_since`, `card_headline`, `card_show_institutions`, `card_show_atlas_entry`, `accepts_patient_messages` |
-| `consents` | `user_id`, `consent_type` (health_data / contribute), `version`, `granted_at`, `revoked_at` |
+| `profiles` | `user_id`, `role` (patient / doctor / researcher), `role_verified`, `orcid_id`, `language`, `gpc_opt_out`; work details of doctors and researchers: `first_name`, `last_name`, `institutions` (JSON, at most 3), `atlas_node_id`, `professional_updated_at`; verification: `orcid_verified_at`, `verified_name`, `verification_method` (orcid / institutional_email, or orcid_simulated / manual_simulated in local demos), `verified_at`, `verification_reason`, `verification_request` (JSON), `atlas_link_verified`; public card (off by default): `card_id`, `card_visible`, `card_visible_since`, `card_headline`, `card_show_institutions`, `card_show_atlas_entry`, `accepts_patient_messages`; `connect_age_group` (18_plus / 16_17, self-declared), `connect_age_group_at` |
+| `consents` | `user_id`, `consent_type` (health_data / contribute / connect), `version`, `granted_at`, `revoked_at` |
 | `patient_profiles` | `user_id`, `profile` (JSON matching the `PatientProfile` schema), `updated_at` |
 | `chat_sessions` / `chat_messages` | `user_id`, session and message content |
 | `chat_runs` | `id`, `user_id`, `session_id` (unique: one running turn per session), `user_message_id`, `worker`, latest LangGraph checkpoint; exists only while the turn runs |
@@ -355,9 +355,14 @@ One database: Postgres (with pgvector) holds the pipeline's staging schema, the 
 | `contributions` | `id`, `user_id`, `kind`, `payload`, `status`, `consent_id` |
 | `edge_flags` | `edge_id`, `user_id`, `reason`, `status` |
 | `jobs` | `id`, `user_id`, `kind`, `status`, `progress`, `result` |
+| `threads` | `id`, `opener_id` (the patient), `recipient_id` (the professional), `origin` (card / signup), `call_id`, `signup_id`, `recipient_card_id`, name snapshots, `status` (requested / open / declined / closed / blocked), times; readable by both participants |
+| `thread_reads` | `thread_id`, `user_id`, `last_read_at`, `hidden_at`, `guardian_agreed_at`, `guardian_text_version` (own rows) |
+| `messages` | `id`, `thread_id`, `sender_id`, `body_enc` (Fernet, `MESSAGE_ENCRYPTION_KEY`), `created_at`; readable by both participants, deletable by the sender |
+| `blocks` / `reports` | the blocker's / reporter's own rows; a report authorizes a logged operator read of that conversation (`admin_access_log`, no API access) |
 
 **Rules**
 
+- **Messaging tables** use participant policies instead (`opener_id = me OR recipient_id = me`); a card conversation is created only by the `SECURITY DEFINER` function `open_card_thread(card_id, …)`, which resolves the card to the professional without returning a user ID, and the trigger `threads_guard` allows only the planned status changes.
 - **Row-level security** on every user table, with `FORCE ROW LEVEL SECURITY` and the policy `user_id = current_setting('app.user_id', true)::uuid` (on `users`: `id = …`). FastAPI runs `SELECT set_config('app.user_id', :user_id, true)` at the start of every request transaction, so the setting is scoped to that transaction. A bug in the API still cannot leak one user's rows to another; a request without a user sees no user rows at all.
 - **Database roles:**
   - `atlas_owner` owns the schema and runs Alembic migrations.
@@ -535,6 +540,12 @@ Detailed design in [`agent.md`](agent.md).
 | POST | `/me/professional/orcid/start` · GET `/me/professional/orcid/callback` | Signed in, doctor or researcher, rate-limited | ORCID sign-in URL (or the local simulated one) · redirect back with `?orcid=confirmed\|denied\|failed\|already_linked` |
 | POST / DELETE | `/me/professional/verification-request` | Signed in, doctor or researcher, 3 a day | Manual review request (approved at once in local demos) · withdraw it |
 | GET | `/people?disease=` · `/people/{card_id}` | Signed in, rate-limited | Visible verified cards linked to a disease through their verified atlas entry · one card |
+| GET · PUT | `/me/connect` · `/me/connect/age-group` | Signed in (PUT: + connect consent) | Connect consent state, age group, checkbox texts · state or correct the age group |
+| GET · POST | `/me/threads` | Signed in (POST: + connect consent, patients only, 5 per day) | My conversations with unread counts · a message request to a professional's card |
+| GET | `/me/threads/unread-count` · `/me/threads/{id}` | Signed in, participant | Unread messages and waiting requests · a conversation (marks it read) |
+| POST | `/me/threads/{id}/accept` · `/decline` · `/messages` | Participant + connect consent | Accept or decline a request (recipient only) · send a plain-text message |
+| DELETE · POST | `/me/threads/{id}/messages/{mid}` · `/hide` · `/block` · `/report` | Participant | Delete my message for both · hide · block the other person · report (authorizes a logged review) |
+| GET · DELETE | `/me/blocks` · `/me/blocks/{id}` | Signed in | My blocks · unblock |
 | GET | `/me/export` · DELETE `/me` | Signed in | Data export · account deletion |
 
 ## Build order
@@ -561,7 +572,7 @@ Build the graph and the read path first, so the frontend can integrate early; au
 
 - Anonymous data upload to add more data, without disclosing the private person.
 - Autonomous ingestion engine for existing papers and resources.
-- Automatic reach-out from patients to other patients and doctors.
+- Automatic reach-out from patients to other patients. (Patients writing to verified doctors and researchers themselves is built: messaging under the `connect` consent.)
 - Automatic warm introductions between research groups.
 - Automatically connecting patients to studies and trials.
 

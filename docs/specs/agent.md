@@ -18,7 +18,7 @@ Dr. Henry Wu is the conversational agent of the Amber Platform: it turns a patie
 
 - Diagnosis, treatment advice, prognosis or variant reclassification
 - Writing to the shared graph; agent output never becomes trusted evidence (gap-search results stay `pending_review`)
-- Contacting researchers, groups or funders on the user's behalf
+- Contacting researchers, groups or funders on the user's behalf. Users write to verified professionals themselves (messaging, `connect` consent); Dr. Wu never reads, sends, summarizes or drafts those messages and has no tool that reaches them
 
 **Success criteria (mapped to judging)**
 
@@ -200,6 +200,7 @@ The agent is a navigator, not a clinician: it may say what the evidence connects
 - Chat, the profile and uploads run under one `health_data` consent, asked once before the first chat message, profile save or upload; without it the agent does not process the user's messages.
 - Profiles are private to the user; contributions to the shared graph need an active `contribute` consent and are stored as `patient_reported`.
 - Gap search and web search never receive user data.
+- Messages between users (`connect` consent) never reach the agent or any model: no tool reads them, nothing is redacted or rewritten.
 - All agent LLM calls run on the signed-in user's own ChatGPT plan; guests never reach the agent.
 
 ## Output contract, prompt and runtime

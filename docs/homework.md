@@ -84,6 +84,19 @@ Work deliberately left for later. Add an item when you leave something for later
 - **Card frontend:** the endpoints and SDK exist; the profile panel, the Atlas chip ("In Amber · ORCID iD confirmed") and the card page are not built.
 - **ORCID state replay** (`orcid._used_nonces`): used states are remembered per process for 10 minutes; with several workers a replay inside that window is stopped only by ORCID's single-use code.
 
+## Messaging (connect)
+
+- **Before real patients use messaging:** `docs/dpia.md`, `docs/ropa.md` (messaging and the `connect` consent as a purpose) and `docs/incident.md` must exist; counsel must review the `connect` consent text and the banners.
+- **Minors:** messaging and sign-ups are open from 16 with a self-declared age group and a self-declared guardian agreement (`thread_reads.guardian_*`). A legal check is needed on contacting 16- and 17-year-olds and on whether a self-declared guardian agreement is enough. The professional is not told the writer is 16 or 17 today.
+- **Moderation:** reports are read only through `backend.cli read-reported-thread` (logged). There is no moderation UI, no service level, no process for acting on a report (warning, suspending a card) and no evidence copy: a reported message the sender deletes is gone.
+- **E-mail notifications:** none; new messages show only through `GET /me/threads/unread-count`. Messages are not written into the stage 1 `notifications` table (its kinds and bell are graph-shaped and its rows are filled lazily from public data; an unread count is what a stored row would add). Any future e-mail must never contain message text or health data.
+- **Daily clean-up:** `backend.cli purge-messages` (12-month inactive threads, orphaned threads, reports after 12 months, access log after 24 months) needs a scheduler on the deployment; today only the user's own threads are purged when they read their list.
+- **Development key:** without `MESSAGE_ENCRYPTION_KEY` the API derives a key from `SESSION_SECRET` while API and frontend are loopback; messages stored that way cannot be read after `SESSION_SECRET` or the key changes unless the derived key is listed in `MESSAGE_ENCRYPTION_KEY` and rotated.
+- **Operator role:** the CLI uses `atlas_owner`, which has policies on `threads`, `messages` and `reports`; a separate least-privilege operator role would be better.
+- **Sign-up threads (stage 4):** `messaging.open_signup_thread` exists; stage 4 must add foreign keys from `threads.call_id` / `signup_id` and tighten the `threads_signup_insert` policy to the sign-up's own patient.
+- **Messaging tables outside `USER_TABLES`:** `threads`, `messages`, `thread_reads`, `blocks` and `reports` are in `MESSAGING_TABLES` (`db/models.py`), because the generic owner-column tests in `tests/test_rls.py` and `test_data_rights.py` cannot seed shared rows; their RLS is proven in `tests/account/test_messaging.py`.
+- **Banners** ("You are writing to a person, not Dr. Wu", "not a medical consultation; in an emergency call 112/911", "do not give individual medical advice or prescribe through Amber") and the just-in-time `connect` dialog are frontend work still to do.
+
 ## Documents
 
 - **OCR** is basic (clean scans, English); HEIC decoding is untested.
