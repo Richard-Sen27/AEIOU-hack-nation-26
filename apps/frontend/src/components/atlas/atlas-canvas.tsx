@@ -93,8 +93,31 @@ type EdgeAttrs = {
   flagged: boolean;
 };
 
+/** Length of the colour fade between two emphasis states (selection, chain, finds). */
+const FADE_MS = 220;
+/** The fade is quantised so the blended colour strings repeat (Sigma caches parsed colours by string). */
+const FADE_STEPS = 16;
+const blendCache = new Map<string, string>();
+/** `a` → `b` at share `t` (0..1), opaque; quantised to FADE_STEPS. */
+function blend(a: string | undefined, b: string | undefined, t: number): string | undefined {
+  if (a === b || !a || !b) return b;
+  const q = Math.round(t * FADE_STEPS);
+  if (q <= 0) return a;
+  if (q >= FADE_STEPS) return b;
+  const key = `${a}|${b}|${q}`;
+  let c = blendCache.get(key);
+  if (c === undefined) {
+    if (blendCache.size > 50_000) blendCache.clear();
+    c = mixColor(a, b, q / FADE_STEPS);
+    blendCache.set(key, c);
+  }
+  return c;
+}
+
 /** What is emphasised, derived from props once per change and read by the reducers. */
 type Emphasis = {
+  /** The selected node drawn with its name box (null when nothing on the map is selected). */
+  selected: string | null;
   active: boolean;
   keep: Set<string>;
   /** Labelled first (in this order) where there is room. */
@@ -108,6 +131,7 @@ type Emphasis = {
 };
 
 const EMPTY: Emphasis = {
+  selected: null,
   active: false,
   keep: new Set(),
   labelled: new Set(),
@@ -130,6 +154,7 @@ function treePathEdges(index: TreeIndex, id: string, into: Set<string>, nodes?: 
 function computeEmphasis(p: Props): Emphasis {
   const { index, selectedId, chainEdgeIds, found, visibleFamilies } = p;
   const e: Emphasis = {
+    selected: null,
     active: false,
     keep: new Set(),
     labelled: new Set(),
@@ -141,6 +166,7 @@ function computeEmphasis(p: Props): Emphasis {
   };
   const sel = selectedId ? index.nodes.get(selectedId) : undefined;
   if (sel && sel.kind !== "root") {
+    e.selected = sel.id;
     e.active = true;
     e.keep.add(sel.id);
     e.labelled.add(sel.id);
@@ -202,6 +228,9 @@ export const AtlasCanvas = forwardRef<AtlasCanvasHandle, Props>(function AtlasCa
   const logo = useRef<HTMLButtonElement>(null);
   const sigmaRef = useRef<Sigma<NodeAttrs, EdgeAttrs> | null>(null);
   const emphasis = useRef<Emphasis>(EMPTY);
+  /** State the fade starts from, and the fade's eased progress (1 = settled on `emphasis`). */
+  const fromEmphasis = useRef<Emphasis>(EMPTY);
+  const fade = useRef(1);
   const hoverPath = useRef<Set<string>>(new Set());
   const hovered = useRef<string | null>(null);
   const propsRef = useRef(props);
@@ -306,7 +335,9 @@ export const AtlasCanvas = forwardRef<AtlasCanvasHandle, Props>(function AtlasCa
       });
     }
 
+    /** Adds the real edges the emphasis needs; returns how many were new. */
     const syncRealEdges = () => {
+      let added = 0;
       for (const id of emphasis.current.real) {
         if (graph.hasEdge(id)) continue;
         const e = index.edges.get(id);
@@ -320,7 +351,9 @@ export const AtlasCanvas = forwardRef<AtlasCanvasHandle, Props>(function AtlasCa
           family: e.family,
           flagged: e.status !== "active",
         });
+        added += 1;
       }
+      return added;
     };
 
     // Category colours per theme, resolved once per theme object.
@@ -360,9 +393,41 @@ export const AtlasCanvas = forwardRef<AtlasCanvasHandle, Props>(function AtlasCa
     const dotScale = () => Math.min(1, Math.max(0.55, Math.min(el.clientWidth, el.clientHeight) / 700));
     let sizeScale = dotScale();
 
+    // During a fade every item is drawn between its look in the old and the new emphasis state.
     function reduceNode(node: string, data: NodeAttrs & NodeDisplayData): Partial<NodeDisplayData> {
+      const to = nodeLook(node, data, emphasis.current);
+      const k = fade.current;
+      if (k >= 1) return to;
+      const from = nodeLook(node, data, fromEmphasis.current);
+      return {
+        ...to,
+        color: blend(from.color, to.color, k),
+        size: (from.size ?? 0) + ((to.size ?? 0) - (from.size ?? 0)) * k,
+        zIndex: Math.max(from.zIndex ?? 0, to.zIndex ?? 0),
+      };
+    }
+
+    function reduceEdge(edge: string, data: EdgeAttrs & EdgeDisplayData): Partial<EdgeDisplayData> {
+      const to = edgeLook(edge, data, emphasis.current);
+      const k = fade.current;
+      if (k >= 1) return to;
+      const from = edgeLook(edge, data, fromEmphasis.current);
+      if (from.hidden && to.hidden) return to;
+      // A connection drawn in (or out) grows from a thin line in the background colour.
+      const bg = propsRef.current.theme.background;
+      const a = from.hidden ? { ...to, color: bg, size: (to.size ?? 1) * 0.3 } : from;
+      const b = to.hidden ? { ...from, color: bg, size: (from.size ?? 1) * 0.3 } : to;
+      return {
+        ...b,
+        hidden: false,
+        color: blend(a.color, b.color, k),
+        size: (a.size ?? 0) + ((b.size ?? 0) - (a.size ?? 0)) * k,
+        zIndex: Math.max(a.zIndex ?? 0, b.zIndex ?? 0),
+      };
+    }
+
+    function nodeLook(node: string, data: NodeAttrs & NodeDisplayData, em: Emphasis): Partial<NodeDisplayData> {
       const t = propsRef.current.theme;
-      const em = emphasis.current;
       const res: Partial<NodeDisplayData> & { label?: string | null; left?: boolean } = {
         ...data,
         size: data.size * sizeScale,
@@ -387,9 +452,8 @@ export const AtlasCanvas = forwardRef<AtlasCanvasHandle, Props>(function AtlasCa
       return res;
     }
 
-    function reduceEdge(edge: string, data: EdgeAttrs & EdgeDisplayData): Partial<EdgeDisplayData> {
+    function edgeLook(edge: string, data: EdgeAttrs & EdgeDisplayData, em: Emphasis): Partial<EdgeDisplayData> {
       const t = propsRef.current.theme;
-      const em = emphasis.current;
       if (data.tree) {
         const pal = palette(data.category);
         const base = data.depth <= 2 ? pal.trunk : pal.edge;
@@ -498,7 +562,8 @@ export const AtlasCanvas = forwardRef<AtlasCanvasHandle, Props>(function AtlasCa
     };
     frameRef.current = frame;
 
-    emphasis.current = computeEmphasis(propsRef.current);
+    emphasis.current = fromEmphasis.current = computeEmphasis(propsRef.current);
+    fade.current = 1;
     syncRealEdges();
     sigma.refresh();
 
@@ -595,8 +660,7 @@ export const AtlasCanvas = forwardRef<AtlasCanvasHandle, Props>(function AtlasCa
       const box: [number, number, number, number] = [x - 6, p.y - 11, x + tw + 6, p.y + 11];
       return { n, x, y: p.y, tw, box };
     };
-    const drawSelectedName = (ctx: CanvasRenderingContext2D) => {
-      const id = propsRef.current.selectedId;
+    const drawSelectedName = (ctx: CanvasRenderingContext2D, id: string | null) => {
       if (!id || id === hovered.current) return;
       const t = propsRef.current.theme;
       const font = getComputedStyle(document.body).fontFamily || "sans-serif";
@@ -614,14 +678,18 @@ export const AtlasCanvas = forwardRef<AtlasCanvasHandle, Props>(function AtlasCa
       ctx.fillText(b.n.label, b.x, b.y + 0.5);
     };
 
-    const drawLabels = (ctx: CanvasRenderingContext2D, w: number, h: number, blocked: Array<[number, number, number, number]>) => {
-      const { theme: t } = propsRef.current;
-      const em = emphasis.current;
+    type PlacedLabel = { id: string; text: string; x: number; y: number; group: boolean; category: AtlasCategory | null };
+    /** Where the names go for one emphasis state (collision-avoided), without drawing them. */
+    const layoutLabels = (
+      ctx: CanvasRenderingContext2D,
+      w: number,
+      h: number,
+      blocked: Array<[number, number, number, number]>,
+      em: Emphasis,
+      font: string,
+    ): PlacedLabel[] => {
+      const out: PlacedLabel[] = [];
       const ratio = ratioNow();
-      const font = getComputedStyle(document.body).fontFamily || "sans-serif";
-      ctx.lineJoin = "round";
-      ctx.textBaseline = "middle";
-      ctx.lineWidth = 3;
       // Grid hash of placed boxes, for cheap overlap tests.
       const grid = new Map<number, Array<[number, number, number, number]>>();
       const cells = (b: [number, number, number, number], fn: (k: number) => boolean | void) => {
@@ -642,7 +710,7 @@ export const AtlasCanvas = forwardRef<AtlasCanvasHandle, Props>(function AtlasCa
       // The selected and the hovered dot's name boxes win: every other name, the selection's
       // ancestors included, goes around them or is dropped.
       const reserved: Array<[number, number, number, number]> = [];
-      for (const id of [propsRef.current.selectedId, hovered.current]) {
+      for (const id of [em.selected, hovered.current]) {
         const b = id ? nameBox(ctx, id, font) : null;
         if (!b) continue;
         reserved.push(b.box);
@@ -658,7 +726,7 @@ export const AtlasCanvas = forwardRef<AtlasCanvasHandle, Props>(function AtlasCa
         if (seen.has(id)) continue;
         seen.add(id);
         // The hovered and the selected dot get Sigma's label box instead.
-        if (id === hovered.current || id === propsRef.current.selectedId) continue;
+        if (id === hovered.current || id === em.selected) continue;
         const n = index.nodes.get(id);
         if (!n || (n.kind !== "group" && n.kind !== "entity")) continue;
         const forced = em.labelled.has(id);
@@ -691,11 +759,70 @@ export const AtlasCanvas = forwardRef<AtlasCanvasHandle, Props>(function AtlasCa
         if (Number.isNaN(x0)) continue;
         place(box);
         count += 1;
-        ctx.strokeStyle = t.background;
-        ctx.strokeText(n.label, x0, p.y);
-        ctx.fillStyle = group ? palette(n.category).text : t.label;
-        ctx.fillText(n.label, x0, p.y);
+        out.push({ id, text: n.label, x: x0, y: p.y, group, category: n.category });
       }
+      return out;
+    };
+    const paintLabels = (ctx: CanvasRenderingContext2D, items: PlacedLabel[], alpha: number, font: string) => {
+      if (items.length === 0 || alpha <= 0) return;
+      const t = propsRef.current.theme;
+      ctx.globalAlpha = alpha;
+      ctx.lineJoin = "round";
+      ctx.textBaseline = "middle";
+      ctx.lineWidth = 3;
+      ctx.strokeStyle = t.background;
+      let currentFont = "";
+      for (const l of items) {
+        const f = `${l.group ? 600 : 500} ${LABEL_FONT_PX}px ${font}`;
+        if (f !== currentFont) ctx.font = currentFont = f;
+        ctx.strokeText(l.text, l.x, l.y);
+        ctx.fillStyle = l.group ? palette(l.category).text : t.label;
+        ctx.fillText(l.text, l.x, l.y);
+      }
+      ctx.globalAlpha = 1;
+    };
+    let fadeLabels: { key: string; from: Emphasis; to: Emphasis; prev: PlacedLabel[]; next: PlacedLabel[] } | null = null;
+    /** Names for the settled state, or cross-faded between the old and the new state during a fade. */
+    const drawLabels = (ctx: CanvasRenderingContext2D, w: number, h: number, blocked: Array<[number, number, number, number]>) => {
+      const font = getComputedStyle(document.body).fontFamily || "sans-serif";
+      const k = fade.current;
+      if (k >= 1) {
+        fadeLabels = null;
+        paintLabels(ctx, layoutLabels(ctx, w, h, blocked, emphasis.current, font), 1, font);
+        return;
+      }
+      // During a fade both layouts are computed once and reused while the camera stands still.
+      const cam = sigma.getCamera().getState();
+      const key = `${cam.x}|${cam.y}|${cam.ratio}|${cam.angle}|${w}|${h}|${hovered.current}`;
+      if (!fadeLabels || fadeLabels.key !== key || fadeLabels.from !== fromEmphasis.current || fadeLabels.to !== emphasis.current) {
+        fadeLabels = {
+          key,
+          from: fromEmphasis.current,
+          to: emphasis.current,
+          prev: layoutLabels(ctx, w, h, blocked, fromEmphasis.current, font),
+          next: layoutLabels(ctx, w, h, blocked, emphasis.current, font),
+        };
+      }
+      const { prev, next } = fadeLabels;
+      const at = new Map(prev.map((l) => [l.id, l]));
+      const both: PlacedLabel[] = [];
+      const fresh: PlacedLabel[] = [];
+      const kept = new Set<string>();
+      for (const l of next) {
+        const p = at.get(l.id);
+        if (p && p.x === l.x && p.y === l.y) {
+          both.push(l);
+          kept.add(l.id);
+        } else fresh.push(l);
+      }
+      paintLabels(ctx, both, 1, font);
+      paintLabels(
+        ctx,
+        prev.filter((l) => !kept.has(l.id)),
+        1 - k,
+        font,
+      );
+      paintLabels(ctx, fresh, k, font);
     };
 
     // Category labels (HTML, rotated along the outer edge) and the logo on the hub.
@@ -816,9 +943,39 @@ export const AtlasCanvas = forwardRef<AtlasCanvasHandle, Props>(function AtlasCa
         blocked.push([r.left - host.left, r.top - host.top, r.right - host.left, r.bottom - host.top]);
       }
       drawLabels(ctx, w, h, blocked);
-      const { theme: t, found, selectedId } = propsRef.current;
+      const k = fade.current;
+      const next = emphasis.current;
+      const prev = fromEmphasis.current;
+      if (k < 1) {
+        // Rings and the name box of the old state fade out, the new ones fade in.
+        ctx.globalAlpha = 1 - k;
+        drawRingSet(ctx, w, h, prev, next.rings);
+        if (prev.selected !== next.selected) drawSelectedName(ctx, prev.selected);
+        ctx.globalAlpha = k;
+        drawRingSet(ctx, w, h, next, prev.rings);
+        if (prev.selected !== next.selected) drawSelectedName(ctx, next.selected);
+        ctx.globalAlpha = 1;
+        drawRingSet(ctx, w, h, next, null, prev.rings);
+        if (prev.selected === next.selected) drawSelectedName(ctx, next.selected);
+        return;
+      }
+      drawRingSet(ctx, w, h, next);
+      drawSelectedName(ctx, next.selected);
+    };
+    /** Rings of one state; `skip` leaves out ids, `only` keeps just those. */
+    const drawRingSet = (
+      ctx: CanvasRenderingContext2D,
+      w: number,
+      h: number,
+      em: Emphasis,
+      skip: Set<string> | null = null,
+      only: Set<string> | null = null,
+    ) => {
+      const { theme: t, found } = propsRef.current;
+      const selectedId = em.selected;
       const foundSet = new Set(found?.nodeIds ?? []);
-      for (const id of emphasis.current.rings) {
+      for (const id of em.rings) {
+        if (skip?.has(id) || (only && !only.has(id))) continue;
         if (!graph.hasNode(id)) continue;
         const a = graph.getNodeAttributes(id);
         const d = sigma.getNodeDisplayData(id);
@@ -839,7 +996,6 @@ export const AtlasCanvas = forwardRef<AtlasCanvasHandle, Props>(function AtlasCa
           ctx.stroke();
         }
       }
-      drawSelectedName(ctx);
     };
     sigma.on("resize", () => {
       const next = dotScale();
@@ -850,14 +1006,52 @@ export const AtlasCanvas = forwardRef<AtlasCanvasHandle, Props>(function AtlasCa
     });
     sigma.on("afterRender", placeOverlays);
     placeOverlays();
+    // A change of emphasis fades over FADE_MS: one eased value read by the reducers. Frames in
+    // between re-run the reducers only (partial refresh, no re-index, Sigma's own render loop);
+    // the first and the last frame are full refreshes (new edges, draw order). Nothing renders
+    // once the fade has settled.
+    const treeEdgeIds = graph.filterEdges((_, a) => a.tree);
+    let fadeFrame = 0;
+    const settle = () => {
+      fadeFrame = 0;
+      fade.current = 1;
+      fromEmphasis.current = emphasis.current;
+    };
     restyle.current = () => {
+      cancelAnimationFrame(fadeFrame);
+      const prev = emphasis.current;
       emphasis.current = computeEmphasis(propsRef.current);
-      syncRealEdges();
+      const added = syncRealEdges();
       sigma.setSetting("labelColor", { color: propsRef.current.theme.label });
-      sigma.refresh();
+      if (propsRef.current.reducedMotion || prev === emphasis.current) {
+        settle();
+        sigma.refresh();
+        return;
+      }
+      fromEmphasis.current = prev;
+      fade.current = 0;
+      // New edges need indexing once; otherwise the fade starts on partial refreshes straight away.
+      if (added > 0) sigma.refresh();
+      const nodes = graph.nodes();
+      const edges = [...treeEdgeIds, ...new Set([...prev.real, ...emphasis.current.real])].filter((id) => graph.hasEdge(id));
+      const start = performance.now();
+      const step = (now: number) => {
+        const p = Math.min(1, (now - start) / FADE_MS);
+        if (p >= 1) {
+          settle();
+          sigma.refresh({ schedule: true });
+          return;
+        }
+        // Ease-out (cubic).
+        fade.current = 1 - Math.pow(1 - p, 3);
+        sigma.refresh({ partialGraph: { nodes, edges }, skipIndexation: true, schedule: true });
+        fadeFrame = requestAnimationFrame(step);
+      };
+      fadeFrame = requestAnimationFrame(step);
     };
 
     return () => {
+      cancelAnimationFrame(fadeFrame);
       restyle.current = null;
       sigma.kill();
       sigmaRef.current = null;
@@ -890,7 +1084,9 @@ export const AtlasCanvas = forwardRef<AtlasCanvasHandle, Props>(function AtlasCa
     };
     if (move[e.key]) {
       e.preventDefault();
-      camera.setState({ ...s, ...move[e.key] });
+      // A short glide per key press; held keys stay responsive because each press starts afresh.
+      if (props.reducedMotion) camera.setState({ ...s, ...move[e.key] });
+      else void camera.animate({ ...s, ...move[e.key] }, { duration: 160, easing: "quadraticOut" });
     } else if (e.key === "Escape") {
       props.onSelect(null);
     }
