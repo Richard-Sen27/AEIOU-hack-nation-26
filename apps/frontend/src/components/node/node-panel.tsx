@@ -39,8 +39,27 @@ const ATTR_LABEL: Record<string, string> = {
   contact_url: "Contact",
   website: "Website",
   frequency: "Frequency",
+  orphanet_prevalence: "Prevalence",
+  top_genes: "Main genes",
+  top_phenotypes: "Main symptoms",
+  top_pathways: "Main pathways",
 };
-const INTERNAL_ATTRS = new Set(["fixture", "placeholder_id", "gene", "x", "y"]);
+/**
+ * Not shown as rows: bookkeeping, id lists that repeat the header or "Also called",
+ * and structured cluster data that the page shows elsewhere (members) or not at all.
+ */
+const INTERNAL_ATTRS = new Set([
+  "fixture", "placeholder_id", "gene", "x", "y",
+  "tier", "xrefs", "exact_matches", "ancestors", "hpo_lineage",
+  "lineage", "members", "inferred", "mechanisms", "model_label", "label_origin", "distinctive_phenotypes",
+]);
+
+/** Orphanet prevalence rows read as their distinct classes, e.g. "<1 / 1 000 000". */
+function formatPrevalence(v: unknown): string {
+  const rows = Array.isArray(v) ? v : [];
+  const classes = [...new Set(rows.map((r) => (r && typeof r === "object" ? (r as Record<string, unknown>).class : null)).filter((c): c is string => typeof c === "string" && c !== ""))];
+  return classes.join(" · ");
+}
 const ACTIONABLE = new Set(["patient_org", "registry", "trial", "researcher", "grant", "doctor", "institution", "network"]);
 
 function formatAttr(v: unknown): string {
@@ -88,7 +107,13 @@ export function NodePanel({
   const { labelStyle } = useLens();
   const node = detail?.node ?? center;
   const meta = nodeTypeMeta(node.type);
-  const attrs = Object.entries(node.attrs ?? {}).filter(([k, v]) => !INTERNAL_ATTRS.has(k) && v !== null && v !== "" && !/url$/i.test(k));
+  const attrs = Object.entries(node.attrs ?? {})
+    .map(([k, v]): [string, unknown] => [k, k === "orphanet_prevalence" ? formatPrevalence(v) : v])
+    .filter(([k, v]) => !INTERNAL_ATTRS.has(k) && v !== null && v !== "" && !(Array.isArray(v) && v.length === 0) && !/url$/i.test(k));
+  // A cluster's members are listed in its attrs; its neighbourhood also holds their genes and symptoms.
+  const memberIds = Array.isArray(node.attrs?.members) ? (node.attrs.members as unknown[]).filter((x): x is string => typeof x === "string") : null;
+  const members = [...nodes.values()].filter((n) => n.id !== node.id && (memberIds ? memberIds.includes(n.id) : true));
+  const memberTotal = memberIds?.length ?? members.length;
   const links = Object.entries(node.attrs ?? {}).filter(([k, v]) => /url$/i.test(k) && safeHref(v));
   const source = safeHref(node.url);
   const classification = detail?.classification ?? (node.attrs?.classification as string | undefined);
@@ -214,20 +239,26 @@ export function NodePanel({
       {node.type === "cluster" && (
         <section aria-labelledby="node-members-title" className="border-b px-4 py-4" data-testid="cluster-members">
           <h2 id="node-members-title" className="mb-1 text-sm font-semibold">
-            Members · {[...nodes.values()].filter((n) => n.id !== node.id).length}
+            Members · {memberTotal}
           </h2>
           <p className="mb-2.5 text-xs text-muted-foreground">
             Grouped by analysis of shared genes, pathways and symptoms. Membership is a hypothesis.
           </p>
           <ul className="flex flex-wrap gap-1.5">
-            {[...nodes.values()]
-              .filter((n) => n.id !== node.id)
-              .map((n) => (
-                <li key={n.id}>
-                  <NodeChip id={n.id} type={n.type} label={n.label} size="sm" />
-                </li>
-              ))}
+            {members.map((n) => (
+              <li key={n.id}>
+                <NodeChip id={n.id} type={n.type} label={n.label} size="sm" />
+              </li>
+            ))}
           </ul>
+          {memberTotal > members.length && (
+            <p className="mt-2 text-xs text-muted-foreground" data-testid="cluster-members-more">
+              {members.length > 0 ? `${memberTotal - members.length} more in the` : "Listed in the"}{" "}
+              <Link href={`/atlas?focus=${encodeURIComponent(node.id)}`} className="font-medium text-foreground underline underline-offset-2">
+                Atlas summary
+              </Link>
+            </p>
+          )}
         </section>
       )}
 
