@@ -32,7 +32,6 @@ export function SiteFooter() {
                 About this data
               </Link>
             </li>
-            <li className="font-mono text-[10.5px] uppercase tracking-[0.14em]">Amber — Rare Disease Atlas</li>
           </ul>
         </nav>
       </div>
