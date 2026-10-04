@@ -2,6 +2,7 @@
 
     uv run python -m backend.cli precompute-explanations [--language en ...] [--limit N]
     uv run python -m backend.cli eval [--mock] [--only golden,refusal,...]
+    uv run python -m backend.cli demo-graph-changes MONDO:0100135 [--clear]
 
 precompute-explanations fills explanations_cache for the demo paths in every role and the
 requested languages. With a CLI ChatGPT login (`python -m backend.openai_auth.cli login`) the
@@ -14,14 +15,22 @@ cluster or one disease-disease edge away, plus the patient organizations serving
 and the registries/studies those organizations run. For each (seed, target) the best path
 (family "all") is kept if it is supported (every edge >= 0.6). Paths are ranked by weakest
 edge confidence (desc), then length (asc), then path_id, and the first --limit are used.
+
+demo-graph-changes (DEMO DATA, local development only) inserts sample graph_changes rows for one
+disease, as if a new load had linked its existing papers, trials, grants and patient groups, so
+followers get notifications before a real second load produces changes. The rows use the data
+version `demo-<UTC time>`; `--clear` deletes every demo row. Refuses to run unless API_URL and
+the pipeline database are loopback addresses.
 """
 
 import argparse
 import asyncio
 import logging
+import re
 import sys
 from collections.abc import Sequence
 from dataclasses import dataclass, field
+from datetime import UTC, datetime
 
 from backend.schemas.enums import NodeType, PathFamily, Relation, Role
 from backend.schemas.path import Path
@@ -193,6 +202,100 @@ async def precompute_explanations(
     return report
 
 
+DEMO_VERSION_PREFIX = "demo-"
+DEMO_TYPES = ("trial", "paper", "grant", "patient_org")
+DEMO_RELATIONS = ("about", "studies", "funds_research_on", "serves")
+_MONDO_ID = re.compile(r"^MONDO:\d{7}$")
+
+
+def _host_is_loopback(url: str) -> bool:
+    from urllib.parse import urlsplit
+
+    from backend.config import is_loopback_url
+
+    host = urlsplit(url).hostname or ""
+    return is_loopback_url(f"http://{host}") if host else False
+
+
+def demo_graph_changes(disease_id: str, *, clear: bool = False, out=sys.stdout) -> list[dict]:
+    """Insert (or with clear=True delete) demo graph_changes rows; see the module docstring."""
+    import psycopg
+    from psycopg.rows import dict_row
+
+    from backend.config import get_settings, is_loopback_url
+
+    settings = get_settings()
+    if not is_loopback_url(settings.api_url):
+        raise SystemExit("refusing: API_URL is not a loopback address (demo data is local only)")
+    if not _host_is_loopback(settings.pipeline_database_url):
+        raise SystemExit("refusing: the pipeline database is not on a loopback address")
+    url = settings.pipeline_database_url.replace("postgresql+psycopg://", "postgresql://")
+    with psycopg.connect(url, row_factory=dict_row) as conn:
+        if clear:
+            n = conn.execute(
+                "DELETE FROM graph_changes WHERE data_version LIKE %s",
+                (DEMO_VERSION_PREFIX + "%",),
+            ).rowcount
+            print(f"demo graph_changes deleted: {n}", file=out)
+            return []
+        if not _MONDO_ID.match(disease_id):
+            raise SystemExit("not a disease id (MONDO:0000000)")
+        disease = conn.execute(
+            "SELECT id, label FROM nodes WHERE id = %s AND type = 'disease'", (disease_id,)
+        ).fetchone()
+        if disease is None:
+            raise SystemExit("no such disease in the atlas")
+        linked = conn.execute(
+            """
+            SELECT DISTINCT ON (n.type) n.id, n.type, n.label, n.attrs->>'status' AS status,
+                   e.id AS edge_id
+              FROM edges e JOIN nodes n ON n.id = e.source_id
+             WHERE e.target_id = %s AND e.relation = ANY(%s) AND n.type = ANY(%s)
+             ORDER BY n.type, n.id DESC
+            """,
+            (disease_id, list(DEMO_RELATIONS), list(DEMO_TYPES)),
+        ).fetchall()
+        if not linked:
+            raise SystemExit("this disease has no papers, trials, grants or patient groups")
+        row = conn.execute(
+            "SELECT data_version FROM ingestion_runs ORDER BY created_at DESC LIMIT 1"
+        ).fetchone()
+        previous = row["data_version"] if row else None
+        version = DEMO_VERSION_PREFIX + datetime.now(UTC).strftime("%Y%m%dT%H%M%S%f")
+        rows = [
+            {"node_id": n["id"], "node_type": n["type"], "change": "added", "edge_id": n["edge_id"]}
+            for n in linked
+        ]
+        rows += [
+            {
+                "node_id": n["id"],
+                "node_type": n["type"],
+                "change": "now_recruiting",
+                "edge_id": n["edge_id"],
+            }
+            for n in linked
+            if n["type"] == "trial" and (n["status"] or "").lower() == "recruiting"
+        ]
+        for r in rows:
+            conn.execute(
+                "INSERT INTO graph_changes (data_version, previous_version, disease_id, node_id,"
+                " node_type, change, edge_id) VALUES (%s, %s, %s, %s, %s, %s, %s)",
+                (
+                    version,
+                    previous,
+                    disease_id,
+                    r["node_id"],
+                    r["node_type"],
+                    r["change"],
+                    r["edge_id"],
+                ),
+            )
+    print(f"DEMO DATA: {len(rows)} graph_changes rows for {disease_id} ({version})", file=out)
+    for r in rows:
+        print(f"  {r['change']:<15} {r['node_type']:<12} {r['node_id']}", file=out)
+    return rows
+
+
 def _run(coro):
     from backend.db.session import configure_engine, dispose_engine
 
@@ -227,7 +330,24 @@ def main(argv: list[str] | None = None) -> int:
     )
     ev.add_argument("--limit", type=int, default=None, help="Max golden questions")
 
+    demo = sub.add_parser(
+        "demo-graph-changes",
+        help="DEMO DATA, local only: insert sample graph_changes rows for one disease",
+        description="DEMO DATA for local development: inserts sample graph_changes rows (data "
+        "version demo-<time>) for a disease, as if a new load had linked its existing papers, "
+        "trials, grants and patient groups, so users who follow it get notifications. Follow the "
+        "disease first. Refuses to run unless API_URL and the pipeline database are loopback "
+        "addresses. Writes as atlas_pipeline (PIPELINE_DATABASE_URL).",
+    )
+    demo.add_argument("disease_id", nargs="?", help="Disease ID, e.g. MONDO:0100135")
+    demo.add_argument("--clear", action="store_true", help="Delete every demo row instead")
+
     args = parser.parse_args(argv)
+    if args.command == "demo-graph-changes":
+        if not args.clear and not args.disease_id:
+            parser.error("disease_id is required unless --clear is given")
+        demo_graph_changes(args.disease_id or "", clear=args.clear)
+        return 0
     if args.command == "precompute-explanations":
         use_llm = False if args.template else (True if args.llm else None)
         report = _run(
