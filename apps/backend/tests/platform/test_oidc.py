@@ -66,6 +66,7 @@ async def test_full_round_trip_and_reuse_of_issued_client(oai_settings, mock_ope
     assert tokens.client_id == issued
     assert tokens.has_plan_usage and tokens.refresh_token
     assert claims.sub == "user-mock-alice-0001" and claims.email == "alice@example.test"
+    assert (claims.given_name, claims.family_name) == ("Alice Jane", "Example")
 
     _, params2, tokens2, claims2 = await _sign_in(oidc, authorize, client_id=issued, host=host)
     assert "client_id" not in params2
@@ -149,6 +150,19 @@ async def test_id_token_valid(oai_settings, mock_openai):
     )
     claims = await oidc.validate_id_token(token, client_id="oaiapp_me", nonce="n1")
     assert claims.sub == "s1" and claims.email == "a@b.test"
+    assert claims.given_name is None and claims.family_name is None
+
+    token = mock_openai.state.sign(
+        _claims(
+            mock_openai,
+            oai_settings.issuer,
+            "oaiapp_me",
+            "n1",
+            {"given_name": " Ana ", "family_name": "", "name": "Ana B"},
+        )
+    )
+    claims = await oidc.validate_id_token(token, client_id="oaiapp_me", nonce="n1")
+    assert (claims.given_name, claims.family_name, claims.name) == ("Ana", None, "Ana B")
 
 
 async def test_refresh_rotation_and_reuse_detection(oai_settings, mock_openai, authorize):

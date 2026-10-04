@@ -63,8 +63,16 @@ class IdentityClaims(BaseModel):
     sub: str
     email: str | None = None
     name: str | None = None
+    given_name: str | None = None
+    family_name: str | None = None
     email_verified: bool | None = None
     raw: dict[str, Any] = {}
+
+
+def _str_claim(claims: dict[str, Any], key: str) -> str | None:
+    """An optional string claim (OIDC standard claims such as given_name); None otherwise."""
+    value = claims.get(key)
+    return (value.strip() or None) if isinstance(value, str) else None
 
 
 def new_state() -> str:
@@ -348,6 +356,8 @@ class OIDCClient:
             sub=str(claims["sub"]),
             email=claims.get("email"),
             name=claims.get("name"),
+            given_name=_str_claim(claims, "given_name"),
+            family_name=_str_claim(claims, "family_name"),
             email_verified=claims.get("email_verified"),
             raw=claims,
         )

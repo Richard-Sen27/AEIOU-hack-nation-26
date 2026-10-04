@@ -22,12 +22,22 @@ class MockUser:
     sub: str
     email: str
     name: str
+    # Optional OIDC standard claims; carol has none, so the name split fallback is exercised.
+    given_name: str | None = None
+    family_name: str | None = None
 
 
 DEFAULT_USERS = {
     u.key: u
     for u in (
-        MockUser("alice", "user-mock-alice-0001", "alice@example.test", "Alice Example"),
+        MockUser(
+            "alice",
+            "user-mock-alice-0001",
+            "alice@example.test",
+            "Alice Example",
+            given_name="Alice Jane",
+            family_name="Example",
+        ),
         MockUser("bob", "user-mock-bob-0002", "bob@example.test", "Bob Example"),
         MockUser("carol", "user-mock-carol-0003", "carol@example.test", "Carol Example"),
     )
@@ -251,6 +261,10 @@ class MockState:
                 "email_verified": True,
                 "name": user.name,
             }
+            if user.given_name:
+                claims["given_name"] = user.given_name
+            if user.family_name:
+                claims["family_name"] = user.family_name
             if nonce:
                 claims["nonce"] = nonce
             body["id_token"] = self.sign(claims)
