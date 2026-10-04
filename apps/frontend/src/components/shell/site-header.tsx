@@ -15,7 +15,7 @@ import { Separator } from "@/components/ui/separator";
 import { Sheet, SheetContent, SheetDescription, SheetHeader, SheetTitle, SheetTrigger } from "@/components/ui/sheet";
 import { cn } from "@/lib/utils";
 
-import { LensSwitcher } from "./lens-switcher";
+import { PrivacyMenu } from "./privacy-links";
 import { ThemeToggle } from "./theme-toggle";
 import { UserMenu } from "./user-menu";
 
@@ -105,7 +105,7 @@ export function SiteHeader() {
           </Button>
 
           <div className="hidden shrink-0 items-center gap-1 md:flex">
-            <LensSwitcher />
+            {!user && status !== "loading" && <PrivacyMenu />}
             <ThemeToggle />
           </div>
 
@@ -146,10 +146,6 @@ export function SiteHeader() {
               </nav>
               <Separator />
               <div className="flex items-center justify-between px-5 py-3">
-                <span className="text-sm text-muted-foreground">Lens</span>
-                <LensSwitcher />
-              </div>
-              <div className="flex items-center justify-between px-5 py-3">
                 <span className="text-sm text-muted-foreground">Theme</span>
                 <ThemeToggle />
               </div>
@@ -161,7 +157,17 @@ export function SiteHeader() {
                     <UserMenu />
                   </div>
                 ) : (
-                  <ContinueWithChatGPT className="w-full" onClick={() => setMobileOpen(false)} />
+                  <>
+                    <ContinueWithChatGPT className="w-full" onClick={() => setMobileOpen(false)} />
+                    <p className="mt-4 flex gap-4 text-sm">
+                      <Link href="/privacy" onClick={() => setMobileOpen(false)} className="text-muted-foreground underline-offset-4 hover:text-foreground hover:underline">
+                        Privacy
+                      </Link>
+                      <Link href="/about-data" onClick={() => setMobileOpen(false)} className="text-muted-foreground underline-offset-4 hover:text-foreground hover:underline">
+                        About this data
+                      </Link>
+                    </p>
+                  </>
                 )}
               </div>
             </SheetContent>
