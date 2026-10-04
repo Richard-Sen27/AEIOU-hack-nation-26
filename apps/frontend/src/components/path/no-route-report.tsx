@@ -91,10 +91,10 @@ export function NoRouteReport({
           No supported route between {from.label} and {to.label}.
         </p>
         <p className="mt-1.5 max-w-prose text-sm text-muted-foreground">
-          Amber found no chain of cited links where every link passes the confidence threshold
+          No chain of cited links passes the confidence threshold
           {threshold !== null ? ` (${threshold.toFixed(2)})` : ""}
-          {family !== "all" ? `, following ${familyLabel(family, labelStyle).toLowerCase()} only` : ""}. It will not draw a
-          connection the evidence does not support. Here is what was checked and what is missing.
+          {family !== "all" ? `, following ${familyLabel(family, labelStyle).toLowerCase()} only` : ""}. Amber does not draw
+          unsupported connections.
         </p>
       </div>
 
@@ -103,7 +103,7 @@ export function NoRouteReport({
           <h2 className="text-base font-semibold">Closest partial route</h2>
           <p className="text-sm text-muted-foreground">
             {partial
-              ? "The best chain Amber found. It is incomplete or rests on a link below the threshold, so it is not a route."
+              ? "Incomplete or below the threshold, so not a route."
               : "Amber found no partial chain worth showing."}
           </p>
         </div>

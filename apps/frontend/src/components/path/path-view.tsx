@@ -101,7 +101,7 @@ function TrustSummary({ path }: { path: PathT }) {
             <span className="font-semibold">
               Includes {hyp} hypothesis link{hyp === 1 ? "" : "s"}.
             </span>{" "}
-            Dashed lines were inferred by analysis, not observed directly. Treat them as leads to check, not facts.
+            Dashed lines are inferred, not observed: leads to check, not facts.
           </>
         )}{" "}
         {flagged > 0 && (
@@ -231,7 +231,7 @@ export function PathView() {
       <PageHeader
         eyebrow="Path"
         title={title}
-        description="The most trustworthy cited route, not the shortest. Every link shows its source, confidence and whether it is data or a hypothesis. If no route is supported, Amber says so."
+        description="The most trustworthy cited route, not the shortest."
       />
 
       <div className="rounded-xl border bg-card/60 p-4 shadow-xs sm:p-5">

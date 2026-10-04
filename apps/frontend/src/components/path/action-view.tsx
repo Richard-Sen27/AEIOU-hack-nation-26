@@ -191,7 +191,7 @@ export function ActionView({ path, fromLabel, toLabel }: { path: PathT; fromLabe
             Leads on this route
           </h2>
           <p className="text-sm text-muted-foreground">
-            A lead is viable only if every step to it is observed data, active and uncontradicted.
+            Viable only if every step is observed, active and uncontradicted.
           </p>
         </div>
         <div className="flex flex-col items-start gap-1 sm:items-end">
@@ -230,7 +230,7 @@ export function ActionView({ path, fromLabel, toLabel }: { path: PathT; fromLabe
             <h3 className="flex items-center gap-2 text-sm font-semibold">
               <CircleCheck className="size-4 text-confidence-high" aria-hidden /> Viable leads · {viable.length}
             </h3>
-            {viable.length === 0 && <p className="text-sm text-muted-foreground">None yet: every lead here depends on a hypothesis or an unchecked link.</p>}
+            {viable.length === 0 && <p className="text-sm text-muted-foreground">None yet: every lead depends on a hypothesis or unchecked link.</p>}
             {groups.map((g) => {
               const items = viable.filter((l) => l.group === g);
               return items.length ? (

@@ -185,7 +185,7 @@ export function ExplanationPanel({ path, onCite }: { path: PathT; onCite: (edgeI
                   <Sparkles className="size-3.5" aria-hidden /> Written just now
                 </span>
               )}
-              <span>Numbers link to the step each sentence relies on.</span>
+              <span>Numbers link to their step.</span>
               <span>Not medical advice.</span>
             </p>
           )}

@@ -303,9 +303,8 @@ export function GapSearchPanel({
             Search for the missing evidence
           </h3>
           <p className="max-w-prose text-sm text-muted-foreground">
-            An AI agent searches PubMed, ClinicalTrials.gov and the web for this missing link, for up to 90 seconds.
-            It searches with public graph names only, never with anything about you. What it finds is a candidate to
-            check, not a fact.
+            An AI agent searches PubMed, ClinicalTrials.gov and the web for up to 90 seconds, using public graph names
+            only, never anything about you. Results are candidates to check, not facts.
           </p>
         </div>
         {running ? (
