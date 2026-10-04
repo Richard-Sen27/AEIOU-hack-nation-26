@@ -12,6 +12,7 @@ from backend.api.errors import error_body, install_error_handlers
 from backend.api.ratelimit import limiter
 from backend.api.routes import (
     account,
+    atlas,
     auth,
     chat,
     contributions,
@@ -37,6 +38,7 @@ ROUTERS = (
     auth,
     account,
     graph,
+    atlas,
     path,
     explain,
     chat,

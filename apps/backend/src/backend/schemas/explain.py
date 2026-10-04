@@ -12,3 +12,6 @@ class ExplainRequest(ApiModel):
     language: str | None = Field(
         None, pattern=LANGUAGE_PATTERN, description="Output language; defaults to the profile."
     )
+    subject_node_id: str | None = Field(
+        None, max_length=200, description="Summarise how this node is connected via the edges."
+    )
