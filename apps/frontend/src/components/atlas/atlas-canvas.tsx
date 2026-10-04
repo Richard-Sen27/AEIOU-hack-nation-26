@@ -356,11 +356,17 @@ export const AtlasCanvas = forwardRef<AtlasCanvasHandle, Props>(function AtlasCa
     };
 
     const ratioNow = () => sigmaRef.current?.getCamera().getState().ratio ?? 1;
+    // Dots are sized in screen pixels; on a small canvas the same map needs smaller dots.
+    const dotScale = () => Math.min(1, Math.max(0.55, Math.min(el.clientWidth, el.clientHeight) / 700));
+    let sizeScale = dotScale();
 
     function reduceNode(node: string, data: NodeAttrs & NodeDisplayData): Partial<NodeDisplayData> {
       const t = propsRef.current.theme;
       const em = emphasis.current;
-      const res: Partial<NodeDisplayData> & { label?: string | null; left?: boolean } = { ...data };
+      const res: Partial<NodeDisplayData> & { label?: string | null; left?: boolean } = {
+        ...data,
+        size: data.size * sizeScale,
+      };
       if (data.kind === "root") return { ...res, color: "rgba(0,0,0,0)", label: null, zIndex: 0 };
       const pal = palette(data.category);
       res.color =
@@ -370,7 +376,7 @@ export const AtlasCanvas = forwardRef<AtlasCanvasHandle, Props>(function AtlasCa
       const onHover = hoverPath.current.has(node);
       if (em.active && !em.keep.has(node) && !onHover) {
         res.color = data.kind === "entity" ? pal.dot : pal.dim;
-        res.size = data.size * 0.7;
+        res.size = data.size * sizeScale * 0.7;
         res.label = null;
         res.zIndex = 0;
         return res;
@@ -657,7 +663,7 @@ export const AtlasCanvas = forwardRef<AtlasCanvasHandle, Props>(function AtlasCa
       for (const c of index.categories.values()) {
         const d = document.createElement("div");
         d.className =
-          "absolute top-0 left-0 whitespace-nowrap font-heading text-[13px] font-semibold tracking-[0.08em] uppercase sm:text-sm";
+          "absolute top-0 left-0 whitespace-nowrap font-heading text-[11px] font-semibold tracking-[0.08em] uppercase sm:text-sm";
         d.style.color = `color-mix(in oklab, var(${CATEGORY_META[c.id].colorVar}) 80%, var(--foreground))`;
         d.style.textShadow = "0 0 3px var(--background), 0 0 6px var(--background)";
         d.dataset.testid = "atlas-category-label";
@@ -744,6 +750,13 @@ export const AtlasCanvas = forwardRef<AtlasCanvasHandle, Props>(function AtlasCa
         }
       }
     };
+    sigma.on("resize", () => {
+      const next = dotScale();
+      if (Math.abs(next - sizeScale) > 0.02) {
+        sizeScale = next;
+        sigma.refresh({ schedule: true });
+      }
+    });
     sigma.on("afterRender", placeOverlays);
     placeOverlays();
     restyle.current = () => {
