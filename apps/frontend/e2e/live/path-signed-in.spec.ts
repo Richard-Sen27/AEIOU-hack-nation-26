@@ -29,7 +29,11 @@ test.describe("signed-in path features", () => {
       await expect(page).toHaveURL(/\/path$/);
       await page.goto(UNCACHED);
       const explanation = page.getByTestId("explanation");
-      await expect(explanation.getByTestId("explanation-fresh")).toBeVisible({ timeout: 60_000 });
+      // Generated on the first run, then served from explanations_cache (keyed
+      // by path, role, language and data version) on every later run.
+      await expect(explanation.getByTestId("explanation-fresh").or(explanation.getByTestId("explanation-cached"))).toBeVisible({
+        timeout: 60_000,
+      });
       await expect(explanation.getByTestId("explanation-text")).not.toBeEmpty();
       await expect(explanation.getByTestId("explanation-text")).not.toContainText("[e_");
       await shot(page, "path-fresh-explanation");
