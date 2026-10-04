@@ -5,7 +5,7 @@ from fastapi import Depends, Query, Request, Response
 from sqlalchemy import text
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from backend.api.errors import ApiError
+from backend.api.errors import CONTRIBUTE_CONSENT_MESSAGE, ApiError
 from backend.api.security import COOKIE_NAME, clear_session, issue_session, verify_session_token
 from backend.db.session import get_db, set_user
 from backend.schemas.account import CurrentUser
@@ -120,7 +120,8 @@ def require_consent(consent_type: ConsentType) -> Callable[..., Awaitable[Curren
             {"t": consent_type.value},
         )
         if not found:
-            raise ApiError(403, ErrorCode.consent_required)
+            message = CONTRIBUTE_CONSENT_MESSAGE if consent_type == ConsentType.contribute else None
+            raise ApiError(403, ErrorCode.consent_required, message)
         return user
 
     _require.__name__ = f"require_consent_{consent_type.value}"

@@ -15,7 +15,7 @@ from uuid import UUID
 from sqlalchemy import text
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from backend.api.errors import ApiError
+from backend.api.errors import CONTRIBUTE_CONSENT_MESSAGE, ApiError
 from backend.schemas.account import CurrentUser
 from backend.schemas.contributions import (
     AssetPayload,
@@ -219,7 +219,7 @@ async def create(db: AsyncSession, user: CurrentUser, body: ContributionCreate) 
         {"uid": user.id},
     )
     if consent_id is None:
-        raise ApiError(403, ErrorCode.consent_required)
+        raise ApiError(403, ErrorCode.consent_required, CONTRIBUTE_CONSENT_MESSAGE)
     row = (
         (
             await db.execute(

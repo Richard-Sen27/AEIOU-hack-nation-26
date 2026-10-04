@@ -23,7 +23,10 @@ async def test_guest(client):
 
 async def test_needs_contribute_consent(make_user):
     user = await make_user(consents=["health_data"])
-    assert_error(await user.client.post("/contributions", json=PHENO), 403, "consent_required")
+    r = await user.client.post("/contributions", json=PHENO)
+    assert_error(r, 403, "consent_required")
+    # The frontend's consent gate (gate-provider.tsx) opens the contribute dialog on /contribut/i.
+    assert "contribut" in r.json()["error"]["message"].lower()
 
 
 async def test_create_list_delete(make_user, superuser):

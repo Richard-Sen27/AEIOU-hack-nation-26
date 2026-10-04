@@ -39,6 +39,9 @@ DEFAULT_MESSAGES: dict[ErrorCode, str] = {
     ErrorCode.internal_error: "Something went wrong.",
 }
 
+# The frontend's consent gate opens the contribute dialog when the message names contributing.
+CONTRIBUTE_CONSENT_MESSAGE = "Contributing needs your consent first."
+
 STATUS_CODES: dict[int, ErrorCode] = {
     400: ErrorCode.bad_request,
     401: ErrorCode.sign_in_required,
