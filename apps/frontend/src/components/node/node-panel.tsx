@@ -52,6 +52,10 @@ const INTERNAL_ATTRS = new Set([
   "fixture", "placeholder_id", "gene", "x", "y",
   "tier", "xrefs", "exact_matches", "ancestors", "hpo_lineage",
   "lineage", "members", "inferred", "mechanisms", "model_label", "label_origin", "distinctive_phenotypes",
+  // Raw source fields of the wide data set: graph counts, ids, coordinates and scores.
+  "degree", "ic", "rare", "omim_ids", "orpha_ids", "symbol", "start", "end", "strand", "assembly", "cytoband",
+  "chromosome", "entrez_id", "ensembl_id", "uniprot_ids", "locus_group", "clinvar_plp", "clinvar_vus",
+  "clinvar_truncating_share", "clingen_hi_score", "clingen_ts_score", "design", "eligibility", "n_locations", "study_type",
 ]);
 
 /** Orphanet prevalence rows read as their distinct classes, e.g. "<1 / 1 000 000". */
