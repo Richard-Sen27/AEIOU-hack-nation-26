@@ -467,7 +467,7 @@ export function AtlasSearch({ index, onPick, onAskWu, className }: AtlasSearchPr
             </Kbd>{" "}
             show
             <Kbd className="ml-2">esc</Kbd> close
-            <span className="ml-auto">Names only. Descriptions are never sent to search.</span>
+            <span className="ml-auto">Descriptions are never searched.</span>
           </div>
         )}
       </div>
