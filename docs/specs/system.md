@@ -97,12 +97,30 @@ Every node is visible to every user, and you can follow any connection from anyw
 - **Clinical:** reference network (e.g. European Reference Networks) → hospital / center of expertise → department or team → doctor → clinical studies
 - **Community:** umbrella organization (EURORDIS, NORD) → patient organization → registry / natural history study
 
+**The Atlas enters the graph through a tree.** The Amber logo sits in the middle as a hub, with one tree per category around it, clockwise from the top: researchers, hospitals & universities, literature, community, pathways, genes, diseases, symptoms, doctors. Every node is always visible and appears exactly once; the trees are never collapsed. Only tree lines are drawn by default. Clicking a node draws its real connections and opens its summary. The tree is navigation only: it gives every node a place to be found and does not change how nodes are connected. The chains above are followed along the real connections and through the summary panel, not along the tree.
+
 **The role decides where you start and how things are explained, never what you can see:**
 
 - **Patients** start at their disease, with similar diseases and patient communities highlighted, explained in plain language.
 - **Doctors** start with the symptom profile, with centers of expertise, clinical studies and variant classifications highlighted, explained in clinical terms.
 - **Researchers** start with mechanism clusters, with variants, pathways, papers and funding highlighted, explained technically with IDs shown.
 - **Guests** start with a guided tour in very simple language. They can explore everything but have no agent features (see Sign-in).
+
+In the Atlas, patients and researchers start framed on the Diseases tree, doctors on the Symptoms tree, guests on the whole map.
+
+### Atlas view
+
+- **Map:** the hub and the nine trees, with positions from the API (see Graph service). Hovering a node shows its label and its line back to the hub, never its connections. Clicking an entity draws its real connections (dashed when inferred, flagged when under review) and dims the rest; clicking a group highlights its branch; clicking the logo resets the view. Filters choose which connection families are drawn on click and hold the key.
+- **Search bar** over the map ("Search the map", `/` focuses it): matches every tree node, groups included, with the branch it sits in. Text that looks like a name also runs the synonym search (`GET /search`); free text is never sent there and never put into a URL. It is offered to Dr. Wu instead.
+- **List:** an outline of the same trees as an ARIA tree (arrow keys, Home/End, Enter, typeahead, a filter box). It is the accessible alternative to the canvas, and here branches can be opened and closed.
+- **Summary panel** on the right (a bottom sheet on mobile): for an entity, its place in the tree, a headline and its connections grouped by type (researchers, doctors, papers, trials, hospitals and universities, patient groups, genes, symptoms, similar conditions, …), each with the chain it is reached by, data vs. hypothesis and review flags. Picking an item selects it on the map and draws that chain. **Write a summary** streams a written summary of these connections from `POST /explain` (cached ones for anyone, new ones signed in). For a group, the panel explains how it was formed and lists its children.
+- **Dr. Wu dock** in the bottom-left corner: guests see the sign-in offer; signed-in users chat with Dr. Wu under the same `health_data` consent as the chat page. The nodes his reply points to are highlighted and framed on the map and listed as "Dr. Wu found N". What the user typed and the found node IDs stay in memory only: never in the URL, never in browser storage.
+
+**How the trees are grouped.** Every level below a category comes from stored data; a node that lacks what a level needs goes into a "… not recorded" group, nothing is dropped, and a group with more than 30 entries is split into alphabetical ranges. Three groupings are choices rather than facts, and the group panel says so:
+
+- **Diseases** are grouped by the computed mechanism clusters (Stage 5), which are inferred.
+- **Hospitals & universities** are one tree, split by keywords in the institution's name into hospitals and clinics (checked first, so "University Hospital …" counts as clinical), universities and research institutes, and other organisations, then by country. The data has no hospital or university type.
+- **Symptoms** follow the HPO classification (organ system, then the HPO hierarchy with one parent per term) when phenotype nodes carry `attrs.hpo_lineage`. Without it they fall back to one "Classification not loaded" group in alphabetical ranges; the pipeline does not write `hpo_lineage` yet.
 
 ### Handling uncertainty
 
@@ -210,7 +228,7 @@ The result is clamped to 0–1 and shown in the UI as High / Medium / Low, with 
 - **Mechanism features per gene:** share of pathogenic ClinVar variants that are truncating vs. missense, ClinGen haploinsufficiency score, pathway memberships. These produce `shared_pathway`, `same_gene_same_mechanism` and `same_gene_different_mechanism` edges, labeled `inferred`, with their features stored.
 - **Research overlap:** shared authors or PIs across diseases produce `shared_researcher` edges.
 - **Clustering:** Leiden (`igraph` + `leidenalg`) on the combined weighted similarity graph. The model writes each cluster's label from members' shared genes and pathways, marked inferred.
-- **Layout and centrality:** precompute ForceAtlas2 positions for the Atlas and ring views, plus centrality scores.
+- **Layout and centrality:** precompute ForceAtlas2 positions for the ring views and the old whole-graph Atlas layout, plus centrality scores. The Atlas view no longer draws these positions: its tree layout is computed by the API (see Graph service).
 
 ### Stage 6: Validate
 
@@ -368,7 +386,9 @@ Ten services, each a module under `/api/services`; the `PatientProfile` schema i
 
 - Loads nodes and edges into memory at startup (NetworkX for queries, positions precomputed).
 - `neighborhood(node, role)` returns the same full neighborhood for every role; the role only adds presentation hints (starting layout, label style, which edge family is highlighted first).
-- `clusters()` serves Atlas metadata (the full Atlas layout ships as a static file to the frontend).
+- `clusters()` serves cluster metadata.
+- **Atlas tree** (`GET /atlas/tree.json`): built from the in-memory graph on the first request after startup and cached, with its layout, until the graph changes (shared contributions or flags are reloaded). Each category gets its own angular sector and its tree grows outward without overlaps; the layout is deterministic. The payload carries every tree node with its position, the category sectors and label positions, and all real edges, which the frontend draws only for a clicked node. Its ETag is keyed on the data version and the layout version. The old whole-graph layout (`GET /atlas.json`, pipeline positions) is still served but no longer used by the frontend.
+- **Atlas summary** (`GET /atlas/summary/{id}`): what a node is connected to, deterministic and without a model, read from the in-memory graph on every click. Direct links plus fixed chains of up to three hops per node type (for example a disease's researchers via its papers). Items are grouped into sections by type and ranked by the number of chains that reach them, then by the weakest link of the best chain; each section keeps its top 10. Each item carries the edge IDs of its best chain and a short "via …" label; membership of a computed cluster is marked as grouped by the atlas, not a direct link. The response also lists up to 20 edge IDs for "Write a summary".
 
 ### Path
 
@@ -382,6 +402,7 @@ Ten services, each a module under `/api/services`; the `PatientProfile` schema i
 - The model may cite only edge IDs present in the path; the output is validated and regenerated if it cites anything else.
 - `textstat` reading-level gate per role (regenerate with a "simpler" instruction if above target).
 - Cached in `explanations_cache` by `(path_id, role, language, data_version)`.
+- With `subject_node_id`, it writes a summary of one node's connections instead of a path explanation: the edges are the ones the Atlas summary lists for it, strongest first, and the model may cite only those. Same access rule; cached under its own `path_id` (over `subject:<id>` plus the edges), so it never collides with a path over the same edges.
 
 ### Chat orchestrator
 
@@ -437,9 +458,11 @@ Detailed design in [`agent.md`](agent.md).
 | GET | `/node/{id}` | Anyone | Node details + summary for the side panel |
 | GET | `/neighborhood/{id}` | Anyone | Full neighborhood with positions + role presentation hints |
 | GET | `/clusters` | Anyone | Cluster IDs, labels, sizes |
+| GET | `/atlas/tree.json` | Anyone | Atlas hub and category trees with positions, all edges, clusters (ETag) |
+| GET | `/atlas/summary/{id}?role=` | Anyone | A node's place in the tree, headline, ranked connections by section, edge IDs for a written summary |
 | GET | `/path?from=&to=&family=` | Anyone | Ordered path steps, or `no_supported_route` + coverage report |
 | GET | `/edge/{id}/evidence` | Anyone | Sources, quotes, tiers, contradictions |
-| POST | `/explain` (SSE) | Anyone for cached explanations; signed in to generate new ones | Streamed role-specific explanation with citation IDs |
+| POST | `/explain` (SSE) | Anyone for cached explanations; signed in to generate new ones | Streamed role-specific explanation of a path with citation IDs; with `subject_node_id`, a summary of that node's connections |
 | POST | `/chat` (SSE) | Signed in + health-data consent | Streamed reply, chips, cards, follow-up question |
 | POST | `/gap-search` (SSE) | Signed in, rate-limited | Agent progress + candidate edges |
 | GET | `/export/graph` | Anyone | CSV / GraphML of the requested subgraph |

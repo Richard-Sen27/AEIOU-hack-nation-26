@@ -130,6 +130,8 @@ W1 → W3 → W4 together are the one complete journey the 24h goal asks for.
 4. Open the resolved node in the graph view at the lens's starting point (one global search principle).
 5. Reply: two-sentence plain summary, then cards (mini graph, patient group, evidence chips, "Open in Atlas").
 
+**In the Atlas: the Dr. Wu dock.** The same chat runs in a dock in the bottom-left corner of the Atlas, under the same sign-in and `health_data` consent. Free text typed into the Atlas search bar is offered to the dock instead of the search. On each final reply, the node IDs from `graph_focus.node_ids`, the cards and the unnegated chips that exist in the Atlas are highlighted and framed on the map, `graph_focus.highlight_path` is drawn, and the nodes are listed as "Dr. Wu found N". The question and these found node IDs are health data: they stay in memory only, never in the URL (no `?focus=`, no links that carry them) and never in browser storage.
+
 **W2 — Documents** (handled by the document service, not by the agent)
 
 1. Upload requires sign-in and an active `health_data` consent (`POST /documents`); guests see the inline sign-in dialog first.
@@ -246,7 +248,7 @@ User role: {role}. Expert mode: {expert_mode}. Profile: {confirmed_profile_json}
 - The gap-search agent uses the OpenAI Agents SDK with its own budgets.
 - Planner/answer model: the strongest OpenAI model on the team's credits; extraction and classification on a smaller, cheaper model; embeddings via OpenAI embeddings into pgvector.
 - Streaming over SSE (`POST /chat`): `summary` streams first, then chips, claims, cards and actions.
-- Path explanations go through the Explanation service (`POST /explain`), which is cached per `(path_id, role, language, data_version)` and gated by textstat per role.
+- Path explanations go through the Explanation service (`POST /explain`), which is cached per `(path_id, role, language, data_version)` and gated by textstat per role. With `subject_node_id` the same service writes a summary of one node's connections (the Atlas panel's "Write a summary"), citing only the edges listed for that node.
 
 **Endpoints the agent uses or produces** (full API in `system.md`)
 
@@ -254,7 +256,7 @@ User role: {role}. Expert mode: {expert_mode}. Profile: {confirmed_profile_json}
 | --- | --- | --- |
 | POST | `/chat` (SSE) | Send a message, stream the structured reply |
 | GET / PUT | `/profile` | Read or update the `PatientProfile` (confirmed chips and findings) |
-| POST | `/explain` (SSE) | Role-specific explanation of a path with citation IDs |
+| POST | `/explain` (SSE) | Role-specific explanation of a path with citation IDs, or with `subject_node_id` a summary of one node's connections |
 | GET | `/edge/{id}/evidence` | Full evidence for the trust panel |
 | POST | `/gap-search` (SSE) | Gap-search agent progress and candidate edges |
 | POST | `/proposal` | Export an action plan as a one-page sourced proposal |
