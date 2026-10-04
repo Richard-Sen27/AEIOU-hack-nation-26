@@ -86,7 +86,8 @@ Work deliberately left for later. Add an item when you leave something for later
 - **Demo verifications can name real people** (`ORCID_MOCK`, local only): the simulated sign-in accepts any ORCID iD, so a local demo card can carry a real researcher's iD and atlas entry, labelled "demo, verification simulated". Do not demo with real names you do not own.
 - **Card cache across workers** (`people.CACHE_MAX_AGE_S`): a card switched off disappears at once in the process that handled the change, elsewhere (another worker, after an operator `--revoke`) within 60 s; `GET /people/{card_id}` is always fresh.
 - **Cards per disease** (`people._person_diseases`): a card is listed for a disease only through its verified atlas entry (papers, grants, trials); cards without one are reachable by card link only. No work topics, by decision.
-- **Card frontend:** the endpoints and SDK exist; the profile panel, the Atlas chip ("In Amber · ORCID iD confirmed") and the card page are not built.
+- **Disease id in the people query** (`GET /people?disease=MONDO:…`, `components/people/use-people.ts`): the disease page's "Reachable in Amber" sends the disease id in the API query string (it is already in the page path); the calls list filters in the browser instead. A body-based lookup or client-side filter would keep it out of server logs.
+- **Card frontend verified with mocks only** (`components/account/card-section.tsx`, `components/people/*`): the ORCID round trip, the manual request and `GET /people` have not run against a live API yet.
 - **ORCID state replay** (`orcid._used_nonces`): used states are remembered per process for 10 minutes; with several workers a replay inside that window is stopped only by ORCID's single-use code.
 
 ## Messaging (connect)
