@@ -51,7 +51,7 @@ export function NodeList({
   const { labelStyle } = useLens();
   const rows = edges.filter((e) => !hiddenFamilies.has(e.family));
   return (
-    <div className="h-full overflow-auto" data-testid="node-list">
+    <div className="relative h-full overflow-auto" data-testid="node-list">
       <table className="w-full min-w-[640px] text-sm">
         <caption className="sr-only">All connections in this view, with their trust details.</caption>
         <thead className="sticky top-0 z-10 bg-card text-left text-xs text-muted-foreground">

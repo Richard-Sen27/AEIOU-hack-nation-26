@@ -2,6 +2,7 @@
 
 import {
   Download,
+  Info,
   Map as MapIcon,
   Maximize,
   Minus,
@@ -40,6 +41,7 @@ import type { NodeGraphHandle } from "./node-graph";
 import { NodeList } from "./node-list";
 import { NodePanel } from "./node-panel";
 import { PathPicker } from "./path-picker";
+import { useMediaQuery } from "./use-media-query";
 import { useReducedMotion } from "./use-reduced-motion";
 import { ViewToggle, type ViewMode } from "./view-toggle";
 
@@ -62,6 +64,8 @@ export function NodeView({ nodeId }: { nodeId: string }) {
   const { requireSignIn } = useGate();
   const theme = useGraphTheme();
   const reducedMotion = useReducedMotion();
+  /** From 1024 px the page is fixed to the viewport and each column scrolls on its own. */
+  const fitViewport = useMediaQuery("(min-width: 1024px)");
   const graph = useRef<NodeGraphHandle>(null);
 
   const [detail, setDetail] = useState<Load<Schemas.NodeDetail>>({ kind: "loading" });
@@ -254,7 +258,11 @@ export function NodeView({ nodeId }: { nodeId: string }) {
   const exportUrl = (format: "csv" | "graphml") => buildUrl("/export/graph", { node: center.id, depth: 1, format });
 
   return (
-    <div className="mx-auto w-full max-w-[1440px] px-4 py-5 sm:px-6" data-testid="node-view">
+    <div
+      className="mx-auto w-full max-w-[1440px] px-4 py-5 sm:px-6 lg:flex lg:min-h-0 lg:flex-1 lg:flex-col"
+      data-fit-viewport={fitViewport || undefined}
+      data-testid="node-view"
+    >
       {/* Header */}
       <header className="mb-4 flex flex-col gap-3 lg:flex-row lg:items-end lg:justify-between">
         <div className="min-w-0 space-y-1">
@@ -316,9 +324,9 @@ export function NodeView({ nodeId }: { nodeId: string }) {
 
       {isVus(classification) && <VusNotice className="mb-4" />}
 
-      <div className="grid gap-4 lg:grid-cols-[minmax(0,1fr)_400px]">
+      <div className="grid gap-4 lg:min-h-0 lg:flex-1 lg:grid-cols-[minmax(0,1fr)_400px] lg:grid-rows-[minmax(0,1fr)]">
         {/* Graph / list */}
-        <section aria-label="Neighbourhood" className="flex min-w-0 flex-col overflow-hidden rounded-xl border bg-card">
+        <section aria-label="Neighbourhood" className="flex min-w-0 flex-col overflow-hidden rounded-xl border bg-card lg:min-h-0">
           <div className="flex flex-wrap items-center gap-2 border-b px-3 py-2">
             {presentFamilies.length > 0 && (
               <FamilyChips
@@ -338,7 +346,12 @@ export function NodeView({ nodeId }: { nodeId: string }) {
             )}
             <ViewToggle value={view} onChange={setView} graphLabel="Graph" className="ml-auto" />
           </div>
-          <div className={cn("relative", view === "graph" ? "bg-atlas-grid h-[min(62vh,620px)] min-h-[380px]" : "min-h-[380px]")}>
+          <div
+            className={cn(
+              "relative lg:min-h-0 lg:flex-1",
+              view === "graph" ? "bg-atlas-grid h-[min(62vh,620px)] min-h-[380px] lg:h-auto" : "min-h-[380px] lg:overflow-hidden",
+            )}
+          >
             {hood.kind === "error" ? (
               <div className="flex h-full items-center justify-center p-6 text-center text-sm text-muted-foreground" role="status" data-testid="hood-error">
                 {hood.code === "not_implemented"
@@ -381,6 +394,31 @@ export function NodeView({ nodeId }: { nodeId: string }) {
                     <Maximize aria-hidden />
                   </Button>
                 </div>
+                <Popover>
+                  <PopoverTrigger
+                    render={
+                      <Button
+                        variant="outline"
+                        size="sm"
+                        className="absolute bottom-3 left-3 bg-card/90 shadow-xs backdrop-blur"
+                        aria-label="Key: what the lines, colours and icons mean"
+                        data-testid="legend-toggle"
+                      />
+                    }
+                  >
+                    <Info data-icon="inline-start" aria-hidden /> Key
+                  </PopoverTrigger>
+                  <PopoverContent side="top" align="start" className="w-auto max-w-[min(22rem,calc(100vw-2rem))]">
+                    <PopoverHeader className="sr-only">
+                      <PopoverTitle>Key</PopoverTitle>
+                    </PopoverHeader>
+                    <GraphLegend
+                      nodeTypes={nodeTypes}
+                      families={presentFamilies.length ? presentFamilies : undefined}
+                      className="border-0 bg-transparent p-0 backdrop-blur-none"
+                    />
+                  </PopoverContent>
+                </Popover>
               </>
             ) : (
               <NodeList
@@ -393,21 +431,13 @@ export function NodeView({ nodeId }: { nodeId: string }) {
               />
             )}
           </div>
-          <div className="border-t p-3">
-            <GraphLegend
-              orientation="horizontal"
-              nodeTypes={nodeTypes}
-              families={presentFamilies.length ? presentFamilies : undefined}
-              className="border-0 bg-transparent p-0 backdrop-blur-none"
-            />
-          </div>
         </section>
 
         {/* Side panel */}
         <aside
           id="node-side"
           aria-label={selectedEdge ? "Connection details" : "Summary and connections"}
-          className="min-w-0 rounded-xl border bg-card lg:self-start"
+          className="relative min-w-0 rounded-xl border bg-card lg:min-h-0 lg:overflow-y-auto"
         >
           {selectedEdge ? (
             <EdgePanel

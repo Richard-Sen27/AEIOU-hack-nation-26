@@ -225,6 +225,103 @@ test.describe("node view", () => {
     await expect(page.getByTestId("node-panel")).toContainText("Severe childhood epilepsy");
   });
 
+  for (const viewport of [{ width: 1440, height: 900 }, { width: 1280, height: 720 }]) {
+    test(`desktop ${viewport.width}x${viewport.height}: the page does not scroll, each column scrolls inside`, async ({ page }) => {
+      await page.setViewportSize(viewport);
+      await mockApi(page, graphMocks());
+      await page.goto(DRAVET);
+      await expect(page.getByTestId("node-graph").locator("canvas").first()).toBeVisible({ timeout: 30_000 });
+      const side = page.getByTestId("node-panel").locator("xpath=ancestor::aside[@id='node-side']");
+      await expect(side).toBeVisible();
+      for (const view of ["Graph", "List"]) {
+        await page.getByRole("radio", { name: view }).click();
+        const m = await page.evaluate(() => {
+          const se = document.scrollingElement!;
+          const aside = document.getElementById("node-side")!;
+          const list = document.querySelector<HTMLElement>('[data-testid="node-list"]');
+          return {
+            docOverflow: se.scrollHeight - se.clientHeight,
+            asideBottom: aside.getBoundingClientRect().bottom,
+            asideOverflowY: getComputedStyle(aside).overflowY,
+            listBottom: list?.getBoundingClientRect().bottom ?? 0,
+          };
+        });
+        expect(m.docOverflow, `${view}: page scroll`).toBeLessThanOrEqual(1);
+        expect(m.asideBottom).toBeLessThanOrEqual(viewport.height);
+        expect(m.asideOverflowY).toBe("auto");
+        expect(m.listBottom).toBeLessThanOrEqual(viewport.height);
+      }
+      // The side card scrolls within itself when its content is taller than the column.
+      const scrolled = await side.evaluate((el) => {
+        if (el.scrollHeight <= el.clientHeight) return "fits";
+        el.scrollTop = 120;
+        return el.scrollTop > 0 ? "scrolled" : "stuck";
+      });
+      expect(["fits", "scrolled"]).toContain(scrolled);
+      expect(await page.evaluate(() => window.scrollY)).toBe(0);
+    });
+  }
+
+  test("the map key is collapsed until opened and closes with Escape", async ({ page }) => {
+    await mockApi(page, graphMocks());
+    await page.goto(DRAVET);
+    await expect(page.getByTestId("node-graph").locator("canvas").first()).toBeVisible({ timeout: 30_000 });
+    const toggle = page.getByRole("button", { name: /^Key/ });
+    await expect(toggle).toHaveAttribute("aria-expanded", "false");
+    await expect(page.getByTestId("graph-legend")).toHaveCount(0);
+    await toggle.focus();
+    await page.keyboard.press("Enter");
+    await expect(toggle).toHaveAttribute("aria-expanded", "true");
+    await expect(page.getByTestId("graph-legend")).toContainText("Line style");
+    await page.keyboard.press("Escape");
+    await expect(page.getByTestId("graph-legend")).toHaveCount(0);
+    await expect(toggle).toBeFocused();
+  });
+
+  test("a five-node graph keeps labels and nodes in proportion to the page", async ({ page }) => {
+    await page.setViewportSize({ width: 1440, height: 900 });
+    // Dravet syndrome with only four neighbours.
+    const small = {
+      "GET /neighborhood/*": (req: { url: string }) => {
+        const full = (graphMocks()["GET /neighborhood/*"] as (r: { url: string }) => { json: { nodes: { id: string }[]; edges: { source_id: string; target_id: string }[]; center: { id: string } } })(req).json;
+        const keep = new Set([full.center.id, ...full.nodes.filter((n) => n.id !== full.center.id).slice(0, 4).map((n) => n.id)]);
+        return { json: { ...full, nodes: full.nodes.filter((n) => keep.has(n.id)), edges: full.edges.filter((e) => keep.has(e.source_id) && keep.has(e.target_id)) } };
+      },
+    };
+    await mockApi(page, graphMocks(small));
+    await page.goto(DRAVET);
+    await expect(page.getByTestId("node-counts")).toContainText("5 items");
+    const graph = page.getByTestId("node-graph");
+    await expect(graph.locator("canvas").first()).toBeVisible({ timeout: 30_000 });
+    await page.waitForTimeout(800);
+    const m = await graph.evaluate((el) => {
+      type N = { id: () => string; style: (k: string) => string; renderedWidth: () => number; renderedBoundingBox: (o: object) => { x1: number; x2: number; y1: number; y2: number } };
+      const cy = (el as unknown as { _cyreg: { cy: { zoom: () => number; nodes: () => { toArray: () => N[] } } } })._cyreg.cy;
+      const zoom = cy.zoom();
+      const nodes = cy.nodes().toArray();
+      const labels = nodes.map((n) => n.renderedBoundingBox({ includeNodes: false, includeEdges: false, includeLabels: true }));
+      let overlaps = 0;
+      for (let i = 0; i < labels.length; i++)
+        for (let j = i + 1; j < labels.length; j++) {
+          const a = labels[i], b = labels[j];
+          if (a.x1 < b.x2 && b.x1 < a.x2 && a.y1 < b.y2 && b.y1 < a.y2) overlaps++;
+        }
+      return {
+        zoom,
+        labelPx: nodes.map((n) => parseFloat(n.style("font-size")) * zoom),
+        nodePx: nodes.map((n) => n.renderedWidth()),
+        overlaps,
+      };
+    });
+    expect(m.zoom).toBeLessThanOrEqual(1.1 + 1e-6);
+    for (const px of m.labelPx) {
+      expect(px).toBeGreaterThanOrEqual(9);
+      expect(px).toBeLessThanOrEqual(15);
+    }
+    expect(Math.max(...m.nodePx)).toBeLessThanOrEqual(48);
+    expect(m.overlaps).toBe(0);
+  });
+
   test("screenshots: light and dark", async ({ page }) => {
     await page.emulateMedia({ reducedMotion: "reduce" });
     await mockApi(page, graphMocks());
