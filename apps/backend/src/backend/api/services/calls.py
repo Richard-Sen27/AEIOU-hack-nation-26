@@ -1,20 +1,26 @@
-"""Calls: surveys, studies and trials that verified professionals publish after review.
+"""Calls: surveys, studies and trials that verified professionals publish.
 
 Who may write: a doctor or researcher whose public card is visible and verified (the definer
 function professional_cards() lists them; `publisher_card` is the single check). Writing is
 contract-based (publisher terms), no consent type. Reading published calls needs only a signed-in
 16+ account: no health data is processed and nothing about the reader is stored.
 
-Life cycle: draft -> pending_review (submit: wording check, atlas check, publisher check) ->
-published or rejected (the operator, `backend.cli calls ...`, through the definer function
-review_call(), logged in call_reviews). The publisher may edit a draft, a rejected call or one
-still pending review (it goes back to draft and must be submitted again); a published call is
-never edited (close it and write a new one). Closing ends a published call (closed) or pulls an
-unpublished one (withdrawn). The database enforces that only the operator publishes (trigger
-calls_guard).
+Two modes, chosen by the setting CALLS_REVIEW_REQUIRED (default false):
+- Self-publishing (default): submit runs the wording check, the atlas check and the publisher
+  check and publishes the call at once through the definer function publish_own_call(), which
+  re-checks ownership and the card, marks the call `self_published` and logs it in call_reviews.
+  Such a call says "Published by the expert. Not reviewed by the Amber team."
+- Review: draft -> pending_review (submit, same checks) -> published or rejected by the operator
+  (`backend.cli calls ...`, definer function review_call(), logged in call_reviews).
+
+The publisher may edit a draft, a rejected call or one still pending review (it goes back to
+draft); a published call is never edited (close it and write a new one). Closing ends a published
+call (closed) or pulls an unpublished one (withdrawn). The database enforces that a call goes
+live only through one of the two definer functions (trigger calls_guard).
 
 Hard limits ("to get medication"): a call describes research that looks for participants. The
-wording check refuses offers, promises and prices of treatments; the operator checks the rest.
+wording check refuses offers, promises and prices of treatments in both modes; in review mode
+the operator checks the rest.
 """
 
 import re
@@ -23,14 +29,18 @@ from typing import Any
 from uuid import UUID
 
 from sqlalchemy import text
+from sqlalchemy.exc import DBAPIError
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from backend.api.errors import ApiError
 from backend.api.services.graph import get_graph
 from backend.api.services.people import card_from_row
+from backend.config import get_settings
 from backend.schemas.account import CurrentUser
 from backend.schemas.calls import (
     MAX_OPEN_CALLS,
+    REVIEW_BADGE,
+    SELF_PUBLISHED_BADGE,
     AtlasRef,
     Call,
     CallExport,
@@ -50,6 +60,9 @@ from backend.schemas.people import PublicCard
 OPEN_STATUSES = (CallStatus.draft, CallStatus.pending_review, CallStatus.published)
 EDITABLE_STATUSES = (CallStatus.draft, CallStatus.pending_review, CallStatus.rejected)
 SUBMITTABLE_STATUSES = (CallStatus.draft, CallStatus.rejected)
+# Self-publishing never takes a rejected call live as it is: it must be edited first (-> draft).
+SELF_PUBLISHABLE_STATUSES = (CallStatus.draft, CallStatus.pending_review)
+INSUFFICIENT_PRIVILEGE = "42501"
 RUN_BY_TYPES = frozenset(
     {NodeType.institution, NodeType.patient_org, NodeType.network, NodeType.registry}
 )
@@ -113,7 +126,7 @@ _CALL_COLUMNS = (
     " c.run_by_label, c.run_by_node_id, c.ethics_body, c.ethics_reference, c.registry_id,"
     " c.external_url, c.opens_at, c.closes_at, c.max_signups, c.requested_fields, c.status,"
     " c.review_note, c.submitted_at, c.reviewed_at, c.published_at, c.closed_at, c.demo,"
-    " c.created_at, c.updated_at"
+    " c.self_published, c.created_at, c.updated_at"
 )
 _CARD_COLUMNS = (
     "pc.card_id, pc.role, pc.name, pc.name_verified, pc.institutions, pc.orcid_id,"
@@ -278,6 +291,18 @@ def registry_url(registry_id: str | None) -> str | None:
     return f"https://www.clinicaltrialsregister.eu/ctr-search/search?query={registry_id}"
 
 
+def review_required() -> bool:
+    return get_settings().calls_review_required
+
+
+def _review_badge(row: Any) -> str:
+    """What a call says about its review: for one that went live, how it went live; for one
+    that has not, the badge it would get in the current mode."""
+    if row["published_at"] is not None:
+        return SELF_PUBLISHED_BADGE if row["self_published"] else REVIEW_BADGE
+    return REVIEW_BADGE if review_required() else SELF_PUBLISHED_BADGE
+
+
 def _call_fields(row: Any, publisher: PublicCard | None) -> dict[str, Any]:
     run_by = _refs([row["run_by_node_id"]])[0] if row["run_by_node_id"] else None
     return {
@@ -310,6 +335,8 @@ def _call_fields(row: Any, publisher: PublicCard | None) -> dict[str, Any]:
         "publisher": publisher,
         "published_at": row["published_at"],
         "demo": row["demo"],
+        "self_published": row["self_published"],
+        "review_badge": _review_badge(row),
     }
 
 
@@ -386,7 +413,11 @@ async def list_own(db: AsyncSession, user: CurrentUser) -> OwnCallList:
             {"uid": user.id},
         )
     ).mappings()
-    return OwnCallList(items=[_own(r, card) for r in rows], can_publish=card is not None)
+    return OwnCallList(
+        items=[_own(r, card) for r in rows],
+        can_publish=card is not None,
+        review_required=review_required(),
+    )
 
 
 async def get_own(db: AsyncSession, user: CurrentUser, call_id: UUID) -> OwnCall:
@@ -452,11 +483,37 @@ async def update(db: AsyncSession, user: CurrentUser, call_id: UUID, body: CallI
     return _own(await _own_row(db, user, call_id), card)
 
 
+async def _publish_own(db: AsyncSession, user: CurrentUser, call_id: UUID, row: Any) -> None:
+    """Self-publishing: the same checks as a submit, then publish_own_call(), which re-checks
+    ownership and the card in the database and writes the log row."""
+    status = CallStatus(row["status"])
+    if status not in SELF_PUBLISHABLE_STATUSES:
+        raise ApiError(
+            409,
+            ErrorCode.conflict,
+            "Only drafts can be published. Edit a rejected call first; closed and withdrawn "
+            "calls stay closed.",
+        )
+    _check_stored(row)
+    try:
+        await db.execute(text("SELECT publish_own_call(:id)"), {"id": call_id})
+    except DBAPIError as exc:
+        if getattr(exc.orig, "sqlstate", None) != INSUFFICIENT_PRIVILEGE:
+            raise
+        raise ApiError(409, ErrorCode.conflict, "The call could not be published.") from None
+
+
 async def submit(db: AsyncSession, user: CurrentUser, call_id: UUID) -> OwnCall:
-    """Send a draft (or a rejected call after editing) to the Amber team for review."""
+    """Publish the call (default), or with CALLS_REVIEW_REQUIRED send a draft (or a rejected
+    call) to the Amber team for review. Idempotent once it is published or pending."""
     card = await _require_publisher(db, user)
     row = await _own_row(db, user, call_id, lock=True)
     status = CallStatus(row["status"])
+    if not review_required():
+        if status == CallStatus.published:
+            return _own(row, card)
+        await _publish_own(db, user, call_id, row)
+        return _own(await _own_row(db, user, call_id), card)
     if status == CallStatus.pending_review:
         return _own(row, card)
     if status not in SUBMITTABLE_STATUSES:

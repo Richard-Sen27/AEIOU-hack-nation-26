@@ -64,6 +64,12 @@ class Settings(BaseSettings):
     orcid_redirect_uri: str = ""
     orcid_mock: bool = False
 
+    # Calls (surveys, studies, trials). False: a verified professional with a visible card
+    # publishes their own call from the form at once (after the wording check); the call says it
+    # was not reviewed. True: every call waits for the operator (`backend.cli calls approve`).
+    # Switch it on before real patients use the product.
+    calls_review_required: bool = False
+
     @property
     def is_local(self) -> bool:
         """API and frontend both on loopback addresses (local development and demos)."""

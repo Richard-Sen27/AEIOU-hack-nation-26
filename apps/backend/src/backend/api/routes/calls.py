@@ -62,7 +62,8 @@ async def get_call(request: Request, call_id: UUID, db: DB, user: User) -> Call:
     operation_id="listMyCalls",
 )
 async def list_my_calls(db: DB, user: SignedInUser) -> OwnCallList:
-    """The user's own calls in every status, and whether they may publish."""
+    """The user's own calls in every status, whether they may publish, and whether publishing
+    goes through a review (`review_required`)."""
     return await calls.list_own(db, user)
 
 
@@ -102,8 +103,8 @@ async def create_call(request: Request, body: CallInput, db: DB, user: User) -> 
 async def update_call(
     request: Request, call_id: UUID, body: CallInput, db: DB, user: User
 ) -> OwnCall:
-    """Replace a draft, rejected or pending call; it becomes a draft and must be submitted again.
-    409 for published, closed and withdrawn calls."""
+    """Replace a draft, rejected or pending call; it becomes a draft (publish or submit it
+    again). 409 for published, closed and withdrawn calls."""
     return await calls.update(db, user, call_id, body)
 
 
@@ -115,9 +116,11 @@ async def update_call(
 )
 @limiter.limit(SUBMIT_LIMIT)
 async def submit_call(request: Request, call_id: UUID, db: DB, user: User) -> OwnCall:
-    """Send the call to the Amber team for review (status pending_review). 422 when the wording
-    check finds an offer, promise or price of a treatment (the message names field and rule) or
-    an atlas ID has left the atlas."""
+    """Publish the call at once (status published; it is marked as not reviewed by the Amber
+    team). When `review_required` is true (see `listMyCalls`) it is sent to the Amber team for
+    review instead (status pending_review). 422 when the wording check finds an offer, promise or
+    price of a treatment (the message names field and rule) or an atlas ID has left the atlas;
+    409 for a rejected call that was not edited, or a closed or withdrawn one."""
     return await calls.submit(db, user, call_id)
 
 

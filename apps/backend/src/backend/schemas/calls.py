@@ -1,9 +1,11 @@
 """Calls: surveys, studies and trials looking for participants ("Find trials and studies looking
 for participants").
 
-A verified doctor or researcher with a visible public card writes a call; the Amber team reviews
-its wording, ethics approval and registry number (not its science) and publishes it. Every
-signed-in user sees every published call; nothing about who looked at one is stored. Calls never
+A verified doctor or researcher with a visible public card writes a call and publishes it from
+the form; it then says that the Amber team did not review it. With CALLS_REVIEW_REQUIRED on, the
+Amber team reviews its wording, ethics approval and registry number (not its science) and
+publishes it instead. Every signed-in user sees every published call; nothing about who looked
+at one is stored. Calls never
 offer, promise, price or promote a treatment: they describe research that looks for participants
 and link to its registry entry.
 """
@@ -45,6 +47,7 @@ REVIEW_BADGE = (
     "Reviewed by the Amber team for wording, ethics and registry numbers, not for scientific "
     "quality"
 )
+SELF_PUBLISHED_BADGE = "Published by the expert. Not reviewed by the Amber team."
 NOTICE = (
     "Ask your doctor whether this trial or study could apply to you. This is not an eligibility "
     "check: only the study team decides who can take part."
@@ -242,7 +245,17 @@ class Call(ApiModel):
     )
     published_at: datetime | None
     demo: bool = Field(description="Seeded demo data: label it 'Demo, not a real study'.")
-    review_badge: str = Field(REVIEW_BADGE, description="Show on every published call.")
+    self_published: bool = Field(
+        False,
+        description="The expert published it without a review by the Amber team "
+        "(CALLS_REVIEW_REQUIRED off).",
+    )
+    review_badge: str = Field(
+        REVIEW_BADGE,
+        description="Show on every published call, exactly as sent: either the review badge or, "
+        "for a self-published call, that it was not reviewed. On the publisher's unpublished "
+        "calls it is the badge the call would get when it goes live.",
+    )
     notice: str = Field(NOTICE, description="Show on every call.")
 
 
@@ -275,6 +288,10 @@ class OwnCallList(ApiModel):
     items: list[OwnCall] = Field(description="Newest first.")
     can_publish: bool = Field(
         description="The user is a verified doctor or researcher with a visible card."
+    )
+    review_required: bool = Field(
+        description="False (the default): `submitCall` publishes the call at once, so the "
+        "form's button reads 'Publish'. True: it sends the call to the Amber team for review."
     )
     open_limit: int = Field(
         MAX_OPEN_CALLS, description="Most draft, pending and published calls at a time."
@@ -320,5 +337,6 @@ class CallExport(ApiModel):
     published_at: datetime | None = None
     closed_at: datetime | None = None
     demo: bool
+    self_published: bool = False
     created_at: datetime
     updated_at: datetime
