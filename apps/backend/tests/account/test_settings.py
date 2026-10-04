@@ -81,3 +81,42 @@ async def test_gpc_recorded_and_reported(make_user, superuser):
     assert r.json()["user"]["gpc_opt_out"] is True  # but recorded
     export = (await user.client.get("/me/export")).json()
     assert export["settings"]["gpc_opt_out"] is True
+
+
+WORK = {"first_name": "Ada", "last_name": "Byron", "orcid_id": "0000-0002-1825-0097"}
+
+
+async def test_switch_to_patient_deletes_work_details(make_user, superuser):
+    user = await make_user(role="doctor")
+    assert (await user.client.put("/me/professional", json=WORK)).status_code == 200
+
+    # Doctor <-> researcher keeps them.
+    r = await user.client.patch("/me/settings", json={"role": "researcher"})
+    assert r.json()["name"] == "Ada Byron"
+    assert (await user.client.get("/me/professional")).json()["first_name"] == "Ada"
+
+    # Patient deletes them (account name again in the session).
+    r = await user.client.patch("/me/settings", json={"role": "patient"})
+    assert r.json()["name"] == "Test"
+    row = await superuser.fetchrow(
+        "SELECT first_name, last_name, orcid_id, institutions, atlas_node_id,"
+        " professional_updated_at FROM profiles WHERE user_id = $1",
+        user.id,
+    )
+    assert dict(row) == {
+        "first_name": None,
+        "last_name": None,
+        "orcid_id": None,
+        "institutions": "[]",
+        "atlas_node_id": None,
+        "professional_updated_at": None,
+    }
+    r = await user.client.patch("/me/settings", json={"role": "doctor"})
+    assert (await user.client.get("/me/professional")).json()["first_name"] is None
+
+
+async def test_same_role_keeps_work_details(make_user):
+    user = await make_user(role="researcher")
+    assert (await user.client.put("/me/professional", json=WORK)).status_code == 200
+    await user.client.patch("/me/settings", json={"role": "researcher", "language": "de"})
+    assert (await user.client.get("/me/professional")).json()["last_name"] == "Byron"

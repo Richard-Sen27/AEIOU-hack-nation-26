@@ -87,6 +87,30 @@ async def test_complete_sign_in(browser, mock_openai, connect_as):
     assert row["expires_at"] is not None
 
 
+@pytest.mark.parametrize(
+    "user,suggested",
+    [
+        ("alice", {"first_name": "Alice Jane", "last_name": "Example"}),  # ID token claims
+        ("carol", {"first_name": "Carol", "last_name": "Example"}),  # split of the name
+    ],
+)
+async def test_work_details_prefill(browser, mock_openai, connect_as, user, suggested):
+    await sign_in(browser, user)
+    r = await browser.patch("/me/settings", json={"role": "doctor", "age_confirmed_16": True})
+    assert r.status_code == 200, r.text
+    data = (await browser.get("/me/professional")).json()
+    assert data["suggested"] == {**suggested, "source": "chatgpt"}
+    assert data["first_name"] is None and data["updated_at"] is None
+    conn = await connect_as("atlas")
+    row = await conn.fetchrow(
+        "SELECT p.first_name, p.last_name, u.name FROM profiles p JOIN users u ON u.id = p.user_id"
+        " WHERE u.chatgpt_sub = $1",
+        f"user-mock-{user}-000{1 if user == 'alice' else 3}",
+    )
+    assert row["first_name"] is None and row["last_name"] is None  # nothing stored
+    assert row["name"] == f"{user.title()} Example"
+
+
 async def test_second_sign_in_reuses_issued_client_id(browser, mock_openai, connect_as):
     await sign_in(browser)
     first = mock_openai.state.recorded("authorize")[-1]["params"]

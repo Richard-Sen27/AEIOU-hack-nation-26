@@ -81,6 +81,30 @@ async def test_export_contains_everything_and_no_secrets(make_user, connect_as, 
     assert data["edge_flags"][0]["edge_id"] == edge_ids[0]
     assert "SECRET" not in r.text
     assert "client" not in json.dumps(data["openai_connection"])
+    assert data["professional"] is None  # patients have no work details
+
+
+async def test_export_contains_work_details(make_user):
+    user = await make_user(role="researcher")
+    body = {
+        "first_name": "Ada",
+        "last_name": "Byron",
+        "orcid_id": "0000-0002-1825-0097",
+        "institutions": [{"node_id": "INST:fx-neuro"}, {"label": "Free Text Institute"}],
+        "atlas_node_id": "RES:fx-alpha",
+    }
+    assert (await user.client.put("/me/professional", json=body)).status_code == 200
+    data = (await user.client.get("/me/export")).json()
+    professional = data["professional"]
+    assert professional["first_name"] == "Ada" and professional["last_name"] == "Byron"
+    assert professional["orcid_id"] == "0000-0002-1825-0097"
+    assert professional["atlas_node_id"] == "RES:fx-alpha"
+    assert professional["updated_at"]
+    assert professional["institutions"] == [
+        {"node_id": "INST:fx-neuro", "label": "Fixture University Neuroscience Institute"},
+        {"node_id": None, "label": "Free Text Institute"},
+    ]
+    assert data["settings"]["orcid_id"] == "0000-0002-1825-0097"
 
 
 async def test_export_is_own_data_only(make_user, connect_as, edge_ids):
@@ -100,13 +124,18 @@ async def test_export_is_own_data_only(make_user, connect_as, edge_ids):
     ):
         assert data[key] == [], key
     assert data["patient_profile"] is None
+    assert data["professional"] is None
     assert data["openai_connected"] is False
 
 
 async def test_delete_leaves_nothing(make_user, connect_as, edge_ids, superuser):
-    user = await make_user(consents=["health_data", "contribute"])
+    user = await make_user(role="doctor", consents=["health_data", "contribute"])
     other = await make_user(consents=["contribute"])
     await seed_everything(connect_as, user, edge_ids[0])
+    r = await user.client.put(
+        "/me/professional", json={"first_name": "Gone", "atlas_node_id": "DOC:fx-one"}
+    )
+    assert r.status_code == 200
     await seed_everything(connect_as, other, edge_ids[1])
     contribution_ids = {
         r["id"]
