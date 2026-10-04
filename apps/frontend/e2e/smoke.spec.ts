@@ -118,6 +118,28 @@ test.describe("shell", () => {
     await expect(page.getByRole("menuitem", { name: "About this data" })).toHaveAttribute("href", "/about-data");
   });
 
+  test("header nav items stay on one line from 1024 px up, signed out and in", async ({ page }) => {
+    for (const session of [guestSession, signedInSession({ role: "patient" })]) {
+      await page.unrouteAll({ behavior: "ignoreErrors" });
+      await mockApi(page, { "GET /auth/session": session });
+      for (const width of [1024, 1100, 1280, 1440]) {
+        await page.setViewportSize({ width, height: 800 });
+        await page.goto("/atlas");
+        const header = page.getByRole("banner");
+        await expect(
+          session.user ? header.getByTestId("user-menu") : header.getByRole("button", { name: "Continue with ChatGPT" }),
+        ).toBeVisible();
+        const links = header.getByRole("navigation", { name: "Primary" }).getByRole("link");
+        await expect(links).toHaveCount(4);
+        // One line: every item is one line tall, and the page does not scroll sideways.
+        const heights = await links.evaluateAll((els) => els.map((el) => el.getBoundingClientRect().height));
+        expect(Math.max(...heights) - Math.min(...heights), `nav items at ${width}px`).toBeLessThan(1);
+        expect(Math.max(...heights), `nav items at ${width}px`).toBeLessThan(36);
+        expect(await page.evaluate(() => document.documentElement.scrollWidth - window.innerWidth)).toBeLessThanOrEqual(0);
+      }
+    }
+  });
+
   test("screenshots: light and dark", async ({ page }) => {
     await page.emulateMedia({ reducedMotion: "reduce" });
     await mockApi(page, {
