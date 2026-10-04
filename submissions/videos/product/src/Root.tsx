@@ -18,7 +18,7 @@ export const RemotionRoot: React.FC = () => {
       <Composition
         id="ProductVideo"
         component={ProductVideo}
-        durationInFrames={1740}
+        durationInFrames={1713}
         fps={30}
         width={1920}
         height={1080}
@@ -27,7 +27,7 @@ export const RemotionRoot: React.FC = () => {
         <Composition
           id="Scene1-Arrive"
           component={ArriveScene}
-          durationInFrames={240}
+          durationInFrames={252}
           fps={30}
           width={1920}
           height={1080}
@@ -35,7 +35,7 @@ export const RemotionRoot: React.FC = () => {
         <Composition
           id="Scene2-Graph"
           component={GraphScene}
-          durationInFrames={330}
+          durationInFrames={338}
           fps={30}
           width={1920}
           height={1080}
@@ -43,7 +43,7 @@ export const RemotionRoot: React.FC = () => {
         <Composition
           id="Scene3-DrWu"
           component={DrWuScene}
-          durationInFrames={330}
+          durationInFrames={312}
           fps={30}
           width={1920}
           height={1080}
@@ -51,7 +51,7 @@ export const RemotionRoot: React.FC = () => {
         <Composition
           id="Scene4-Gap"
           component={GapScene}
-          durationInFrames={330}
+          durationInFrames={324}
           fps={30}
           width={1920}
           height={1080}
@@ -59,7 +59,7 @@ export const RemotionRoot: React.FC = () => {
         <Composition
           id="Scene5-People"
           component={PeopleScene}
-          durationInFrames={240}
+          durationInFrames={237}
           fps={30}
           width={1920}
           height={1080}
@@ -67,7 +67,7 @@ export const RemotionRoot: React.FC = () => {
         <Composition
           id="Scene6-Close"
           component={CloseScene}
-          durationInFrames={270}
+          durationInFrames={250}
           fps={30}
           width={1920}
           height={1080}
@@ -86,7 +86,7 @@ export const RemotionRoot: React.FC = () => {
         <Composition
           id="LogoOutro"
           component={LogoOutro}
-          durationInFrames={60}
+          durationInFrames={102}
           fps={30}
           width={1920}
           height={1080}

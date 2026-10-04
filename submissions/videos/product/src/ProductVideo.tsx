@@ -47,22 +47,22 @@ export const ProductVideo: React.FC = () => {
     <AbsoluteFill style={{backgroundColor: COLORS.background}}>
       <TimelineCheck>
         <Series>
-          <Series.Sequence name="1 Alex arrives" durationInFrames={240} premountFor={fps}>
+          <Series.Sequence name="1 Alex arrives" durationInFrames={252} premountFor={fps}>
             <ArriveScene />
           </Series.Sequence>
-          <Series.Sequence name="2 The graph" durationInFrames={330} premountFor={fps}>
+          <Series.Sequence name="2 The graph" durationInFrames={338} premountFor={fps}>
             <GraphScene />
           </Series.Sequence>
-          <Series.Sequence name="3 Dr. Wu" durationInFrames={330} premountFor={fps}>
+          <Series.Sequence name="3 Dr. Wu" durationInFrames={312} premountFor={fps}>
             <DrWuScene />
           </Series.Sequence>
-          <Series.Sequence name="4 The honest gap" durationInFrames={330} premountFor={fps}>
+          <Series.Sequence name="4 The honest gap" durationInFrames={324} premountFor={fps}>
             <GapScene />
           </Series.Sequence>
-          <Series.Sequence name="5 People" durationInFrames={240} premountFor={fps}>
+          <Series.Sequence name="5 People" durationInFrames={237} premountFor={fps}>
             <PeopleScene />
           </Series.Sequence>
-          <Series.Sequence name="6 Close" durationInFrames={270} premountFor={fps}>
+          <Series.Sequence name="6 Close" durationInFrames={250} premountFor={fps}>
             <CloseScene />
           </Series.Sequence>
         </Series>

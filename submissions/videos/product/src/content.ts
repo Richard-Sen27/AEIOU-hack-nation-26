@@ -41,7 +41,7 @@ export const SCENES = {
     number: 2,
     name: 'The graph',
     narration:
-      'Amber connects it. One search places the disease in a graph of seven thousand rare diseases: symptoms, look-alike conditions, and one gene, CARD14. Every link shows its sources.',
+      'Amber connects it. One search places the disease among seven thousand others: symptoms, look-alike conditions, and one gene, CARD14. Every link shows its sources.',
     shots: [
       'Atlas overview, 7,760 items',
       '⌘K, type "pityriasis", Enter',

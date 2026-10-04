@@ -45,7 +45,8 @@ for (const scene of scenes) {
       body: JSON.stringify({
         text: scene.narration,
         model_id: 'eleven_multilingual_v2',
-        voice_settings: {stability: 0.5, similarity_boost: 0.75, style: 0.3},
+        // speed 1.15: at her default pace the narration runs 65 s, past the 60 s cap.
+        voice_settings: {stability: 0.5, similarity_boost: 0.75, style: 0.3, speed: 1.15},
       }),
     },
   );

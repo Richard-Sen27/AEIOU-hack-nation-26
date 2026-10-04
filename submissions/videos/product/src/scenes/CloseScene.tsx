@@ -10,7 +10,8 @@ import {usePublicFile} from '../use-public-file';
 
 const scene = SCENES.close;
 
-// The recording runs for about 7 s, then the logo outro covers the last 2 s.
+// The logo outro fades in over the recording as the last sentence is spoken
+// (about 5 s in) and holds to the end.
 export const CloseScene: React.FC = () => {
   const frame = useCurrentFrame();
   const {fps} = useVideoConfig();
@@ -30,7 +31,7 @@ export const CloseScene: React.FC = () => {
             muted
             trimBefore={0}
             playbackRate={1}
-            durationInFrames={225}
+            durationInFrames={165}
             objectFit="contain"
             premountFor={fps}
             style={{width: '100%', height: '100%'}}
@@ -41,11 +42,11 @@ export const CloseScene: React.FC = () => {
       </RecordingFrame>
       <Caption
         name="Caption"
-        from={45}
-        durationInFrames={150}
+        from={30}
+        durationInFrames={105}
         premountFor={fps}
         style={{
-          opacity: interpolate(frame, [45, 57, 183, 195], [0, 1, 1, 0], {
+          opacity: interpolate(frame, [30, 42, 123, 135], [0, 1, 1, 0], {
             extrapolateLeft: 'clamp',
             extrapolateRight: 'clamp',
           }),
@@ -55,11 +56,11 @@ export const CloseScene: React.FC = () => {
       </Caption>
       <LogoOutro
         name="Logo outro"
-        from={210}
-        durationInFrames={60}
+        from={148}
+        durationInFrames={102}
         premountFor={fps}
         style={{
-          opacity: interpolate(frame, [210, 222], [0, 1], {
+          opacity: interpolate(frame, [148, 160], [0, 1], {
             extrapolateLeft: 'clamp',
             extrapolateRight: 'clamp',
           }),

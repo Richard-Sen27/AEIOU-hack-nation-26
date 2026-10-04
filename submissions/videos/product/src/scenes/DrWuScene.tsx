@@ -39,10 +39,10 @@ export const DrWuScene: React.FC = () => {
       <Caption
         name="Caption"
         from={45}
-        durationInFrames={255}
+        durationInFrames={240}
         premountFor={fps}
         style={{
-          opacity: interpolate(frame, [45, 57, 288, 300], [0, 1, 1, 0], {
+          opacity: interpolate(frame, [45, 57, 273, 285], [0, 1, 1, 0], {
             extrapolateLeft: 'clamp',
             extrapolateRight: 'clamp',
           }),
