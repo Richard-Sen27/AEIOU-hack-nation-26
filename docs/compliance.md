@@ -10,17 +10,18 @@ The atlas processes health and genetic data of EU residents, often about childre
 
 ### What counts as personal data here
 
-- **Account data:** email, name, ChatGPT or Google identity, ORCID iD, IP addresses, session and log data. For doctors and researchers who add them, the optional work details: first and last name, up to three institutions, ORCID iD and a private link to their own entry in the atlas.
+- **Account data:** email, name, ChatGPT or Google identity, ORCID iD, IP addresses, session and log data. For doctors and researchers who add them, the optional work details: first and last name, up to three institutions, ORCID iD and a private link to their own entry in the atlas; and, if they ask for it, the verification record (method, time, the name from ORCID or the review, a confirmed ORCID iD, a manual review request with an institutional e-mail and a profile link, the operator's reason) and the settings of their opt-in public card.
 - **Special-category data (Art. 9):** patient profiles, chat messages about symptoms or diagnoses, uploaded documents, extracted findings, patient contributions. Health and genetic data, always.
 - **Professional nodes:** researchers and doctors built from public sources are still personal data; Art. 14 (data not collected from the person) applies.
 - **Not personal data:** the graph built from public literature and databases, as long as it contains no individual patients.
 
 ### Lawful basis
 
-- **Health and genetic data:** explicit consent (Art. 9(2)(a)). One general consent (`health_data`) covers all processing of the user's own health and genetic data for the service: chat messages, the patient profile, uploaded documents and extracted findings. A purpose that goes beyond the user's own use MUST have its own separate consent; today that is `contribute` (sharing into the shared graph). Consent MUST NOT be bundled with sign-up, is asked just in time before the first such processing, and is as easy to withdraw as to give (Art. 7(3)). Store consent type, text version and timestamp.
+- **Health and genetic data:** explicit consent (Art. 9(2)(a)). One general consent (`health_data`) covers all processing of the user's own health and genetic data for the service: chat messages, the patient profile, uploaded documents and extracted findings, and the diseases the user follows with the in-app notifications about them (a followed disease is health data for every role). A purpose that goes beyond the user's own use MUST have its own separate consent; today that is `contribute` (sharing into the shared graph). Consent MUST NOT be bundled with sign-up, is asked just in time before the first such processing, and is as easy to withdraw as to give (Art. 7(3)). Store consent type, text version and timestamp.
 - **Children:** many patients are minors. Accounts are for users aged 16 or older (the strictest age of digital consent in the EU, Art. 8). When a user uploads or describes data about a child, they MUST confirm they hold parental responsibility.
 - **Account and core service:** performance of a contract (Art. 6(1)(b)).
-- **Work details of doctors and researchers:** performance of a contract (Art. 6(1)(b)): a feature the user sets up and can delete at any time (`DELETE /me/professional`). No new consent type. The details are self-declared and private to the account: never shown to other users, never part of the atlas data, never sent to a model and never logged. They verify nothing: `role_verified` stays false.
+- **Work details of doctors and researchers:** performance of a contract (Art. 6(1)(b)): a feature the user sets up and can delete at any time (`DELETE /me/professional`). No new consent type. The details are self-declared and private to the account: never part of the atlas data, never sent to a model, never logged, and never shown to other users unless the person verifies and switches on the public card (next item). Saving them verifies nothing.
+- **Verification and the public card:** performance of a contract (Art. 6(1)(b)); no consent type. Verification is the person's own request: ORCID sign-in (confirms the ORCID iD and the public name on the record, not a medical licence) or a manual review by the Amber team of an institutional e-mail and a public profile page (decided with a logged reason in the operator CLI). The card is a separate switch, off by default, with its own choices (headline, institutions shown or not, atlas entry shown or not, "accepts messages from patients", which is only stored while messaging is not built). Others see a card only while the person is a doctor or researcher, verified and has the switch on; only signed-in users see it; it never shows the e-mail, the ChatGPT identity, a self-declared ORCID iD or an atlas link matched by name. Switching it off, deleting the work details, switching the role to patient or deleting the account removes it at once; a role change between doctor and researcher ends the verification. Withdrawing `health_data` does not touch it.
 - **Security logs and abuse prevention:** legitimate interest (Art. 6(1)(f)).
 - **Researcher and doctor nodes:** legitimate interest, limited to public professional information (papers, grants, institution pages, trial listings). Provide a public "about this data" page (Art. 14 notice) and a claim-or-remove flow (right to object, Art. 21).
 
@@ -50,7 +51,7 @@ Respond within one month. Signed-in users are verified by their session; never a
 | Access and portability (Art. 15, 20) | `GET /me/export`: all user data as machine-readable JSON |
 | Rectification (Art. 16) | Edit profile and findings in the app |
 | Erasure (Art. 17) | `DELETE /me` with cascade; contributions removed from the shared graph; deleted from backups within the backup cycle |
-| Withdraw consent (Art. 7(3)) | `DELETE /consents/{type}`: stops processing and deletes data held under that consent (`health_data`: profile, chats, documents and findings; `contribute`: contributions) |
+| Withdraw consent (Art. 7(3)) | `DELETE /consents/{type}`: stops processing and deletes data held under that consent (`health_data`: profile, chats, documents, findings, followed diseases and notifications; `contribute`: contributions). The public card is not held under a consent: it is withdrawn with its own switch (`PUT /me/professional/card`) |
 | Object (Art. 21) | Researchers and doctors: claim-or-remove flow for their node. Linking one's account to an atlas entry in the work details is not a claim and proves nothing; any change to a node still goes through this flow |
 | Automated decisions (Art. 22) | The atlas makes no decisions with legal or similarly significant effect. It shows information, never a diagnosis or trial eligibility verdict; such questions are labeled "needs expert review" |
 
@@ -78,12 +79,16 @@ Respond within one month. Signed-in users are verified by their session; never a
 - Store raw uploaded files.
 - State or imply a diagnosis.
 - Read or reuse another user's data, including in admin tooling, without a logged reason.
+- Let professionals list, search or count patients. Professionals have no API that returns patient rows or counts; cards exist for verified doctors and researchers only.
+- Show anything on a public card that the person did not switch on, or show a card that is not both verified and switched on.
+- Let the demo shortcuts run anywhere but a local demo. With `ORCID_MOCK` on (refused unless API and frontend are loopback), ORCID sign-in is simulated and manual verification requests are approved at once; anything verified this way is labelled "demo, verification simulated".
 
 ### Per-feature checklist
 
 Before merging any feature, answer in the PR description:
 
 - [ ] Which personal data does it touch, and is any of it special-category?
+- [ ] Who else can see it, and did the person switch that on?
 - [ ] What is the legal basis, and is consent checked where required?
 - [ ] Is every collected field necessary?
 - [ ] Where is it stored, for how long, and is it covered by the retention table?

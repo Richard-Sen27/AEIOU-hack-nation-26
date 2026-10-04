@@ -74,7 +74,14 @@ Work deliberately left for later. Add an item when you leave something for later
 - **Work details: legal basis** (`api/services/professional.py`): counsel should confirm contract (Art. 6(1)(b)) as the basis for the optional work details of doctors and researchers.
 - **Work details: name prefill** (`auth.stored_name_claims`, `professional.suggested_name`): reading `given_name` / `family_name` from the real OpenAI ID token is unverified; the mock is the only source tested, and without the claims the code splits the account name (last word = last name).
 - **Work details: role switch** (`on_role_change` in `api/services/account.py`): switching to patient deletes them today; the user has not decided between deleting and keeping them hidden. Keeping them means dropping the clear there.
-- **Professionals for others:** listing doctors and researchers to other users, contacting them and credit on contributions are deferred to the connect work and need real verification first; the work details verify nothing today.
+- **Professionals for others:** contacting doctors and researchers and credit on contributions are still deferred (messaging is stage 5); verified, opt-in public cards exist (`api/services/people.py`).
+- **Real ORCID credentials** (`config.py`, `ORCID_*`): ORCID sign-in is built but untested against ORCID; it needs a registered client (`ORCID_CLIENT_ID`, `ORCID_CLIENT_SECRET`, `ORCID_BASE_URL` sandbox then production, the exact `ORCID_REDIRECT_URI`). Demos use `ORCID_MOCK=true`.
+- **Institutional verification is manual** (`backend verify-professional`): no automatic e-mail check, no notice to the operator when a request arrives, no moderation UI; the user sees only "pending" until the operator runs the CLI.
+- **Demo verifications can name real people** (`ORCID_MOCK`, local only): the simulated sign-in accepts any ORCID iD, so a local demo card can carry a real researcher's iD and atlas entry, labelled "demo, verification simulated". Do not demo with real names you do not own.
+- **Card cache across workers** (`people.CACHE_MAX_AGE_S`): a card switched off disappears at once in the process that handled the change, elsewhere (another worker, after an operator `--revoke`) within 60 s; `GET /people/{card_id}` is always fresh.
+- **Cards per disease** (`people._person_diseases`): a card is listed for a disease only through its verified atlas entry (papers, grants, trials); cards without one are reachable by card link only. No work topics, by decision.
+- **Card frontend:** the endpoints and SDK exist; the profile panel, the Atlas chip ("In Amber · ORCID iD confirmed") and the card page are not built.
+- **ORCID state replay** (`orcid._used_nonces`): used states are remembered per process for 10 minutes; with several workers a replay inside that window is stopped only by ORCID's single-use code.
 
 ## Documents
 
