@@ -18,6 +18,9 @@ from backend.schemas.search import SearchResponse
 
 router = APIRouter(tags=["graph"])
 
+NEIGHBORHOOD_TOTAL_HEADER = "X-Neighborhood-Total"
+NEIGHBORHOOD_TRUNCATED_HEADER = "X-Neighborhood-Truncated"
+
 
 @router.get(
     "/search",
@@ -53,9 +56,16 @@ async def get_node(node_id: str, lens: LensDep) -> NodeDetail:
     responses=responses(404, 501),
     operation_id="getNeighborhood",
 )
-async def get_neighborhood(node_id: str, lens: LensDep) -> Neighborhood:
+async def get_neighborhood(node_id: str, lens: LensDep, response: Response) -> Neighborhood:
     """Full neighborhood with positions and role presentation hints."""
-    return graph.neighborhood(node_id, lens)
+    # Hubs are capped at their strongest neighbours (graph.MAX_NEIGHBORS); the response then
+    # carries the full neighbour count in X-Neighborhood-Total and X-Neighborhood-Truncated.
+    # Headers, not fields, so the response schema (and the generated SDK) stay unchanged.
+    hood, total = graph.neighborhood_with_total(node_id, lens)
+    if total > len(hood.nodes) - 1:
+        response.headers[NEIGHBORHOOD_TOTAL_HEADER] = str(total)
+        response.headers[NEIGHBORHOOD_TRUNCATED_HEADER] = "true"
+    return hood
 
 
 @router.get(

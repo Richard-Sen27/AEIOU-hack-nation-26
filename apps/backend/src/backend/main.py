@@ -137,6 +137,7 @@ def create_app(settings: Settings | None = None) -> FastAPI:
         allow_credentials=True,
         allow_methods=["GET", "POST", "PUT", "PATCH", "DELETE", "OPTIONS"],
         allow_headers=["Content-Type", "Accept", "Last-Event-ID", "Sec-GPC"],
+        expose_headers=["X-Neighborhood-Total", "X-Neighborhood-Truncated"],
     )
     install_error_handlers(app)
     for module in ROUTERS:

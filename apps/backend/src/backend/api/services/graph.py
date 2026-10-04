@@ -80,6 +80,9 @@ GENERIC_TYPES = frozenset({NodeType.phenotype, NodeType.mechanism, NodeType.path
 HUB_DAMPING = 0.4
 HUB_MIN_DEGREE = 10
 HUB_PERCENTILE = 0.95
+# /neighborhood/{id} returns at most this many neighbours (wide scope: a symptom can be linked
+# to more than 2,000 diseases); the route reports the full count in a response header.
+MAX_NEIGHBORS = 300
 
 PATH_FAMILIES: dict[PathFamily, frozenset[EdgeFamily]] = {
     PathFamily.dna: frozenset({EdgeFamily.dna}),
@@ -658,21 +661,41 @@ def _cluster_of(store: GraphStore, node: Node) -> ClusterSummary | None:
 
 
 def neighborhood(node_id: str, lens: Lens) -> Neighborhood:
-    """Same full neighborhood for every role; the lens only adds presentation hints."""
+    """Same neighborhood for every role; the lens only adds presentation hints. Capped at
+    MAX_NEIGHBORS nodes (see neighborhood_with_total)."""
+    return neighborhood_with_total(node_id, lens)[0]
+
+
+def _neighbor_key(store: GraphStore, edge: Edge) -> tuple[bool, float, str]:
+    return (not edge_is_active(store, edge), -edge.confidence, edge.id)
+
+
+def neighborhood_with_total(node_id: str, lens: Lens) -> tuple[Neighborhood, int]:
+    """The neighborhood and the number of neighbours before the cap. A hub (a symptom linked
+    to 2,000 diseases) keeps its MAX_NEIGHBORS strongest neighbours: cluster members first,
+    then by the best direct edge (active first, higher confidence, edge id)."""
     store = get_graph()
     center = _require_node(store, node_id)
-    ids = {center.id}
-    if center.type == NodeType.cluster:
-        ids.update(store.members.get(center.id, ()))
+    best: dict[str, tuple[bool, float, str]] = {}
     for edge in _incident_edges(store, center.id):
-        ids.add(_other(edge, center.id))
+        other, key = _other(edge, center.id), _neighbor_key(store, edge)
+        if other != center.id and (other not in best or key < best[other]):
+            best[other] = key
+    members = (
+        [m for m in sorted(store.members.get(center.id, ())) if m != center.id]
+        if center.type == NodeType.cluster
+        else []
+    )
+    member_set = set(members)
+    ranked = members + sorted((n for n in best if n not in member_set), key=best.__getitem__)
+    ids = {center.id, *ranked[:MAX_NEIGHBORS]}
     edges: dict[str, Edge] = {}
     for nid in ids:
         for edge in _incident_edges(store, nid):
             if _other(edge, nid) in ids:
                 edges[edge.id] = edge
     others = sorted(ids - {center.id})
-    return Neighborhood(
+    hood = Neighborhood(
         center=center,
         nodes=[center] + [n for i in others if (n := get_node(i)) is not None],
         edges=[edges[k] for k in sorted(edges)],
@@ -680,6 +703,7 @@ def neighborhood(node_id: str, lens: Lens) -> Neighborhood:
         hints=layout_hints(lens.role),
         data_version=store.data_version,
     )
+    return hood, len(ranked)
 
 
 _TYPE_WORDS: dict[NodeType, tuple[str, str]] = {
