@@ -11,7 +11,7 @@ export default function Page() {
       <PageHeader
         eyebrow="Profile and privacy"
         title="Your profile"
-        description="Your health profile, settings, consents and data in one place. You are in control of all of it."
+        description="Your health profile, settings, consents and data."
       />
       <div className="mt-8">
         <ProfilePage />

@@ -83,8 +83,7 @@ export function DataRights() {
         <div className="space-y-1 text-sm">
           <p className="font-medium">Download my data</p>
           <p className="text-muted-foreground">
-            Everything Amber stores about you as one machine-readable JSON file: account, settings, consents, profile,
-            chats, documents, findings, contributions and flags. Your ChatGPT tokens are never included.
+            Everything Amber stores about you, as one JSON file. ChatGPT tokens are never included.
           </p>
         </div>
         <Button variant="outline" size="lg" onClick={() => void exportData()} disabled={busy} className="mt-auto self-start" data-testid="export-data">
@@ -96,8 +95,7 @@ export function DataRights() {
         <div className="space-y-1 text-sm">
           <p className="font-medium">Delete my account</p>
           <p className="text-muted-foreground">
-            Deletes your account and everything in it, and removes your contributions from the shared atlas. One
-            confirmation, then you are signed out.
+            Deletes everything, including your contributions to the shared atlas. One confirmation, then you are signed out.
           </p>
         </div>
         <div className="mt-auto">

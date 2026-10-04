@@ -23,15 +23,15 @@ export type SelectableRole = (typeof SELECTABLE_ROLES)[number];
 export const ROLE_COPY: Record<SelectableRole, { label: string; start: string }> = {
   patient: {
     label: "Patient or family",
-    start: "Start at your condition, with similar diseases and patient communities, in plain language.",
+    start: "Your condition and patient groups, in plain words.",
   },
   doctor: {
     label: "Doctor",
-    start: "Start with the symptom profile, centres of expertise and variant classifications, in clinical terms.",
+    start: "Symptoms and experts, in clinical terms.",
   },
   researcher: {
     label: "Researcher",
-    start: "Start with mechanism clusters, pathways, papers and funding, with IDs shown.",
+    start: "Mechanisms and papers, with IDs.",
   },
 };
 

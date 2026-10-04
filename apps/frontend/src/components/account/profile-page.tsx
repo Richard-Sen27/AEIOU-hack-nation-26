@@ -54,7 +54,7 @@ export function ProfilePage() {
     return (
       <SignInPrompt
         title="Sign in to see your profile"
-        description="Your profile holds the diagnoses, genes and symptoms you confirmed, your consents and your privacy choices. It is private to you."
+        description="Your confirmed diagnoses, genes and symptoms, consents and privacy choices. Private to you."
         returnTo="/profile"
       />
     );
@@ -79,8 +79,7 @@ export function ProfilePage() {
           title="Health profile"
           description={
             <>
-              What Amber uses to find connections for you. Only things you confirmed are here, each shows where it came
-              from, and you can correct or remove anything. It is never shared.{" "}
+              Only what you confirmed, with its source. Edit anything. Never shared.{" "}
               <Link href="/documents" className="font-medium text-foreground underline underline-offset-2">
                 Add from a report
               </Link>
@@ -95,14 +94,14 @@ export function ProfilePage() {
         <Panel
           id="consents"
           title="Consents"
-          description="One consent covers the use of your health information (chats, profile, documents); contributing to the shared atlas needs its own. Withdrawing is one click."
+          description="One consent covers your health information (chats, profile, documents). Contributing to the shared atlas needs its own. Withdrawing is one click."
         >
           <ConsentsSection />
         </Panel>
         <Panel
           id="contributions"
           title="Contributions"
-          description="Symptom profiles and resources you shared with the atlas. They are labelled patient-reported, reviewed before they appear, and never treated as cited evidence."
+          description="What you shared with the atlas: labelled patient-reported, reviewed first, never cited as evidence."
         >
           <ContributionsSection />
         </Panel>

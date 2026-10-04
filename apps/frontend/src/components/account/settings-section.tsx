@@ -47,7 +47,7 @@ export function SettingsSection({ user }: { user: SessionUser }) {
       <fieldset className="space-y-2">
         <legend className="mb-1 text-sm font-medium">Role</legend>
         <p className="text-sm text-muted-foreground">
-          Decides where you start and how things are explained, never what you can see.
+          Changes the starting point and wording, never what you can see.
         </p>
         <RadioGroup
           value={role}
@@ -104,8 +104,7 @@ export function SettingsSection({ user }: { user: SessionUser }) {
               className="mt-0.5"
             />
             <span className="text-muted-foreground">
-              Lets you ask mechanism questions (for example &ldquo;AAV gene replacement for loss of function&rdquo;) and get
-              ranked clusters. Open to everyone.
+              Mechanism questions and ranked clusters. Open to everyone.
             </span>
           </div>
         </div>

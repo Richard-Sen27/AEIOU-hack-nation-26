@@ -243,7 +243,7 @@ export function ProfileEditor() {
     <div className="space-y-6" data-testid="profile-editor">
       <Group
         title="Diagnoses"
-        description="Diagnoses you confirmed. Amber never makes a diagnosis."
+        description="Confirmed by you. Amber never makes a diagnosis."
         count={diseases.length}
       >
         {diseases.length ? (
@@ -275,7 +275,7 @@ export function ProfileEditor() {
         />
       </Group>
 
-      <Group title="Genes" description="Genes named in a report or by your care team." count={genes.length}>
+      <Group title="Genes" description="From a report or your care team." count={genes.length}>
         {genes.length ? (
           <ul className="flex flex-wrap gap-2">
             {genes.map((g) => (
@@ -305,7 +305,7 @@ export function ProfileEditor() {
 
       <Group
         title="Variants"
-        description="As written on the genetic report, in HGVS notation (for example NM_003165.6:c.1631G>A)."
+        description="As on the report, e.g. NM_003165.6:c.1631G>A."
         count={variants.length}
       >
         {variants.length ? (
@@ -388,7 +388,7 @@ export function ProfileEditor() {
 
       <Group
         title="Symptoms"
-        description="Symptoms present, and ones that are clearly not present (that helps tell similar conditions apart)."
+        description="Present and clearly not present. Both help tell conditions apart."
         count={phenotypes.length}
       >
         {present.length ? <ul className="space-y-2" aria-label="Present">{present.map(phenoRow)}</ul> : <EmptyLine>No symptoms yet.</EmptyLine>}
@@ -430,7 +430,7 @@ export function ProfileEditor() {
         </div>
       </Group>
 
-      <Group title="About" description="Only what helps find connections. Amber never asks for names, birth dates, addresses or patient numbers.">
+      <Group title="About" description="Amber never asks for names, birth dates, addresses or patient numbers.">
         <div className="grid gap-4 sm:grid-cols-2">
           <fieldset className="space-y-2 text-sm sm:col-span-2">
             <legend className="mb-1 font-medium">Age</legend>
