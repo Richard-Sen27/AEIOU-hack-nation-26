@@ -17,7 +17,23 @@ How to host Amber on Railway: project `amber`, environment `production`, service
 | frontend | `apps/frontend` (Dockerfile) | `apps/frontend/railway.toml` | `PORT=3100` | `/`, 120 s |
 | Postgres | `ghcr.io/railwayapp-templates/postgres-ssl:18` | (template) | 5432 | (template) |
 
-The backend runs `alembic upgrade head` as its pre-deploy command, then `uvicorn` on `::` port 8000 with no access log.
+The backend runs `alembic upgrade head` as its pre-deploy command, then `uvicorn` on `::` port 8000 with uvicorn's access log off: the API writes its own request lines instead (route templates, never raw paths or query strings; see Logs below).
+
+### Logs
+
+Everything goes to stdout, which Railway collects (`railway logs -s backend`). One line per request, for example:
+
+```
+2026-10-04T12:41:03.351Z INFO backend.request request rid=3f9c0a1b2c4d5e6f method=GET route=/node/{node_id} status=200 ms=12 bytes=5123 client=guest
+```
+
+Signed-in requests add `uh=<10 hex>`, a pseudonym of the account that changes every UTC day. Every response carries the same id in `X-Request-ID`, and error responses in `error.request_id`, so a reported error can be found in the log. Start-up writes `starting …` (which features are configured, secrets as `set`/`unset`), `migrations state=…`, `graph loaded: <n> nodes, <m> edges data_version=… ms=…` and `ready ms=…`; shutdown writes run counts. Failed model calls show as `model call failed provider=openai credential=server_key model=… status=… upstream_code=… param=…` (for example `status=400 upstream_code=unsupported_value param=stream` when the OpenAI organisation is not verified for streaming). `LOG_LEVEL=debug` adds health checks and model-call timings. What is never logged: `docs/compliance.md` (Security logs).
+
+### Rate limits
+
+The request chain is browser → Railway edge → Next.js server (`frontend`) → API over the private network. The Railway edge puts the address it saw into `X-Forwarded-For` (whether it appends to a header the client sent or replaces it, that address is the last entry); the Next.js rewrite proxy (`httpxy` without `xfwd`) forwards the header unchanged and adds no entry of its own. So exactly one trusted proxy writes the header, and `TRUSTED_PROXY_HOPS=1` makes the API take the last entry; entries further left come from the client and are ignored, so a client cannot choose its own key. This chain is read from the code, not yet observed on Railway (check below). `X-Real-IP` is not used. With the default `0` every guest would be keyed on the frontend's private address (one shared bucket); the API logs a warning if the header has fewer entries than the setting. To check after a deploy: with `LOG_LEVEL=debug`, two guests on different networks (a laptop and a phone on mobile data) show different `net=` values in their request lines, and `via=forwarded`. Set `LOG_LEVEL` back afterwards.
+
+Limits (in memory, per process): every request 600/minute per client (account; guests: address plus User-Agent, and 4× that per address); search 120/minute, neighbourhood 60/minute, path 30/minute, clusters 30/minute, Atlas tree 30/minute, Atlas summaries 120/minute; new explanations 20/minute and 200/day per account; chat 30/minute and 300/day; at most 3 model-calling runs at once per account and 16 per process ("busy"); and for Google accounts on the operator's key `MODEL_DAILY_BUDGET` model-calling requests per account and day and `MODEL_DAILY_CEILING` for all of them together (the usual "usage limit" message). Every 429 carries `Retry-After`. Also set a monthly spend limit on the OpenAI project itself.
 
 **Deploying without a push:** `railway up <dir> --path-as-root` uploads one directory and finds `railway.toml` at its root. To upload exactly one commit (no `.env`, nothing uncommitted from other work), deploy from a `git archive` export (step 10). **With GitHub instead:** connect the branch (`railway service source connect --repo Richard-Sen27/AEIOU-hack-nation-26 --branch <branch> -s <service>`) and in the dashboard set the root directory to `/apps/backend` (or `/apps/frontend`) and the config file path to `/apps/backend/railway.toml` (or `/apps/frontend/railway.toml`); the config path does not follow the root directory. Pick one way per service: a GitHub config path does not exist in a `railway up` upload.
 
@@ -43,6 +59,9 @@ The backend runs `alembic upgrade head` as its pre-deploy command, then `uvicorn
 | `OPENAI_API_KEY` | the operator's key; without it set `GOOGLE_LOGIN_ENABLED=true` and Dr. Wu answers 503 | secret, you |
 | `OPENAI_API_MODEL_MAIN`, `OPENAI_API_MODEL_SMALL` | optional, default `gpt-5`, `gpt-5-mini` | you |
 | `CALLS_REVIEW_REQUIRED` | `false` (default) or `true` | you |
+| `TRUSTED_PROXY_HOPS` | `1` (see Rate limits below; without it every guest shares the frontend's address) | fixed |
+| `MODEL_DAILY_BUDGET`, `MODEL_DAILY_CEILING` | optional, default `200` per account and `2000` per process and UTC day (model-calling requests on `OPENAI_API_KEY`) | you |
+| `LOG_LEVEL`, `RATE_LIMIT_GENERAL`, `MODEL_MAX_CONCURRENT`, `MODEL_MAX_CONCURRENT_PER_ACCOUNT` | optional, defaults `info`, `600/minute`, `16`, `3` | you |
 | `NCBI_API_KEY`, `BRIGHTDATA_API_KEY`, `BRIGHTDATA_SERP_ZONE` | optional (gap search) | you |
 
 Leave unset: `ORCID_MOCK` (refused off loopback; experts verify through the manual request and `backend.cli`, or set real `ORCID_CLIENT_ID`, `ORCID_CLIENT_SECRET`, `ORCID_BASE_URL` and register `https://<F>/api/me/professional/orcid/callback`), `DEMO_MODE`, `LANGFUSE_*`, `LANGSMITH_*`, `PIPELINE_DATABASE_URL`, `BOOTSTRAP_DATABASE_URL`.
@@ -126,7 +145,7 @@ Run from the repository root with the project linked (`railway link -p amber -e 
    echo "postgresql+asyncpg://atlas_app:$ATLAS_APP_PASSWORD@\${{Postgres.RAILWAY_PRIVATE_DOMAIN}}:5432/\${{Postgres.PGDATABASE}}" | railway variable set DATABASE_URL --stdin $S
    echo "postgresql+psycopg://atlas_owner:$ATLAS_OWNER_PASSWORD@\${{Postgres.RAILWAY_PRIVATE_DOMAIN}}:5432/\${{Postgres.PGDATABASE}}" | railway variable set MIGRATION_DATABASE_URL --stdin $S
    railway variable set PORT=8000 COOKIE_SECURE=true FRONTEND_URL=https://<F> API_URL=https://<F>/api \
-     GOOGLE_REDIRECT_URI=https://<F>/auth/google/callback $S
+     GOOGLE_REDIRECT_URI=https://<F>/auth/google/callback TRUSTED_PROXY_HOPS=1 $S
    railway variable set GOOGLE_CLIENT_ID --stdin $S        # paste, then Ctrl-D
    railway variable set GOOGLE_CLIENT_SECRET --stdin $S
    railway variable set OPENAI_API_KEY --stdin $S
@@ -162,7 +181,7 @@ Run from the repository root with the project linked (`railway link -p amber -e 
 - Continue with Google returns to the page you started from, signed in (cookie `amber_session` on `<F>`, `Secure`, `HttpOnly`, `SameSite=Lax`); reload keeps you signed in; sign out works.
 - A chat turn with Dr. Wu streams token by token (not all at once at the end) and finishes even when it takes over 30 s.
 - Upload of a small document works (20 MB limit); messaging opens (not 501); `GET /api/me/export` downloads.
-- `railway logs -s backend` shows no access-log lines (no query strings, no health data).
+- `railway logs -s backend` shows `request rid=… route=/… status=…` lines with route templates only (no raw paths, no query strings, no health data), the `starting …`, `graph loaded: …` and `ready` lines, and no uvicorn access-log lines.
 
 ## Rollback
 

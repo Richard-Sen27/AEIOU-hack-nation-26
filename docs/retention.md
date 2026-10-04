@@ -14,7 +14,7 @@ There are three consents (Art. 9(2)(a)), each with a text version the server pin
 
 | Data | Where | How long | How it is deleted |
 | --- | --- | --- | --- |
-| Nothing | — | — | Guests are stateless: no user rows, no cookies besides the strictly necessary sign-in state. Graph search and views read only public graph tables. |
+| Nothing | — | — | Guests are stateless: no user rows, no cookies besides the strictly necessary sign-in state. Graph search and views read only public graph tables. For rate limiting, the API keeps a keyed hash of the guest's address (and of address plus User-Agent) with request times in process memory (see Operational data). |
 
 ## Account data (signed-in users)
 
@@ -54,9 +54,10 @@ There are three consents (Art. 9(2)(a)), each with a text version the server pin
 
 | Data | Where | How long | How it is deleted |
 | --- | --- | --- | --- |
-| Application logs (no user content, IDs or tokens; error types only) | Container stdout, collected by the host | At most 30 days | Host log rotation; must be configured to ≤ 30 days on the deployment platform |
+| Application logs: one line per request (request id, method, route template, status, duration, size, guest or signed-in, for signed-in users a pseudonym that changes every UTC day: keyed hash of the account ID); start-up settings with secrets masked, graph size, migration state; run counts; error types with code locations; failed model calls (provider, model, status, error code, parameter name, duration); rate-limit rejections (client kind, route template). Never bodies, raw paths, query strings, names, e-mail addresses, ORCID iDs, node or other health-related IDs, raw account IDs, IP addresses, tokens, prompts, model output or exception messages. `LOG_LEVEL=debug` adds health checks, model-call timings and, for guests, a 6-character per-process hash of the address | Container stdout, collected by the host (Railway) | At most 30 days | The host's log retention, which Amber does not control: must be ≤ 30 days on the deployment platform (open for Railway, `docs/homework.md`) |
 | LLM traces (redacted text only) | Self-hosted Langfuse, off unless configured | At most 30 days | Langfuse data retention set to ≤ 30 days |
-| Rate-limit counters (user ID or IP, request counts) | API process memory | At most 1 day (the verification request limit counts per day) | Expire automatically; lost on restart |
+| Rate-limit counters: account ID, or for guests a keyed hash of the address and of address plus User-Agent (random key per process, the address itself is never kept), with request times | API process memory | At most 1 day (the longest window, e.g. 300 chat turns a day) | Expire automatically; lost on restart |
+| Model-use counters: account ID with the number of model-calling requests this UTC day (operator's API key only) and the running model calls per account | API process memory | Until the end of the UTC day; running calls until they end (at most 15 minutes) | Reset at midnight UTC; lost on restart |
 | ORCID sign-in state (used state markers; no tokens) and simulated ORCID codes (local demo only) | API process memory | At most 10 minutes | Expire automatically; lost on restart. ORCID access tokens are never stored |
 | Public card cache (the visible cards only) | API process memory | Refreshed after every card change, at most 60 seconds old | Replaced on refresh; lost on restart |
 | Operator access log for reported conversations (operator, reason, report and conversation IDs; no content) | `admin_access_log` (no API access) | 24 months | `backend.cli purge-messages` |
