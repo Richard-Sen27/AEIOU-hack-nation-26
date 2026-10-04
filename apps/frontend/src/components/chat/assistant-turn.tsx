@@ -88,7 +88,7 @@ const ERROR_COPY: Record<string, { icon: typeof CircleAlert; title: string; hint
   rate_limited: {
     icon: Clock,
     title: "Your ChatGPT plan's usage limit is reached",
-    hint: "Dr. Wu runs on your own ChatGPT plan. Try again when your plan allows more requests.",
+    hint: "Wait until your plan allows more requests.",
     retry: true,
   },
   reauth_required: {
@@ -101,34 +101,39 @@ const ERROR_COPY: Record<string, { icon: typeof CircleAlert; title: string; hint
   timeout: {
     icon: Clock,
     title: "Dr. Wu took too long to answer",
-    hint: "What arrived so far is kept. You can try again.",
+    hint: "What arrived is kept.",
     retry: true,
   },
   network_error: {
     icon: WifiOff,
     title: "The connection dropped",
-    hint: "What arrived before the drop is kept. You can try again.",
+    hint: "What arrived is kept.",
     retry: true,
   },
   not_implemented: {
     icon: CircleAlert,
     title: "Dr. Wu is not available yet",
-    hint: "This part of Amber is still being built. You can keep exploring the atlas.",
+    hint: "The atlas works meanwhile.",
     retry: true,
   },
 };
 
+const FALLBACK_ERROR = { icon: CircleAlert, title: "Dr. Wu could not finish this answer", hint: "", retry: true };
+
 function errorCopy(err: TurnError) {
   if (err.code === "upstream_error" && /usage|quota|limit/i.test(err.message)) return ERROR_COPY.rate_limited;
   if (err.code === "upstream_error" && /time/i.test(err.message)) return ERROR_COPY.timeout;
-  return (
-    ERROR_COPY[err.code] ?? {
-      icon: CircleAlert,
-      title: "Dr. Wu could not finish this answer",
-      hint: "You can try again.",
-      retry: true,
-    }
-  );
+  return ERROR_COPY[err.code] ?? FALLBACK_ERROR;
+}
+
+/**
+ * The server's message, only for errors without their own copy, and without
+ * "try again" phrases (the button already says that).
+ */
+function serverDetail(error: TurnError, copy: typeof FALLBACK_ERROR): string {
+  if (copy !== FALLBACK_ERROR || !error.message) return "";
+  const m = error.message.replace(/\s*(please\s+)?(you\s+can\s+)?try again[^.]*\.?/gi, "").trim();
+  return m && m !== copy.title ? m : "";
 }
 
 function TurnErrorNotice({ error, onRetry }: { error: TurnError; onRetry: () => void }) {
@@ -141,10 +146,10 @@ function TurnErrorNotice({ error, onRetry }: { error: TurnError; onRetry: () => 
       <Icon className="size-4 shrink-0 text-destructive" aria-hidden />
       <div className="flex-1 text-sm">
         <p className="font-medium">{copy.title}</p>
-        <p className="text-muted-foreground">
-          {error.message && error.message !== copy.title ? `${error.message} ` : ""}
-          {copy.hint}
-        </p>
+        {(() => {
+          const detail = [serverDetail(error, copy), copy.hint].filter(Boolean).join(" ");
+          return detail ? <p className="text-muted-foreground">{detail}</p> : null;
+        })()}
       </div>
       {signIn ? (
         <Button size="sm" onClick={() => openSignIn("Sign in again to continue the conversation with Dr. Wu.")}>
