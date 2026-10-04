@@ -1,14 +1,23 @@
 "use client";
 
-import { FilePen, Plus } from "lucide-react";
+import { ClipboardCheck, FilePen, Plus } from "lucide-react";
 import Link from "next/link";
 
 import { useSession } from "@/components/providers/session-provider";
 import { buttonVariants } from "@/components/ui/button";
 
-/** Doctors and researchers only: their own calls and the form. Patients never see it. */
+import { SIGNUPS_HREF } from "./signup-meta";
+
+/** Doctors and researchers: their own calls and the form. Patients: their sign-ups. */
 export function MyCallsLink() {
   const { user } = useSession();
+  if (user?.role === "patient") {
+    return (
+      <Link href={SIGNUPS_HREF} className={buttonVariants({ variant: "outline", size: "sm" })} data-testid="my-signups-link">
+        <ClipboardCheck data-icon="inline-start" aria-hidden /> My sign-ups
+      </Link>
+    );
+  }
   if (user?.role !== "doctor" && user?.role !== "researcher") return null;
   return (
     <>

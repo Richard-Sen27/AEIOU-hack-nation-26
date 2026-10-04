@@ -2,6 +2,7 @@
 
 import Link from "next/link";
 
+import { MySignups } from "@/components/calls/my-signups";
 import { ConnectSettings } from "@/components/messages/connect-settings";
 import { useSession } from "@/components/providers/session-provider";
 import { cn } from "@/lib/utils";
@@ -19,6 +20,7 @@ import { WorkDetailsForm } from "./work-details";
 const SECTIONS = [
   { id: "health-profile", title: "Health profile" },
   { id: "following", title: "Following" },
+  { id: "signups", title: "Sign-ups" },
   { id: "your-work", title: "Your work" },
   { id: "settings", title: "Settings" },
   { id: "consents", title: "Consents" },
@@ -68,7 +70,9 @@ export function ProfilePage() {
 
   // Work details are for doctors and researchers only.
   const professional = user.role === "doctor" || user.role === "researcher";
-  const sections = SECTIONS.filter((s) => s.id !== "your-work" || professional);
+  // Sign-ups to calls are for patients and caregivers only.
+  const patient = user.role === "patient";
+  const sections = SECTIONS.filter((s) => (s.id !== "your-work" || professional) && (s.id !== "signups" || patient));
 
   return (
     <div className="grid gap-8 lg:grid-cols-[200px_minmax(0,1fr)]">
@@ -101,6 +105,11 @@ export function ProfilePage() {
         <Panel id="following" title="Following" description="Diseases you follow. New atlas entries show under the bell.">
           <FollowingSection />
         </Panel>
+        {patient && (
+          <Panel id="signups" title="Sign-ups" description="Studies, surveys and trials you signed up to. Withdraw any time.">
+            <MySignups variant="profile" />
+          </Panel>
+        )}
         {professional && (
           <Panel id="your-work" title="Your work" description={<WorkNote />}>
             <div className="space-y-6">
@@ -116,7 +125,7 @@ export function ProfilePage() {
         <Panel
           id="consents"
           title="Consents"
-          description="One consent covers your health information (chats, profile, documents). Contributing to the shared atlas and messages each need their own. Withdrawing is one click."
+          description="One consent covers your health information (chats, profile, documents). Contributing to the shared atlas and contacts (messages, sign-ups) each need their own. Withdrawing is one click."
         >
           <ConsentsSection />
         </Panel>
