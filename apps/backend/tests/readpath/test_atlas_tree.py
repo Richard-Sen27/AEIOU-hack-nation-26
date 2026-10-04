@@ -323,3 +323,34 @@ def test_category_order_and_sectors():
     }
     by_id = _by_id(tree)
     assert by_id["HGNC:1"].label == "SCN1A · 2q24.3" and by_id["HGNC:1"].parent_id == "T:genes/chr2"
+
+
+def _min_distance(tree: AtlasTree) -> float:
+    pts = [(n.x, n.y) for n in tree.nodes]
+    return min(math.dist(a, b) for i, a in enumerate(pts) for b in pts[i + 1 :])
+
+
+async def test_nodes_keep_their_distance_and_labels_stay_clear(app):
+    store = _with_contribution(graph_service.get_graph())
+    tree = atlas_tree.build_tree(store)
+    # coordinates are rounded to 0.1, so allow that much below the spacing
+    assert _min_distance(tree) >= atlas_tree.SPACING - 0.15
+    xs, ys = [n.x for n in tree.nodes], [n.y for n in tree.nodes]
+    extent = max(max(xs) - min(xs), (max(ys) - min(ys)) / 0.5625)
+    clear = atlas_tree.LABEL_HEIGHT * extent / 2
+    for c in tree.categories:
+        assert all(math.dist((c.label_x, c.label_y), (n.x, n.y)) >= clear for n in tree.nodes), c.id
+        # each label sits on its own sector's side of the map
+        a = math.atan2(c.label_y, c.label_x)
+        while a > c.angle_start:
+            a -= 2 * math.pi
+        while a < c.angle_end:
+            a += 2 * math.pi
+        assert c.angle_end <= a <= c.angle_start, c.id
+
+
+def test_dense_groups_keep_their_distance():
+    nodes = [_node(f"RES:{i:04d}", "researcher", f"Person {i:04d}") for i in range(400)]
+    tree = atlas_tree.build_tree(_store_from_rows(nodes))
+    assert _min_distance(tree) >= atlas_tree.SPACING - 0.15
+    _assert_tree_invariants(tree, {n["id"] for n in nodes})

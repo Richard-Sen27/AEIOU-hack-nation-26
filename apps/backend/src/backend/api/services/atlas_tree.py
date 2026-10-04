@@ -34,7 +34,7 @@ from backend.schemas.atlas import (
 from backend.schemas.enums import NodeType, Relation
 from backend.schemas.graph import Node
 
-LAYOUT_VERSION = 3
+LAYOUT_VERSION = 4
 ROOT_ID = "T:root"
 MAX_LEAVES = 30
 
@@ -1122,16 +1122,19 @@ def _build_drafts(store: graph.GraphStore) -> list[_Draft]:
 
 # --- layout ---------------------------------------------------------------------------------
 
-SPACING = 14.0  # minimum distance between two nodes
-R_CATEGORY = 260.0  # radius of the category (trunk) nodes
-BRANCH_LENGTHS = (0.0, 0.0, 300.0, 210.0, 160.0, 130.0)  # base branch length by depth
-FAN_R0 = 3.0 * SPACING  # distance from a node to its first row of leaves
-FAN_ROW = SPACING  # distance between rows of leaves
+SPACING = 20.0  # minimum distance between two nodes
+LEAF_SPACING = 32.0  # distance between neighbouring leaves of a fan
+R_CATEGORY = 300.0  # radius of the category (trunk) nodes
+BRANCH_LENGTHS = (0.0, 0.0, 340.0, 240.0, 190.0, 150.0)  # base branch length by depth
+FAN_R0 = 2.0 * LEAF_SPACING  # distance from a node to its first row of leaves
+FAN_ROW = 0.9 * LEAF_SPACING  # distance between rows of leaves
+FAN_PAD = 4.0  # extra clear space around each leaf fan
 GAP = math.radians(4)  # empty wedge between two sectors
 INNER_MARGIN = math.radians(3)  # branches are shared out over the sector minus this per side
 MIN_SECTOR = math.radians(16)
 SECTOR_EXPONENT = 0.95
 WEDGE_EXPONENT = 0.85
+UPRIGHT_BONUS = 1.0  # extra sector weight for categories pointing up or down
 LABEL_OFFSET = 120.0
 EDGE_MARGIN = math.radians(0.6)  # keep nodes this far off the sector edges
 MAX_TRIES_R = 300
@@ -1152,13 +1155,11 @@ def _need(d: _Draft) -> float:
     return d.need
 
 
-def _sectors(drafts: list[_Draft]) -> list[tuple[float, float]]:
-    """(start, end) per category, clockwise from 12 o'clock (start > end)."""
-    total = 2 * math.pi - GAP * len(drafts)
-    weights = [max(_need(d), 1.0) ** SECTOR_EXPONENT for d in drafts]
-    widths = [0.0] * len(drafts)
+def _sector_widths(weights: list[float], total: float) -> list[float]:
+    """Share `total` by weight; small categories get at least MIN_SECTOR."""
+    widths = [0.0] * len(weights)
     fixed: set[int] = set()
-    while True:  # give small categories the minimum, share the rest by weight
+    while True:
         free = total - MIN_SECTOR * len(fixed)
         w_free = sum(w for i, w in enumerate(weights) if i not in fixed)
         changed = False
@@ -1172,6 +1173,25 @@ def _sectors(drafts: list[_Draft]) -> list[tuple[float, float]]:
             break
     for i in fixed:
         widths[i] = MIN_SECTOR
+    return widths
+
+
+def _sectors(drafts: list[_Draft]) -> list[tuple[float, float]]:
+    """(start, end) per category, clockwise from 12 o'clock (start > end). Sectors pointing
+    up or down get more angle than their size alone gives them, so their trees stay
+    shorter, and the sideways ones grow longer: the map fits a landscape canvas."""
+    total = 2 * math.pi - GAP * len(drafts)
+    base = [max(_need(d), 1.0) ** SECTOR_EXPONENT for d in drafts]
+    widths = _sector_widths(base, total)
+    for _ in range(4):  # the bonus depends on where a sector ends up: settle it
+        mids, start = [], math.pi / 2 - GAP / 2
+        for w in widths:
+            mids.append(start - w / 2)
+            start -= w + GAP
+        widths = _sector_widths(
+            [b * (1 + UPRIGHT_BONUS * math.sin(m) ** 2) for b, m in zip(base, mids, strict=True)],
+            total,
+        )
     out = []
     start = math.pi / 2 - GAP / 2
     for w in widths:
@@ -1183,14 +1203,18 @@ def _sectors(drafts: list[_Draft]) -> list[tuple[float, float]]:
 def _fan(n: int) -> list[tuple[float, float]]:
     """Leaf offsets (distance, angle) in front of a node: rows of arcs, staggered, inner first."""
     pts: list[tuple[float, float]] = []
-    half = min(1.15, 0.3 + 0.06 * n)  # half spread grows with the number of leaves
+    half = min(1.3, 0.35 + 0.07 * n)  # half spread grows with the number of leaves
     row = 0
     left = n
     while left:
         rho = FAN_R0 + row * FAN_ROW
-        cap = max(1, int(2 * half * rho / SPACING) + 1)
+        cap = max(1, int(2 * half * rho / LEAF_SPACING) + 1)
         m = min(cap, left)
-        step = SPACING / rho if m == cap else min(2 * half / max(m - 1, 1), 1.6 * SPACING / rho)
+        step = (
+            LEAF_SPACING / rho
+            if m == cap
+            else min(2 * half / max(m - 1, 1), 1.6 * LEAF_SPACING / rho)
+        )
         shift = (step / 2) if row % 2 and m < cap else 0.0
         for i in range(m):
             pts.append((rho, (i - (m - 1) / 2) * step + shift))
@@ -1266,7 +1290,7 @@ def _fan_disc(n: int) -> _Fan | None:
     fu = (min(min(us), 0.0) + max(us)) / 2
     fv = (min(vs) + max(vs)) / 2
     fr = max(math.hypot(u - fu, v - fv) for u, v in zip(us, vs, strict=True))
-    return _Fan(offsets, fu, fv, max(fr, math.hypot(fu, fv)) + SPACING / 2)
+    return _Fan(offsets, fu, fv, max(fr, math.hypot(fu, fv)) + LEAF_SPACING / 2 + FAN_PAD)
 
 
 class _Grower:
@@ -1451,6 +1475,83 @@ def _pull_forks(drafts: list[_Draft], pos: dict[str, _Placed]) -> None:
             f *= 0.85
 
 
+# Longest category wording the frontend shows across its lenses (atlas-categories.ts), in
+# characters: category labels are sized for it.
+LABEL_CHARS: dict[AtlasCategory, int] = {
+    AtlasCategory.researchers: 11,
+    AtlasCategory.institutions: 24,
+    AtlasCategory.literature: 29,
+    AtlasCategory.community: 34,
+    AtlasCategory.pathways: 14,
+    AtlasCategory.genes: 20,
+    AtlasCategory.diseases: 10,
+    AtlasCategory.symptoms: 17,
+    AtlasCategory.doctors: 10,
+}
+LABEL_CHAR_WIDTH = 0.006  # one character, as a share of the map's 16:9 fitting extent
+LABEL_HEIGHT = 0.018  # label height, same unit
+LABEL_MARGIN = 0.006  # clear space around a label, same unit
+
+
+def _label_points(
+    drafts: list[_Draft], sectors: list[tuple[float, float]], pos: dict[str, _Placed]
+) -> dict[AtlasCategory, tuple[float, float]]:
+    """Centre of each category label: just outside its own tree, written along the outer
+    edge (tangentially), at the first spot where the label box touches no node and no
+    other label. Small sectors slide outward until the box clears their neighbours."""
+    xs = [p.x for p in pos.values()]
+    ys = [p.y for p in pos.values()]
+    extent = max(max(xs) - min(xs), (max(ys) - min(ys)) / 0.5625, 1.0)
+    height, margin = LABEL_HEIGHT * extent, LABEL_MARGIN * extent
+    points = [(p.x, p.y) for p in pos.values()]
+    owner = {d.category: {n for n in _subtree_ids(d)} for d in drafts}
+    out: dict[AtlasCategory, tuple[float, float]] = {}
+    for d, (start, end) in zip(drafts, sectors, strict=True):
+        assert d.category is not None
+        width = LABEL_CHARS.get(d.category, len(d.label)) * LABEL_CHAR_WIDTH * extent
+        half_w, half_h = width / 2 + margin, height / 2 + margin
+        mid, span = (start + end) / 2, start - end
+        own = [pos[i] for i in owner[d.category]]
+        best: tuple[float, float, float] | None = None
+        for k in (0.0, 0.15, -0.15, 0.3, -0.3):
+            a = mid + k * span
+            ux, uy = math.cos(a), math.sin(a)  # outward
+            tx, ty = -uy, ux  # along the label
+            # outer edge of the own tree in the label's direction
+            edge = max(
+                (p.x * ux + p.y * uy for p in own if abs(p.x * tx + p.y * ty) <= half_w),
+                default=R_CATEGORY,
+            )
+            r = edge + half_h
+            for _ in range(400):
+                cx, cy = r * ux, r * uy
+                if not any(
+                    abs((x - cx) * tx + (y - cy) * ty) < half_w
+                    and abs((x - cx) * ux + (y - cy) * uy) < half_h
+                    for x, y in points
+                ):
+                    break
+                r += height / 2
+            if best is None or r < best[0] - 1e-6:
+                best = (r, cx, cy)
+        assert best is not None
+        _, cx, cy = best
+        out[d.category] = (cx, cy)
+        a = math.atan2(cy, cx)  # the placed label is an obstacle for the next ones
+        tx, ty = -math.sin(a), math.cos(a)
+        steps = max(2, int(width / (height / 2)))
+        for i in range(steps + 1):
+            f = i / steps - 0.5
+            points.append((cx + f * width * tx, cy + f * width * ty))
+    return out
+
+
+def _subtree_ids(d: _Draft) -> Iterable[str]:
+    yield d.id
+    for c in d.children:
+        yield from _subtree_ids(c)
+
+
 # --- assembly -------------------------------------------------------------------------------
 
 
@@ -1461,7 +1562,8 @@ def _xy(value: float) -> float:
 def build_tree(store: graph.GraphStore) -> AtlasTree:
     """Pure, deterministic tree and layout from the in-memory store."""
     drafts = _build_drafts(store)
-    pos, sectors, reach = _layout(drafts)
+    pos, sectors, _reach = _layout(drafts)
+    labels = _label_points(drafts, sectors, pos)
     out: list[AtlasTreeNode] = [
         AtlasTreeNode(
             id=ROOT_ID,
@@ -1516,8 +1618,7 @@ def build_tree(store: graph.GraphStore) -> AtlasTree:
     for d, (start, end) in zip(drafts, sectors, strict=True):
         emit(d, ROOT_ID, 1)
         assert d.category is not None
-        mid = (start + end) / 2
-        r = reach.get(d.category, R_CATEGORY) + LABEL_OFFSET
+        lx, ly = labels[d.category]
         categories.append(
             AtlasCategorySummary(
                 id=d.category,
@@ -1526,8 +1627,8 @@ def build_tree(store: graph.GraphStore) -> AtlasTree:
                 entity_count=d.count,
                 angle_start=round(start, 4),
                 angle_end=round(end, 4),
-                label_x=_xy(r * math.cos(mid)),
-                label_y=_xy(r * math.sin(mid)),
+                label_x=_xy(lx),
+                label_y=_xy(ly),
             )
         )
 
