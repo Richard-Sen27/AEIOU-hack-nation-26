@@ -71,7 +71,7 @@ test.describe("search the map", () => {
     await expect(page).toHaveURL(/focus=MONDO%3A9900007|focus=MONDO:9900007/);
   });
 
-  test("merges synonym matches from the server, only those on the map", async ({ page }) => {
+  test("merges synonym matches from the server and marks those not on the map", async ({ page }) => {
     const queries: string[] = [];
     await mockApi(
       page,
@@ -95,7 +95,10 @@ test.describe("search the map", () => {
     await expect(dravet).toContainText("Severe myoclonic epilepsy of infancy");
     await expect(dravet).toContainText("Dravet syndrome");
     await expect(dravet).toContainText("Conditions");
-    await expect(search.locator('[data-node-id="MONDO:NOT-ON-MAP"]')).toHaveCount(0);
+    const offMap = search.locator('[data-node-id="MONDO:NOT-ON-MAP"]');
+    await expect(offMap).toHaveAttribute("data-offmap", "true");
+    await expect(offMap.getByTestId("atlas-offmap")).toHaveText("Not on the map yet");
+    await expect(dravet.getByTestId("atlas-offmap")).toHaveCount(0);
     // Debounced: one request for the settled query, not one per keystroke.
     expect(queries).toEqual(["severe myoclonic"]);
   });

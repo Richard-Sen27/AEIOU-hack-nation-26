@@ -441,6 +441,8 @@ export function atlasSummary(id: string) {
         ? "This result is uncertain. Discuss it with a genetic counselor before acting on it."
         : null,
     data_version: "fixture",
+    coverage: "focus",
+    focus_disease_count: FOCUS_DISEASE_COUNT,
   };
 }
 
@@ -501,6 +503,8 @@ export function stxbp1Summary() {
     explain_edge_ids: ["e_e5f778ac8a21", "e_3b8845b635b8"],
     vus_notice: null,
     data_version: "fixture",
+    coverage: "focus",
+    focus_disease_count: FOCUS_DISEASE_COUNT,
   };
 }
 
@@ -515,6 +519,201 @@ export function summaryMock(overrides: Record<string, unknown> = {}) {
     if (id in overrides) return overrides[id] as Record<string, unknown>;
     const s = id === "MONDO:9900007" ? stxbp1Summary() : atlasSummary(id);
     return s ? { json: s } : { status: 404, json: { error: { code: "not_found", message: "Not found" } } };
+  };
+}
+
+// ---------------------------------------------------------------------------
+// Wide scope, stage A: nodes that exist in the atlas but are not on the map
+// (core diseases with their genes and symptoms). None of these ids is in the tree.
+
+/** Diseases with literature, trials and people collected (the map's set). */
+export const FOCUS_DISEASE_COUNT = 169;
+
+export const CORE = {
+  fop: "MONDO:0007606",
+  pcd: "MONDO:0014203",
+  acvr1: "HGNC:171",
+  fopGeneEdge: "e_core_fop_acvr1",
+} as const;
+
+type CoreNode = { id: string; type: string; label: string; attrs: Record<string, unknown> };
+const CORE_NODES: CoreNode[] = [
+  {
+    id: CORE.fop,
+    type: "disease",
+    label: "fibrodysplasia ossificans progressiva",
+    attrs: { tier: "core", orpha_ids: ["ORPHA:337"], omim_ids: ["OMIM:135100"] },
+  },
+  {
+    id: CORE.pcd,
+    type: "disease",
+    label: "primary ciliary dyskinesia 25",
+    attrs: { tier: "core", orpha_ids: [], omim_ids: ["OMIM:615482"] },
+  },
+  { id: "MONDO:0011989", type: "disease", label: "progressive osseous heteroplasia", attrs: { tier: "core", orpha_ids: ["ORPHA:2762"], omim_ids: ["OMIM:166350"] } },
+  { id: CORE.acvr1, type: "gene", label: "ACVR1", attrs: { tier: "core", symbol: "ACVR1" } },
+  { id: "HP:0011987", type: "phenotype", label: "Ectopic ossification in muscle tissue", attrs: { tier: "core" } },
+  { id: "HP:0001788", type: "phenotype", label: "Hallux valgus", attrs: { tier: "core" } },
+  { id: "HP:0000365", type: "phenotype", label: "Hearing impairment", attrs: { tier: "core" } },
+  { id: "HP:0034315", type: "phenotype", label: "Chronic cough", attrs: { tier: "core" } },
+];
+const coreById = new Map(CORE_NODES.map((n) => [n.id, n]));
+
+function coreApiNode(n: CoreNode) {
+  return { id: n.id, type: n.type, label: n.label, description: null, url: null, attrs: n.attrs, cluster_id: null, x: 0, y: 0, centrality: 0 };
+}
+
+function coreItem(id: string, via: string[], extra: Record<string, unknown> = {}) {
+  const n = coreById.get(id) ?? nodeById.get(id)!;
+  return { id, label: n.label, type: n.type, hops: 1, score: 1, best_confidence: 0.9, inferred: false, under_review: false, via, via_label: null, explanation: null, ...extra };
+}
+
+/** Symptom edges of FOP: edge id, HPO id, frequency (0-1), the source's label. */
+const FOP_SYMPTOMS: Array<[string, string, number, string]> = [
+  ["e_core_fop_hv", "HP:0001788", 0.55, "Frequent"],
+  ["e_core_fop_hear", "HP:0000365", 0.17, "Occasional"],
+  ["e_core_fop_ossif", "HP:0011987", 0.9, "Very frequent"],
+];
+
+/** `GET /atlas/summary/MONDO:0007606`: a core disease (FOP), no tree path, coverage "core". */
+export function coreDiseaseSummary() {
+  return {
+    node: coreApiNode(coreById.get(CORE.fop)!),
+    tree_path: [],
+    headline: "A rare genetic condition. Linked to 1 gene and 52 symptoms in the atlas.",
+    sections: [
+      {
+        key: "similar_diseases",
+        node_type: "disease",
+        total: 2,
+        items: [
+          coreItem("MONDO:0011989", ["e_core_fop_poh"], {
+            inferred: true,
+            best_confidence: 0.62,
+            explanation: "Similar symptom profile: both list Ectopic ossification in muscle tissue. Similar experience, possibly different cause.",
+          }),
+          // On the map, but the link to an off-map disease is not: nothing to draw.
+          coreItem("MONDO:9900003", ["e_core_fop_scn2a"], { inferred: true, best_confidence: 0.46, explanation: "Both list Hearing impairment." }),
+        ],
+      },
+      { key: "genes", node_type: "gene", total: 1, items: [coreItem(CORE.acvr1, [CORE.fopGeneEdge], { best_confidence: 0.99 })] },
+      {
+        key: "symptoms",
+        node_type: "phenotype",
+        total: 52,
+        // The summary's own order (not by frequency); the panel sorts by frequency.
+        items: FOP_SYMPTOMS.map(([edge, hp]) => coreItem(hp, [edge], { best_confidence: 0.99 })),
+      },
+    ],
+    explain_edge_ids: [CORE.fopGeneEdge, "e_core_fop_ossif"],
+    vus_notice: null,
+    data_version: "fixture",
+    coverage: "core",
+    focus_disease_count: FOCUS_DISEASE_COUNT,
+  };
+}
+
+/** `GET /neighborhood/MONDO:0007606`: the direct edges, with frequencies on the symptom links. */
+export function coreNeighborhood() {
+  const center = coreApiNode(coreById.get(CORE.fop)!);
+  const edge = (id: string, target: string, relation: string, family: string, features: Record<string, unknown> | null) => ({
+    id, source_id: CORE.fop, target_id: target, relation, family, confidence: 0.99, confidence_level: "high", origin: "observed",
+    status: "active", features, data_version: "fixture", evidence_count: 2, contradiction_count: 0, flagged: false, explanation: null,
+  });
+  return {
+    center,
+    nodes: [center, ...[CORE.acvr1, ...FOP_SYMPTOMS.map((s) => s[1])].map((id) => coreApiNode(coreById.get(id)!))],
+    edges: [
+      edge(CORE.fopGeneEdge, CORE.acvr1, "caused_by_variant_in", "dna", null),
+      ...FOP_SYMPTOMS.map(([id, hp, frequency, label]) =>
+        edge(id, hp, "has_phenotype", "symptoms", { frequency, frequency_label: label, frequency_by_source: { hpo: frequency } }),
+      ),
+    ],
+    cluster: null,
+    hints: HINTS.guest,
+    data_version: "fixture",
+  };
+}
+
+/** `GET /edge/e_core_fop_acvr1/evidence`: the gene link, from Orphanet and HPO. */
+export function coreGeneEvidence() {
+  const ev = (id: number, source_type: string, source_id: string, url: string) => ({
+    id, edge_id: CORE.fopGeneEdge, tier: "curated_db", tier_weight: 0.9, source_type, source_id, url,
+    quote: null, retrieved_at: "2026-10-04T00:00:00Z", polarity: "supports", claim_type: null,
+  });
+  return {
+    edge: coreNeighborhood().edges[0],
+    source: coreApiNode(coreById.get(CORE.fop)!),
+    target: coreApiNode(coreById.get(CORE.acvr1)!),
+    supporting: [
+      ev(1, "orphanet", "ORPHA:337", "https://www.orpha.net/en/disease/detail/337"),
+      ev(2, "hpo", "OMIM:135100", "https://omim.org/entry/135100"),
+      ev(3, "orphanet", "ORPHA:337", "https://www.orpha.net/en/disease/detail/337"),
+    ],
+    contradicting: [],
+    confidence_breakdown: { supporting: [], support_score: 0.99, n_contradicting: 0, penalty_per_contradiction: 0.1, penalty: 0, result: 0.99, level: "high", formula: "" },
+    open_flags: 0,
+  };
+}
+
+/** `GET /node/{id}` for a core node (the dock labels off-map finds with it). */
+export function coreNodeDetail(id: string) {
+  const n = coreById.get(id);
+  if (!n) return null;
+  return { node: coreApiNode(n), synonyms: [], summary: null, relation_counts: [], degree: 0, cluster: null, classification: null, vus_notice: null };
+}
+
+/**
+ * `graphMocks` plus the core nodes: their summaries, node details, FOP's
+ * neighbourhood and gene evidence, and `GET /search` hits for "FOP".
+ */
+export function wideMocks(extra: Record<string, unknown> = {}) {
+  const base = graphMocks();
+  const lastSegment = (url: string) => decodeURIComponent(new URL(url).pathname.split("/").pop()!);
+  const delegate = (key: keyof typeof base) => base[key] as (req: { url: string }) => unknown;
+  return {
+    ...base,
+    "GET /search": ({ url }: { url: string }) => {
+      const q = (new URL(url).searchParams.get("q") ?? "").toLowerCase();
+      const results =
+        q === "fop" || q.startsWith("fibro")
+          ? [
+              { id: CORE.fop, type: "disease", label: coreById.get(CORE.fop)!.label, matched_synonym: q === "fop" ? "FOP" : null, score: 3, match_kind: "exact", cluster_id: null },
+              { id: CORE.acvr1, type: "gene", label: "ACVR1", matched_synonym: null, score: 1, match_kind: "trigram", cluster_id: null },
+            ]
+          : [];
+      return { json: { results } };
+    },
+    "GET /atlas/summary/*": summaryMock({
+      [CORE.fop]: { json: coreDiseaseSummary() },
+      "MONDO:0011989": {
+        json: {
+          ...coreDiseaseSummary(),
+          node: coreApiNode(coreById.get("MONDO:0011989")!),
+          headline: "A rare genetic condition. Linked to 1 similar condition in the atlas.",
+          sections: [{ key: "similar_diseases", node_type: "disease", total: 1, items: [coreItem(CORE.fop, ["e_core_fop_poh"], { inferred: true, best_confidence: 0.62 })] }],
+          explain_edge_ids: [],
+        },
+      },
+      [CORE.pcd]: {
+        json: {
+          ...coreDiseaseSummary(),
+          node: coreApiNode(coreById.get(CORE.pcd)!),
+          headline: "A rare genetic condition. Linked to 1 gene in the atlas.",
+          sections: [{ key: "symptoms", node_type: "phenotype", total: 1, items: [coreItem("HP:0034315", ["e_core_pcd_cough"])] }],
+          explain_edge_ids: [],
+        },
+      },
+    }),
+    "GET /node/*": ({ url }: { url: string }) => {
+      const d = coreNodeDetail(lastSegment(url));
+      return d ? { json: d } : delegate("GET /node/*")({ url });
+    },
+    "GET /neighborhood/*": ({ url }: { url: string }) =>
+      lastSegment(url) === CORE.fop ? { json: coreNeighborhood() } : delegate("GET /neighborhood/*")({ url }),
+    "GET /edge/*/evidence": ({ url }: { url: string }) =>
+      url.includes(CORE.fopGeneEdge) ? { json: coreGeneEvidence() } : delegate("GET /edge/*/evidence")({ url }),
+    ...extra,
   };
 }
 
