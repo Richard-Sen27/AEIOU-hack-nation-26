@@ -751,13 +751,16 @@ class CallRecord(Base):
     published_at: Mapped[datetime | None] = mapped_column()
     closed_at: Mapped[datetime | None] = mapped_column()
     demo: Mapped[bool] = mapped_column(Boolean, nullable=False, server_default="false")
+    # Went live through publish_own_call() without review (migration c8e5b3a1f7d4).
+    self_published: Mapped[bool] = mapped_column(Boolean, nullable=False, server_default="false")
     created_at: Mapped[datetime] = _created()
     updated_at: Mapped[datetime] = _created()
 
 
 class CallReviewRecord(Base):
-    """Operator log of call reviews (viewed, approved, rejected). Written only by the definer
-    functions; the publisher can read the rows about their own calls."""
+    """Log of how calls went live: operator reviews (viewed, approved, rejected) and
+    self-publications (self_published). Written only by the definer functions; the publisher can
+    read the rows about their own calls."""
 
     __tablename__ = "call_reviews"
     __table_args__ = (
