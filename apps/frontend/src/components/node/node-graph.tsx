@@ -88,9 +88,13 @@ function fitViewport(cy: Core, eles = cy.elements(":visible")) {
   return { zoom, pan: { x: (w - zoom * (bb.x1 + bb.x2)) / 2, y: (h - zoom * (bb.y1 + bb.y2)) / 2 } };
 }
 
+/** Smaller changes of the card's size (a scrollbar, sub-pixel rounding) keep the user's zoom and pan. */
+const REFIT_MIN_RESIZE = 8;
+
 function fitCapped(cy: Core, animate: boolean) {
   const vp = fitViewport(cy);
   if (!vp) return;
+  cy.scratch("_fitSize", { w: cy.width(), h: cy.height() });
   if (animate) cy.animate(vp, { duration: 300 });
   else cy.viewport(vp);
 }
@@ -143,6 +147,7 @@ export const NodeGraph = forwardRef<NodeGraphHandle, Props>(function NodeGraph(p
   const container = useRef<HTMLDivElement>(null);
   const cyRef = useRef<Core | null>(null);
   const propsRef = useRef(props);
+  const highlightKey = (hints.highlight_family ?? []).join(",");
   useLayoutEffect(() => {
     propsRef.current = props;
   });
@@ -421,9 +426,14 @@ export const NodeGraph = forwardRef<NodeGraphHandle, Props>(function NodeGraph(p
       if (!cy.destroyed()) fitCapped(cy, animate && options !== ring);
     });
     layout.run();
-    // Keep the frame when the card changes size (window resize, desktop fit).
+    // Refit only when the card's size really changed. Cytoscape also emits
+    // "resize" during wheel and pointer interaction without any size change;
+    // refitting then undid the user's zoom a moment later.
     const onResize = () => {
-      if (!running) fitCapped(cy, false);
+      if (running) return;
+      const last = cy.scratch("_fitSize") as { w: number; h: number } | undefined;
+      if (last && Math.abs(cy.width() - last.w) < REFIT_MIN_RESIZE && Math.abs(cy.height() - last.h) < REFIT_MIN_RESIZE) return;
+      fitCapped(cy, false);
     };
     cy.on("resize", onResize);
     return () => {
@@ -432,7 +442,8 @@ export const NodeGraph = forwardRef<NodeGraphHandle, Props>(function NodeGraph(p
       layout.stop();
       cy.off("resize", onResize);
     };
-  }, [props.hints.start_layout, props.hints.highlight_family, props.nodes, props.edges, props.centerId]);
+    // The highlighted families by value: a new array with the same families is not a new layout.
+  }, [props.hints.start_layout, highlightKey, props.nodes, props.edges, props.centerId]);
 
   return (
     <div

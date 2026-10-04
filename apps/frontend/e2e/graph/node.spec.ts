@@ -262,6 +262,32 @@ test.describe("node view", () => {
     });
   }
 
+  test("a manual zoom is kept: no refit a few seconds later", async ({ page }) => {
+    await page.setViewportSize({ width: 1440, height: 900 });
+    await mockApi(page, graphMocks());
+    await page.goto(DRAVET);
+    const graph = page.getByTestId("node-graph");
+    await expect(graph.locator("canvas").first()).toBeVisible({ timeout: 30_000 });
+    await page.waitForTimeout(1000);
+    const zoom = () => graph.evaluate((el) => (el as unknown as { _cyreg: { cy: { zoom: () => number } } })._cyreg.cy.zoom());
+    const fitted = await zoom();
+    // Wheel zoom, then move the pointer over the graph: Cytoscape emits "resize" during this without a size change.
+    const box = (await graph.boundingBox())!;
+    await page.mouse.move(box.x + box.width / 2 + 40, box.y + box.height / 2 + 30);
+    for (let i = 0; i < 6; i++) {
+      await page.mouse.wheel(0, -300);
+      await page.waitForTimeout(80);
+    }
+    for (let i = 0; i < 15; i++) {
+      await page.mouse.move(box.x + 120 + i * 30, box.y + 100 + i * 20);
+      await page.waitForTimeout(40);
+    }
+    const userZoom = await zoom();
+    expect(userZoom).toBeGreaterThan(fitted * 1.03);
+    await page.waitForTimeout(4000);
+    expect(await zoom()).toBeCloseTo(userZoom, 5);
+  });
+
   test("the map key is collapsed until opened and closes with Escape", async ({ page }) => {
     await mockApi(page, graphMocks());
     await page.goto(DRAVET);
