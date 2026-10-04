@@ -96,6 +96,8 @@ How the action layer maps onto the graph (all precomputed edges, read via `get_n
 
 What the agent may claim from it: these are "conditions in the atlas whose recorded symptoms overlap", with the overlap count ("3 of your 4 symptoms are recorded for it"), each shared symptom citing its `has_phenotype` edge. The score is a similarity, not a probability: never a probability, likelihood or percentage, never "you have" or "this is", never a diagnosis; the conditions are to discuss with a clinical geneticist. The tool result carries this rule as a note, and the system prompt repeats it.
 
+The reply carries the ranking as `symptom_match`, built by the post-check from the tool result, never from the model's text: the top 5 conditions with `overlap` of `of`, whether each is on the Atlas map, and each shared or contradicting symptom with its `has_phenotype` edge (a term whose edge the turn did not return is dropped, and so is a condition left without one); no score. The chat page and the Atlas dock show it as a card ("Symptom overlap in the atlas data, not a diagnosis."); conditions on the map open in the Atlas, the others their node page. The post-check also removes summary sentences and claims that give the overlap as a probability, likelihood or percentage. The eval's `symptoms` check (chronic cough) asserts the ranking, a cited `has_phenotype` edge and no such wording.
+
 ## Graph and evidence model
 
 Defined in `system.md` (Graph data model, Database). What the agent relies on:
@@ -223,7 +225,10 @@ Every agent turn returns one structured object (OpenAI Structured Outputs); the 
     {"title": "…", "type": "reuse_asset|contact|join_trial|fund", "viable": true, "edge_ids": ["…"],
      "timeline_today": "…", "timeline_proposed": "…", "assumptions": ["…"]}
   ],
-  "follow_up": {"question": "…", "quick_replies": ["…"], "skippable": true}
+  "follow_up": {"question": "…", "quick_replies": ["…"], "skippable": true},
+  "symptom_match": {"items": [{"id": "…", "label": "…", "overlap": 2, "of": 3, "on_map": false,
+    "shared": [{"user_symptom": "…", "recorded_as": "…", "match": "same|more_specific|broader", "edge_id": "e_123"}],
+    "absent": []}]}
 }
 ```
 

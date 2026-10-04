@@ -40,8 +40,8 @@ Work deliberately left for later. Add an item when you leave something for later
 - **Dock history:** the Atlas dock shows only this tab's current conversation (kept in memory across views) or a turn still running on the server; it never lists stored sessions, so an older failed turn shows on `/chat` only.
 - **Retry of an older failed turn** returns 409 when a later message exists in the session; the UI still offers "Try again" on such turns in a reloaded session.
 - **Real model untested:** answer quality, document extraction, the gap-search agent, written explanations and summaries were covered only by the mock.
-- **No ranking card for `match_phenotypes`:** the frontend has no Dr. Wu card for the symptom-overlap ranking; it shows only through the normal reply and `graph_focus`.
-- **No eval for symptom matching:** `evals/golden.yaml` has no chronic-cough case expecting primary ciliary dyskinesia 25 (`MONDO:0014203`) in `graph_focus`.
+- **Chronic cough eval only on the mock:** the `symptoms` check (`evals/golden.yaml` `symptom_questions`) passed with a scripted mock; it has not run against a real model (`backend.cli eval --only symptoms`). It asserts the ranking (`reply.symptom_match`), a cited `has_phenotype` edge and no diagnosis or percentage wording, not `graph_focus`.
+- **Ranking links to node pages:** conditions on the symptom-overlap card that are not on the map link to `/node/<id>` (`components/chat/symptom-match.tsx`), like the other chat links above.
 
 ## Data and pipeline
 
@@ -67,7 +67,6 @@ Work deliberately left for later. Add an item when you leave something for later
 - **Consent version for the new OpenAI wording** (`schemas/account.py` `CONSENT_TEXT_VERSIONS`, `components/privacy/consent-texts.ts` `CONSENT_VERSION`): the `health_data` safeguard now names both routes to OpenAI (own ChatGPT plan, or Amber's API account for Google sign-ins) but the version was not bumped; bump both together (`health-data-2026-10-04` -> a new id) before Google sign-in goes live, so Google users consent to the text that names the operator's account.
 - **Account linking:** a Google and a ChatGPT account with the same e-mail are two accounts (no merge by e-mail, to rule out takeover). Linking would need the signed-in user to prove both identities in one session.
 - **Server-key spending is unbounded:** Google accounts' model calls run on `OPENAI_API_KEY` with only the existing per-account limits (chat 30/min and 300/day, uploads 10/h, gap search 20/h; explanations have none), held in process memory and per account, and anyone can create more Google accounts. Fix: a global or per-account token budget, and a spend limit on the OpenAI project.
-- **"ChatGPT plan" in usage-limit errors** (`api/services/explanation/common.py` `LLM_ERRORS`, used by chat): a Google account on the server key that hits OpenAI's 429 is told "Your ChatGPT plan's usage limit is reached". Left because `tests/agent/test_chat*.py` (chat agent's work) pin the text; change to neutral wording with those tests.
 - **Google sign-in untested against real Google:** the flow is covered with a faked Google (discovery, keys, token endpoint); try it once with a real client id before the demo.
 - **Missing documents:** `docs/incident.md`, `docs/dpia.md`, `docs/ropa.md`; `ropa.md` must include the work details of doctors and researchers as a purpose (contract, Art. 6(1)(b)).
 - **`/privacy` placeholders** (`apps/frontend/src/app/privacy/page.tsx`, `ToBeCompleted`): controller name and address, `NEXT_PUBLIC_PRIVACY_EMAIL`, hosting provider and region, supervisory authority.
