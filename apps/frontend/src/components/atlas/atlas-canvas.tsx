@@ -382,7 +382,8 @@ export const AtlasCanvas = forwardRef<AtlasCanvasHandle, Props>(function AtlasCa
         return res;
       }
       res.zIndex = em.active ? 2 : data.kind === "entity" ? 1 : 2;
-      if (node === propsRef.current.selectedId || node === hovered.current) res.highlighted = true;
+      // Sigma draws the hover box; the selected dot's name is drawn on the overlay, on top of all names.
+      if (node === hovered.current) res.highlighted = true;
       return res;
     }
 
@@ -581,6 +582,38 @@ export const AtlasCanvas = forwardRef<AtlasCanvasHandle, Props>(function AtlasCa
     const ENTITY_LABEL_MIN_PX = 4.2;
     const MAX_LABELS = 320;
     const CELL = 48;
+    /** Box of the label card Sigma's hover style draws for a dot (also used for the selected dot). */
+    const nameBox = (ctx: CanvasRenderingContext2D, id: string, font: string) => {
+      const n = index.nodes.get(id);
+      const d = sigma.getNodeDisplayData(id);
+      if (!n || !d || n.kind === "root" || n.kind === "category") return null;
+      ctx.font = `600 12px ${font}`;
+      const tw = ctx.measureText(n.label).width;
+      const p = sigma.framedGraphToViewport(d);
+      const r = sigma.scaleSize(d.size);
+      const x = graph.getNodeAttribute(id, "left") ? p.x - r - 7 - tw : p.x + r + 7;
+      const box: [number, number, number, number] = [x - 6, p.y - 11, x + tw + 6, p.y + 11];
+      return { n, x, y: p.y, tw, box };
+    };
+    const drawSelectedName = (ctx: CanvasRenderingContext2D) => {
+      const id = propsRef.current.selectedId;
+      if (!id || id === hovered.current) return;
+      const t = propsRef.current.theme;
+      const font = getComputedStyle(document.body).fontFamily || "sans-serif";
+      const b = nameBox(ctx, id, font);
+      if (!b) return;
+      ctx.textBaseline = "middle";
+      ctx.fillStyle = t.dark ? "#1f2725" : "#ffffff";
+      ctx.strokeStyle = t.border;
+      ctx.lineWidth = 1;
+      ctx.beginPath();
+      ctx.roundRect(b.x - 5, b.y - 10, b.tw + 10, 20, 6);
+      ctx.fill();
+      ctx.stroke();
+      ctx.fillStyle = t.label;
+      ctx.fillText(b.n.label, b.x, b.y + 0.5);
+    };
+
     const drawLabels = (ctx: CanvasRenderingContext2D, w: number, h: number, blocked: Array<[number, number, number, number]>) => {
       const { theme: t } = propsRef.current;
       const em = emphasis.current;
@@ -606,18 +639,17 @@ export const AtlasCanvas = forwardRef<AtlasCanvasHandle, Props>(function AtlasCa
         });
       blocked.forEach(place);
       let currentFont = "";
-      // Keep room for Sigma's label box on the selected and the hovered dot.
+      // The selected and the hovered dot's name boxes win: every other name, the selection's
+      // ancestors included, goes around them or is dropped.
+      const reserved: Array<[number, number, number, number]> = [];
       for (const id of [propsRef.current.selectedId, hovered.current]) {
-        const n = id ? index.nodes.get(id) : undefined;
-        const d = id ? sigma.getNodeDisplayData(id) : undefined;
-        if (!id || !n || !d) continue;
-        ctx.font = currentFont = `600 12px ${font}`;
-        const tw = ctx.measureText(n.label).width;
-        const p = sigma.framedGraphToViewport(d);
-        const r = sigma.scaleSize(d.size);
-        const x0 = graph.getNodeAttribute(id, "left") ? p.x - r - 12 - tw : p.x + r + 2;
-        place([x0, p.y - 11, x0 + tw + 12, p.y + 11]);
+        const b = id ? nameBox(ctx, id, font) : null;
+        if (!b) continue;
+        reserved.push(b.box);
+        place(b.box);
       }
+      const hitsReserved = (b: [number, number, number, number]) =>
+        reserved.some(([a, c, d, e]) => b[0] < d && b[2] > a && b[1] < e && b[3] > c);
       const order = em.active ? [...em.labelled, ...labelOrder] : labelOrder;
       const seen = new Set<string>();
       let count = 0;
@@ -644,10 +676,19 @@ export const AtlasCanvas = forwardRef<AtlasCanvasHandle, Props>(function AtlasCa
         let tw = widths.get(id);
         if (tw === undefined) widths.set(id, (tw = ctx.measureText(n.label).width));
         const left = graph.getNodeAttribute(id, "left");
-        const x0 = left ? p.x - r - 4 - tw : p.x + r + 4;
-        const box: [number, number, number, number] = [x0 - 2, p.y - 7, x0 + tw + 2, p.y + 7];
-        if (box[2] < 0 || box[0] > w) continue;
-        if (!em.must.has(id) && hits(box)) continue;
+        // Preferred side first (outward), then the other side.
+        let x0 = NaN;
+        let box: [number, number, number, number] = [0, 0, 0, 0];
+        for (const side of [left, !left]) {
+          const x = side ? p.x - r - 4 - tw : p.x + r + 4;
+          const b: [number, number, number, number] = [x - 2, p.y - 7, x + tw + 2, p.y + 7];
+          if (b[2] < 0 || b[0] > w) continue;
+          if (em.must.has(id) ? hitsReserved(b) : hits(b)) continue;
+          x0 = x;
+          box = b;
+          break;
+        }
+        if (Number.isNaN(x0)) continue;
         place(box);
         count += 1;
         ctx.strokeStyle = t.background;
@@ -751,6 +792,7 @@ export const AtlasCanvas = forwardRef<AtlasCanvasHandle, Props>(function AtlasCa
           ctx.stroke();
         }
       }
+      drawSelectedName(ctx);
     };
     sigma.on("resize", () => {
       const next = dotScale();
