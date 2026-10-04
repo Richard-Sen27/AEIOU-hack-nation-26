@@ -9,7 +9,7 @@
 export type ConnectStatus = "live" | "coming";
 
 export const CONNECT_STATUS = {
-  follow: "coming",
+  follow: "live",
   calls: "coming",
   choose: "coming",
 } as const satisfies Record<string, ConnectStatus>;
@@ -17,7 +17,10 @@ export const CONNECT_STATUS = {
 export type ConnectItem = keyof typeof CONNECT_STATUS;
 
 /** Where a networking card links once its item is live (unused while "coming"). */
-export const CONNECT_HREF: Partial<Record<ConnectItem, string>> = {};
+export const CONNECT_HREF: Partial<Record<ConnectItem, string>> = {
+  // Diseases are followed from the Atlas panel or a disease page.
+  follow: "/atlas",
+};
 
 /** The demo family's condition: developmental and epileptic encephalopathy 4 (STXBP1). */
 export const HERO_FOCUS_ID = "MONDO:0012812";

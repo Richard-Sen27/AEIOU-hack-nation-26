@@ -126,7 +126,10 @@ test.describe("landing", () => {
       await expect(page.getByRole("heading", { level: 2, name })).toBeVisible();
     }
     await expect(page.getByText("Where to start")).toHaveCount(0);
-    for (const key of ["follow", "calls", "choose"]) {
+    const follow = page.getByTestId("connect-follow");
+    await expect(follow).not.toContainText("Coming soon");
+    await expect(follow.getByRole("link")).toHaveAttribute("href", "/atlas");
+    for (const key of ["choose"]) {
       const card = page.getByTestId(`connect-${key}`);
       await expect(card).toContainText("Coming soon");
       await expect(card).toContainText("Example");
