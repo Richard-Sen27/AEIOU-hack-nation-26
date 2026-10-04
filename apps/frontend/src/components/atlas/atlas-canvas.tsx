@@ -65,7 +65,7 @@ type Props = {
 };
 
 const DASH: Record<string, DashKind> = { solid: 0, dashed: 1, dotted: 2 };
-const LOGO_PX = 64;
+const LOGO_PX = 44;
 /** Camera ratio below which deeper groups are labelled too. */
 const DEEP_LABEL_RATIO = 0.45;
 
@@ -693,7 +693,7 @@ export const AtlasCanvas = forwardRef<AtlasCanvasHandle, Props>(function AtlasCa
       }
       const btn = logo.current;
       if (btn) {
-        const px = Math.round(Math.min(120, Math.max(48, LOGO_PX / Math.pow(sigma.getCamera().getState().ratio, 0.35))));
+        const px = Math.round(Math.min(84, Math.max(32, LOGO_PX / Math.pow(sigma.getCamera().getState().ratio, 0.35))));
         btn.style.width = btn.style.height = `${px}px`;
         btn.style.padding = `${Math.round(px * 0.14)}px`;
         btn.style.transform = `translate(${origin.x}px, ${origin.y}px) translate(-50%, -50%)`;
