@@ -40,6 +40,8 @@ The atlas processes health and genetic data of EU residents, often about childre
 ### Processors and international transfers (Art. 28 and 44–49)
 
 - Every vendor that touches personal data needs a data processing agreement: Supabase, OpenAI, Vercel, the API host (Railway or Fly), Langfuse.
+- **Two routes to OpenAI.** ChatGPT accounts: redacted text goes to OpenAI on the user's own ChatGPT plan. Google accounts (only when the operator sets `OPENAI_API_KEY`): the same redacted text goes to OpenAI under the operator's API account, so the operator's OpenAI API data processing agreement and data controls (no training on API data, retention, zero data retention or EU residency where available) must cover it. The consent text and the privacy notice name both routes.
+- **Google as identity provider** (optional, `GOOGLE_*` settings): Google sends name, e-mail address and Google account ID at sign-in; Amber sends Google no user data and keeps no Google tokens. Scopes `openid email profile` only.
 - Prefer EU hosting: Supabase project in an EU region, Langfuse EU cloud or self-hosted, and OpenAI's zero-data-retention or EU data-residency options where available (verify what your account supports).
 - Transfers to US vendors rely on the vendor's EU–US Data Privacy Framework certification or Standard Contractual Clauses; record which one per vendor.
 - **Bright Data, web search and PubMed receive no user data.** The gap-search agent builds queries from graph IDs and public terms only, never from profile text or chat messages.

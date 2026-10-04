@@ -76,7 +76,7 @@ Everything is **dockerized**. Initial development runs everything locally via do
 | AI layer | openai, Langfuse, textstat |
 | Database | Postgres + pgvector (no Supabase; auth in FastAPI, RLS in Postgres) |
 
-**Login with ChatGPT** is the only sign-in method. It is used for identity *and* to bill OpenAI API usage to the signed-in user's own ChatGPT plan; that is the main reason for using it. Guests can explore the graph but get no agent features (see Sign-in).
+**Login with ChatGPT** is the default sign-in method. It is used for identity *and* to bill OpenAI API usage to the signed-in user's own ChatGPT plan; that is the main reason for using it. An operator can also enable **Continue with Google**, whose model calls run on a server API key (see Sign-in). Guests can explore the graph but get no agent features (see Sign-in).
 
 ## Frontend
 
@@ -343,7 +343,7 @@ One database: Postgres (with pgvector) holds the pipeline's staging schema, the 
 
 | Table | Key columns |
 | --- | --- |
-| `users` | `id` (UUID), `chatgpt_sub` (unique), `email`, `name`, `created_at`, `last_login_at` |
+| `users` | `id` (UUID), `auth_provider` (`openai` \| `google`), `auth_subject` (the provider's `sub`; unique together with `auth_provider`), `email`, `name`, `created_at`, `last_login_at` |
 | `openai_tokens` | `user_id`, encrypted access and refresh token, `expires_at`, `scopes` (used to bill LLM calls to the user's ChatGPT plan) |
 | `profiles` | `user_id`, `role` (patient / doctor / researcher), `role_verified`, `orcid_id`, `language`, `gpc_opt_out`; work details of doctors and researchers: `first_name`, `last_name`, `institutions` (JSON, at most 3), `atlas_node_id`, `professional_updated_at`; verification: `orcid_verified_at`, `verified_name`, `verification_method` (orcid / institutional_email, or orcid_simulated / manual_simulated in local demos), `verified_at`, `verification_reason`, `verification_request` (JSON), `atlas_link_verified`; public card (off by default): `card_id`, `card_visible`, `card_visible_since`, `card_headline`, `card_show_institutions`, `card_show_atlas_entry`, `accepts_patient_messages`; `connect_age_group` (18_plus / 16_17, self-declared), `connect_age_group_at` |
 | `consents` | `user_id`, `consent_type` (health_data / contribute / connect), `version`, `granted_at`, `revoked_at` |
@@ -369,24 +369,28 @@ One database: Postgres (with pgvector) holds the pipeline's staging schema, the 
   - `atlas_app` is what FastAPI connects as: not the table owner, no `BYPASSRLS`, read-only on graph tables, read/write on user tables (subject to RLS).
   - `atlas_pipeline` writes the staging schema and graph tables, and has no access to user tables.
 - **Public cards:** other users see a doctor's or researcher's card only through the `SECURITY DEFINER` function `professional_cards()`, which returns the chosen card fields (never `user_id`) for rows with `role_verified AND card_visible`; `atlas_definer` reads only the profile columns its functions need. `pending_verification_requests()` is executable by `atlas_owner` only, for the operator CLI (`backend verification-requests`, `backend verify-professional`).
-- **Auth bridge exception:** sign-in must look up a user by `chatgpt_sub` before `app.user_id` is known. This one query runs through a narrow `SECURITY DEFINER` function (`auth_find_or_create_user(sub, email, name)`) instead of bypassing RLS for the whole connection.
+- **Auth bridge exception:** sign-in must look up a user by `(auth_provider, auth_subject)` before `app.user_id` is known. This one query runs through a narrow `SECURITY DEFINER` function (`auth_find_or_create_user(provider, sub, email, name)`; the three-argument form means `openai`) instead of bypassing RLS for the whole connection. Accounts are never matched or merged by e-mail.
 - `ON DELETE CASCADE` from `users`, so account deletion removes everything.
 - Access from FastAPI via `asyncpg` through SQLAlchemy 2.0 async; migrations are managed with Alembic in `apps/backend/migrations` (autogenerate from the SQLAlchemy models; extensions, roles, RLS policies and other raw SQL go in via `op.execute`).
 - At startup the API loads `nodes`, `edges` and `hpo_terms` into memory; Postgres serves search, evidence lookups and all writes. A new load is picked up only when the API restarts.
 
 ## Sign-in
 
-**Continue with ChatGPT is the only sign-in method.** Everyone else uses the app as a guest.
+**Continue with ChatGPT is the default sign-in method; Continue with Google is optional.** Everyone else uses the app as a guest.
+
+Google is offered only when `GOOGLE_CLIENT_ID` and `GOOGLE_CLIENT_SECRET` are set **and** either a server `OPENAI_API_KEY` is set or `GOOGLE_LOGIN_ENABLED=true` (default false). Otherwise `/auth/google/*` answer 404 and nothing changes. The frontend learns the methods from `sign_in_methods` in `GET /auth/session`. A Google account and a ChatGPT account with the same e-mail are two accounts.
+
+Model access is chosen in the gateway (`llm_for_user`): ChatGPT accounts always use their own plan (a lost sign-in asks them to sign in again, never falls back to the server key); other accounts use `OPENAI_API_KEY` with `OPENAI_API_MODEL_MAIN` / `OPENAI_API_MODEL_SMALL` (defaults `gpt-5`, `gpt-5-mini`), billed to the operator; without a key every model feature answers 503 `assistant_unavailable` ("Dr. Wu is not available for this sign-in.") and the rest of the app works.
 
 | | Guest | Signed in with ChatGPT |
 | --- | --- | --- |
 | Search, graph views, paths, evidence, clusters, graph export | Yes | Yes |
 | Cached (precomputed) explanations | Yes | Yes |
 | Chat orchestrator, uncached explanations, gap search, document upload, profile, contributions, flags, proposals | No — prompts sign-in | Yes |
-| LLM calls | None | Billed to the user's own ChatGPT plan |
+| LLM calls | None | Billed to the user's own ChatGPT plan (Google accounts: the server key, if configured) |
 | Stored data | None (stateless, no user rows) | User tables under RLS |
 
-Guests never trigger an LLM call, so there is no team key for guests; the team's own OpenAI key is used only by the offline pipeline (extraction, linking, precomputed explanations). For guests, the landing-page input box works as the global search; typing free text there offers sign-in to use the agent.
+Guests never trigger an LLM call, so there is no team key for guests; apart from the optional server key for Google accounts, the team's own OpenAI key is used only by the offline pipeline (extraction, linking, precomputed explanations). For guests, the landing-page input box works as the global search; typing free text there offers sign-in to use the agent.
 
 ### Flow
 
@@ -397,7 +401,9 @@ Guests never trigger an LLM call, so there is no team key for guests; the team's
    2. `GET /auth/chatgpt/callback` validates `state`, exchanges the code, and verifies the ID token: signature against OpenAI's published keys, `iss`, `aud`, `exp`, `nonce`.
    3. The backend calls `auth_find_or_create_user` with `sub`, `email`, `name`: a known `chatgpt_sub` signs into the existing user, a new one creates a user. The OpenAI tokens are stored encrypted in `openai_tokens`.
    4. The backend sets the session cookie (below) and redirects back to where the user was.
-4. First sign-in: the user picks a role (patient, doctor, researcher). Doctors and researchers then see an optional, skippable step for their work details: first and last name (prefilled from the ChatGPT account, nothing saved until they save), up to three institutions (atlas institutions or free text), an ORCID iD, and a private link to their own researcher or doctor entry, picked from up to five candidates matched by exact ORCID iD or by name, shared institutions first. The details are self-declared and private: never shown to others, never sent to a model, and saving them verifies nothing. Separately, a doctor or researcher can confirm their identity (ORCID sign-in, or a manual review of an institutional e-mail and a public profile page) and then switch on a public card, off by default, that signed-in users can open; it shows only what the person chose, labels the role as self-declared and says what was checked. While the role is doctor or researcher, the confirmed name is the display name. Switching the role to patient deletes them today (whether to delete or keep them hidden is not finally decided). Before the first chat message, profile save or upload, whichever comes first, one consent screen covers all processing of the user's own health and genetic data (`health_data`). It explains what is processed, that personal data is redacted, that raw files are deleted after extraction, and that nothing is shared without the separate `contribute` opt-in. The consent is stored with timestamp and text version (GDPR Article 9).
+
+   **Continue with Google** (when enabled) is the same pattern: `GET /auth/google/start` (state, nonce, PKCE S256 in a sealed cookie on `/auth/google`, scopes `openid email profile` only) and `GET /auth/google/callback` (redirect URI `GOOGLE_REDIRECT_URI`, default `<API_URL>/auth/google/callback`), which checks `state` (single use), exchanges the code with the verifier and verifies the ID token: RS256 signature against Google's published keys, `iss`, `aud`, `exp`, `nonce`, `azp`, and `email_verified`. Then `auth_find_or_create_user('google', sub, email, name)` and the same session cookie. Google's access and refresh tokens are discarded, never stored.
+4. First sign-in: the user picks a role (patient, doctor, researcher). Doctors and researchers then see an optional, skippable step for their work details: first and last name (prefilled from the sign-in account, nothing saved until they save), up to three institutions (atlas institutions or free text), an ORCID iD, and a private link to their own researcher or doctor entry, picked from up to five candidates matched by exact ORCID iD or by name, shared institutions first. The details are self-declared and private: never shown to others, never sent to a model, and saving them verifies nothing. Separately, a doctor or researcher can confirm their identity (ORCID sign-in, or a manual review of an institutional e-mail and a public profile page) and then switch on a public card, off by default, that signed-in users can open; it shows only what the person chose, labels the role as self-declared and says what was checked. While the role is doctor or researcher, the confirmed name is the display name. Switching the role to patient deletes them today (whether to delete or keep them hidden is not finally decided). Before the first chat message, profile save or upload, whichever comes first, one consent screen covers all processing of the user's own health and genetic data (`health_data`). It explains what is processed, that personal data is redacted, that raw files are deleted after extraction, and that nothing is shared without the separate `contribute` opt-in. The consent is stored with timestamp and text version (GDPR Article 9).
 5. The requested feature proceeds.
 
 ### Sessions
@@ -406,7 +412,7 @@ Guests never trigger an LLM call, so there is no team key for guests; the team's
 - The Next.js frontend never handles tokens; it calls the API with the cookie (same site, behind the same domain or with credentials enabled).
 - OpenAI access tokens are refreshed server-side with the stored refresh token; if refresh fails, the user is asked to sign in again.
 
-**Availability caveat:** Sign in with ChatGPT for websites is currently a limited trial for selected partners and needs a requested client ID. Request it immediately; there is no other sign-in method, so if approval is late the demo runs in guest mode only. Billing API usage to the user's ChatGPT plan is in scope and the main reason for this sign-in method.
+**Availability caveat:** Sign in with ChatGPT for websites is currently a limited trial for selected partners and needs a requested client ID. Request it immediately; if approval is late, the demo runs in guest mode or with the optional Google sign-in and a server key. Billing API usage to the user's ChatGPT plan is in scope and the main reason for this sign-in method.
 
 ### FastAPI dependencies
 
@@ -510,6 +516,7 @@ Detailed design in [`agent.md`](agent.md).
 | --- | --- | --- | --- |
 | GET | `/auth/chatgpt/start` | Anyone | Redirect to OpenAI (OIDC + PKCE) |
 | GET | `/auth/chatgpt/callback` | Anyone | Session cookie, redirect back |
+| GET | `/auth/google/start` · `/auth/google/callback` | Anyone, only when Google sign-in is enabled (else 404) | Redirect to Google (OIDC + PKCE) · session cookie, redirect back |
 | POST | `/auth/logout` | Signed in | Session cleared |
 | GET | `/search?q=` | Anyone | Typed matches with matched synonym |
 | GET | `/node/{id}` | Anyone | Node details + summary for the side panel |

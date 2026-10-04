@@ -64,6 +64,11 @@ Work deliberately left for later. Add an item when you leave something for later
 
 ## Privacy and compliance
 
+- **Consent version for the new OpenAI wording** (`schemas/account.py` `CONSENT_TEXT_VERSIONS`, `components/privacy/consent-texts.ts` `CONSENT_VERSION`): the `health_data` safeguard now names both routes to OpenAI (own ChatGPT plan, or Amber's API account for Google sign-ins) but the version was not bumped; bump both together (`health-data-2026-10-04` -> a new id) before Google sign-in goes live, so Google users consent to the text that names the operator's account.
+- **Account linking:** a Google and a ChatGPT account with the same e-mail are two accounts (no merge by e-mail, to rule out takeover). Linking would need the signed-in user to prove both identities in one session.
+- **Server-key spending is unbounded:** Google accounts' model calls run on `OPENAI_API_KEY` with only the existing per-account limits (chat 30/min and 300/day, uploads 10/h, gap search 20/h; explanations have none), held in process memory and per account, and anyone can create more Google accounts. Fix: a global or per-account token budget, and a spend limit on the OpenAI project.
+- **"ChatGPT plan" in usage-limit errors** (`api/services/explanation/common.py` `LLM_ERRORS`, used by chat): a Google account on the server key that hits OpenAI's 429 is told "Your ChatGPT plan's usage limit is reached". Left because `tests/agent/test_chat*.py` (chat agent's work) pin the text; change to neutral wording with those tests.
+- **Google sign-in untested against real Google:** the flow is covered with a faked Google (discovery, keys, token endpoint); try it once with a real client id before the demo.
 - **Missing documents:** `docs/incident.md`, `docs/dpia.md`, `docs/ropa.md`; `ropa.md` must include the work details of doctors and researchers as a purpose (contract, Art. 6(1)(b)).
 - **`/privacy` placeholders** (`apps/frontend/src/app/privacy/page.tsx`, `ToBeCompleted`): controller name and address, `NEXT_PUBLIC_PRIVACY_EMAIL`, hosting provider and region, supervisory authority.
 - **HPO release date hard-coded** (`apps/frontend/src/app/about-data/page.tsx`, "Data version"): "2 September 2026" goes stale at the next fetch; it should come from `ingestion_runs.source_versions` via `GET /stats`.

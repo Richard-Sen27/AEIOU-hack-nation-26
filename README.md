@@ -65,13 +65,19 @@ Every user table has `FORCE ROW LEVEL SECURITY` with a policy on
 that runs before a user id is known goes through a narrow `SECURITY DEFINER` function owned by the
 non-login role `atlas_definer`. Account deletion cascades from `users`.
 
-**Sign-in and billing.** Continue with ChatGPT is the only sign-in method. The API runs OpenID
+**Sign-in and billing.** Continue with ChatGPT is the default sign-in method. The API runs OpenID
 Connect with PKCE against `auth.openai.com`. It uses OpenAI's locally hosted flow with dynamic
 client registration (`OPENAI_CLIENT_ID` empty) and requests the identity scopes plus the scopes
 that allow API use on the user's ChatGPT plan. The OpenAI tokens are stored encrypted with
 `TOKEN_ENCRYPTION_KEY` in `openai_tokens`. The browser only gets an `HttpOnly` session cookie,
 which is a JWT signed with `SESSION_SECRET`. Every model call goes through `backend.llm.LLMClient`
 with that user's token, so usage counts against their plan. Guests never trigger a model call.
+
+Optionally, an operator can also offer **Continue with Google** for people without a ChatGPT plan.
+It appears only when `GOOGLE_CLIENT_ID` and `GOOGLE_CLIENT_SECRET` are set and either a server
+`OPENAI_API_KEY` is set or `GOOGLE_LOGIN_ENABLED=true` (default false). Google accounts are separate
+accounts (never merged by e-mail); their model calls run on the server key, billed to the operator,
+and without one Dr. Wu says it is not available for that sign-in. See `apps/backend/.env.example`.
 
 The offline steps that use a model have no team API key either. They are: abstract and
 patient-organization extraction, LLM-assisted linking of leftover names, cluster labels and

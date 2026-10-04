@@ -20,7 +20,7 @@ There are three consents (Art. 9(2)(a)), each with a text version the server pin
 
 | Data | Where | How long | How it is deleted |
 | --- | --- | --- | --- |
-| Account: ChatGPT subject ID, e-mail, name, sign-in times | `users` | Until account deletion | `DELETE /me` |
+| Account: sign-in provider (ChatGPT or Google) and its account ID, e-mail, name, sign-in times. No Google tokens are stored | `users` | Until account deletion | `DELETE /me` |
 | Settings: role, language, expert mode, 16+ confirmation time, GPC opt-out | `profiles` | Until account deletion | `DELETE /me` |
 | Work details of doctors and researchers (optional, self-declared, private): first and last name, up to three institutions, ORCID iD, linked atlas entry | `profiles` | Until the user clears them, switches the role to patient, or deletes the account | `DELETE /me/professional`, `PATCH /me/settings` (role switch to patient), `DELETE /me` |
 | Verification of doctors and researchers: method, time, name from ORCID or the review, confirmed ORCID iD, verified atlas link, the operator's reason | `profiles` | Until the work details are cleared, the role changes (any change ends it), the operator revokes it, or the account is deleted. Editing a manually reviewed name or institution ends it | `DELETE /me/professional`, `PATCH /me/settings`, `backend verify-professional --revoke`, `DELETE /me` |

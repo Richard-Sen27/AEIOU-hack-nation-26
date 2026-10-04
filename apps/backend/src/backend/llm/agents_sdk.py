@@ -6,6 +6,8 @@ Constraints of ChatGPT plan usage that callers must keep:
 - do not set temperature, top_p, max_tokens, truncation, metadata or prompt_cache_retention
   in ModelSettings; `model_settings()` returns compatible settings (store=False).
 Budgets (max steps via `max_turns`, wall clock via asyncio.timeout) stay the caller's job.
+With a server-key client (Google accounts) the same code runs on the public API with the key
+and the `OPENAI_API_MODEL_*` models; a rejected request falls back to the gateway tool loop.
 """
 
 from typing import Any
