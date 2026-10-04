@@ -413,6 +413,117 @@ test.describe("node view", () => {
     expect(requests.slice(before).filter((u) => /scn1a|no%20such|no\+such/i.test(u))).toEqual([]);
   });
 
+  test("the side card's connections filter shares one query with the graph and the list", async ({ page }) => {
+    await page.setViewportSize({ width: 1440, height: 900 });
+    const requests: string[] = [];
+    page.on("request", (r) => requests.push(r.url()));
+    await mockApi(page, graphMocks());
+    await page.goto(DRAVET);
+    const graph = page.getByTestId("node-graph");
+    await expect(graph.locator("canvas").first()).toBeVisible({ timeout: 30_000 });
+    const panel = page.getByTestId("node-panel");
+    const rows = panel.getByTestId("relation-group").locator("li");
+    const toolbar = page.getByRole("textbox", { name: "Filter these connections" });
+    const side = panel.getByRole("textbox", { name: "Filter the connections list" });
+    const sideCount = page.getByTestId("panel-filter-count");
+    await expect(rows.first()).toBeVisible();
+    const total = await rows.count();
+    // The weakest row of the biggest group: the last one of a long list.
+    const groupSizes = await panel.getByTestId("relation-group").evaluateAll((gs) => gs.map((g) => g.querySelectorAll("li").length));
+    const big = groupSizes.indexOf(Math.max(...groupSizes));
+    const lastLabel = (await panel.getByTestId("relation-group").nth(big).locator("li").last().getByTestId("node-chip").locator(".truncate").textContent())!.trim();
+    const before = requests.length;
+
+    // Typing in the side card filters its rows and group counts, and the toolbar mirrors it.
+    await side.fill("scn1a");
+    await expect(toolbar).toHaveValue("scn1a");
+    await expect(sideCount).toHaveText(new RegExp(`^\\d+ of ${total}$`));
+    const hits = Number((await sideCount.textContent())!.split(" of ")[0]);
+    expect(hits).toBeGreaterThan(0);
+    expect(hits).toBeLessThan(total);
+    await expect(rows).toHaveCount(hits);
+    for (const text of await rows.allTextContents()) expect(text.toLowerCase()).toContain("scn1a");
+    for (const g of await panel.getByTestId("relation-group").all()) {
+      const n = await g.locator("li").count();
+      await expect(g.locator("h3 .tabular")).toHaveText(String(n));
+    }
+    await expect(page.getByTestId("filter-count")).toHaveText(/^\d+ of \d+$/);
+    const matched = await graph.evaluate((el) => {
+      const cy = (el as unknown as { _cyreg: { cy: { $id: (id: string) => { hasClass: (c: string) => boolean } } } })._cyreg.cy;
+      return cy.$id("HGNC:10585").hasClass("match");
+    });
+    expect(matched).toBe(true);
+    await page.getByRole("radio", { name: "List" }).click();
+    const listRows = page.getByTestId("node-list-row");
+    for (const text of await listRows.allTextContents()) expect(text.toLowerCase()).toContain("scn1a");
+
+    // Typing in the toolbar filters the side card; the last row of a long group is found too.
+    await toolbar.fill(lastLabel);
+    await expect(side).toHaveValue(lastLabel);
+    await expect(panel.getByTestId("node-chip").filter({ hasText: lastLabel }).first()).toBeVisible();
+
+    // Empty state and its clear button.
+    await side.fill("no such thing");
+    await expect(page.getByTestId("panel-filter-empty")).toContainText("No connections match");
+    await expect(page.getByTestId("panel-filter-empty")).toContainText("no such thing");
+    await page.getByTestId("panel-filter-empty").getByRole("button", { name: "Clear the filter" }).click();
+    await expect(side).toHaveValue("");
+    await expect(toolbar).toHaveValue("");
+    await expect(rows).toHaveCount(total);
+    await expect(sideCount).toHaveCount(0);
+
+    // Escape and the clear button in the side card's input.
+    await side.fill("scn1a");
+    await side.press("Escape");
+    await expect(toolbar).toHaveValue("");
+    await expect(rows).toHaveCount(total);
+    await side.fill("scn1a");
+    await page.getByTestId("panel-filter").getByRole("button", { name: "Clear the filter" }).click();
+    await expect(side).toHaveValue("");
+    await expect(rows).toHaveCount(total);
+
+    // Client-side only: typing sent nothing.
+    expect(requests.slice(before).filter((u) => /scn1a|no%20such|no\+such/i.test(u) || u.includes(encodeURIComponent(lastLabel)))).toEqual([]);
+    expect(page.url()).not.toContain("scn1a");
+  });
+
+  test("filtering a capped hub says that only the strongest links are searched", async ({ page }) => {
+    await page.setViewportSize({ width: 1440, height: 900 });
+    const hood = graphMocks()["GET /neighborhood/*"] as (req: { url: string }) => { json: unknown };
+    await mockApi(page, graphMocks({
+      "GET /neighborhood/*": (req: { url: string }) => ({
+        ...hood(req),
+        headers: { "X-Neighborhood-Total": "2172", "X-Neighborhood-Truncated": "true", "Access-Control-Expose-Headers": "X-Neighborhood-Total, X-Neighborhood-Truncated" },
+      }),
+    }));
+    await page.goto(DRAVET);
+    const side = page.getByRole("textbox", { name: "Filter the connections list" });
+    await expect(side).toBeVisible();
+    await expect(page.getByTestId("panel-filter-capped")).toHaveCount(0);
+    await side.fill("scn");
+    await expect(page.getByTestId("panel-filter-capped")).toHaveText(/^Searches the \d+ strongest of 2,172 links\.$/);
+    await expect(page.getByTestId("node-truncated")).toBeVisible();
+  });
+
+  test("screenshots: a filtered node page, light and dark", async ({ page }) => {
+    await page.emulateMedia({ reducedMotion: "reduce" });
+    await mockApi(page, graphMocks());
+    for (const width of [1440, 390]) {
+      await page.setViewportSize({ width, height: width === 390 ? 844 : 900 });
+      for (const theme of ["light", "dark"] as const) {
+        await setTheme(page, theme);
+        await page.goto(DRAVET);
+        await expect(page.getByTestId("node-graph").locator("canvas").first()).toBeVisible({ timeout: 30_000 });
+        const side = page.getByRole("textbox", { name: "Filter the connections list" });
+        await side.fill("scn");
+        // On a phone the side card sits below the graph: bring its connections into view.
+        if (width === 390) await side.evaluate((el) => (el.scrollIntoView({ block: "start" }), window.scrollBy(0, -120)));
+        await page.waitForTimeout(500);
+        await shot(page, `node-filter-${theme}-${width}`);
+      }
+    }
+  });
+
   test("the map key is collapsed until opened and closes with Escape", async ({ page }) => {
     await mockApi(page, graphMocks());
     await page.goto(DRAVET);
@@ -508,5 +619,13 @@ test("node view on a phone @mobile", async ({ page }) => {
   // Under 16 px, iOS zooms the page when the field gets focus.
   const filter = page.getByRole("textbox", { name: "Filter these connections" });
   expect(await filter.evaluate((el) => parseFloat(getComputedStyle(el).fontSize))).toBeGreaterThanOrEqual(16);
+  // The side card has its own copy of the filter, below the graph.
+  const side = page.getByRole("textbox", { name: "Filter the connections list" });
+  expect(await side.evaluate((el) => parseFloat(getComputedStyle(el).fontSize))).toBeGreaterThanOrEqual(16);
+  await side.fill("scn1a");
+  await expect(filter).toHaveValue("scn1a");
+  const rows = page.getByTestId("node-panel").getByTestId("relation-group").locator("li");
+  for (const text of await rows.allTextContents()) expect(text.toLowerCase()).toContain("scn1a");
+  expect(await page.evaluate(() => document.documentElement.scrollWidth - window.innerWidth)).toBeLessThanOrEqual(0);
   expect(errors()).toEqual([]);
 });
