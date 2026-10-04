@@ -2,9 +2,10 @@
 
 import { ArrowUp, Bot, ChevronDown, CircleAlert, Clock, KeyRound, MessageSquareText, Phone, RotateCcw, Sparkles, Square, WifiOff, X } from "lucide-react";
 import Link from "next/link";
-import { useCallback, useEffect, useId, useRef, useState, useSyncExternalStore } from "react";
+import { useCallback, useEffect, useId, useMemo, useRef, useState, useSyncExternalStore } from "react";
 import { toast } from "sonner";
 
+import { useNodes } from "@/components/chat/graph-data";
 import { isEmergencyReply, type AssistantTurn, type PartialReply, type TurnError } from "@/components/chat/types";
 import { useChat } from "@/components/chat/use-chat";
 import { ContinueWithChatGPT } from "@/components/gates/continue-with-chatgpt";
@@ -18,6 +19,7 @@ import { Spinner } from "@/components/ui/spinner";
 import { nodeTypeMeta } from "@/lib/graph/meta";
 import { cn } from "@/lib/utils";
 
+import { OffMapMark } from "./atlas-offmap";
 import type { AtlasSelect, AtlasWuDockProps, WuFound } from "./atlas-props";
 import type { TreeIndex } from "./tree-model";
 
@@ -42,21 +44,52 @@ function useIsMobile() {
   );
 }
 
-/** Ids from a final reply that are entities on the map, deduplicated, in reply order. */
+/**
+ * Ids from a final reply, deduplicated, in reply order: all of them (`allIds`, listed and
+ * counted) and those that are entities on the map (`nodeIds`, ringed and framed).
+ */
 function collectFound(reply: PartialReply, index: TreeIndex): WuFound {
   const seen = new Set<string>();
   const nodeIds: string[] = [];
+  const allIds: string[] = [];
   const add = (id: string | null | undefined) => {
     if (!id || seen.has(id)) return;
     seen.add(id);
-    if (index.nodes.get(id)?.kind === "entity") nodeIds.push(id);
+    const node = index.nodes.get(id);
+    if (node && node.kind !== "entity") return;
+    allIds.push(id);
+    if (node) nodeIds.push(id);
   };
   reply.graph_focus?.node_ids.forEach(add);
   reply.cards.forEach((c) => c.node_ids.forEach(add));
   // Negated chips ("no feeding problems") are not something to find.
   reply.chips.forEach((c) => !c.negated && c.state !== "removed" && add(c.id));
   const edgeIds = (reply.graph_focus?.highlight_path ?? []).filter((id) => index.edges.has(id));
-  return { nodeIds, edgeIds };
+  return { nodeIds, edgeIds, allIds };
+}
+
+type FoundItem = { id: string; label: string; type: string; onMap: boolean };
+
+/**
+ * The finds to list: on-map ones labelled from the tree, the others from `GET /node/{id}`
+ * (public graph ids, cached). An id that cannot be loaded is left out; one still loading
+ * shows its id.
+ */
+function useFoundItems(found: WuFound | null, index: TreeIndex): FoundItem[] {
+  const all = useMemo(() => found?.allIds ?? found?.nodeIds ?? [], [found]);
+  const offMapIds = useMemo(() => all.filter((id) => !index.nodes.has(id)), [all, index]);
+  const loaded = useNodes(offMapIds);
+  return useMemo(
+    () =>
+      all.flatMap((id): FoundItem[] => {
+        const n = index.nodes.get(id);
+        if (n) return [{ id, label: n.label, type: n.entity_type ?? "disease", onMap: true }];
+        const d = loaded[id];
+        if (d === null) return [];
+        return [{ id, label: d?.node.label ?? id, type: d?.node.type ?? "disease", onMap: false }];
+      }),
+    [all, index, loaded],
+  );
 }
 
 /** Dr. Wu dock: a floating card bottom-left of the Atlas canvas, a bottom Sheet on mobile. */
@@ -90,7 +123,8 @@ function DockFrame({
   footer?: React.ReactNode;
 }) {
   const mobile = useIsMobile();
-  const count = found?.nodeIds.length ?? 0;
+  const items = useFoundItems(found, index);
+  const count = items.length;
   const bodyId = useId();
 
   const header = (
@@ -111,7 +145,7 @@ function DockFrame({
   const content = (
     <>
       <div id={bodyId} className="min-h-0 flex-1 space-y-3 overflow-y-auto overscroll-contain px-3 py-3" data-testid="atlas-wu-body">
-        {count > 0 && <FoundList found={found!} index={index} onClear={onClear} onSelect={onSelect} />}
+        {count > 0 && <FoundList items={items} onClear={onClear} onSelect={onSelect} />}
         {body}
       </div>
       {footer && <div className="shrink-0 border-t px-3 py-2.5">{footer}</div>}
@@ -178,13 +212,11 @@ function DockFrame({
 }
 
 function FoundList({
-  found,
-  index,
+  items,
   onClear,
   onSelect,
 }: {
-  found: WuFound;
-  index: TreeIndex;
+  items: FoundItem[];
   onClear: () => void;
   onSelect: AtlasSelect;
 }) {
@@ -194,16 +226,15 @@ function FoundList({
       <div className="mb-1.5 flex items-center gap-2">
         <Sparkles className="size-3.5 text-primary" aria-hidden />
         <h3 id="atlas-wu-found-title" className="flex-1 text-xs font-semibold">
-          Dr. Wu found {found.nodeIds.length}
+          Dr. Wu found {items.length}
         </h3>
         <Button variant="ghost" size="icon-xs" onClick={onClear} aria-label="Clear what Dr. Wu found" data-testid="atlas-wu-clear">
           <X aria-hidden />
         </Button>
       </div>
       <ul className="max-h-40 space-y-0.5 overflow-y-auto">
-        {found.nodeIds.map((id) => {
-          const n = index.nodes.get(id);
-          const meta = nodeTypeMeta(n?.entity_type ?? "disease");
+        {items.map(({ id, label, type, onMap }) => {
+          const meta = nodeTypeMeta(type);
           const Icon = meta.icon;
           return (
             <li key={id}>
@@ -212,10 +243,12 @@ function FoundList({
                 onClick={() => onSelect(id, { center: true, persist: false })}
                 className="flex w-full items-center gap-1.5 rounded px-1 py-1 text-left text-[13px] outline-none hover:bg-muted focus-visible:ring-2 focus-visible:ring-ring"
                 data-testid="atlas-wu-found-item"
+                data-offmap={onMap ? undefined : "true"}
               >
                 <Icon className="size-3.5 shrink-0" style={{ color: `var(${meta.colorVar})` }} aria-hidden />
-                <span className="min-w-0 flex-1 truncate">{n?.label ?? id}</span>
-                <span className="sr-only">({meta.label[labelStyle]}). Show on the map</span>
+                <span className="min-w-0 flex-1 truncate">{label}</span>
+                {!onMap && <OffMapMark />}
+                <span className="sr-only">({meta.label[labelStyle]}). {onMap ? "Show on the map" : "Show the summary"}</span>
               </button>
             </li>
           );
@@ -335,9 +368,12 @@ function SignedInDock({
     if (!lastAssistant || !lastAssistant.final || lastAssistant.phase !== "done") return;
     if (reported.current === lastAssistant.reply) return;
     reported.current = lastAssistant.reply;
-    const next = isEmergencyReply(lastAssistant) ? { nodeIds: [], edgeIds: [] } : collectFound(lastAssistant.reply, index);
-    setLastCount(next.nodeIds.length);
-    if (next.nodeIds.length > 0) onFound(next);
+    const next: WuFound = isEmergencyReply(lastAssistant)
+      ? { nodeIds: [], edgeIds: [], allIds: [] }
+      : collectFound(lastAssistant.reply, index);
+    const total = next.allIds?.length ?? next.nodeIds.length;
+    setLastCount(total);
+    if (total > 0) onFound(next);
     else onClear();
   }, [lastAssistant, index, onFound, onClear]);
 
@@ -507,7 +543,7 @@ function CompactTurn({
           )}
           {turn.final && foundCount === 0 && (
             <p className="text-xs text-muted-foreground" data-testid="atlas-wu-none">
-              Nothing on the map.
+              Nothing found.
             </p>
           )}
         </>
