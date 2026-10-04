@@ -671,3 +671,8 @@ export function largeAtlasTree(entities = 6343, edges = 17000) {
     summary,
   };
 }
+
+/** `GET /stats`: headline counts (the landing page's counts line). */
+export function statsPayload() {
+  return { data_version: "fixture", diseases: 168, genes: 125, symptoms: 769, links_cited: 15553, links_computed: 2176 };
+}

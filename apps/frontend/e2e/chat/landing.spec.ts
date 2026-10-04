@@ -1,5 +1,6 @@
 import { expect, test, type Page } from "@playwright/test";
 
+import { atlasTreePayload, statsPayload } from "../graph/fixtures";
 import { guestSession, hit, mockApi, setTheme, shot, signedInSession, trackConsoleErrors } from "../helpers";
 
 const STORY = "My daughter is 2, diagnosed with STXBP1 last month. Lots of seizures, not walking yet, no problems with eating.";
@@ -96,7 +97,7 @@ test.describe("landing", () => {
       "GET /documents": [],
     });
     await page.goto("/");
-    await expect(page.getByTestId("entry-patient")).toBeVisible();
+    await expect(page.getByTestId("landing-ready")).toBeAttached();
     const dt = await page.evaluateHandle(() => {
       const d = new DataTransfer();
       d.items.add(new File(["%PDF-1.4"], "report.pdf", { type: "application/pdf" }));
@@ -118,33 +119,119 @@ test.describe("landing", () => {
     await expect(page.getByTestId("sign-in-dialog")).toBeVisible();
   });
 
-  test("role entry points and demo shortcut", async ({ page }) => {
+  test("sections, the coming switch and the demo line", async ({ page }) => {
+    await mockApi(page, { "GET /auth/session": guestSession });
+    await page.goto("/");
+    for (const name of ["Click one thing. See everything linked.", "Cleaned before you see it.", "Experts ask. Patients decide."]) {
+      await expect(page.getByRole("heading", { level: 2, name })).toBeVisible();
+    }
+    await expect(page.getByText("Where to start")).toHaveCount(0);
+    for (const key of ["follow", "calls", "choose"]) {
+      const card = page.getByTestId(`connect-${key}`);
+      await expect(card).toContainText("Coming soon");
+      await expect(card).toContainText("Example");
+      await expect(card.getByRole("link")).toHaveCount(0);
+    }
+    await expect(page.getByTestId("demo-journey")).toHaveCount(0);
+  });
+
+  test("demo line only in demo mode, starting the tour for guests", async ({ page }) => {
     await mockApi(page, { "GET /auth/session": { ...guestSession, demo_mode: true } });
     await page.goto("/");
-    await expect(page.getByTestId("demo-journey")).toBeVisible();
-    await expect(page.getByTestId("entry-guest")).toBeVisible();
-    await page.getByTestId("entry-researcher").click();
-    await expect(page).toHaveURL(/\/clusters$/);
-    await page.goBack();
-    await page.getByTestId("entry-guest").click();
+    await page.getByTestId("demo-journey").getByRole("button", { name: /one family/ }).click();
     await expect(page).toHaveURL(/\/atlas\?tour=1$/);
+  });
+
+  test("live map preview, graph chips and counts line", async ({ page }) => {
+    const tree = atlasTreePayload();
+    await mockApi(page, {
+      "GET /auth/session": guestSession,
+      "GET /atlas/tree.json": tree,
+      "GET /stats": statsPayload(),
+    });
+    const errors = trackConsoleErrors(page);
+    await page.goto("/");
+    await expect(page.getByTestId("landing-counts")).toHaveText("168 rare diseases · 15,553 cited links · 2,176 computed hypotheses");
+    const preview = page.getByTestId("atlas-preview");
+    await expect(preview).toHaveAttribute("href", "/atlas");
+    await expect(preview).toHaveAccessibleName("Open the Atlas");
+    await expect(preview.locator("svg path[d^='M']").first()).toBeAttached();
+    // One branch path per category, drawn from the payload's own coordinates.
+    await expect(preview.locator("svg g[data-category]")).toHaveCount(9);
+    const genes = tree.nodes.find((n) => n.parent_id === "T:genes")!;
+    await expect(preview.locator("g[data-category='genes'] path").first()).toHaveAttribute(
+      "d",
+      new RegExp(`L${Math.round(genes.x)} ${Math.round(-genes.y)}`),
+    );
+
+    const section = page.getByTestId("graph-section");
+    await section.scrollIntoViewIfNeeded();
+    await expect(section.getByRole("img")).toBeVisible();
+    const card = section.getByTestId("link-card-observed");
+    await expect(card).toBeVisible();
+    // The demo disease is not in the fixture tree, so its chip is hidden and SCN1A leads.
+    const chips = section.getByRole("group", { name: "Focus" }).getByRole("button");
+    await expect(chips.first()).toHaveText("SCN1A");
+    await expect(chips.first()).toHaveAttribute("aria-pressed", "true");
+    await expect(section.getByRole("img")).toHaveAccessibleName(/^SCN1A: \d+ links, \d+ cited, \d+ computed$/);
+    const before = await card.textContent();
+    await chips.last().click();
+    await expect(chips.last()).toHaveAttribute("aria-pressed", "true");
+    await expect(section.getByRole("img")).not.toHaveAccessibleName(/^SCN1A:/);
+    await expect(card).not.toHaveText(before ?? "");
+    expect(errors()).toEqual([]);
+  });
+
+  test("API down: hero and prepared-data steps render, no counts line", async ({ page }) => {
+    await mockApi(page, { "GET /auth/session": guestSession });
+    const errors = trackConsoleErrors(page);
+    await page.goto("/");
+    await expect(page.getByRole("heading", { level: 1 })).toHaveText("Rare diseases, connected by what they share.");
+    await expect(input(page)).toBeVisible();
+    await expect(page.getByTestId("atlas-preview")).toHaveAttribute("data-state", "error");
+    await expect(page.getByTestId("atlas-preview")).toHaveAttribute("href", "/atlas");
+    await page.getByTestId("prep-section").scrollIntoViewIfNeeded();
+    await expect(page.getByTestId("prep-steps")).toContainText("Collect");
+    await expect(page.getByTestId("prep-visual")).toHaveCount(0);
+    await expect(page.getByTestId("landing-counts")).toHaveCount(0);
+    expect(errors()).toEqual([]);
+  });
+
+  test("prepared data shows the entry's real names", async ({ page }) => {
+    const synonyms = ["developmental and epileptic encephalopathy, 4", "DEE4", "EIEE4", "STXBP1-related encephalopathy"];
+    await mockApi(page, {
+      "GET /auth/session": guestSession,
+      "GET /node/*": {
+        node: { id: "MONDO:0012812", type: "disease", label: synonyms[0], description: null, url: null, attrs: {}, cluster_id: null, x: 0, y: 0, centrality: null },
+        synonyms,
+        summary: "",
+        relation_counts: {},
+        degree: 0,
+        cluster: null,
+        classification: null,
+        vus_notice: null,
+      },
+    });
+    await page.goto("/");
+    await page.getByTestId("prep-section").scrollIntoViewIfNeeded();
+    await expect(page.getByTestId("prep-count")).toHaveText("4 names, 1 entry");
   });
 
   for (const theme of ["light", "dark"] as const) {
     test(`screenshot ${theme}`, async ({ page }) => {
       await setTheme(page, theme);
-      await mockApi(page, { "GET /auth/session": { ...guestSession, demo_mode: true } });
+      await mockApi(page, { "GET /auth/session": { ...guestSession, demo_mode: true }, "GET /atlas/tree.json": atlasTreePayload(), "GET /stats": statsPayload() });
       await page.goto("/");
-      await expect(page.getByTestId("entry-guest")).toBeVisible();
+      await expect(page.getByTestId("atlas-preview")).toHaveAttribute("data-state", "ready");
       await input(page).fill(STORY);
       await shot(page, `chat-landing-${theme}`, { fullPage: true });
     });
   }
 
   test("screenshot phone @mobile", async ({ page }) => {
-    await mockApi(page, { "GET /auth/session": guestSession });
+    await mockApi(page, { "GET /auth/session": guestSession, "GET /atlas/tree.json": atlasTreePayload(), "GET /stats": statsPayload() });
     await page.goto("/");
-    await expect(page.getByTestId("entry-guest")).toBeVisible();
+    await expect(page.getByTestId("atlas-preview")).toHaveAttribute("data-state", "ready");
     await shot(page, "chat-landing-mobile", { fullPage: true });
   });
 });
