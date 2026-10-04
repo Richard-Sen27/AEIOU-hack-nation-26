@@ -12,7 +12,7 @@ export function needsOnboarding(user: SessionUser | null | undefined): boolean {
 }
 
 /** Pages a not-yet-onboarded user may still read (notices, the flow itself). */
-const EXEMPT = ["/welcome", "/privacy", "/about-data"];
+const EXEMPT = ["/welcome", "/privacy", "/about-data", "/guide"];
 
 /** `/welcome?next=<path>`; the path only, never a query string. */
 export function welcomeHref(returnTo: string | null | undefined): string {
