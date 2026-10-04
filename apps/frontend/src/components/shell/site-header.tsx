@@ -1,12 +1,15 @@
 "use client";
 
-import { Menu, Search } from "lucide-react";
+import { Bell, ChevronDown, Menu, Search } from "lucide-react";
 import Image from "next/image";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { useState } from "react";
 
 import { ContinueWithChatGPT } from "@/components/gates/continue-with-chatgpt";
+import { CountBadge, NotificationBell, unreadLabel } from "@/components/notifications/notification-bell";
+import { NotificationList } from "@/components/notifications/notification-list";
+import { useUnreadCount } from "@/components/notifications/use-unread-count";
 import { useSession } from "@/components/providers/session-provider";
 import { useSearch } from "@/components/search/search-provider";
 import { Button } from "@/components/ui/button";
@@ -53,6 +56,8 @@ export function SiteHeader() {
   const { user, status } = useSession();
   const { openSearch } = useSearch();
   const [mobileOpen, setMobileOpen] = useState(false);
+  const [mobileList, setMobileList] = useState(false);
+  const unread = useUnreadCount();
 
   return (
     <header className="sticky top-0 z-40 border-b bg-background/85 backdrop-blur supports-[backdrop-filter]:bg-background/70">
@@ -107,6 +112,7 @@ export function SiteHeader() {
           <div className="hidden shrink-0 items-center gap-1 md:flex">
             {!user && status !== "loading" && <PrivacyMenu />}
             <ThemeToggle />
+            {unread.enabled && <NotificationBell count={unread.count} onCount={unread.setCount} />}
           </div>
 
           <div className="hidden min-w-9 shrink-0 items-center justify-end pl-1 md:flex">
@@ -119,9 +125,27 @@ export function SiteHeader() {
             )}
           </div>
 
-          <Sheet open={mobileOpen} onOpenChange={setMobileOpen}>
-            <SheetTrigger render={<Button variant="ghost" size="icon" className="md:hidden" aria-label="Open menu" />}>
+          <Sheet
+            open={mobileOpen}
+            onOpenChange={(open) => {
+              setMobileOpen(open);
+              if (!open) setMobileList(false);
+            }}
+          >
+            <SheetTrigger
+              render={
+                <Button
+                  variant="ghost"
+                  size="icon"
+                  className="relative md:hidden"
+                  aria-label={unread.enabled && unread.count > 0 ? `Open menu, ${unread.count} unread` : "Open menu"}
+                />
+              }
+            >
               <Menu aria-hidden />
+              {unread.enabled && unread.count > 0 && (
+                <span className="absolute top-1.5 right-1.5 size-2 rounded-full bg-primary" aria-hidden data-testid="menu-unread-dot" />
+              )}
             </SheetTrigger>
             <SheetContent side="right" className="w-[86vw] max-w-sm gap-0 p-0">
               <SheetHeader className="border-b px-5 py-4">
@@ -144,6 +168,29 @@ export function SiteHeader() {
                   ))}
                 </ul>
               </nav>
+              {unread.enabled && (
+                <>
+                  <Separator />
+                  <div className="px-3 py-2">
+                    <button
+                      type="button"
+                      onClick={() => setMobileList((o) => !o)}
+                      aria-expanded={mobileList}
+                      aria-label={unreadLabel(unread.count)}
+                      className="flex w-full items-center gap-2 rounded-md px-3 py-2.5 text-base text-muted-foreground outline-none hover:bg-muted hover:text-foreground focus-visible:ring-2 focus-visible:ring-ring"
+                      data-testid="menu-notifications"
+                    >
+                      <Bell className="size-4" aria-hidden />
+                      <span className="flex-1 text-left">Notifications</span>
+                      <CountBadge count={unread.count} />
+                      <ChevronDown className={cn("size-4 transition-transform", mobileList && "rotate-180")} aria-hidden />
+                    </button>
+                    {mobileList && (
+                      <NotificationList className="px-2 pt-1" showTitle={false} onCount={unread.setCount} onNavigate={() => setMobileOpen(false)} />
+                    )}
+                  </div>
+                </>
+              )}
               <Separator />
               <div className="flex items-center justify-between px-5 py-3">
                 <span className="text-sm text-muted-foreground">Theme</span>
