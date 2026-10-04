@@ -1,16 +1,17 @@
 import React from 'react';
-import {AbsoluteFill, getStaticFiles, staticFile, useVideoConfig} from 'remotion';
+import {AbsoluteFill, Img, getStaticFiles, staticFile, useVideoConfig} from 'remotion';
 import {Audio} from '@remotion/media';
 import {TransitionSeries, linearTiming} from '@remotion/transitions';
 import {fade} from '@remotion/transitions/fade';
 import {loadFont} from '@remotion/google-fonts/Inter';
-import {TitleScene} from './TitleScene';
 import {PhotoScene} from './PhotoScene';
 import {TeamScene} from './TeamScene';
 import {OutroScene} from './OutroScene';
 import {COLORS, FONT_FALLBACK} from './theme';
 import {CLIPS, clipSeconds, type ClipId} from './content';
 
+import teamSlide from '../images/team-slide.png';
+import viennaSchools from '../images/vienna-schools.jpg';
 import school from '../images/Gymnasium_Neusiedl.jpg';
 import mindstorm from '../images/mindstorm.jpg';
 import france1 from '../images/Frankreich.png';
@@ -50,8 +51,8 @@ const OUTRO_HOLD = 60;
 const SCENE_CLIPS = {
   title: ['hello'],
   school: ['studies', 'school'],
-  // No photo of the Vienna schools yet, so the robots stay for that sentence.
-  mindstorm: ['robotics', 'vienna'],
+  mindstorm: ['robotics'],
+  vienna: ['vienna'],
   france1: ['hackathons'],
   france2: ['challenges'],
   lsz: ['goal'],
@@ -126,7 +127,7 @@ export const Intro: React.FC = () => {
     >
       <TransitionSeries>
         <TransitionSeries.Sequence durationInFrames={SCENES.title}>
-          <TitleScene />
+          <Img src={teamSlide} style={{width: '100%', height: '100%', objectFit: 'cover'}} />
           <Voiceover scene="title" />
         </TransitionSeries.Sequence>
         {transition()}
@@ -152,6 +153,17 @@ export const Intro: React.FC = () => {
             containOnBlur
           />
           <Voiceover scene="mindstorm" />
+        </TransitionSeries.Sequence>
+        {transition()}
+
+        <TransitionSeries.Sequence durationInFrames={SCENES.vienna}>
+          <PhotoScene
+            src={viennaSchools}
+            eyebrow="Vienna"
+            caption="HTL Spengergasse and HTL Rennweg"
+            durationInFrames={SCENES.vienna}
+          />
+          <Voiceover scene="vienna" />
         </TransitionSeries.Sequence>
         {transition()}
 
