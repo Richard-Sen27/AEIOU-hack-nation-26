@@ -4,7 +4,7 @@ Work deliberately left for later. Add an item when you leave something for later
 
 ## Landing page
 
-- **Networking cards** (`apps/frontend/src/components/landing/landing-config.ts`, `CONNECT_STATUS`): follow is live (links to `/atlas`), calls is live (links to `/calls`); choose is "coming"; switch each to "live" (with its `CONNECT_HREF`) as its networking stage lands, so the card links there and drops "Coming soon".
+- **Networking cards** (`apps/frontend/src/components/landing/landing-config.ts`, `CONNECT_STATUS`): all three are live: follow links to `/atlas`, calls to `/calls`, choose to `/calls/signups` (the patient's sign-ups). A new networking card starts as "coming" and switches to "live" with its `CONNECT_HREF` when its stage lands.
 
 ## Atlas view
 
@@ -121,8 +121,8 @@ Work deliberately left for later. Add an item when you leave something for later
 - **Expired calls** stay `published` after `closes_at` (only hidden from the list); no job closes them.
 - **Wording check** (`WORDING_RULES` in `api/services/calls.py`) is a coarse English/German blocklist; counsel should review the drug-advertising wording before real use.
 - **Call frontend:** browsing, the publisher form and the "for adults" label for 16-17 users are not built yet (frontend task).
-- **Sign-up and suggestion frontend:** the endpoints and SDK exist (`listSuggestedCalls`, `get/setSuggestionSettings`, `getSignupOptions`, `signUpToCall`, `listMySignups`, `withdrawSignup`, `listCallSignups`, `declineCallSignup`, `call_match` notifications); the screens are not built.
-- **Connect consent text in the frontend:** the backend's `connect` text now names suggestions and sign-ups (version `connect-signups-2026-10-04`, `schemas/messaging.py` `CONNECT_CONSENT_TEXT`); `components/privacy/consent-texts.ts` has the new version but still the old messaging-only wording, which must be updated to match before the dialog is shown. Counsel should review it.
+- **Connect consent text:** the dialog (`components/privacy/consent-texts.ts`) carries the backend's `CONNECT_CONSENT_TEXT` (version `connect-signups-2026-10-04`) split into the dialog's sections; counsel should review it. Keep both in step when either changes.
+- **Sign-up errors told apart by message:** the 409s of `signUpToCall` share the code `conflict`; the frontend (`components/calls/signup-meta.ts`, `signupErrorText`) tells full, closed, duplicate, declined, own call, not open yet and hidden card apart by the backend's message text. A machine-readable reason in the error envelope would be sturdier.
 - **Suggestions match exact ids only:** no symptom similarity, no disease or gene neighbours; a profile with only one matching symptom gets no suggestion.
 - **`max_signups` is fixed once published:** published calls are never edited, so a full call cannot be widened (close it and publish a new one); there is no waiting list.
 - **Demo sign-ups:** `backend.cli demo-calls` seeds calls a Dravet or STXBP1 profile is suggested, but no demo sign-ups, and the demo publisher cannot sign in, so the publisher's sign-up view is shown only with a real verified account.

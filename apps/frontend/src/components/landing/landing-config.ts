@@ -11,7 +11,7 @@ export type ConnectStatus = "live" | "coming";
 export const CONNECT_STATUS = {
   follow: "live",
   calls: "live",
-  choose: "coming",
+  choose: "live",
 } as const satisfies Record<string, ConnectStatus>;
 
 export type ConnectItem = keyof typeof CONNECT_STATUS;
@@ -21,6 +21,8 @@ export const CONNECT_HREF: Partial<Record<ConnectItem, string>> = {
   // Diseases are followed from the Atlas panel or a disease page.
   follow: "/atlas",
   calls: "/calls",
+  // What the patient chose to send, with withdraw.
+  choose: "/calls/signups",
 };
 
 /** The demo family's condition: developmental and epileptic encephalopathy 4 (STXBP1). */

@@ -131,12 +131,10 @@ test.describe("landing", () => {
     await expect(follow.getByRole("link")).toHaveAttribute("href", "/atlas");
     await expect(page.getByTestId("connect-calls")).not.toContainText("Coming soon");
     await expect(page.getByTestId("connect-calls").getByRole("link")).toHaveAttribute("href", "/calls");
-    for (const key of ["choose"]) {
-      const card = page.getByTestId(`connect-${key}`);
-      await expect(card).toContainText("Coming soon");
-      await expect(card).toContainText("Example");
-      await expect(card.getByRole("link")).toHaveCount(0);
-    }
+    const choose = page.getByTestId("connect-choose");
+    await expect(choose).not.toContainText("Coming soon");
+    await expect(choose).toContainText("Example");
+    await expect(choose.getByRole("link")).toHaveAttribute("href", "/calls/signups");
     await expect(page.getByTestId("demo-journey")).toHaveCount(0);
   });
 
