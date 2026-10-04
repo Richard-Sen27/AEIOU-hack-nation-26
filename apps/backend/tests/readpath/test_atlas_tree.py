@@ -354,3 +354,35 @@ def test_dense_groups_keep_their_distance():
     tree = atlas_tree.build_tree(_store_from_rows(nodes))
     assert _min_distance(tree) >= atlas_tree.SPACING - 0.15
     _assert_tree_invariants(tree, {n["id"] for n in nodes})
+
+
+def test_variant_with_several_genes_has_one_home():
+    """A variant overlapping several genes (several variant_of edges) sits once, under the
+    gene with the smallest id."""
+    nodes = [
+        _node("HGNC:20", "gene", "GENEB", location="2q24.3"),
+        _node("HGNC:10", "gene", "GENEA", location="2q24.3"),
+        _node("CLINVAR:1", "variant", "big deletion"),
+    ]
+    edges = [
+        {
+            "id": f"e_{gene}",
+            "source_id": "CLINVAR:1",
+            "target_id": gene,
+            "relation": "variant_of",
+            "family": "dna",
+            "confidence": 0.9,
+            "origin": "observed",
+            "status": "active",
+            "features": None,
+            "data_version": "rows",
+        }
+        for gene in ("HGNC:20", "HGNC:10")
+    ]
+    store = graph_service.build_store(
+        nodes=nodes, edges=edges, evidence=[], clusters=[], ingestion={"data_version": "rows"}
+    )
+    tree = atlas_tree.build_tree(store)
+    assert [n.id for n in tree.nodes].count("CLINVAR:1") == 1
+    assert _by_id(tree)["CLINVAR:1"].parent_id == "HGNC:10"
+    _assert_tree_invariants(tree, {n["id"] for n in nodes})
