@@ -3,6 +3,7 @@
 import { ArrowUpRight, FileSearch, HeartHandshake, Map as MapIcon, Share2 } from "lucide-react";
 import Link from "next/link";
 
+import { atlasHandoffClick } from "@/components/atlas/atlas-handoff";
 import { NodeChip, VusNotice } from "@/components/graph-ui";
 import { buttonVariants } from "@/components/ui/button";
 import { Skeleton } from "@/components/ui/skeleton";
@@ -138,7 +139,9 @@ function OpenInAtlasCard({ card }: { card: Card }) {
                 {n && <span className="ml-1.5 text-xs font-normal text-muted-foreground">{nodeTypeMeta(n.type).label[labelStyle]}</span>}
               </span>
               <Link
-                href={`/atlas?focus=${encodeURIComponent(id)}`}
+                // Ids from a health conversation stay out of the URL: in-memory handoff.
+                href="/atlas"
+                onClick={atlasHandoffClick({ nodeIds: [id], edgeIds: card.edge_ids })}
                 className={cn(buttonVariants({ variant: "default", size: "sm" }))}
               >
                 <MapIcon aria-hidden /> Open in Atlas<span className="sr-only">: {label}</span>

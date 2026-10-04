@@ -17,6 +17,7 @@ import {
 import Link from "next/link";
 import { useState } from "react";
 
+import { atlasHandoffClick } from "@/components/atlas/atlas-handoff";
 import { useGate } from "@/components/providers/gate-provider";
 import { AiDisclosure } from "@/components/shell/ai-disclosure";
 import { Button, buttonVariants } from "@/components/ui/button";
@@ -221,9 +222,8 @@ export function AssistantTurnView({
   const streaming = turn.phase === "streaming";
   const emergency = isEmergencyReply(turn);
   const focus = r.graph_focus;
-  const focusHref = focus?.node_ids.length
-    ? `/atlas?focus=${encodeURIComponent(focus.node_ids[0])}${focus.highlight_path.length ? `&path=${encodeURIComponent(focus.highlight_path.join(","))}` : ""}`
-    : null;
+  // Ids from a health conversation stay out of the URL: plain `/atlas` plus an in-memory handoff.
+  const focusHref = focus?.node_ids.length ? "/atlas" : null;
   const gap = r.gap_search;
 
   return (
@@ -283,7 +283,12 @@ export function AssistantTurnView({
             {(focusHref || gap) && (
               <div className="flex flex-wrap gap-2">
                 {focusHref && (
-                  <Link href={focusHref} className={cn(buttonVariants({ variant: "outline", size: "sm" }))} data-testid="show-in-graph">
+                  <Link
+                    href={focusHref}
+                    onClick={atlasHandoffClick({ nodeIds: focus!.node_ids, edgeIds: focus!.highlight_path })}
+                    className={cn(buttonVariants({ variant: "outline", size: "sm" }))}
+                    data-testid="show-in-graph"
+                  >
                     <MapIcon aria-hidden /> Show in graph
                   </Link>
                 )}

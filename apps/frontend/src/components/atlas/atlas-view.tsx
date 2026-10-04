@@ -27,6 +27,7 @@ import { categoryLabel } from "./atlas-categories";
 import { lensStartCategory, treeFacets } from "./atlas-model";
 import { AtlasOutline } from "./atlas-outline";
 import { AtlasPanel } from "./atlas-panel";
+import { takeAtlasHandoff } from "./atlas-handoff";
 import type { AtlasSelect, WuFound } from "./atlas-props";
 import { AtlasSearch } from "./atlas-search";
 import { AtlasWuDock } from "./atlas-wu-dock";
@@ -108,6 +109,22 @@ export function AtlasView() {
         const index = buildTreeIndex(data);
         setLoad({ kind: "ready", index });
         announce(`Atlas loaded: ${index.entityCount} items and ${index.connectionCount} connections.`);
+        // Dr. Wu's finds handed over from /chat in memory (never the URL): treat them as the dock's finds.
+        const handed = takeAtlasHandoff();
+        const nodeIds = handed?.nodeIds.filter((id, i, all) => all.indexOf(id) === i && index.nodes.get(id)?.kind === "entity") ?? [];
+        if (handed && nodeIds.length > 0) {
+          setFound({ nodeIds, edgeIds: handed.edgeIds.filter((id) => index.edges.has(id)) });
+          announce(`Dr. Wu found ${nodeIds.length} item${nodeIds.length === 1 ? "" : "s"} on the map.`);
+          // Frame them once the (lazily loaded) canvas is up. Nothing is selected, so no panel
+          // link carries a found id until the user picks one.
+          let tries = 0;
+          const tick = () => {
+            if (!alive) return;
+            if (canvas.current) requestAnimationFrame(() => canvas.current?.frameNodes(nodeIds));
+            else if (tries++ < 600) requestAnimationFrame(tick);
+          };
+          requestAnimationFrame(tick);
+        }
       })
       .catch((e: ApiError) => alive && setLoad({ kind: "error", code: e?.code ?? "unknown" }));
     return () => {

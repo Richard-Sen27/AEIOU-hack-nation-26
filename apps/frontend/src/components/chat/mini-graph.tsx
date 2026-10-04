@@ -3,6 +3,7 @@
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 
+import { atlasHandoffClick } from "@/components/atlas/atlas-handoff";
 import { useLens } from "@/components/providers/lens-provider";
 import { nodeTypeMeta, relationLabel } from "@/lib/graph/meta";
 import { edgeVisual, svgDashArray } from "@/lib/graph/style";
@@ -152,7 +153,10 @@ export function MiniGraph({
         </span>
         <span>Thicker line = more confident</span>
         {list[0] && (
-          <Link href={`/atlas?focus=${encodeURIComponent(list[0].id)}`} className="ml-auto font-medium text-foreground underline-offset-2 hover:underline">
+          <Link
+            href="/atlas"
+            onClick={atlasHandoffClick({ nodeIds: list.map((n) => n.id), edgeIds })}
+            className="ml-auto font-medium text-foreground underline-offset-2 hover:underline">
             Open in Atlas
           </Link>
         )}
