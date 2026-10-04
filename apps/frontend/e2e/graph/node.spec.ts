@@ -505,5 +505,8 @@ test("node view on a phone @mobile", async ({ page }) => {
   await page.waitForTimeout(600);
   await shot(page, "node-mobile");
   await shot(page, "node-mobile-full", { fullPage: true });
+  // Under 16 px, iOS zooms the page when the field gets focus.
+  const filter = page.getByRole("textbox", { name: "Filter these connections" });
+  expect(await filter.evaluate((el) => parseFloat(getComputedStyle(el).fontSize))).toBeGreaterThanOrEqual(16);
   expect(errors()).toEqual([]);
 });
