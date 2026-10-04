@@ -23,6 +23,8 @@ const ITEM_NAME: Record<string, string> = {
  * never "just published": the year is when it was published, not when it was found.
  */
 export function notificationText(n: Notification): string {
+  // A suggestion (switched on by the user): never worded as an eligibility decision.
+  if (n.kind === "call_match") return ["Study that may fit", n.item_label ?? "a call"].join(" · ");
   const disease = n.disease_label ?? n.disease_id ?? "a followed disease";
   if (n.kind === "now_recruiting") {
     return ["New trial recruiting", disease, n.registry_id ?? n.item_label].filter(Boolean).join(" · ");
@@ -140,16 +142,17 @@ export function NotificationList({
               </>
             );
             const row = cn("flex w-full items-center gap-2 rounded-md px-2 py-1.5 text-left text-[13px]", !n.read_at && "font-medium");
+            const callId = n.kind === "call_match" ? (n.call_id ?? n.item_id) : null;
             return (
-              <li key={n.id} data-testid="notification" data-read={n.read_at ? "true" : "false"} data-gone={n.gone || undefined} title={text}>
+              <li key={n.id} data-testid="notification" data-kind={n.kind} data-read={n.read_at ? "true" : "false"} data-gone={n.gone || undefined} title={text}>
                 {n.gone ? (
                   <div className={cn(row, "text-muted-foreground")}>
                     {label}
-                    <span className="shrink-0 text-[11px]">No longer in the atlas</span>
+                    <span className="shrink-0 text-[11px]">{callId ? "Closed" : "No longer in the atlas"}</span>
                   </div>
                 ) : (
                   <Link
-                    href={`/node/${encodeURIComponent(n.item_id)}`}
+                    href={callId ? `/calls/${encodeURIComponent(callId)}` : `/node/${encodeURIComponent(n.item_id)}`}
                     onClick={() => {
                       if (!n.read_at) void markRead({ ids: [n.id] });
                       onNavigate?.();
