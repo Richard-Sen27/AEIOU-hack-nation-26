@@ -28,6 +28,13 @@ RELATION_PHRASES: dict[str, dict[str, str]] = {
         "similar_symptoms": "{s} and {t} have similar symptoms (similar experience, possibly "
         "different cause)",
         "shared_researcher": "{s} and {t} are studied by the same researchers",
+        "shared_gene": "{s} and {t} are both linked to variants in the same gene (whether they "
+        "share a mechanism is not established)",
+        "near_on_chromosome": "{s} and {t} lie close together on the same chromosome (closeness "
+        "alone is weak evidence of a shared cause)",
+        "candidate_phenotype": "{t} is recorded in diseases similar to {s}, but not for {s} itself",
+        "suggested_by_neighbour": "{s} may resemble {t}, a better-studied disease with an "
+        "overlapping profile",
         "asserts": "{s} states that {t}",
         "authored": "{s} wrote {t}",
         "pi_of": "{s} leads the grant {t}",
@@ -55,6 +62,14 @@ RELATION_PHRASES: dict[str, dict[str, str]] = {
         "similar_symptoms": "{s} und {t} haben ähnliche Symptome (ähnliche Erfahrung, "
         "möglicherweise andere Ursache)",
         "shared_researcher": "{s} und {t} werden von denselben Forschenden untersucht",
+        "shared_gene": "{s} und {t} sind beide mit Varianten im selben Gen verbunden (ob derselbe "
+        "Mechanismus dahintersteht, ist nicht belegt)",
+        "near_on_chromosome": "{s} und {t} liegen nah beieinander auf demselben Chromosom (Nähe "
+        "allein ist ein schwacher Hinweis auf eine gemeinsame Ursache)",
+        "candidate_phenotype": "{t} ist bei Krankheiten verzeichnet, die {s} ähneln, aber nicht "
+        "bei {s} selbst",
+        "suggested_by_neighbour": "{s} ähnelt möglicherweise {t}, einer besser untersuchten "
+        "Krankheit mit überlappendem Profil",
         "asserts": "{s} stellt fest: {t}",
         "authored": "{s} hat {t} verfasst",
         "pi_of": "{s} leitet die Förderung {t}",
@@ -112,6 +127,7 @@ TIER_WORDS = {
     "preprint": "preprint",
     "llm_inferred": "computed by AI from text",
     "patient_reported": "patient-reported",
+    "computed": "computed by the analysis (hypothesis)",
 }
 
 
