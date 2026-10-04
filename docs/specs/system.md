@@ -494,6 +494,11 @@ Detailed design in [`agent.md`](agent.md).
 
 - Any signed-in user can flag an edge with a reason; the edge moves to `under_review` and shows a visible flag.
 
+### Calls
+
+- Verified doctors and researchers with a visible card write surveys, studies and trials looking for participants (`calls`); a study or trial needs an ethics reference, a trial a registry ID (NCT, EU CT / EudraCT, DRKS); atlas IDs must exist.
+- Draft -> submit (wording check: no offer, promise or price of a treatment) -> the operator approves or rejects with `backend.cli calls ...` through the definer functions `pending_calls()` and `review_call()`, every action logged in `call_reviews`; the trigger `calls_guard` stops the API role from publishing. Published calls are listed to every signed-in user while the publisher's card stays visible (`call_publisher_cards()` joined with `professional_cards()`); nothing about readers is stored. `backend.cli demo-calls` seeds labelled demo calls locally.
+
 ### Proposal export and data rights
 
 - Generates a one-page sourced proposal from a path, its assets and contacts (HTML for print-to-PDF).
@@ -546,6 +551,10 @@ Detailed design in [`agent.md`](agent.md).
 | POST | `/me/threads/{id}/accept` · `/decline` · `/messages` | Participant + connect consent | Accept or decline a request (recipient only) · send a plain-text message |
 | DELETE · POST | `/me/threads/{id}/messages/{mid}` · `/hide` · `/block` · `/report` | Participant | Delete my message for both · hide · block the other person · report (authorizes a logged review) |
 | GET · DELETE | `/me/blocks` · `/me/blocks/{id}` | Signed in | My blocks · unblock |
+| GET | `/calls?kind=` · `/calls/{id}` | Signed in (16+), rate-limited | Every published, still open call with its publisher's card, the review badge and the "ask your doctor" notice · one call |
+| GET | `/me/calls` · `/me/calls/{id}` | Signed in | Own calls in every status with review note and wording-check result · one |
+| POST · PUT | `/me/calls` · `/me/calls/{id}` | Verified doctor or researcher with a visible card, rate-limited | New draft (at most 10 open calls) · replace a draft, rejected or pending call (back to draft) |
+| POST | `/me/calls/{id}/submit` · `/close` · DELETE `/me/calls/{id}` | Submit: as above, 10 a day; close and delete: owner | To review (wording check) · close a published call or withdraw an unpublished one · delete |
 | GET | `/me/export` · DELETE `/me` | Signed in | Data export · account deletion |
 
 ## Build order
