@@ -30,7 +30,6 @@ import { AtlasOutline } from "./atlas-outline";
 import { AtlasPanel } from "./atlas-panel";
 import { takeAtlasHandoff } from "./atlas-handoff";
 import type { AtlasSelect, WuFound } from "./atlas-props";
-import { resolveRoute } from "./atlas-wu-path";
 import { AtlasSearch } from "./atlas-search";
 import { AtlasWuDock } from "./atlas-wu-dock";
 import { buildTreeIndex, type TreeIndex } from "./tree-model";
@@ -126,21 +125,6 @@ export function AtlasView() {
         if (handed && allIds.length > 0) {
           setFound({ nodeIds, edgeIds: handed.edgeIds.filter((id) => index.edges.has(id)), allIds, names: handed.names });
           announce(foundMessage(allIds.length, nodeIds.length));
-        }
-        if (handed && handed.edgeIds.length > 0) {
-          // A found connection: draw the whole route, also links outside the tree (atlas-wu-path).
-          void resolveRoute(index, handed.edgeIds).then((route) => {
-            if (!alive) return;
-            setFound((f) => {
-              const all = [...(f?.allIds ?? allIds)];
-              const names = { ...(f?.names ?? handed.names) };
-              for (const n of route.nodes) {
-                if (!all.includes(n.id)) all.push(n.id);
-                if (!names[n.id]) names[n.id] = { label: n.label, type: n.type };
-              }
-              return { nodeIds: all.filter((id) => index.nodes.get(id)?.kind === "entity"), edgeIds: route.edgeIds, allIds: all, names };
-            });
-          });
         }
         if (handed && nodeIds.length > 0) {
           // Frame them once the (lazily loaded) canvas is up. Nothing is selected, so no panel

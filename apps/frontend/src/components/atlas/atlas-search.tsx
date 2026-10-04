@@ -141,19 +141,27 @@ export function AtlasSearch({ index, onPick, onAskWu, className }: AtlasSearchPr
   }, [q, entityQuery]);
 
   const options = useMemo<Option[]>(() => {
-    const out: Option[] = local.map((node) => ({ key: node.id, kind: "node", node }));
-    if (server.kind === "done" && server.q === q) {
-      const seen = new Set(local.map((n) => n.id));
-      let added = 0;
-      for (const hit of server.hits) {
-        if (added >= SERVER_LIMIT) break;
-        if (seen.has(hit.id)) continue;
-        const node = index.nodes.get(hit.id);
-        seen.add(hit.id);
-        added += 1;
-        const synonym = hit.matched_synonym && hit.matched_synonym !== hit.label ? hit.matched_synonym : undefined;
-        out.push(node ? { key: hit.id, kind: "node", node, synonym } : { key: hit.id, kind: "offmap", hit, synonym });
-      }
+    const toOption = (hit: SearchHit): Option => {
+      const node = index.nodes.get(hit.id);
+      const synonym = hit.matched_synonym && hit.matched_synonym !== hit.label ? hit.matched_synonym : undefined;
+      return node ? { key: hit.id, kind: "node", node, synonym } : { key: hit.id, kind: "offmap", hit, synonym };
+    };
+    const hits = server.kind === "done" && server.q === q ? server.hits : [];
+    // An exact id or exact name/symbol match from the API (also one not on the map) comes first.
+    const exact = hits.filter((h) => h.match_kind === "exact" && !h.matched_synonym).slice(0, SERVER_LIMIT);
+    const out: Option[] = exact.map(toOption);
+    const seen = new Set(exact.map((h) => h.id));
+    for (const node of local) {
+      if (!seen.has(node.id)) out.push({ key: node.id, kind: "node", node });
+      seen.add(node.id);
+    }
+    let added = exact.length;
+    for (const hit of hits) {
+      if (added >= SERVER_LIMIT) break;
+      if (seen.has(hit.id)) continue;
+      seen.add(hit.id);
+      added += 1;
+      out.push(toOption(hit));
     }
     // Free text (or a name the map does not have) can go to Dr. Wu, in memory only.
     const searching = server.kind === "loading" && server.q === q;
@@ -166,12 +174,24 @@ export function AtlasSearch({ index, onPick, onAskWu, className }: AtlasSearchPr
   const searching = entityQuery && server.kind === "loading";
   const nodeCount = options.filter((o) => o.kind !== "ask").length;
 
-  // Reset the highlighted option when the query changes; server results
-  // arriving later only append, so they keep the highlight in place.
+  // Reset the highlighted option when the query changes, and when server results
+  // put an exact match in front (other server results only append).
+  const leadKey = options[0]?.key;
   useEffect(() => {
     // eslint-disable-next-line react-hooks/set-state-in-effect -- derived from input
     setActive(-1);
-  }, [q]);
+  }, [q, leadKey]);
+
+  // Distinct records can share a name (two papers titled "Fibrodysplasia ossificans
+  // progressiva."): those show their id as well.
+  const sharedLabels = useMemo(() => {
+    const counts = new Map<string, number>();
+    for (const o of options) {
+      const label = o.kind === "node" ? o.node.label : o.kind === "offmap" ? o.hit.label : null;
+      if (label) counts.set(label.toLowerCase(), (counts.get(label.toLowerCase()) ?? 0) + 1);
+    }
+    return new Set([...counts].filter(([, n]) => n > 1).map(([l]) => l));
+  }, [options]);
   const activeIndex = active < options.length ? active : -1;
 
   // Tell screen readers how many results there are, once the search settles.
@@ -411,7 +431,12 @@ export function AtlasSearch({ index, onPick, onAskWu, className }: AtlasSearchPr
                         )}
                         <span className="font-medium">{hit.label}</span>
                       </span>
-                      <span className="ml-auto shrink-0 text-[11px] text-muted-foreground">{meta.label[labelStyle]}</span>
+                      <span className="ml-auto shrink-0 text-[11px] text-muted-foreground">
+                        {sharedLabels.has(hit.label.toLowerCase()) && (
+                          <span className="font-mono" data-testid="atlas-search-id">{hit.id} · </span>
+                        )}
+                        {meta.label[labelStyle]}
+                      </span>
                     </span>
                     <OffMapMark className="mt-0.5" />
                   </span>
@@ -451,6 +476,9 @@ export function AtlasSearch({ index, onPick, onAskWu, className }: AtlasSearchPr
                       )}
                     </span>
                     <span className="ml-auto shrink-0 text-[11px] text-muted-foreground">
+                      {node.kind === "entity" && sharedLabels.has(node.label.toLowerCase()) && (
+                        <span className="font-mono" data-testid="atlas-search-id">{node.id} · </span>
+                      )}
                       {kindName(node, labelStyle)}
                       {node.kind !== "entity" && (
                         <span className="tabular-nums"> · {node.entity_count.toLocaleString("en")}</span>
