@@ -153,3 +153,9 @@ Decided and built (Oct 4): a Dr. Wu turn is a LangGraph graph (`api/services/cha
 - **Guest rate limits behind the proxy** (`api/ratelimit.py`, `user_or_ip`): hosted, every request reaches the API from the Next.js server, so guests share one IP key. Today only signed-in routes are limited; a guest limit would need the client IP forwarded and trusted.
 - **Embedding model per deploy** (`embeddings.py`): the fastembed model is downloaded from Hugging Face on the first semantic search after every deploy (no volume at `/data/fastembed`); a small volume would keep it.
 - **Hosted memory and start-up not measured on Linux:** the local API's footprint is about 2.3 GB on macOS; watch `railway metrics -s backend` after the first deploy and the time to "graph loaded" against the 300 s health check.
+
+## Submission videos
+
+- **Product video assets** (`submissions/videos/product/public/recordings`, `public/voiceover`): the six screen recordings and the six ElevenLabs clips are not produced yet; every scene shows its placeholder card until its file is dropped in (names in the project's `README.md`). Decide then whether the mp4s are committed or git-ignored.
+- **Voiceover length is not checked against the scene slot** (`submissions/videos/product/src/scenes/*.tsx`): a clip longer than its scene is cut off by the next scene, and a recording shorter than its slot freezes on its last frame, both without a warning. Fix: measure the files in `calculateMetadata` and fail the render when one does not fit.
+- **A scene's length lives in two places** (`src/ProductVideo.tsx` and the scene's own composition in `src/Root.tsx`): the duration check covers the `ProductVideo` total only, not the per-scene preview compositions.
