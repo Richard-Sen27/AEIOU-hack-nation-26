@@ -93,8 +93,30 @@ async def test_route_limit_has_retry_after(make_user):
     user = await make_user()
     for _ in range(10):
         assert (await user.client.get("/me/export")).status_code == 200
-    retry = _assert_429(await user.client.get("/me/export"))
+    r = await user.client.get("/me/export")
+    retry = _assert_429(r)
     assert retry <= 3600
+    assert r.json()["error"]["message"] == ratelimit.too_many(retry)
+    assert "scope" not in r.json()["error"]
+
+
+@pytest.mark.parametrize(
+    ("retry", "message"),
+    [
+        (1, "Too many requests. Try again in 1 second."),
+        (42, "Too many requests. Try again in 42 seconds."),
+        (90, "Too many requests. Try again in about a minute."),
+        (601, "Too many requests. Try again in 11 minutes."),
+        (3600, "Too many requests. Try again in about an hour."),
+        (7200, "Today's limit is reached. Try again tomorrow."),
+    ],
+)
+def test_rate_messages_name_the_wait(retry, message):
+    err = ratelimit.rejection(retry)
+    assert err.message == message
+    assert err.status_code == 429
+    assert err.extra == {"reason": "rate", "retry_after": retry}
+    assert err.headers == {"Retry-After": str(retry)}
 
 
 # ---- client key behind proxies -----------------------------------------------------------------
@@ -256,7 +278,8 @@ async def test_daily_budget_for_server_key_accounts(make_user, settings, monkeyp
     r = await user.client.post("/explain", json={"edge_ids": EDGES})
     retry = _assert_429(r, "budget")
     assert retry <= 24 * 3600
-    assert r.json()["error"]["message"] == "The AI usage limit is reached. Please try again later."
+    assert r.json()["error"]["message"] == "Today's AI limit is reached. Try again tomorrow."
+    assert r.json()["error"]["scope"] == "account"
     fresh = await make_user()
     assert (await fresh.client.post("/explain", json={"edge_ids": EDGES})).status_code == 200
 
@@ -279,7 +302,10 @@ async def test_global_daily_ceiling(make_user, settings, monkeypatch, caplog):
     a, b = await make_user(), await make_user()
     for c in (a.client, a.client, b.client):
         assert (await c.post("/explain", json={"edge_ids": EDGES})).status_code == 200
-    _assert_429(await b.client.post("/explain", json={"edge_ids": EDGES}), "budget")
+    r = await b.client.post("/explain", json={"edge_ids": EDGES})
+    _assert_429(r, "budget")
+    assert r.json()["error"]["message"] == "Amber's daily limit is reached. Try again tomorrow."
+    assert r.json()["error"]["scope"] == "server"
     fresh = await make_user()
     _assert_429(await fresh.client.post("/explain", json={"edge_ids": EDGES}), "budget")
     assert sum("ceiling reached" in r.getMessage() for r in caplog.records) == 1
@@ -333,7 +359,10 @@ async def test_concurrent_runs_per_account(make_user, settings, monkeypatch, cap
         assert (await user.client.post("/chat", json={"message": "hi"})).status_code == 200
     r = await user.client.post("/chat", json={"message": "hi"})
     assert _assert_429(r, "busy") == ratelimit.BUSY_RETRY_S
-    assert "still running" in r.json()["error"]["message"]
+    assert (
+        r.json()["error"]["message"]
+        == "Your other answers are still running. Try again in a moment."
+    )
     ends[0]()  # one run ends
     assert (await user.client.post("/chat", json={"message": "hi"})).status_code == 200
     assert any("model busy scope=account route=/chat" in rec.getMessage() for rec in caplog.records)

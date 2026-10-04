@@ -9,7 +9,7 @@ Layers, each answering 429 `rate_limited` in the error envelope with `Retry-Afte
 3. Model calls (`admit_model_request`): new explanations per account (EXPLAIN_LIMIT), runs at
    once per account and per process (MODEL_MAX_CONCURRENT*, answer "busy"), and, for accounts on
    the operator's OPENAI_API_KEY only, a daily budget per account (MODEL_DAILY_BUDGET) and per
-   process (MODEL_DAILY_CEILING), answered with the usual "usage limit" message.
+   process (MODEL_DAILY_CEILING), answered "try again tomorrow" with `scope` account or server.
 
 The client is the account for signed-in users. A guest is a browser: a keyed hash of the client
 address and its User-Agent, plus the address alone (`network`) with GUEST_NETWORK_FACTOR times
@@ -68,12 +68,16 @@ BUSY_RETRY_S = 5
 # A slot whose release was missed (a stream never started) frees itself after this long.
 SLOT_MAX_HOLD_S = 15 * 60
 
-TOO_MANY = "Too many requests in a short time. Please wait a moment."
-USAGE_LIMIT = "The AI usage limit is reached. Please try again later."
+USAGE_LIMIT = "Today's AI limit is reached. Try again tomorrow."
+DAILY_CEILING = "Amber's daily limit is reached. Try again tomorrow."
+DAILY_LIMIT = "Today's limit is reached. Try again tomorrow."
+# A wait longer than this comes from a per-day limit: the message says "tomorrow".
+DAILY_WAIT_S = 3600
 BUSY_ACCOUNT = "Your other answers are still running. Try again in a moment."
 BUSY_PROCESS = "Amber is busy right now. Try again in a moment."
 
 Reason = Literal["rate", "busy", "budget"]
+Scope = Literal["account", "server"]
 
 _SALT = os.urandom(16)  # per process: hashed addresses mean nothing after a restart
 _storage = MemoryStorage()
@@ -181,13 +185,39 @@ def reset() -> None:
     gate.reset()
 
 
-def rejection(retry_after: int, message: str = TOO_MANY, reason: Reason = "rate") -> ApiError:
+def wait_phrase(seconds: int) -> str:
+    """'in 40 seconds', 'in about a minute', 'in 12 minutes', 'in about an hour'."""
+    if seconds < 60:
+        return f"in {seconds} second{'' if seconds == 1 else 's'}"
+    if seconds < 120:
+        return "in about a minute"
+    if seconds < DAILY_WAIT_S - 300:
+        return f"in {math.ceil(seconds / 60)} minutes"
+    return "in about an hour"
+
+
+def too_many(retry_after: int) -> str:
+    """The default message of a `rate` refusal: the real wait, or "tomorrow" for a daily limit."""
+    if retry_after > DAILY_WAIT_S:
+        return DAILY_LIMIT
+    return f"Too many requests. Try again {wait_phrase(retry_after)}."
+
+
+def rejection(
+    retry_after: int,
+    message: str | None = None,
+    reason: Reason = "rate",
+    scope: Scope | None = None,
+) -> ApiError:
+    extra: dict[str, object] = {"reason": reason, "retry_after": retry_after}
+    if scope is not None:
+        extra["scope"] = scope
     return ApiError(
         429,
         ErrorCode.rate_limited,
-        message,
+        message or too_many(retry_after),
         headers={"Retry-After": str(retry_after)},
-        extra={"reason": reason, "retry_after": retry_after},
+        extra=extra,
     )
 
 
@@ -321,12 +351,12 @@ class ModelGate:
             budget, ceiling = settings.model_daily_budget, settings.model_daily_ceiling
             if budget and self._spent.get(user_id, 0) >= budget:
                 log.info("model budget reached scope=account route=%s budget=%d", route, budget)
-                raise rejection(_seconds_to_midnight(), USAGE_LIMIT, "budget")
+                raise rejection(_seconds_to_midnight(), USAGE_LIMIT, "budget", "account")
             if ceiling and self._total >= ceiling:
                 if not self._ceiling_logged:
                     self._ceiling_logged = True
                     log.warning("model daily ceiling reached ceiling=%d", ceiling)
-                raise rejection(_seconds_to_midnight(), USAGE_LIMIT, "budget")
+                raise rejection(_seconds_to_midnight(), DAILY_CEILING, "budget", "server")
             self._spent[user_id] = self._spent.get(user_id, 0) + 1
             self._total += 1
             ticket.charged = day

@@ -37,6 +37,11 @@ class ErrorDetail(ApiModel):
     retry_after: int | None = Field(
         None, description="rate_limited only: seconds to wait, as in the Retry-After header."
     )
+    scope: Literal["account", "server"] | None = Field(
+        None,
+        description="budget only: account (this account's daily limit) or server (Amber's "
+        "daily limit for everyone).",
+    )
 
 
 class ErrorResponse(ApiModel):

@@ -164,6 +164,7 @@ def install_error_handlers(app: FastAPI) -> None:
         return error_response(
             429,
             ErrorCode.rate_limited,
+            ratelimit.too_many(retry),
             headers={"Retry-After": str(retry)},
             extra={"reason": "rate", "retry_after": retry},
         )
