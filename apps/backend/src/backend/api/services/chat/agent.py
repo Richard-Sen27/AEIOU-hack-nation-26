@@ -25,7 +25,7 @@ from backend.schemas.common import Lens
 from backend.schemas.profile import PatientProfile
 
 MAX_TOOL_CALLS = 8
-TURN_DEADLINE_S = 30.0
+TURN_DEADLINE_S = 45.0
 HISTORY_MESSAGES = 8
 
 SYSTEM_PROMPT = """You are Dr. Henry Wu, the guide of the Amber rare-disease atlas.

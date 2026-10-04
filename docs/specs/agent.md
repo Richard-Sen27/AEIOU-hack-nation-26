@@ -243,7 +243,7 @@ User role: {role}. Expert mode: {expert_mode}. Profile: {confirmed_profile_json}
 
 **Runtime**
 
-- OpenAI Responses API with function calling; tool loop capped at 8 calls per turn, 30 s wall clock.
+- OpenAI Responses API with function calling; tool loop capped at 8 calls per turn, 45 s wall clock.
 - Billing: every agent call runs on the signed-in user's ChatGPT plan usage, using their stored OpenAI token. The team key is used only by the offline pipeline.
 - The gap-search agent uses the OpenAI Agents SDK with its own budgets.
 - Planner/answer model: the strongest OpenAI model on the team's credits; extraction and classification on a smaller, cheaper model; embeddings via OpenAI embeddings into pgvector.
