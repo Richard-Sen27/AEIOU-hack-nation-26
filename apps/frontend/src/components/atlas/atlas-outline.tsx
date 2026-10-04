@@ -312,7 +312,8 @@ export function AtlasOutline({ index, selectedId, onSelect, className }: AtlasOu
         )}
       </div>
 
-      <div className="min-h-0 flex-1 overflow-y-auto overscroll-contain py-1">
+      {/* `relative` keeps the rows' sr-only text inside this scroller, so the page itself never grows. */}
+      <div className="relative min-h-0 flex-1 overflow-y-auto overscroll-contain py-1">
         {rows.length === 0 ? (
           <p className="p-6 text-center text-sm text-muted-foreground">
             Nothing matches. Try another name or part of a name.
@@ -353,7 +354,7 @@ export function AtlasOutline({ index, selectedId, onSelect, className }: AtlasOu
                   onClick={() => activate(row)}
                   style={{ paddingLeft: `${(row.level - 1) * 1.125 + 0.25}rem` }}
                   className={cn(
-                    "group flex min-h-8 cursor-default items-center gap-1.5 rounded-md pr-2 text-sm outline-none [contain-intrinsic-size:auto_2rem] [content-visibility:auto]",
+                    "group relative flex min-h-8 cursor-default items-center gap-1.5 rounded-md pr-2 text-sm outline-none [contain-intrinsic-size:auto_2rem] [content-visibility:auto]",
                     "hover:bg-muted/60 focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-inset",
                     selected && "bg-primary/10 font-medium text-foreground hover:bg-primary/15",
                     node.kind === "category" && "font-medium",
