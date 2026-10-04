@@ -1093,13 +1093,14 @@ def _build_community(store: graph.GraphStore, nodes: list[Node]) -> list[_Draft]
     return out
 
 
-TIERED_TYPES = frozenset({NodeType.disease, NodeType.gene, NodeType.phenotype})
+TIERED_TYPES = frozenset({NodeType.disease, NodeType.gene, NodeType.phenotype, NodeType.pathway})
 
 
 def is_focus(node: Node) -> bool:
-    """On the map: a disease, gene or phenotype whose `attrs.tier` is "focus" or absent, or a
-    node of any other type (those exist for the focus set only; papers use `attrs.tier` for
-    their publication tier). Core-only nodes are found through search and Dr. Wu instead."""
+    """On the map: a disease, gene, phenotype or pathway whose `attrs.tier` is "focus" or
+    absent, or a node of any other type (those exist for the focus set only; papers use
+    `attrs.tier` for their publication tier). Core-only nodes are found through search and
+    Dr. Wu instead."""
     if node.type not in TIERED_TYPES:
         return True
     tier = node.attrs.get("tier")
