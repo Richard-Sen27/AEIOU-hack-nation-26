@@ -13,6 +13,7 @@ from pgvector.sqlalchemy import Vector
 from sqlalchemy import (
     BigInteger,
     Boolean,
+    CheckConstraint,
     DateTime,
     Float,
     ForeignKey,
@@ -20,6 +21,7 @@ from sqlalchemy import (
     Integer,
     PrimaryKeyConstraint,
     Text,
+    UniqueConstraint,
     func,
     text,
 )
@@ -182,11 +184,15 @@ class HpoTerm(Base):
 
 
 class GraphChange(Base):
-    """What a pipeline load added around a disease (for later in-app notifications). Written by
-    the pipeline, read-only for the API; nothing reads it yet."""
+    """What a pipeline load added around a disease. Written by the pipeline, read-only for the
+    API, which turns rows for followed diseases into the user's notifications."""
 
     __tablename__ = "graph_changes"
-    __table_args__ = (PrimaryKeyConstraint("data_version", "disease_id", "node_id", "change"),)
+    __table_args__ = (
+        PrimaryKeyConstraint("data_version", "disease_id", "node_id", "change"),
+        Index("ix_graph_changes_disease", "disease_id", "created_at"),
+        Index("ix_graph_changes_created_at", "created_at"),
+    )
 
     data_version: Mapped[str] = mapped_column(Text)
     previous_version: Mapped[str | None] = mapped_column(Text)
@@ -428,6 +434,45 @@ class JobRecord(Base):
     updated_at: Mapped[datetime] = _created()
 
 
+class FollowRecord(Base):
+    """A disease the user follows (health data, held under the health_data consent)."""
+
+    __tablename__ = "follows"
+    __table_args__ = (
+        PrimaryKeyConstraint("user_id", "node_id"),
+        CheckConstraint("node_id ~ '^MONDO:[0-9]{7}$'", name="ck_follows_mondo_id"),
+    )
+
+    user_id: Mapped[uuid.UUID] = mapped_column(
+        UUID(as_uuid=True), ForeignKey("users.id", ondelete="CASCADE")
+    )
+    node_id: Mapped[str] = mapped_column(Text)
+    created_at: Mapped[datetime] = _created()
+    since_version: Mapped[str | None] = mapped_column(Text)  # data version live when followed
+
+
+class NotificationRecord(Base):
+    """In-app notification. No text: labels are resolved from the graph when read."""
+
+    __tablename__ = "notifications"
+    __table_args__ = (
+        UniqueConstraint("user_id", "dedupe_key", name="uq_notifications_dedupe"),
+        Index("ix_notifications_user_created", "user_id", "created_at"),
+    )
+
+    id: Mapped[uuid.UUID] = _uuid_pk()
+    user_id: Mapped[uuid.UUID] = mapped_column(
+        UUID(as_uuid=True), ForeignKey("users.id", ondelete="CASCADE"), nullable=False
+    )
+    kind: Mapped[str] = mapped_column(Text, nullable=False)  # added | now_recruiting
+    ref_id: Mapped[str] = mapped_column(Text, nullable=False)  # the new item's node id
+    subject_node_id: Mapped[str | None] = mapped_column(Text)  # the followed disease
+    data_version: Mapped[str | None] = mapped_column(Text)
+    dedupe_key: Mapped[str] = mapped_column(Text, nullable=False)
+    created_at: Mapped[datetime] = _created()
+    read_at: Mapped[datetime | None] = mapped_column()
+
+
 USER_TABLES = (
     "users",
     "openai_tokens",
@@ -441,4 +486,6 @@ USER_TABLES = (
     "contributions",
     "edge_flags",
     "jobs",
+    "follows",
+    "notifications",
 )

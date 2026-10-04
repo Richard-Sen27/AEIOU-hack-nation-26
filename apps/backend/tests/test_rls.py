@@ -65,6 +65,14 @@ async def seed_rows(conn: asyncpg.Connection, uid: uuid.UUID) -> dict[str, uuid.
             uid,
             ids["document"],
         )
+        await conn.execute(
+            "INSERT INTO follows (user_id, node_id) VALUES ($1, 'MONDO:0100135')", uid
+        )
+        await conn.execute(
+            "INSERT INTO notifications (user_id, kind, ref_id, subject_node_id, dedupe_key)"
+            " VALUES ($1, 'added', 'NCT99000001', 'MONDO:0100135', 'k')",
+            uid,
+        )
     return ids
 
 
@@ -147,6 +155,12 @@ async def test_user_cannot_write_other_users_rows(two_users):
             (b,),
         ),
         "jobs": ("INSERT INTO jobs (user_id, kind) VALUES ($1, 'document_extraction')", (b,)),
+        "follows": ("INSERT INTO follows (user_id, node_id) VALUES ($1, 'MONDO:9900007')", (b,)),
+        "notifications": (
+            "INSERT INTO notifications (user_id, kind, ref_id, dedupe_key)"
+            " VALUES ($1, 'added', 'PMID:FX0001', 'other')",
+            (b,),
+        ),
         "users": ("INSERT INTO users (id, chatgpt_sub) VALUES ($1, 'spoof')", (b,)),
     }
     assert set(inserts) == set(USER_TABLES)
