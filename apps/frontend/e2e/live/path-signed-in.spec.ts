@@ -39,8 +39,9 @@ test.describe("signed-in path features", () => {
       await shot(page, "path-fresh-explanation");
 
       const [popup] = await Promise.all([context.waitForEvent("page"), page.getByTestId("export-proposal").click()]);
-      await expect(popup.locator("body")).toContainText(/proposal/i);
-      await expect(popup.locator("a[href^='http']").first()).toBeAttached();
+      await expect(popup.locator("body")).toContainText("Who is connected and why");
+      await expect(popup.locator("body")).toContainText(/Sources: /);
+      await expect(popup.locator("body")).toContainText("Not medical advice");
       await popup.close();
 
       await page.goto(NO_ROUTE);
