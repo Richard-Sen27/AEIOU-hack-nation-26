@@ -2,7 +2,10 @@
 
 `run_agent` is the turn without persistence (used by run_turn and by the eval harness)."""
 
+import asyncio
 import json
+import logging
+import sys
 import time
 from collections.abc import Callable
 from dataclasses import dataclass, field
@@ -18,7 +21,7 @@ from backend.api.services.explanation.common import (
     looks_german,
     pick,
 )
-from backend.llm import LLMClient, ToolEvent, Usage
+from backend.llm import LLMClient, LLMError, ToolEvent, Usage, observe_calls
 from backend.observability.tracing import Tracer
 from backend.schemas.chat import AgentReply
 from backend.schemas.common import Lens
@@ -27,6 +30,17 @@ from backend.schemas.profile import PatientProfile
 MAX_TOOL_CALLS = 8
 TURN_DEADLINE_S = 45.0
 HISTORY_MESSAGES = 8
+
+# Per-step timing of each turn: step names, model slugs and milliseconds only, never message
+# text, entities, ids or user identifiers. The app configures no log handlers and uvicorn only
+# configures its own loggers, so this logger gets its own stderr handler to show up in the
+# server log.
+timing_log = logging.getLogger("backend.chat.timing")
+if not timing_log.handlers:
+    _handler = logging.StreamHandler(sys.stderr)
+    _handler.setFormatter(logging.Formatter("%(levelname)s %(name)s %(message)s"))
+    timing_log.addHandler(_handler)
+    timing_log.setLevel(logging.INFO)
 
 SYSTEM_PROMPT = """You are Dr. Henry Wu, the guide of the Amber rare-disease atlas.
 You help patients, caregivers, researchers and biotech scouts find
@@ -83,6 +97,71 @@ START_BY_ROLE = {
     "classifications",
     "researcher": "mechanism clusters, with variants, pathways, papers and funding; show IDs",
 }
+
+
+class _TurnClock:
+    """Writes one timing line per model call, tool call and post-check, and one per turn."""
+
+    def __init__(self, tool_names: set[str]):
+        self.started = time.monotonic()
+        self.tool_names = tool_names
+        self.open_tools: dict[str, tuple[str, float]] = {}
+        self.model_calls = 0
+        self.tool_calls = 0
+
+    def elapsed_ms(self) -> int:
+        return round((time.monotonic() - self.started) * 1000)
+
+    def _name(self, name: str | None) -> str:
+        return name if name in self.tool_names else "unknown"
+
+    def step(
+        self,
+        kind: str,
+        name: str,
+        duration_ms: float,
+        error: str | None = None,
+        model: str | None = None,
+    ) -> None:
+        timing_log.info(
+            "chat step kind=%s name=%s%s duration_ms=%d elapsed_ms=%d%s",
+            kind,
+            name,
+            f" model={model}" if model else "",
+            round(duration_ms),
+            self.elapsed_ms(),
+            f" error={error}" if error else "",
+        )
+
+    def model_call(self, step: str, model: str, duration_ms: float, error: str | None) -> None:
+        self.model_calls += 1
+        self.step("model", step, duration_ms, error, model=model or "unknown")
+
+    def tool_event(self, event: ToolEvent) -> None:
+        key = event.call_id or ""
+        if event.type == "tool_start":
+            self.open_tools[key] = (self._name(event.name), time.monotonic())
+        elif event.type == "tool_end":
+            self.open_tools.pop(key, None)
+            self.tool_calls += 1
+            self.step("tool", self._name(event.name), event.duration_ms or 0.0, event.error)
+
+    def cut_open_tools(self) -> None:
+        """Tools still running when the deadline fired never send tool_end."""
+        for name, started in self.open_tools.values():
+            self.tool_calls += 1
+            self.step("tool", name, (time.monotonic() - started) * 1000, "cancelled")
+        self.open_tools.clear()
+
+    def finish(self, outcome: str, error: str | None = None) -> None:
+        timing_log.info(
+            "chat turn outcome=%s total_ms=%d model_calls=%d tool_calls=%d%s",
+            outcome,
+            self.elapsed_ms(),
+            self.model_calls,
+            self.tool_calls,
+            f" error={error}" if error else "",
+        )
 
 
 @dataclass
@@ -169,13 +248,68 @@ async def run_agent(
     items: list[dict[str, str]] = [*(history or [])[-HISTORY_MESSAGES:]]
     items.append({"role": "user", "content": message})
 
+    tools = build_tools(state, llm)
+    clock = _TurnClock({t.name for t in tools})
+
     async def on_event(event: ToolEvent) -> None:
+        clock.tool_event(event)
         if event.type == "tool_start" and on_status is not None and event.name:
             res = on_status(event.name, state.status_text(event.name))
             if hasattr(res, "__await__"):
                 await res
 
-    tools = build_tools(state, llm)
+    with observe_calls(clock.model_call):
+        try:
+            turn = await _tool_loop_and_checks(
+                llm, state, instructions, items, tools, asked, on_event, on_status, clock
+            )
+        except LLMError as exc:
+            clock.cut_open_tools()
+            clock.finish("deadline" if exc.code == "timeout" else "error", exc.code)
+            raise
+        except asyncio.CancelledError:
+            clock.cut_open_tools()
+            clock.finish("cancelled")
+            raise
+        except Exception as exc:
+            clock.cut_open_tools()
+            clock.finish("error", type(exc).__name__)
+            raise
+    clock.finish("answered")
+    result, reply, report = turn
+    if tracer is not None:
+        with tracer.span("chat.postcheck", metadata=report.as_metadata()):
+            pass
+    return TurnResult(
+        reply=reply,
+        tool_calls=[
+            {
+                "name": c.name,
+                "duration_ms": c.duration_ms,
+                "error": c.error,
+            }
+            for c in result.tool_calls
+        ],
+        usage=result.usage,
+        model=result.model,
+        tool_mode=result.tool_mode,
+        latency_ms=round((time.monotonic() - started) * 1000),
+        checks=report,
+        asked=sorted(c.value for c in asked),
+    )
+
+
+async def _tool_loop_and_checks(
+    llm: LLMClient,
+    state: TurnState,
+    instructions: str,
+    items: list[dict[str, str]],
+    tools: list,
+    asked: set[safety.Category],
+    on_event: Callable[[ToolEvent], Any],
+    on_status: Callable[[str | None, str], Any] | None,
+    clock: _TurnClock,
+):
     result = await llm.run_tools(
         instructions=instructions,
         input=items,
@@ -201,24 +335,7 @@ async def run_agent(
         actions=[],
         follow_up=None,
     )
+    checks_started = time.monotonic()
     reply, report = await check_reply(draft, state, llm, asked=asked)
-    if tracer is not None:
-        with tracer.span("chat.postcheck", metadata=report.as_metadata()):
-            pass
-    return TurnResult(
-        reply=reply,
-        tool_calls=[
-            {
-                "name": c.name,
-                "duration_ms": c.duration_ms,
-                "error": c.error,
-            }
-            for c in result.tool_calls
-        ],
-        usage=result.usage,
-        model=result.model,
-        tool_mode=result.tool_mode,
-        latency_ms=round((time.monotonic() - started) * 1000),
-        checks=report,
-        asked=sorted(c.value for c in asked),
-    )
+    clock.step("check", "postcheck", (time.monotonic() - checks_started) * 1000)
+    return result, reply, report
