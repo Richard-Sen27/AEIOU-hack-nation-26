@@ -3,7 +3,6 @@
 import { useId, useState } from "react";
 import { toast } from "sonner";
 
-import { useLens } from "@/components/providers/lens-provider";
 import { useSession } from "@/components/providers/session-provider";
 import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group";
 import { Switch } from "@/components/ui/switch";
@@ -18,7 +17,6 @@ import { NativeSelect } from "./native-select";
 /** Role, language, expert mode: each change is saved immediately (`PATCH /me/settings`). */
 export function SettingsSection({ user }: { user: SessionUser }) {
   const { refresh } = useSession();
-  const { resetRole } = useLens();
   const ids = useId();
   const [pending, setPending] = useState<keyof SettingsUpdate | null>(null);
 
@@ -27,7 +25,6 @@ export function SettingsSection({ user }: { user: SessionUser }) {
     setPending(key);
     try {
       await unwrap(updateSettings({ body, meta: { quiet: true } }));
-      if (body.role) resetRole();
       await refresh();
       toast(`${what} saved`);
     } catch (e) {

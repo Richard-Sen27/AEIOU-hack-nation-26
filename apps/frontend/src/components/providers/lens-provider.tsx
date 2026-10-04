@@ -1,78 +1,29 @@
 "use client";
 
-import { createContext, useCallback, useContext, useMemo, useSyncExternalStore } from "react";
+import { createContext, useContext, useMemo } from "react";
 
 import { LABEL_STYLE_BY_ROLE, type LabelStyle } from "@/lib/graph/meta";
-import { ROLES, type Role } from "@/lib/graph/types";
+import type { Role } from "@/lib/graph/types";
 
 import { useSession } from "./session-provider";
 
 /**
  * The role lens decides where you start and how things are worded, never
- * what you can see. Anyone (guest or signed in) may switch it; a signed-in
- * user's saved role is the default. The choice is a UI preference stored in
- * localStorage (not health data).
+ * what you can see. It follows the signed-in user's role from their settings
+ * (changed on the profile page); signed-out visitors always get the guest lens.
  */
 type LensContextValue = {
   role: Role;
   labelStyle: LabelStyle;
-  /** True when the user picked a lens that differs from the default. */
-  overridden: boolean;
-  setRole: (role: Role) => void;
-  /** Forget the manual choice and use the default again. */
-  resetRole: () => void;
 };
 
-const STORAGE_KEY = "amber.lens";
 const LensContext = createContext<LensContextValue | null>(null);
-
-const listeners = new Set<() => void>();
-function subscribe(cb: () => void) {
-  listeners.add(cb);
-  const onStorage = (e: StorageEvent) => e.key === STORAGE_KEY && cb();
-  window.addEventListener("storage", onStorage);
-  return () => {
-    listeners.delete(cb);
-    window.removeEventListener("storage", onStorage);
-  };
-}
-function readStored(): Role | null {
-  try {
-    const v = window.localStorage.getItem(STORAGE_KEY);
-    return v && (ROLES as string[]).includes(v) ? (v as Role) : null;
-  } catch {
-    return null;
-  }
-}
-function writeStored(role: Role | null) {
-  try {
-    if (role) window.localStorage.setItem(STORAGE_KEY, role);
-    else window.localStorage.removeItem(STORAGE_KEY);
-  } catch {
-    /* storage blocked: the lens just won't persist */
-  }
-  listeners.forEach((l) => l());
-}
 
 export function LensProvider({ children }: { children: React.ReactNode }) {
   const { user } = useSession();
-  const stored = useSyncExternalStore(subscribe, readStored, () => null);
-  const fallback: Role = user?.role ?? "guest";
-  const role = stored ?? fallback;
+  const role: Role = user?.role ?? "guest";
 
-  const setRole = useCallback((next: Role) => writeStored(next), []);
-  const resetRole = useCallback(() => writeStored(null), []);
-
-  const value = useMemo<LensContextValue>(
-    () => ({
-      role,
-      labelStyle: LABEL_STYLE_BY_ROLE[role],
-      overridden: stored !== null && stored !== fallback,
-      setRole,
-      resetRole,
-    }),
-    [role, stored, fallback, setRole, resetRole],
-  );
+  const value = useMemo<LensContextValue>(() => ({ role, labelStyle: LABEL_STYLE_BY_ROLE[role] }), [role]);
   return <LensContext.Provider value={value}>{children}</LensContext.Provider>;
 }
 

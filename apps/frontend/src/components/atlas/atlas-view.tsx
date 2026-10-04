@@ -84,7 +84,7 @@ export function AtlasView() {
   const [canvasFailed, setCanvasFailed] = useState(false);
   const [tourOpen, setTourOpen] = useState(tourParam);
   // Read by the canvas once, when it mounts (after the tree and the lens are known), so a
-  // later lens switch does not move the camera.
+  // role change in settings does not move the camera until the Atlas is opened again.
   const startCategory = lensStartCategory(role);
   // The panel floats over the right of the canvas from lg up; framing keeps clear of it.
   // Read synchronously on the client so the panel mounts in its final place (the loading

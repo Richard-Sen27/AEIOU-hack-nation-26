@@ -6,7 +6,6 @@ import { useRouter } from "next/navigation";
 import { useId, useState } from "react";
 import { toast } from "sonner";
 
-import { useLens } from "@/components/providers/lens-provider";
 import { safeReturnTo, useSession } from "@/components/providers/session-provider";
 import { Button } from "@/components/ui/button";
 import { Checkbox } from "@/components/ui/checkbox";
@@ -96,7 +95,6 @@ export function WelcomeFlow({ next }: { next?: string }) {
 
 function WelcomeForm({ user, next }: { user: SessionUser; next?: string }) {
   const { refresh } = useSession();
-  const { resetRole } = useLens();
   const router = useRouter();
   const ids = useId();
   const firstSignIn = !user.role || user.role === "guest";
@@ -123,7 +121,6 @@ function WelcomeForm({ user, next }: { user: SessionUser; next?: string }) {
     const body: SettingsUpdate = { role, language, age_confirmed_16: true };
     try {
       await unwrap(updateSettings({ body, meta: { quiet: true } }));
-      resetRole();
       await refresh();
       toast("You're all set", { description: `${ROLE_COPY[role].label} view. Change it any time in your profile.` });
       router.replace(target);
