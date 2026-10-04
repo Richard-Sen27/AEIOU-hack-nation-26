@@ -5,6 +5,10 @@
     uv run python -m backend.cli demo-graph-changes MONDO:0100135 [--clear]
     uv run python -m backend.cli verification-requests
     uv run python -m backend.cli verify-professional <user id> --reason "..." [--reject|--revoke]
+    uv run python -m backend.cli calls pending|approve|reject ... --operator NAME
+    uv run python -m backend.cli demo-calls [--clear]
+
+calls and demo-calls (operator review of calls, local demo calls) are in backend.calls_cli.
 
 precompute-explanations fills explanations_cache for the demo paths in every role and the
 requested languages. With a CLI ChatGPT login (`python -m backend.openai_auth.cli login`) the
@@ -515,11 +519,18 @@ def main(argv: list[str] | None = None) -> int:
     decision.add_argument("--reject", action="store_true", help="Reject the pending request")
     decision.add_argument("--revoke", action="store_true", help="End any verification")
 
+    from backend import calls_cli
+
+    calls_cli.add_parsers(sub)
+
     _add_messaging_commands(sub)
 
     args = parser.parse_args(argv)
     if args.command in MESSAGING_COMMANDS:
         return _run_messaging_command(args)
+    handled = calls_cli.run(args)
+    if handled is not None:
+        return handled
     if args.command == "verification-requests":
         verification_requests()
         return 0
