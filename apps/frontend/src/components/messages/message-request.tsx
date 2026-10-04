@@ -122,7 +122,7 @@ function MessageRequestDialog({
 
   return (
     <Dialog open onOpenChange={(o) => !o && !busy && onClose()}>
-      <DialogContent className="sm:max-w-lg" data-testid="message-request-dialog">
+      <DialogContent className="max-h-[calc(100dvh-2rem)] overflow-y-auto sm:max-w-lg" data-testid="message-request-dialog">
         <DialogHeader>
           <DialogTitle>Message {card.name}</DialogTitle>
           <DialogDescription>A request. They accept or decline it.</DialogDescription>
