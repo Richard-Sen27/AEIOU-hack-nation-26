@@ -13,6 +13,7 @@ import importlib
 import json
 import logging
 import math
+import random
 from collections import Counter, defaultdict
 from itertools import combinations
 from typing import Any
@@ -22,6 +23,13 @@ import leidenalg
 import networkx as nx
 import numpy as np
 import polars as pl
+from backend.phenotype_similarity import (
+    SPECIFIC_IC,
+    closure,
+    frequency_weight,
+    phenotype_similarity,
+)
+from backend.schemas.enums import SYMMETRIC_RELATIONS, ClaimType, EvidenceTier
 from pydantic import BaseModel
 
 from pipeline import bio, hpo_sim, taxonomy
@@ -30,6 +38,7 @@ from pipeline.build import (
     STAGE4,
     assign_version,
     content_hash,
+    inferred_cap,
     merge,
     read_graph,
     summarize,
@@ -50,21 +59,38 @@ log = logging.getLogger(__name__)
 
 INFERRED = GRAPH / "inferred"
 
-# Symptom similarity
+# Symptom similarity (shared function: backend.phenotype_similarity)
 SYM_PREFILTER_K = 25
-SYM_TOP_K = 6
+SYM_TOP_K = 8
 SYM_THRESHOLD = 0.45
+SYM_MIN_TERMS = 3
+SYM_MIN_SHARED_SPECIFIC = 2
+SYM_RANDOM_PAIRS = 5000
+SYM_CALIBRATION_QUANTILE = 0.95
+SYM_CONF_BASE, SYM_CONF_SLOPE, SYM_CONF_MAX = 0.30, 0.55, 0.75
 # Mechanism inference from ClinVar
 MIN_PATHOGENIC = 5
 LOF_TRUNC_SHARE = 0.4
 NON_LOF_MAX_TRUNC = 0.05
 NON_LOF_MIN_N = 10
+# Shared gene without an established mechanism
+SHARED_GENE_MAX_DISEASES = 25
+SHARED_GENE_FACTOR = 0.85
 # Shared pathway
 PATHWAY_MAX_GENES = 60
 PATHWAY_TOP_K = 5
+PATHWAY_FACTOR = 0.8
+# Chromosomal proximity (gene <-> gene)
+NEAR_MAX_GAP_BP = 1_000_000
+NEAR_TOP_K = 3
+NEAR_CONFIDENCE = 0.20
+NEAR_CNV_CONFIDENCE = 0.45
+NEAR_MIN_CNV = 2
 # Research overlap
 RESEARCH_TOP_K = 6
-# Clustering layer weights
+RESEARCH_SCORE = 0.4
+# Clustering layer weights. near_on_chromosome never feeds the clustering, and shared_gene is
+# already represented by the same-gene pairs with an unknown mechanism.
 CLUSTER_WEIGHTS = {
     "same_gene_same_mechanism": 1.0,
     "shared_gene_unknown_mechanism": 0.5,
@@ -72,80 +98,285 @@ CLUSTER_WEIGHTS = {
     "similar_symptoms": 0.6,
     "shared_researcher": 0.15,
 }
+CLUSTER_EXCLUDED = frozenset({"near_on_chromosome", "shared_gene"})
 LEIDEN_RESOLUTION = 1.0
 LEIDEN_SEED = 42
 FA2_ITERATIONS = 40
 
+SOURCE_NAMES = {
+    "clinvar": "ClinVar",
+    "clingen": "ClinGen",
+    "hpo": "HPO annotations",
+    "orphanet": "Orphanet",
+    "mondo": "MONDO",
+    "pubmed": "published studies",
+    "curated": "curated literature",
+}
+BASIS_NAMES = {
+    "literature": "published studies",
+    "orphanet": "Orphanet",
+    "clingen_dosage": "ClinGen dosage curation",
+    "clinvar": "ClinVar variant types",
+}
+MECHANISM_PHRASES = {
+    "loss_of_function": "loss of function",
+    "gain_of_function": "gain of function",
+    "dominant_negative": "a dominant-negative effect",
+    "non_lof": "mainly missense variants (not loss of function)",
+}
 
-def _inferred(src, tgt, rel, *, score: float, features: dict, **kw) -> dict:
+
+def _inferred(
+    src,
+    tgt,
+    rel,
+    *,
+    score: float,
+    explanation: str,
+    method: str,
+    confidence_basis: str,
+    features: dict | None = None,
+    cluster_score: float | None = None,
+    **kw,
+) -> dict:
+    """One evidence row of a computed link: tier ``computed``, a hypothesis, with the link's
+    score, a one-line explanation, the method and how the confidence was derived. Rows of the
+    same link must carry the same score; ``finalize_inferred`` caps it and sets the weights.
+
+    ``cluster_score`` is what the mechanism clustering reads (default: the score). It keeps the
+    clustering formulas of earlier builds, which used the uncapped strength of each link."""
+    kw.pop("tier", None)
     return assertion(
         src,
         tgt,
         rel,
         origin="inferred",
-        features={**features, "score": round(score, 4), "weight": round(score, 4)},
+        tier=EvidenceTier.computed.value,
+        claim_type=ClaimType.hypothesis.value,
+        features={
+            **(features or {}),
+            "explanation": explanation,
+            "method": method,
+            "confidence_basis": confidence_basis,
+            "score": round(score, 4),
+            "weight": round(score, 4),
+            "cluster_score": round(score if cluster_score is None else cluster_score, 4),
+        },
         **kw,
     )
+
+
+def finalize_inferred(rows: list[dict]) -> list[dict]:
+    """Cap each link's score at its relation's cap and split it over the link's evidence rows.
+
+    Stage 4 combines evidence rows as 1 - prod(1 - w); each of the k rows of a link gets
+    w = 1 - (1 - score)^(1/k), so the merged confidence equals the link's score (the API shows
+    computed rows the same way)."""
+    groups: dict[tuple[str, str, str], list[dict]] = defaultdict(list)
+    for r in rows:
+        if r["origin"] != "inferred":
+            continue
+        a, b = r["source_id"], r["target_id"]
+        if r["relation"] in SYMMETRIC_RELATIONS:
+            a, b = sorted((a, b))
+        groups[(a, r["relation"], b)].append(r)
+    for (_, rel, _), items in groups.items():
+        cap = inferred_cap(rel)
+        score = min(cap, max(r["features"]["score"] for r in items))
+        # Stage 4 keeps one row per distinct source (same key as build.merge).
+        k = len({(r["tier"], r["source_type"], r["source_ref"], r["quote"]) for r in items})
+        share = 1.0 - (1.0 - score) ** (1.0 / k)
+        for r in items:
+            r["features"]["score"] = round(score, 4)
+            r["features"]["weight"] = round(share, 6)
+    return rows
+
+
+def _join(items: list[str]) -> str:
+    items = [i for i in items if i]
+    if len(items) <= 1:
+        return "".join(items)
+    return f"{', '.join(items[:-1])} and {items[-1]}"
+
+
+def _sources(types: list[str]) -> str:
+    return _join(sorted({SOURCE_NAMES.get(t, t) for t in types}))
 
 
 # ---------------------------------------------------------------- symptoms
 
 
-def symptom_similarity(diseases: list[str]) -> list[dict]:
-    terms = hpo_sim.disease_terms()
-    ids = [d for d in diseases if len(terms.get(d, ())) >= 3]
+def graph_disease_terms(edges: pl.DataFrame, known: set[str] | dict) -> dict[str, dict]:
+    """Disease -> {HPO term: recorded frequency or None} from the graph's has_phenotype edges
+    (the annotations a user can see), limited to terms of the parsed HPO release."""
+    out: dict[str, dict[str, float | None]] = defaultdict(dict)
+    for d, t, f in (
+        edges.filter(pl.col("relation") == "has_phenotype")
+        .select("source_id", "target_id", "features")
+        .iter_rows()
+    ):
+        if t not in known:
+            continue
+        freq = (json.loads(f) if f else {}).get("frequency")
+        out[d][t] = freq if isinstance(freq, int | float) else None
+    return dict(out)
+
+
+def similarity_calibration(
+    corpus: hpo_sim.Corpus,
+    threshold: float,
+    in_scope: list[float],
+    n_pairs: int = SYM_RANDOM_PAIRS,
+    seed: int = LEIDEN_SEED,
+) -> dict[str, Any]:
+    """Scores of random disease pairs from the whole annotation corpus, and where the threshold
+    falls among them. The threshold actually used is raised to the 95th percentile if needed."""
+    pool = sorted(d for d, t in corpus.annotations.items() if len(t) >= SYM_MIN_TERMS)
+    rng = random.Random(seed)
+    closures = {}
+    scores = []
+    seen = set()
+    while len(scores) < n_pairs and len(pool) > 1:
+        a, b = rng.sample(pool, 2)
+        key = (min(a, b), max(a, b))
+        if key in seen:
+            continue
+        seen.add(key)
+        for d in key:
+            if d not in closures:
+                closures[d] = closure(corpus.annotations[d], corpus.ancestors)
+        scores.append(
+            phenotype_similarity(
+                corpus.annotations[a],
+                corpus.annotations[b],
+                corpus.ic,
+                corpus.ancestors,
+                closures[a],
+                closures[b],
+            )
+        )
+    arr = np.array(scores) if scores else np.zeros(1)
+    p95 = float(np.quantile(arr, SYM_CALIBRATION_QUANTILE))
+    used = max(threshold, round(p95, 4))
+    scope_arr = np.array(in_scope) if in_scope else np.zeros(1)
+    return {
+        "random_pairs": len(scores),
+        "random_pool": len(pool),
+        "seed": seed,
+        "random_p95": round(p95, 4),
+        "random_p99": round(float(np.quantile(arr, 0.99)), 4),
+        "random_median": round(float(np.median(arr)), 4),
+        "design_threshold": threshold,
+        "threshold": used,
+        "threshold_percentile_random": round(100 * float((arr < used).mean()), 2),
+        "in_scope_pairs": len(in_scope),
+        "threshold_percentile_in_scope": round(100 * float((scope_arr < used).mean()), 2),
+    }
+
+
+def symptom_similarity(
+    diseases: list[str],
+    dterms: dict[str, dict[str, float | None]],
+    corpus: hpo_sim.Corpus,
+    version: str | None = None,
+    calibrate: bool = True,
+) -> tuple[list[dict], dict[str, Any]]:
+    """`similar_symptoms` with the shared frequency-weighted IC best-match average."""
+    ids = [d for d in diseases if len(dterms.get(d, ())) >= SYM_MIN_TERMS]
     if len(ids) < 2:
-        return []
-    cos = hpo_sim.cosine_matrix(ids, ids)
+        return [], {}
+    ic, anc = corpus.ic, corpus.ancestors
+    weights = {d: {t: frequency_weight(f) for t, f in dterms[d].items()} for d in ids}
+    closures = {d: closure(weights[d], anc) for d in ids}
+
+    def sim(i: int, j: int) -> float:
+        a, b = ids[i], ids[j]
+        return phenotype_similarity(weights[a], weights[b], ic, anc, closures[a], closures[b])
+
+    all_pairs = {(i, j): sim(i, j) for i, j in combinations(range(len(ids)), 2)}
+    cal = (
+        similarity_calibration(corpus, SYM_THRESHOLD, list(all_pairs.values()))
+        if calibrate
+        else {"threshold": SYM_THRESHOLD}
+    )
+    threshold = cal["threshold"]
+    cos = hpo_sim.cosine_matrix(
+        ids, ids, terms=dterms, ic_fn=lambda t: ic.get(t, 0.0), ancestors_fn=anc
+    )
     np.fill_diagonal(cos, -1)
     pairs = set()
     for i in range(len(ids)):
-        for j in np.argsort(-cos[i])[:SYM_PREFILTER_K]:
+        for j in np.argsort(-cos[i], kind="stable")[:SYM_PREFILTER_K]:
             if cos[i, j] > 0:
-                pairs.add((min(i, j), max(i, j)))
-    scores: dict[tuple[int, int], float] = {}
-    for i, j in pairs:
-        scores[(i, j)] = hpo_sim.bma(terms[ids[i]], terms[ids[j]])
+                pairs.add((min(i, int(j)), max(i, int(j))))
+
+    def specific(d: str) -> set[str]:
+        return {t for t in dterms[d] if ic.get(t, 0.0) >= SPECIFIC_IC}
+
     per: dict[int, list[tuple[float, int]]] = defaultdict(list)
-    for (i, j), s in scores.items():
-        if s >= SYM_THRESHOLD:
+    for i, j in pairs:
+        s = all_pairs[(i, j)]
+        if s >= threshold and len(specific(ids[i]) & specific(ids[j])) >= SYM_MIN_SHARED_SPECIFIC:
             per[i].append((s, j))
             per[j].append((s, i))
     keep = set()
     for i, lst in per.items():
         for _s, j in sorted(lst, reverse=True)[:SYM_TOP_K]:
             keep.add((min(i, j), max(i, j)))
-    version = (raw_record("hpo", "phenotype.hpoa") or {}).get("source_version")
     rows = []
     for i, j in sorted(keep):
         a, b = ids[i], ids[j]
-        s = scores[(i, j)]
-        shared = hpo_sim.shared_terms(terms[a], terms[b])
-        for t in shared:
-            t["specificity"] = round(hpo_sim.specificity(t["hpo_id"]), 3)
-        names = ", ".join(t["label"] for t in shared[:6])
+        s = all_pairs[(i, j)]
+        sa, sb = specific(a), specific(b)
+        shared = sorted(
+            sa & sb,
+            key=lambda t: (-ic[t] * (weights[a][t] + weights[b][t]), corpus.labels.get(t, t)),
+        )
+        names = [corpus.labels.get(t, t) for t in shared[:3]]
+        explanation = (
+            f"Similar symptom profile: both list {_join(names)} ({len(shared)} of "
+            f"{len(sa | sb)} specific symptoms shared, weighted by how often they occur). "
+            "Similar experience, possibly different cause."
+        )
+        score = min(SYM_CONF_BASE + SYM_CONF_SLOPE * s, SYM_CONF_MAX)
         rows.append(
             _inferred(
                 a,
                 b,
                 "similar_symptoms",
-                score=0.9 * s,
-                tier="curated_db",
+                score=score,
+                cluster_score=0.9 * s,
+                explanation=explanation,
+                method=(
+                    "Frequency-weighted best-match average of recorded HPO terms, information "
+                    "content from all diseases in the HPO annotations"
+                ),
+                confidence_basis=(
+                    f"0.30 + 0.55 x similarity {s:.2f}, at most 0.75; threshold {threshold:.2f}"
+                ),
                 source_type="hpo",
                 source_ref=f"HPO annotations ({version})" if version else "HPO annotations",
                 url="https://hpo.jax.org/data/annotations",
-                quote=f"Shared phenotypes: {names}" if names else None,
+                quote="Recorded for both: "
+                + ", ".join(corpus.labels.get(t, t) for t in shared[:8]),
                 features={
                     "similarity": round(s, 4),
-                    "method": "pyhpo best-match average, Lin, OMIM information content",
-                    "shared_terms": shared,
-                    "n_terms": [len(terms[a]), len(terms[b])],
-                    "note": "similar experience, possibly different cause",
+                    "shared_specific": len(shared),
+                    "specific_total": len(sa | sb),
+                    "shared_terms": "; ".join(shared[:12]),
+                    "n_terms_source": len(dterms[a]),
+                    "n_terms_target": len(dterms[b]),
                 },
             )
         )
-    log.info("similar_symptoms: %d candidate pairs scored, %d edges", len(scores), len(rows))
-    return rows
+    log.info(
+        "similar_symptoms: %d candidate pairs, threshold %.3f, %d edges (calibration %s)",
+        len(pairs),
+        threshold,
+        len(rows),
+        json.dumps(cal),
+    )
+    return rows, cal
 
 
 # ---------------------------------------------------------------- mechanism
@@ -282,8 +513,11 @@ def compatible(a: str, b: str) -> bool | None:
     return False
 
 
-def gene_mechanism_edges(scope: Scope, gene_stats: dict, mech_pairs: dict) -> list[dict]:
+def gene_mechanism_edges(
+    scope: Scope, gene_stats: dict, mech_pairs: dict, symbols: dict[str, str] | None = None
+) -> list[dict]:
     """acts_via gene -> mechanism inferred from ClinVar (gene level)."""
+    symbols = symbols or {}
     retrieved = (raw_record("clinvar", "variant_summary.scope.tsv.gz") or {}).get("retrieved_at")
     rows = []
     for hid, stats in gene_stats.items():
@@ -291,13 +525,24 @@ def gene_mechanism_edges(scope: Scope, gene_stats: dict, mech_pairs: dict) -> li
         if mech != "loss_of_function":
             continue
         score = 0.45 + 0.4 * strength
+        sym = symbols.get(hid, hid)
         rows.append(
             _inferred(
                 hid,
                 "MECH:loss_of_function",
                 "acts_via",
                 score=score,
-                tier="curated_db",
+                explanation=(
+                    f"{stats['truncating']} of {stats['n_pathogenic']} pathogenic or likely "
+                    f"pathogenic ClinVar variants in {sym} are truncating (nonsense, frameshift, "
+                    "splice), a pattern that suggests loss of function."
+                ),
+                method="Share of truncating variants among pathogenic / likely pathogenic ClinVar "
+                "variants of the gene (at least 40%, at least 5 variants)",
+                confidence_basis=(
+                    f"0.45 + 0.4 x strength {strength:.2f} "
+                    f"(strength = log10(n + 1) / 2 for n = {stats['n_pathogenic']}, at most 1)"
+                ),
                 source_type="clinvar",
                 source_ref="variant_summary (P/LP variants)",
                 url="https://www.ncbi.nlm.nih.gov/clinvar/",
@@ -342,16 +587,20 @@ def disease_genes(edges: pl.DataFrame, min_conf: float = 0.0) -> dict[str, set[s
 
 
 def same_gene_edges(
-    dg: dict[str, set[str]], mech: dict, symbols: dict[str, str]
+    dg: dict[str, set[str]],
+    mech: dict,
+    symbols: dict[str, str],
+    labels: dict[str, str] | None = None,
 ) -> tuple[list[dict], list[tuple]]:
     """same_gene_same_mechanism / same_gene_different_mechanism; returns rows and unknown pairs."""
+    labels = labels or {}
     gene_dis: dict[str, list[str]] = defaultdict(list)
     for d, genes in dg.items():
         for g in genes:
             gene_dis[g].append(d)
     rows, unknown = [], []
     for g, ds in gene_dis.items():
-        if len(ds) > 25:  # grouping genes in umbrella diseases would explode pairs
+        if len(ds) > SHARED_GENE_MAX_DISEASES:  # umbrella genes would explode pairs
             ds = [d for d in ds if (g, d) in mech]
         for a, b in combinations(sorted(ds), 2):
             ma, mb = mech.get((g, a)), mech.get((g, b))
@@ -365,38 +614,140 @@ def same_gene_edges(
             rel = "same_gene_same_mechanism" if same else "same_gene_different_mechanism"
             weight = min(ma["weight"], mb["weight"])
             sym = symbols.get(g, g)
-            desc = {
-                "loss_of_function": "loss of function",
-                "gain_of_function": "gain of function",
-                "dominant_negative": "dominant negative",
-                "non_lof": "missense-only (not loss of function)",
-            }
+            ka, kb = ma["basis"]["kind"], mb["basis"]["kind"]
+            bases = _join(sorted({BASIS_NAMES.get(ka, ka), BASIS_NAMES.get(kb, kb)}))
+            pa, pb = MECHANISM_PHRASES[ma["mechanism"]], MECHANISM_PHRASES[mb["mechanism"]]
+            if same:
+                what = pa if pa == pb else f"{pa} in one and {pb} in the other"
+                explanation = (
+                    f"Both are linked to variants in {sym}, and the records point to {what} "
+                    f"({bases}); a shared mechanism is suggested, not proven."
+                )
+                method = "Same causal gene with a compatible mechanism recorded for each disease"
+            else:
+                explanation = (
+                    f"Both are linked to variants in {sym}, but the records point to {pa} in "
+                    f"{labels.get(a, a)} and {pb} in {labels.get(b, b)} ({bases}); the same gene "
+                    "may act differently in them."
+                )
+                method = "Same causal gene with opposite mechanisms recorded for the two diseases"
             rows.append(
                 _inferred(
                     a,
                     b,
                     rel,
                     score=weight,
-                    tier="curated_db",
+                    explanation=explanation,
+                    method=method,
+                    confidence_basis=(
+                        "the weaker of the two mechanism records "
+                        f"({ma['weight']:.2f}, {mb['weight']:.2f})"
+                    ),
                     source_type="analytics",
-                    source_ref=f"{sym}: {ma['basis']['kind']} + {mb['basis']['kind']}",
+                    source_ref=f"{sym}: {ka} + {kb}",
                     url=None,
                     quote=(
-                        f"{sym} acts via {desc[ma['mechanism']]} in one condition and "
-                        f"{desc[mb['mechanism']]} in the other"
+                        f"{sym} acts via {pa} in one condition and {pb} in the other"
+                        if not same
+                        else f"{sym}: {pa} recorded for both conditions"
                     ),
                     features={
                         "gene": g,
                         "gene_symbol": sym,
-                        "mechanisms": {a: ma["mechanism"], b: mb["mechanism"]},
-                        "basis": {a: ma["basis"], b: mb["basis"]},
+                        "mechanism_source": ma["mechanism"],
+                        "mechanism_target": mb["mechanism"],
+                        "basis_source": ka,
+                        "basis_target": kb,
                     },
                 )
             )
     return rows, unknown
 
 
-def pathway_edges(dg: dict[str, set[str]], edges: pl.DataFrame, nodes: pl.DataFrame) -> list[dict]:
+def gene_sources(edges: pl.DataFrame, evidence: pl.DataFrame) -> dict[tuple[str, str], dict]:
+    """(disease, gene) -> confidence and evidence source types of its caused_by_variant_in."""
+    cv = edges.filter(pl.col("relation") == "caused_by_variant_in")
+    types: dict[str, set[str]] = defaultdict(set)
+    ids = set(cv["id"].to_list())
+    for eid, st in evidence.select("edge_id", "source_type").iter_rows():
+        if eid in ids:
+            types[eid].add(st)
+    return {
+        (d, g): {"confidence": c, "sources": sorted(types.get(eid, ()))}
+        for eid, d, g, c in cv.select("id", "source_id", "target_id", "confidence").iter_rows()
+    }
+
+
+def shared_gene_edges(
+    dg: dict[str, set[str]],
+    covered: set[tuple[str, str]],
+    causal: dict[tuple[str, str], dict],
+    symbols: dict[str, str],
+) -> list[dict]:
+    """`shared_gene`: two diseases linked to the same gene where no same-gene mechanism link
+    exists (mechanism unknown or ambiguous). Genes linked to more than 25 diseases are skipped."""
+    gene_dis: dict[str, list[str]] = defaultdict(list)
+    for d, genes in dg.items():
+        for g in genes:
+            gene_dis[g].append(d)
+    best: dict[tuple[str, str], list[tuple[float, str]]] = defaultdict(list)
+    for g, ds in gene_dis.items():
+        if len(ds) > SHARED_GENE_MAX_DISEASES:
+            continue
+        for a, b in combinations(sorted(ds), 2):
+            if (a, b) in covered:
+                continue
+            conf = min(causal[(a, g)]["confidence"], causal[(b, g)]["confidence"])
+            best[(a, b)].append((conf * SHARED_GENE_FACTOR, g))
+    rows = []
+    for (a, b), cands in sorted(best.items()):
+        cands.sort(key=lambda c: (-c[0], symbols.get(c[1], c[1])))
+        score, g = cands[0]
+        sym = symbols.get(g, g)
+        sources = _sources(causal[(a, g)]["sources"] + causal[(b, g)]["sources"]) or "curated"
+        others = [symbols.get(x, x) for _, x in cands[1:]]
+        rows.append(
+            _inferred(
+                a,
+                b,
+                "shared_gene",
+                score=score,
+                explanation=(
+                    f"Both are linked to variants in {sym} (sources: {sources}); whether they "
+                    "share a mechanism is not established."
+                ),
+                method="Same causal gene, no compatible or opposite mechanism on record",
+                confidence_basis=(
+                    "0.85 x the weaker of the two gene-disease links "
+                    f"({causal[(a, g)]['confidence']:.2f}, {causal[(b, g)]['confidence']:.2f})"
+                ),
+                source_type="analytics",
+                source_ref=f"{sym}: caused_by_variant_in x2",
+                url=None,
+                quote=f"Both conditions are linked to variants in {sym}",
+                features={
+                    "gene": g,
+                    "gene_symbol": sym,
+                    "n_shared_genes": len(cands),
+                    "other_shared_genes": ", ".join(others) if others else None,
+                },
+            )
+        )
+    log.info("shared_gene: %d edges", len(rows))
+    return rows
+
+
+def _pathway_weight(n_genes: int) -> float:
+    return PATHWAY_FACTOR * 0.9 / (1 + math.log10(n_genes))
+
+
+def pathway_edges(
+    dg: dict[str, set[str]],
+    edges: pl.DataFrame,
+    nodes: pl.DataFrame,
+    symbols: dict[str, str] | None = None,
+) -> list[dict]:
+    symbols = symbols or {}
     sizes = {}
     for nid, attrs in nodes.filter(pl.col("type") == "pathway").select("id", "attrs").iter_rows():
         sizes[nid] = json.loads(attrs).get("n_genes") or 999
@@ -427,9 +778,9 @@ def pathway_edges(dg: dict[str, set[str]], edges: pl.DataFrame, nodes: pl.DataFr
         shared = set(dis_pw[a]) & set(dis_pw[b])
         if not shared:
             continue
-        ws = sorted((0.9 / (1 + math.log10(sizes[p])), p) for p in shared)[::-1]
-        score = 1 - math.prod(1 - w for w, _ in ws[:5])
-        cand.append((score, a, b, [p for _, p in ws[:8]]))
+        ws = sorted((_pathway_weight(sizes[p]), p) for p in shared)[::-1]
+        rank = 1 - math.prod(1 - w for w, _ in ws[:5])
+        cand.append((rank, a, b, [p for _, p in ws[:8]]))
     per: dict[str, list] = defaultdict(list)
     for c in cand:
         per[c[1]].append(c)
@@ -439,34 +790,177 @@ def pathway_edges(dg: dict[str, set[str]], edges: pl.DataFrame, nodes: pl.DataFr
         for c in sorted(lst, reverse=True)[:PATHWAY_TOP_K]:
             keep[(c[1], c[2])] = c
     rows = []
-    for (a, b), (score, _, _, pws) in sorted(keep.items()):
-        for p in pws[:3]:
-            w = 0.9 / (1 + math.log10(sizes[p]))
-            genes_a, genes_b = sorted(dis_pw[a][p]), sorted(dis_pw[b][p])
+    for (a, b), (_rank, _, _, pws) in sorted(keep.items()):
+        cited = pws[:3]
+        score = 1 - math.prod(1 - _pathway_weight(sizes[p]) for p in cited)
+        top = cited[0]
+        genes_a = sorted(symbols.get(g, g) for g in dis_pw[a][top])
+        genes_b = sorted(symbols.get(g, g) for g in dis_pw[b][top])
+        kind = "Reactome" if top.startswith("REACT:") else "GO"
+        more = len(pws) - 1
+        explanation = (
+            f"Their linked genes {genes_a[0]} and {genes_b[0]} both take part in "
+            f"{labels.get(top, top)} ({sizes[top]} genes, {kind})"
+            + (f", plus {more} other shared pathway{'s' if more > 1 else ''}." if more else ".")
+        )
+        feats = {
+            "pathway": top,
+            "pathway_label": labels.get(top, top),
+            "pathway_genes": sizes[top],
+            "n_shared_pathways": len(pws),
+            "genes_source": ", ".join(sorted(symbols.get(g, g) for p in pws for g in dis_pw[a][p])),
+            "genes_target": ", ".join(sorted(symbols.get(g, g) for p in pws for g in dis_pw[b][p])),
+        }
+        for p in cited:
             src = "reactome" if p.startswith("REACT:") else "go"
             rows.append(
                 _inferred(
                     a,
                     b,
                     "shared_pathway",
-                    score=w,
-                    tier="curated_db",
+                    score=score,
+                    cluster_score=_pathway_weight(sizes[p]) / PATHWAY_FACTOR,
+                    explanation=explanation,
+                    method=(
+                        "Causal genes in the same small pathway (Reactome or GO, at most 60 "
+                        "genes), top 5 pathway links per disease"
+                    ),
+                    confidence_basis=(
+                        "1 - product of (1 - 0.8 x 0.9 / (1 + log10 pathway size)) over the "
+                        f"{len(cited)} smallest shared pathways"
+                    ),
                     source_type=src,
                     source_ref=p.removeprefix("REACT:"),
                     url=bio.REACTOME_URL.format(p.removeprefix("REACT:"))
                     if src == "reactome"
                     else bio.GO_URL.format(p),
                     quote=f"Causal genes participate in {labels.get(p, p)} ({sizes[p]} genes)",
-                    features={
-                        "pathways": [
-                            {"id": q, "label": labels.get(q, q), "n_genes": sizes[q]} for q in pws
-                        ],
-                        "genes": {a: genes_a, b: genes_b},
-                        "combined_score": round(score, 4),
-                    },
+                    features=dict(feats),
                 )
             )
     log.info("shared_pathway: %d candidate pairs, %d kept", len(cand), len(keep))
+    return rows
+
+
+def _gap(a: dict, b: dict) -> int:
+    """Base pairs between two gene spans on the same chromosome (0 when they overlap)."""
+    return max(0, max(a["start"], b["start"]) - min(a["end"], b["end"]))
+
+
+def _cytoband_subband(band: str | None) -> bool:
+    return bool(band) and "." in band
+
+
+def near_edges(genes: dict[str, dict], cnvs: list[dict] | None = None) -> list[dict]:
+    """`near_on_chromosome` between genes: same chromosome, at most 1 Mb between the MANE spans,
+    the 3 nearest per gene. Genes without coordinates fall back to the same cytoband sub-band.
+    Confidence 0.20, or 0.45 when at least 2 pathogenic / likely pathogenic ClinVar copy-number
+    variants (or deletions / duplications of 1 kb or more) span both genes.
+
+    ``genes``: HGNC id -> attrs (symbol, chromosome, start, end, cytoband).
+    """
+    placed = {
+        g: a
+        for g, a in genes.items()
+        if a.get("chromosome") not in (None, "MT")
+        and isinstance(a.get("start"), int)
+        and isinstance(a.get("end"), int)
+    }
+    by_chr: dict[str, list[str]] = defaultdict(list)
+    for g, a in placed.items():
+        by_chr[a["chromosome"]].append(g)
+    pairs: dict[tuple[str, str], int | None] = {}
+    for gs in by_chr.values():
+        for g in gs:
+            near = sorted(
+                (_gap(placed[g], placed[h]), h)
+                for h in gs
+                if h != g and _gap(placed[g], placed[h]) <= NEAR_MAX_GAP_BP
+            )
+            for gap, h in near[:NEAR_TOP_K]:
+                pairs[tuple(sorted((g, h)))] = gap
+    unplaced = [
+        g
+        for g, a in genes.items()
+        if g not in placed and a.get("chromosome") != "MT" and _cytoband_subband(a.get("cytoband"))
+    ]
+    for g in unplaced:
+        for h, a in genes.items():
+            if h != g and a.get("cytoband") == genes[g]["cytoband"]:
+                pairs.setdefault(tuple(sorted((g, h))), None)
+    spans: Counter = Counter()
+    for v in cnvs or []:
+        hit = sorted({h for h, _ in bio.spanned_genes(v, placed)})
+        for x, y in combinations(hit, 2):
+            spans[(x, y)] += 1
+    rows = []
+    for (a, b), gap in sorted(pairs.items()):
+        ga, gb = genes[a], genes[b]
+        sa, sb = ga.get("symbol") or a, gb.get("symbol") or b
+        chrom = ga.get("chromosome") or gb.get("chromosome") or "?"
+        ba, bb = ga.get("cytoband"), gb.get("cytoband")
+        band = ba if ba == bb or not bb else (bb if not ba else f"{ba} and {bb}")
+        n_cnv = spans.get((a, b), 0)
+        boosted = n_cnv >= NEAR_MIN_CNV
+        if gap is None:
+            where = f"both lie in band {band} on chromosome {chrom} (exact positions not available)"
+        elif gap == 0:
+            where = f"overlap on chromosome {chrom} ({band})"
+        elif gap < 1000:
+            where = f"lie less than 1 kb apart on chromosome {chrom} ({band})"
+        else:
+            where = f"lie {round(gap / 1000):,} kb apart on chromosome {chrom} ({band})"
+        cnv = (
+            f", and {n_cnv} pathogenic or likely pathogenic copy-number changes in ClinVar span "
+            "both"
+            if boosted
+            else ""
+        )
+        explanation = (
+            f"{sa} and {sb} {where}{cnv}. Nearby genes can be deleted or duplicated together, "
+            "but closeness alone is weak evidence of a shared cause."
+        )
+        rows.append(
+            _inferred(
+                a,
+                b,
+                "near_on_chromosome",
+                score=NEAR_CNV_CONFIDENCE if boosted else NEAR_CONFIDENCE,
+                explanation=explanation,
+                method=(
+                    "Gene spans at most 1 Mb apart on NCBI MANE GRCh38 coordinates, 3 nearest "
+                    "per gene"
+                    if gap is not None
+                    else "Same cytoband sub-band (HGNC), no MANE coordinates"
+                ),
+                confidence_basis=(
+                    f"0.45: {n_cnv} pathogenic / likely pathogenic ClinVar copy-number variants "
+                    "span both genes"
+                    if boosted
+                    else "fixed 0.20 for proximity alone"
+                ),
+                source_type="mane" if gap is not None else "hgnc",
+                source_ref="MANE.GRCh38.v1.5" if gap is not None else f"cytoband {band}",
+                url="https://www.ncbi.nlm.nih.gov/refseq/MANE/" if gap is not None else None,
+                quote=None,
+                features={
+                    "chromosome": chrom,
+                    "gap_bp": gap,
+                    "cytoband_source": ba,
+                    "cytoband_target": bb,
+                    "n_spanning_cnv": n_cnv,
+                    "basis": "coordinates" if gap is not None else "cytoband",
+                },
+            )
+        )
+    log.info(
+        "near_on_chromosome: %d edges (%d by cytoband fallback, %d boosted by copy-number "
+        "variants; %d genes without MANE coordinates)",
+        len(rows),
+        sum(1 for g in pairs.values() if g is None),
+        sum(1 for r in rows if r["features"]["n_spanning_cnv"] >= NEAR_MIN_CNV),
+        len(genes) - len(placed),
+    )
     return rows
 
 
@@ -512,20 +1006,32 @@ def research_edges(scope: Scope) -> list[dict]:
         for r, works in rs[:5]:
             pmids = [w for w in works if w.startswith("PMID:")]
             grants = [w for w in works if w.startswith("GRANT:")]
+            n = len(rs)
             rows.append(
                 _inferred(
                     x,
                     y,
                     "shared_researcher",
-                    score=0.4,
-                    tier="peer_reviewed" if pmids else "curated_db",
+                    score=RESEARCH_SCORE,
+                    explanation=(
+                        f"{n} researcher{'s' if n > 1 else ''} published papers or held grants "
+                        "about both conditions. Shared research attention, not evidence of a "
+                        "biological link."
+                    ),
+                    method="Authors of papers and principal investigators of grants about each "
+                    "disease (authors linked to more than 15 diseases left out)",
+                    confidence_basis="fixed 0.40 for shared researchers",
                     source_type="pubmed" if pmids else "reporter",
                     source_ref=(pmids or grants or [r])[0],
                     url=f"https://pubmed.ncbi.nlm.nih.gov/{pmids[0].split(':')[1]}/"
                     if pmids
                     else None,
                     quote=None,
-                    features={"researcher": r, "works": works, "n_shared_researchers": len(rs)},
+                    features={
+                        "researcher": r,
+                        "works": ", ".join(works),
+                        "n_shared_researchers": n,
+                    },
                 )
             )
     log.info("shared_researcher: %d pairs", len(keep))
@@ -546,11 +1052,13 @@ def cluster_diseases(
         f = r["features"] if isinstance(r["features"], dict) else json.loads(r["features"] or "{}")
         a, b = sorted((r["source_id"], r["target_id"]))
         key = (a, b, r["relation"])
-        best[key] = max(best.get(key, 0.0), f.get("score", 0.0))
+        best[key] = max(best.get(key, 0.0), f.get("cluster_score", f.get("score", 0.0)))
     for (a, b, rel), score in best.items():
         if a not in idx or b not in idx:
             continue
         k = (min(idx[a], idx[b]), max(idx[a], idx[b]))
+        if rel in CLUSTER_EXCLUDED:
+            continue
         if rel == "same_gene_different_mechanism":
             neg[k] += 2.0 * score
         elif rel in CLUSTER_WEIGHTS:
@@ -915,6 +1423,38 @@ def cluster_nodes(clusters: list[dict], nodes: pl.DataFrame) -> pl.DataFrame:
     return pl.DataFrame(rows, schema=schema) if rows else nodes.clear()
 
 
+def spanning_variants() -> list[dict]:
+    """Pathogenic / likely pathogenic ClinVar variants that can span several genes (copy-number
+    variants, deletions and duplications), from the cached in-scope ClinVar file."""
+    try:
+        df = bio.clinvar_variants()
+    except FileNotFoundError:
+        return []
+    return (
+        df.filter(
+            pl.col("classification").is_in(["pathogenic", "likely_pathogenic"])
+            & pl.col("type").str.to_lowercase().is_in(list(bio.SPANNING_TYPES))
+        )
+        .select("variation_id", "type", "chromosome", "start", "stop", "assembly")
+        .unique("variation_id")
+        .to_dicts()
+    )
+
+
+def inferred_summary(edges: pl.DataFrame) -> dict[str, dict]:
+    """Count and confidence range per inferred relation."""
+    inf = edges.filter(pl.col("origin") == "inferred")
+    return {
+        rel: {"edges": n, "confidence_min": round(lo, 4), "confidence_max": round(hi, 4)}
+        for rel, n, lo, hi in inf.group_by("relation")
+        .agg(
+            pl.len(), pl.col("confidence").min().alias("lo"), pl.col("confidence").max().alias("hi")
+        )
+        .sort("relation")
+        .iter_rows()
+    }
+
+
 # ---------------------------------------------------------------- run
 
 
@@ -925,17 +1465,32 @@ async def run() -> dict[str, Any]:
     diseases = sorted(nodes.filter(pl.col("type") == "disease")["id"].to_list())
     symbols = dict(nodes.filter(pl.col("type") == "gene").select("id", "label").iter_rows())
 
+    labels = dict(nodes.select("id", "label").iter_rows())
+
     gene_stats, pair_stats = clinvar_stats(scope)
     mech = mechanism_table(edges, evidence, scope, pair_stats)
     dg = disease_genes(edges, 0.6)
+    corpus = hpo_sim.corpus()
+    hpo_version = (raw_record("hpo", "phenotype.hpoa") or {}).get("source_version")
 
     inferred: list[dict] = []
-    inferred += symptom_similarity(diseases)
-    inferred += gene_mechanism_edges(scope, gene_stats, mech)
-    same, unknown = same_gene_edges(dg, mech, symbols)
+    sym_rows, calibration = symptom_similarity(
+        diseases, graph_disease_terms(edges, corpus.ic), corpus, hpo_version
+    )
+    inferred += sym_rows
+    inferred += gene_mechanism_edges(scope, gene_stats, mech, symbols)
+    same, unknown = same_gene_edges(dg, mech, symbols, labels)
     inferred += same
-    inferred += pathway_edges(dg, edges, nodes)
+    covered = {tuple(sorted((r["source_id"], r["target_id"]))) for r in same}
+    inferred += shared_gene_edges(dg, covered, gene_sources(edges, evidence), symbols)
+    inferred += pathway_edges(dg, edges, nodes, symbols)
+    gene_attrs = {
+        nid: {**json.loads(a or "{}"), "symbol": symbols.get(nid, nid)}
+        for nid, a in nodes.filter(pl.col("type") == "gene").select("id", "attrs").iter_rows()
+    }
+    inferred += near_edges(gene_attrs, spanning_variants())
     inferred += research_edges(scope)
+    finalize_inferred(inferred)
     retrieved = now_iso()
     for r in inferred:
         r["retrieved_at"] = r.get("retrieved_at") or retrieved
@@ -972,13 +1527,16 @@ async def run() -> dict[str, Any]:
         .alias("embedding"),
     )
     # Degree goes into attrs so the API can penalize hubs in path search; phenotypes also get
-    # their HPO lineage (organ system .. primary parent) for the Atlas symptom tree.
+    # their HPO lineage (organ system .. primary parent) for the Atlas symptom tree, and their
+    # corpus information content and is_a ancestors for phenotype matching.
     lineage = taxonomy.hpo_lineages(n.filter(pl.col("type") == "phenotype")["id"].to_list())
 
     def _attrs(s: dict) -> str:
         a = {**json.loads(s["attrs"]), "degree": s["degree"]}
         if s["id"] in lineage:
             a["hpo_lineage"] = lineage[s["id"]]
+            a["ic"] = round(corpus.ic.get(s["id"], 0.0), 4)
+            a["ancestors"] = sorted(corpus.ancestors(s["id"]))
         return json.dumps(a, sort_keys=True)
 
     n = n.with_columns(
@@ -1013,7 +1571,17 @@ async def run() -> dict[str, Any]:
         ]
     )
     write_graph(tables, FINAL)
-    summary = summarize(tables) | {"clusters": len(clusters), "data_version": version}
+    summary = summarize(tables) | {
+        "clusters": len(clusters),
+        "data_version": version,
+        "information_content": {
+            "corpus": "phenotype.hpoa, all diseases (aspect P, NOT and 0% left out)",
+            "hpo_annotations_version": hpo_version,
+            "n_diseases": corpus.n_diseases,
+        },
+        "similar_symptoms_calibration": calibration,
+        "inferred_by_relation": inferred_summary(tables["edges"]),
+    }
     (FINAL / "summary.json").write_text(json.dumps(summary, indent=1))
     log.info("final graph %s", json.dumps(summary))
     for c in clusters:
