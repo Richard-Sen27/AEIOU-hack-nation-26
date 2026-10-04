@@ -137,6 +137,47 @@ def cosine_matrix(
     return (norm(ma) @ norm(mb).T).toarray()
 
 
+def cosine_top_k(
+    ids: list[str],
+    terms: Mapping[str, Iterable[str]],
+    k: int,
+    ic_fn: Callable[[str], float],
+    ancestors_fn: Callable[[str], Iterable[str]],
+    block: int = 1024,
+) -> set[tuple[int, int]]:
+    """Index pairs (i < j) where j is among i's ``k`` most cosine-similar diseases (or i among
+    j's), positive similarity only. Same result as ``cosine_matrix(ids, ids)`` with a stable
+    argsort per row, computed in row blocks so the dense n x n matrix is never held."""
+    vocab: dict[str, int] = {}
+    data, ind, ptr = [], [], [0]
+    for mid in ids:
+        expanded = set()
+        for t in terms.get(mid, ()):
+            expanded.add(t)
+            expanded |= set(ancestors_fn(t))
+        for t in expanded:
+            w = ic_fn(t)
+            if w >= 0.5:
+                ind.append(vocab.setdefault(t, len(vocab)))
+                data.append(w)
+        ptr.append(len(ind))
+    m = sparse.csr_matrix((data, ind, ptr), shape=(len(ids), len(vocab)))
+    norms = np.sqrt(np.asarray(m.multiply(m).sum(axis=1)).ravel())
+    norms[norms == 0] = 1
+    m = sparse.diags(1 / norms) @ m
+    mt = m.T.tocsc()
+    pairs: set[tuple[int, int]] = set()
+    for lo in range(0, len(ids), block):
+        sims = (m[lo : lo + block] @ mt).toarray()
+        for r in range(sims.shape[0]):
+            i = lo + r
+            sims[r, i] = -1
+            for j in np.argsort(-sims[r], kind="stable")[:k]:
+                if sims[r, j] > 0:
+                    pairs.add((min(i, int(j)), max(i, int(j))))
+    return pairs
+
+
 def frame_for(ids: list[str]) -> pl.DataFrame:
     dt = disease_terms()
     return pl.DataFrame({"mondo_id": ids, "n_terms": [len(dt.get(i, ())) for i in ids]})

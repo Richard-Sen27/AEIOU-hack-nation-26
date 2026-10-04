@@ -15,7 +15,7 @@ from pipeline.paths import SNAPSHOT
 
 log = logging.getLogger(__name__)
 
-TABLES = ("nodes", "synonyms", "edges", "evidence", "clusters", "mechanisms")
+TABLES = ("nodes", "synonyms", "edges", "evidence", "clusters", "mechanisms", "hpo_terms")
 
 
 def run() -> dict[str, Any]:

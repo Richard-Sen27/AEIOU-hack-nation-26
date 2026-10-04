@@ -8,6 +8,7 @@ to data/graph/final/.
 
 from __future__ import annotations
 
+import bisect
 import hashlib
 import importlib
 import json
@@ -15,6 +16,7 @@ import logging
 import math
 import random
 from collections import Counter, defaultdict
+from collections.abc import Iterable
 from itertools import combinations
 from typing import Any
 
@@ -100,8 +102,13 @@ CLUSTER_WEIGHTS = {
 }
 CLUSTER_EXCLUDED = frozenset({"near_on_chromosome", "shared_gene"})
 LEIDEN_RESOLUTION = 1.0
+# The wide core (thousands of diseases) is clustered at a finer resolution.
+LEIDEN_RESOLUTION_WIDE = 10.0
+WIDE_MIN_DISEASES = 1000
 LEIDEN_SEED = 42
 FA2_ITERATIONS = 40
+# networkx ForceAtlas2 is O(n^2) per iteration: larger core graphs keep the DrL layout only.
+FA2_MAX_NODES = 3000
 
 SOURCE_NAMES = {
     "clinvar": "ClinVar",
@@ -228,6 +235,7 @@ def similarity_calibration(
     in_scope: list[float],
     n_pairs: int = SYM_RANDOM_PAIRS,
     seed: int = LEIDEN_SEED,
+    random_scores: list[float] | None = None,
 ) -> dict[str, Any]:
     """Scores of random disease pairs from the whole annotation corpus, and where the threshold
     falls among them. The threshold actually used is raised to the 95th percentile if needed."""
@@ -256,6 +264,8 @@ def similarity_calibration(
             )
         )
     arr = np.array(scores) if scores else np.zeros(1)
+    if random_scores is not None:
+        random_scores.extend(scores)
     p95 = float(np.quantile(arr, SYM_CALIBRATION_QUANTILE))
     used = max(threshold, round(p95, 4))
     scope_arr = np.array(in_scope) if in_scope else np.zeros(1)
@@ -270,8 +280,37 @@ def similarity_calibration(
         "threshold": used,
         "threshold_percentile_random": round(100 * float((arr < used).mean()), 2),
         "in_scope_pairs": len(in_scope),
+        "in_scope_pairs_basis": f"cosine top-{SYM_PREFILTER_K} candidates of each disease",
         "threshold_percentile_in_scope": round(100 * float((scope_arr < used).mean()), 2),
     }
+
+
+def top_k_cap_stats(
+    per: dict[int, list[tuple[float, int]]],
+    keep: set[tuple[int, int]],
+    qualifying: int,
+    random_scores: np.ndarray | None,
+) -> dict[str, Any]:
+    """How much the per-disease top-K cap decides: qualifying pairs (threshold and shared
+    specific terms passed) that the cap dropped, and the similarity at which it bites (the
+    lowest kept score of each disease that hit the cap), also as a random-pair percentile."""
+    capped = [sorted(lst, reverse=True) for lst in per.values() if len(lst) > SYM_TOP_K]
+    bite = [lst[SYM_TOP_K - 1][0] for lst in capped]
+    med = float(np.median(bite)) if bite else None
+    out: dict[str, Any] = {
+        "top_k": SYM_TOP_K,
+        "qualifying_pairs": qualifying,
+        "kept_pairs": len(keep),
+        "dropped_by_top_k": qualifying - len(keep),
+        "share_decided_by_top_k": round((qualifying - len(keep)) / qualifying, 4)
+        if qualifying
+        else 0.0,
+        "diseases_at_cap": len(capped),
+        "cap_bite_similarity_median": round(med, 4) if med is not None else None,
+    }
+    if med is not None and random_scores is not None:
+        out["cap_bite_percentile_random"] = round(100 * float((random_scores < med).mean()), 2)
+    return out
 
 
 def symptom_similarity(
@@ -293,36 +332,39 @@ def symptom_similarity(
         a, b = ids[i], ids[j]
         return phenotype_similarity(weights[a], weights[b], ic, anc, closures[a], closures[b])
 
-    all_pairs = {(i, j): sim(i, j) for i, j in combinations(range(len(ids)), 2)}
+    # Only the cosine top-K candidates of each disease are scored (all pairs would be
+    # n^2 / 2 similarity computations: 27 M for the wide core).
+    pairs = hpo_sim.cosine_top_k(
+        ids, dterms, SYM_PREFILTER_K, ic_fn=lambda t: ic.get(t, 0.0), ancestors_fn=anc
+    )
+    all_pairs = {p: sim(*p) for p in sorted(pairs)}
+    random_scores: list[float] = []
     cal = (
-        similarity_calibration(corpus, SYM_THRESHOLD, list(all_pairs.values()))
+        similarity_calibration(
+            corpus, SYM_THRESHOLD, list(all_pairs.values()), random_scores=random_scores
+        )
         if calibrate
         else {"threshold": SYM_THRESHOLD}
     )
     threshold = cal["threshold"]
-    cos = hpo_sim.cosine_matrix(
-        ids, ids, terms=dterms, ic_fn=lambda t: ic.get(t, 0.0), ancestors_fn=anc
-    )
-    np.fill_diagonal(cos, -1)
-    pairs = set()
-    for i in range(len(ids)):
-        for j in np.argsort(-cos[i], kind="stable")[:SYM_PREFILTER_K]:
-            if cos[i, j] > 0:
-                pairs.add((min(i, int(j)), max(i, int(j))))
 
     def specific(d: str) -> set[str]:
         return {t for t in dterms[d] if ic.get(t, 0.0) >= SPECIFIC_IC}
 
     per: dict[int, list[tuple[float, int]]] = defaultdict(list)
+    qualifying = 0
     for i, j in pairs:
         s = all_pairs[(i, j)]
         if s >= threshold and len(specific(ids[i]) & specific(ids[j])) >= SYM_MIN_SHARED_SPECIFIC:
+            qualifying += 1
             per[i].append((s, j))
             per[j].append((s, i))
     keep = set()
     for i, lst in per.items():
         for _s, j in sorted(lst, reverse=True)[:SYM_TOP_K]:
             keep.add((min(i, j), max(i, j)))
+    if calibrate:
+        cal |= top_k_cap_stats(per, keep, qualifying, np.array(random_scores))
     rows = []
     for i, j in sorted(keep):
         a, b = ids[i], ids[j]
@@ -385,17 +427,11 @@ def symptom_similarity(
 def clinvar_stats(scope: Scope) -> tuple[dict, dict]:
     """Per gene and per (gene, disease): P/LP variant counts and truncating share."""
     try:
-        df = bio.clinvar_variants()
+        df = bio.clinvar_plp_or_focus()
     except FileNotFoundError:
         return {}, {}
-    sym2id = {g["symbol"]: g["hgnc_id"] for g in scope.genes}
-    df = df.with_columns(
-        pl.coalesce(pl.col("hgnc_id"), pl.col("symbol").replace_strict(sym2id, default=None)).alias(
-            "hgnc_id"
-        )
-    ).filter(
-        pl.col("hgnc_id").is_in(list(scope.gene_ids))
-        & pl.col("classification").is_in(["pathogenic", "likely_pathogenic"])
+    df = bio.with_scope_genes(df, scope).filter(
+        pl.col("classification").is_in(["pathogenic", "likely_pathogenic"])
         & (pl.col("consequence") != "copy_number")
     )
     gene: dict[str, Counter] = defaultdict(Counter)
@@ -516,11 +552,16 @@ def compatible(a: str, b: str) -> bool | None:
 def gene_mechanism_edges(
     scope: Scope, gene_stats: dict, mech_pairs: dict, symbols: dict[str, str] | None = None
 ) -> list[dict]:
-    """acts_via gene -> mechanism inferred from ClinVar (gene level)."""
+    """acts_via gene -> mechanism inferred from ClinVar (gene level), for focus genes only
+    (mechanism nodes belong to the focus set; core pairs still feed the same-gene links)."""
     symbols = symbols or {}
+    focus = scope.focus_gene_ids if scope is not None else None
+    focus_diseases = scope.focus_disease_ids if scope is not None else None
     retrieved = (raw_record("clinvar", "variant_summary.scope.tsv.gz") or {}).get("retrieved_at")
     rows = []
     for hid, stats in gene_stats.items():
+        if focus is not None and hid not in focus:
+            continue
         mech, strength = clinvar_label(stats)
         if mech != "loss_of_function":
             continue
@@ -556,6 +597,8 @@ def gene_mechanism_edges(
         )
     # Pair-level mechanisms (Orphanet, ClinVar) also surface as gene-level acts_via edges.
     for (hid, mid), m in mech_pairs.items():
+        if focus is not None and (hid not in focus or mid not in focus_diseases):
+            continue
         if m["mechanism"] == "non_lof" or m["basis"]["kind"] not in ("orphanet",):
             continue
         rows.append(
@@ -771,8 +814,13 @@ def pathway_edges(
         if m:
             dis_pw[d] = m
     cand = []
-    ds = sorted(dis_pw)
-    for a, b in combinations(ds, 2):
+    # Candidate pairs share at least one pathway (an inverted index instead of all pairs).
+    pw_dis: dict[str, list[str]] = defaultdict(list)
+    for d in sorted(dis_pw):
+        for p in dis_pw[d]:
+            pw_dis[p].append(d)
+    pairs = {pair for ds in pw_dis.values() for pair in combinations(ds, 2)}
+    for a, b in sorted(pairs):
         if dg[a] & dg[b]:
             continue  # same gene is covered by the same-gene relations
         shared = set(dis_pw[a]) & set(dis_pw[b])
@@ -888,11 +936,31 @@ def near_edges(genes: dict[str, dict], cnvs: list[dict] | None = None) -> list[d
         for h, a in genes.items():
             if h != g and a.get("cytoband") == genes[g]["cytoband"]:
                 pairs.setdefault(tuple(sorted((g, h))), None)
+    neighbours: dict[str, set[str]] = defaultdict(set)
+    for x, y in pairs:
+        neighbours[x].add(y)
+        neighbours[y].add(x)
     spans: Counter = Counter()
+    # Per-chromosome index by start, so each copy-number variant only checks nearby genes.
+    starts: dict[str, list[tuple[int, str]]] = {
+        c: sorted((placed[g]["start"], g) for g in gs) for c, gs in by_chr.items()
+    }
+    longest = max((a["end"] - a["start"] for a in placed.values()), default=0)
     for v in cnvs or []:
-        hit = sorted({h for h, _ in bio.spanned_genes(v, placed)})
-        for x, y in combinations(hit, 2):
-            spans[(x, y)] += 1
+        idx = starts.get(v.get("chromosome"), [])
+        if not idx or v.get("start") is None:
+            continue
+        stop = v.get("stop") or v["start"]
+        lo = bisect.bisect_left(idx, (v["start"] - longest, ""))
+        hi = bisect.bisect_right(idx, (stop, "~"))
+        nearby = {g: placed[g] for _, g in idx[lo:hi]}
+        hit = sorted({h for h, _ in bio.spanned_genes(v, nearby)})
+        # Only near pairs can be boosted; large variants would otherwise yield huge pair sets.
+        hit_set = set(hit)
+        for x in hit:
+            for y in neighbours.get(x, ()):
+                if x < y and y in hit_set:
+                    spans[(x, y)] += 1
     rows = []
     for (a, b), gap in sorted(pairs.items()):
         ga, gb = genes[a], genes[b]
@@ -1042,8 +1110,15 @@ def research_edges(scope: Scope) -> list[dict]:
 
 
 def cluster_diseases(
-    diseases: list[str], inferred: list[dict], unknown_same_gene: list[tuple]
+    diseases: list[str],
+    inferred: list[dict],
+    unknown_same_gene: list[tuple],
+    resolution: float | None = None,
 ) -> dict[str, int]:
+    if resolution is None:
+        resolution = (
+            LEIDEN_RESOLUTION_WIDE if len(diseases) >= WIDE_MIN_DISEASES else LEIDEN_RESOLUTION
+        )
     idx = {d: i for i, d in enumerate(diseases)}
     pos: dict[tuple[int, int], float] = defaultdict(float)
     neg: dict[tuple[int, int], float] = defaultdict(float)
@@ -1073,10 +1148,10 @@ def cluster_diseases(
     g_pos = ig.Graph(n=n, edges=list(pos), edge_attrs={"weight": list(pos.values())})
     g_neg = ig.Graph(n=n, edges=list(neg), edge_attrs={"weight": list(neg.values())})
     p_pos = leidenalg.RBConfigurationVertexPartition(
-        g_pos, weights="weight", resolution_parameter=LEIDEN_RESOLUTION
+        g_pos, weights="weight", resolution_parameter=resolution
     )
     p_neg = leidenalg.RBConfigurationVertexPartition(
-        g_neg, weights="weight", resolution_parameter=LEIDEN_RESOLUTION
+        g_neg, weights="weight", resolution_parameter=resolution
     )
     opt = leidenalg.Optimiser()
     opt.set_rng_seed(LEIDEN_SEED)
@@ -1113,6 +1188,42 @@ def cluster_diseases(
 def _top(counter: Counter, n: int, labels: dict[str, str]) -> list[str]:
     """most_common with a deterministic tie-break on the label."""
     return sorted(counter, key=lambda k: (-counter[k], labels.get(k, k)))[:n]
+
+
+def distinctive_phenotypes(
+    members: dict[int, list[str]], dis_ph: dict[str, set[str]], labels: dict[str, str]
+) -> dict[int, list[str]]:
+    """Per cluster, its HPO terms ranked by how distinctive they are: the share of member
+    diseases recording the term x log(1 + clusters / clusters recording it). Terms recorded by
+    a single member rank after shared ones in clusters of two or more."""
+    per = {c: Counter(p for d in ds for p in dis_ph.get(d, ())) for c, ds in members.items()}
+    df = Counter(p for cnt in per.values() for p in cnt)
+    n = max(1, len(members))
+    out = {}
+    for c, cnt in per.items():
+        size = len(members[c])
+
+        def key(p: str, cnt=cnt, size=size) -> tuple:
+            shared = cnt[p] >= 2 or size == 1
+            return (not shared, -(cnt[p] / size) * math.log(1 + n / df[p]), labels.get(p, p))
+
+        out[c] = sorted(cnt, key=key)
+    return out
+
+
+def template_cluster_label(
+    members: list[str], phenotype: str | None, gene: str | None, labels: dict[str, str]
+) -> str:
+    """Cluster name without a model: the most distinctive recorded symptom and the top gene
+    ("Ectopic ossification in muscle tissue · ACVR1"); a single disease keeps its own name."""
+    if len(members) == 1:
+        return labels.get(members[0], members[0])
+    parts = [labels.get(x, x) for x in (phenotype, gene) if x]
+    if not parts:
+        return f"{len(members)} related conditions"
+    if not phenotype:
+        return f"{parts[0]} disorders"
+    return " · ".join(parts)
 
 
 class ClusterLabel(BaseModel):
@@ -1162,13 +1273,20 @@ async def label_clusters(
     }
     df_pw = Counter(p for cnt in cluster_pws.values() for p in cnt)
     n_clusters = max(1, len(members))
+    ranked_ph = distinctive_phenotypes(members, dis_ph, labels)
+    mech_by_disease: dict[str, list[dict]] = defaultdict(list)
+    for (_g, d), m in sorted(mech.items()):
+        mech_by_disease[d].append(m)
     out = []
     for c, ds in sorted(members.items()):
         genes = Counter(g for d in ds for g in dg.get(d, ()))
         pws = cluster_pws[c]
         phs = Counter(p for d in ds for p in dis_ph.get(d, ()))
         mechs = Counter(
-            m["mechanism"] for (g, d), m in mech.items() if d in ds and m["mechanism"] != "non_lof"
+            m["mechanism"]
+            for d in ds
+            for m in mech_by_disease.get(d, ())
+            if m["mechanism"] != "non_lof"
         )
         top_genes = [labels.get(g, g) for g in _top(genes, 4, labels)]
 
@@ -1178,14 +1296,11 @@ async def label_clusters(
         ranked_pw = sorted(pws, key=distinct)
         top_pw = [labels.get(p, p) for p in ranked_pw[:3]]
         top_ph = [labels.get(p, p) for p in _top(phs, 5, labels)]
-        if len(ds) == 1:
-            label = labels.get(ds[0], ds[0])
-        elif top_genes:
-            label = f"{', '.join(top_genes[:3])} disorders"
-            if top_pw and pws[ranked_pw[0]] > 1:
-                label += f" · {top_pw[0]}"
-        else:
-            label = f"{top_ph[0]} spectrum" if top_ph else f"Cluster {c}"
+        distinct_ph = ranked_ph.get(c, [])
+        top_gene = _top(genes, 1, labels)
+        label = template_cluster_label(
+            ds, distinct_ph[0] if distinct_ph else None, top_gene[0] if top_gene else None, labels
+        )
         if mechs:
             m = _top(mechs, 1, {})[0]
             k = mechs[m]
@@ -1233,6 +1348,7 @@ async def label_clusters(
                         "top_genes": top_genes,
                         "top_pathways": top_pw,
                         "top_phenotypes": top_ph,
+                        "distinctive_phenotypes": [labels.get(p, p) for p in distinct_ph[:3]],
                         "mechanisms": dict(mechs),
                     }
                 ),
@@ -1287,8 +1403,13 @@ def layout_and_centrality(nodes: pl.DataFrame, edges: pl.DataFrame) -> pl.DataFr
     if len(order):
         coords = (coords - coords.mean(axis=0)) / (np.ptp(coords, axis=0).max() or 1) * 100
     init = {n: coords[index[n]] for n in order}
-    pos = (
-        nx.forceatlas2_layout(
+    if not order:
+        pos = {}
+    elif len(order) > FA2_MAX_NODES:
+        log.info("layout: %d core nodes, DrL only (no ForceAtlas2)", len(order))
+        pos = init
+    else:
+        pos = nx.forceatlas2_layout(
             core,
             pos=init,
             max_iter=FA2_ITERATIONS,
@@ -1297,9 +1418,6 @@ def layout_and_centrality(nodes: pl.DataFrame, edges: pl.DataFrame) -> pl.DataFr
             gravity=1.0,
             seed=LEIDEN_SEED,
         )
-        if order
-        else {}
-    )
     pos = {n: np.asarray(p, dtype=float) for n, p in pos.items()}
     spread = float(np.std(np.array(list(pos.values())))) if pos else 1.0
     rng = np.random.default_rng(LEIDEN_SEED)
@@ -1360,7 +1478,10 @@ def node_clusters(
     return out
 
 
-def embeddings(nodes: pl.DataFrame) -> dict[str, list[float]]:
+def embeddings(nodes: pl.DataFrame, only: set[str] | None = None) -> dict[str, list[float]]:
+    """Local text embeddings (cached by text hash); ``only`` limits which nodes get one."""
+    if only is not None:
+        nodes = nodes.filter(pl.col("id").is_in(list(only)))
     try:
         from backend.embeddings import embed_texts
     except Exception:  # noqa: BLE001
@@ -1427,7 +1548,7 @@ def spanning_variants() -> list[dict]:
     """Pathogenic / likely pathogenic ClinVar variants that can span several genes (copy-number
     variants, deletions and duplications), from the cached in-scope ClinVar file."""
     try:
-        df = bio.clinvar_variants()
+        df = bio.clinvar_plp_or_focus()
     except FileNotFoundError:
         return []
     return (
@@ -1439,6 +1560,59 @@ def spanning_variants() -> list[dict]:
         .unique("variation_id")
         .to_dicts()
     )
+
+
+HPO_ROOT = "HP:0000001"
+
+
+def hpo_terms_table(corpus: hpo_sim.Corpus, extra: Iterable[str] = ()) -> pl.DataFrame:
+    """Every live HPO term under Phenotypic abnormality (HP:0000118) and that term itself, graph
+    node or not: id, label, synonyms, direct is_a parents and the corpus information content
+    (null when neither the term nor a descendant annotates any disease). Loaded into the
+    ``hpo_terms`` table for symptom matching.
+
+    ``extra``: further terms to include with their ancestors (below the HPO root HP:0000001),
+    for phenotype nodes outside HP:0000118 such as clinical-course terms ("Death in infancy")."""
+    terms = bio.hpo_terms().filter(~pl.col("deprecated"))
+    parents = {hid: list(ps or []) for hid, ps in terms.select("id", "parents").iter_rows()}
+    anc = taxonomy.ancestor_fn(parents)
+    root = taxonomy.PHENOTYPIC_ABNORMALITY
+    wanted = {t for t in extra if t in parents}
+    wanted |= {a for t in wanted for a in anc(t)}
+    wanted.discard(HPO_ROOT)
+    rows = []
+    for r in terms.sort("id").iter_rows(named=True):
+        hid = r["id"]
+        if hid != root and root not in anc(hid) and hid not in wanted:
+            continue
+        rows.append(
+            {
+                "id": hid,
+                "label": r["label"] or hid,
+                "synonyms": sorted({x for x in r["synonyms"] or [] if x and x != r["label"]}),
+                "parents": sorted(p for p in parents[hid] if p in parents),
+                "ic": round(corpus.ic[hid], 6) if corpus.counts.get(hid) else None,
+            }
+        )
+    schema = {
+        "id": pl.String,
+        "label": pl.String,
+        "synonyms": pl.List(pl.String),
+        "parents": pl.List(pl.String),
+        "ic": pl.Float64,
+    }
+    return pl.DataFrame(rows, schema=schema)
+
+
+def tier_summary(nodes: pl.DataFrame) -> dict[str, dict[str, int]]:
+    """Count of focus and core nodes per tiered type."""
+    out: dict[str, dict[str, int]] = {}
+    for typ, attrs in nodes.select("type", "attrs").iter_rows():
+        if typ in ("disease", "gene", "phenotype"):
+            tier = (json.loads(attrs) if attrs else {}).get("tier", "focus")
+            out.setdefault(typ, {}).setdefault(tier, 0)
+            out[typ][tier] += 1
+    return out
 
 
 def inferred_summary(edges: pl.DataFrame) -> dict[str, dict]:
@@ -1517,7 +1691,15 @@ async def run() -> dict[str, Any]:
     )
     lay = layout_and_centrality(tables["nodes"], tables["edges"])
     ncl = node_clusters(membership, tables["edges"], tables["nodes"])
-    emb = embeddings(tables["nodes"])
+    # Embeddings: every focus node (as before) plus every disease; core genes and symptoms
+    # have none (vector search treats a missing embedding as a non-match).
+    tiered = {"disease", "gene", "phenotype"}
+    embed_ids = {
+        nid
+        for nid, typ in tables["nodes"].select("id", "type").iter_rows()
+        if typ == "disease" or typ not in tiered or scope.tier(nid) != "core"
+    }
+    emb = embeddings(tables["nodes"], embed_ids)
 
     n = tables["nodes"].join(lay, on="id", how="left")
     n = n.with_columns(
@@ -1531,8 +1713,14 @@ async def run() -> dict[str, Any]:
     # corpus information content and is_a ancestors for phenotype matching.
     lineage = taxonomy.hpo_lineages(n.filter(pl.col("type") == "phenotype")["id"].to_list())
 
+    types = dict(n.select("id", "type").iter_rows())
+
     def _attrs(s: dict) -> str:
         a = {**json.loads(s["attrs"]), "degree": s["degree"]}
+        if types.get(s["id"]) in tiered:
+            # Disease, gene and phenotype nodes: "focus" (literature, people, variants, on the
+            # map) or "core" (biology only). Nodes outside the scope file count as focus.
+            a["tier"] = scope.tier(s["id"]) or "focus"
         if s["id"] in lineage:
             a["hpo_lineage"] = lineage[s["id"]]
             a["ic"] = round(corpus.ic.get(s["id"], 0.0), 4)
@@ -1571,7 +1759,13 @@ async def run() -> dict[str, Any]:
         ]
     )
     write_graph(tables, FINAL)
+    hpo_table = hpo_terms_table(
+        corpus, tables["nodes"].filter(pl.col("type") == "phenotype")["id"].to_list()
+    )
+    hpo_table.write_parquet(FINAL / "hpo_terms.parquet")
     summary = summarize(tables) | {
+        "tiers": tier_summary(tables["nodes"]),
+        "hpo_terms": hpo_table.height,
         "clusters": len(clusters),
         "data_version": version,
         "information_content": {
