@@ -19,6 +19,7 @@ import { useRouter } from "next/navigation";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { toast } from "sonner";
 
+import { FollowButton } from "@/components/follows/follow-button";
 import { GraphLegend, VusNotice } from "@/components/graph-ui";
 import { useGate } from "@/components/providers/gate-provider";
 import { useLens } from "@/components/providers/lens-provider";
@@ -328,6 +329,13 @@ export function NodeView({ nodeId }: { nodeId: string }) {
           )}
         </div>
         <div className="flex flex-wrap items-center gap-2">
+          {center.type === "disease" && (
+            <FollowButton
+              nodeId={center.id}
+              label={center.label}
+              updatesAvailable={center.attrs?.tier == null || center.attrs.tier === "focus"}
+            />
+          )}
           <Button variant="outline" size="sm" onClick={() => setPathOpen(true)} data-testid="find-path">
             <Route data-icon="inline-start" aria-hidden /> Find a path to…
           </Button>
