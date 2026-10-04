@@ -85,6 +85,12 @@ export function PathStepsList({
                   );
                 })()}
               </div>
+              {s.edge.origin === "inferred" && s.edge.explanation && (
+                <p className="mt-1.5 rounded-md border border-dashed px-2 py-1.5 text-[12.5px]" data-testid="step-explanation">
+                  <span className="font-medium">Why suggested:</span> {s.edge.explanation}{" "}
+                  <span className="text-muted-foreground">A hypothesis, not an established fact.</span>
+                </p>
+              )}
               <p className="mt-1 text-[11.5px] text-muted-foreground">
                 Leads to <span className="font-medium text-foreground">{s.to_node.label}</span>
               </p>

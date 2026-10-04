@@ -591,6 +591,11 @@ function SummaryItemRow({
         <OriginBadge origin={item.inferred ? "inferred" : "observed"} />
         {item.under_review && <StatusFlag status="under_review" />}
       </div>
+      {item.inferred && item.explanation && (
+        <p className="mt-1 pl-5 text-xs" data-testid="atlas-summary-explanation">
+          {item.explanation} <span className="text-muted-foreground">A hypothesis, not an established fact.</span>
+        </p>
+      )}
     </li>
   );
 }

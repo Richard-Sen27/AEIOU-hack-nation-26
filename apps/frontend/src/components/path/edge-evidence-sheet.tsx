@@ -30,7 +30,8 @@ function errorCopy(e: ApiError) {
 const capitalize = (s: string) => (s ? s[0].toUpperCase() + s.slice(1) : s);
 
 function FeatureList({ features }: { features: Record<string, unknown> }) {
-  const entries = Object.entries(features).filter(([, v]) => v !== null && v !== undefined && v !== "");
+  // "explanation" is shown as its own line above this list.
+  const entries = Object.entries(features).filter(([k, v]) => k !== "explanation" && v !== null && v !== undefined && v !== "");
   if (!entries.length) return null;
   return (
     <dl className="grid grid-cols-[auto_1fr] gap-x-3 gap-y-1 text-xs">
@@ -220,6 +221,11 @@ export function EdgeEvidenceSheet({
                   <h3 id="ev-features" className="text-sm font-semibold">
                     {edge.origin === "inferred" ? "Why this was inferred" : "Details"}
                   </h3>
+                  {edge.origin === "inferred" && edge.explanation && (
+                    <p className="rounded-lg border border-dashed px-3 py-2 text-[13px]" data-testid="evidence-explanation">
+                      {edge.explanation} <span className="text-muted-foreground">A hypothesis from the analysis, not an established fact.</span>
+                    </p>
+                  )}
                   <FeatureList features={edge.features} />
                 </section>
               )}

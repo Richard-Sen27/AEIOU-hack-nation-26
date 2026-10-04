@@ -26,8 +26,11 @@ const FEATURE_LABEL: Record<string, string> = {
   missense_share: "Share of missense variants",
   frequency: "How often",
   note: "Note",
+  method: "Method",
+  confidence_basis: "How the score was set",
 };
-const HIDDEN_FEATURES = new Set(["label"]);
+// "explanation" is shown as its own line above the details.
+const HIDDEN_FEATURES = new Set(["label", "explanation"]);
 
 function isIdLike(v: unknown): v is string {
   return typeof v === "string" && /^[A-Z][A-Za-z_]*:[^\s]+$/.test(v);
@@ -92,6 +95,9 @@ export function EdgePanel({
   const evidence = ev ? [...ev.supporting, ...ev.contradicting] : undefined;
   const family = EDGE_FAMILY_META[edge.family];
   const features = Object.entries(edge.features ?? ev?.edge.features ?? {}).filter(([k]) => !HIDDEN_FEATURES.has(k));
+  const inferred = edge.origin === "inferred";
+  // Only inferred (computed) links carry an explanation; it is a hypothesis, never shown as fact.
+  const explanation = inferred ? (edge.explanation ?? ev?.edge.explanation ?? null) : null;
   const counterexample = edge.relation === "same_gene_different_mechanism";
   const similar = edge.relation === "similar_symptoms";
   const technical = labelStyle === "technical";
@@ -154,24 +160,35 @@ export function EdgePanel({
           </div>
         )}
 
-        {features.length > 0 && (
+        {(features.length > 0 || explanation) && (
           <section aria-labelledby="edge-features" data-testid="edge-features">
             <h3 id="edge-features" className="mb-1.5 text-xs font-medium text-muted-foreground">
-              {edge.origin === "inferred" ? "Why the analysis suggests this" : "Details"}
+              {inferred ? "Why the analysis suggests this" : "Details"}
             </h3>
-            <dl className="space-y-2 rounded-lg border bg-background/50 p-3">
-              {features.map(([k, v]) => (
-                <div key={k} className="grid gap-1">
-                  <dt className="text-[11px] text-muted-foreground">
-                    {FEATURE_LABEL[k] ?? k.replace(/_/g, " ")}
-                    {technical && <span className="ml-1 font-mono opacity-70">({k})</span>}
-                  </dt>
-                  <dd>
-                    <FeatureValue value={v} nodes={nodes} />
-                  </dd>
-                </div>
-              ))}
-            </dl>
+            {explanation && (
+              <p
+                className={cn("rounded-lg border border-dashed bg-background/50 px-3 py-2 text-sm", features.length > 0 && "mb-2")}
+                data-testid="edge-explanation"
+              >
+                {explanation}{" "}
+                <span className="text-muted-foreground">A hypothesis from the analysis, not an established fact.</span>
+              </p>
+            )}
+            {features.length > 0 && (
+              <dl className="space-y-2 rounded-lg border bg-background/50 p-3">
+                {features.map(([k, v]) => (
+                  <div key={k} className="grid gap-1">
+                    <dt className="text-[11px] text-muted-foreground">
+                      {FEATURE_LABEL[k] ?? k.replace(/_/g, " ")}
+                      {technical && <span className="ml-1 font-mono opacity-70">({k})</span>}
+                    </dt>
+                    <dd>
+                      <FeatureValue value={v} nodes={nodes} />
+                    </dd>
+                  </div>
+                ))}
+              </dl>
+            )}
           </section>
         )}
 
@@ -191,7 +208,7 @@ export function EdgePanel({
                       <th scope="row" className="py-0.5 text-left font-normal text-muted-foreground">
                         {TIER_SHORT[t.tier as EvidenceTier] ?? t.tier}
                       </th>
-                      <td className="py-0.5 text-right font-mono tabular">weight {t.weight.toFixed(1)}</td>
+                      <td className="py-0.5 text-right font-mono tabular">weight {t.weight.toFixed(t.tier === "computed" ? 2 : 1)}</td>
                     </tr>
                   ))}
                   <tr className="border-t">
