@@ -20,17 +20,17 @@ const COPY = {
   plain: {
     title: "Groups of related conditions",
     description:
-      "Conditions grouped by how they go wrong in the body or by shared symptoms, not by their names. The groups and their names come from analysis, so treat them as a starting point, not a fact.",
+      "Grouped by cause or shared symptoms, not by name. Groups come from analysis: a starting point, not a fact.",
   },
   clinical: {
     title: "Disease clusters",
     description:
-      "Diseases clustered by shared mechanism and phenotype rather than nomenclature. Cluster labels and summaries are generated from members' shared genes and pathways and are hypotheses.",
+      "Clustered by shared mechanism and phenotype, not nomenclature. Labels and summaries are generated hypotheses.",
   },
   technical: {
     title: "Mechanism clusters",
     description:
-      "Leiden communities on the combined weighted similarity graph (shared pathway, same-gene mechanism, HPO similarity). Labels and mechanism summaries are model-written from member genes and pathways: inferred.",
+      "Leiden communities on the weighted similarity graph (pathway, same-gene mechanism, HPO). Labels and summaries are model-written: inferred.",
   },
 } as const;
 
