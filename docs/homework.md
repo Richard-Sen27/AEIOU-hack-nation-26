@@ -51,13 +51,17 @@ Work deliberately left for later. Add an item when you leave something for later
 
 ## Privacy and compliance
 
-- **Missing documents:** `docs/incident.md`, `docs/dpia.md`, `docs/ropa.md`.
+- **Missing documents:** `docs/incident.md`, `docs/dpia.md`, `docs/ropa.md`; `ropa.md` must include the work details of doctors and researchers as a purpose (contract, Art. 6(1)(b)).
 - **`/privacy` placeholders** (`apps/frontend/src/app/privacy/page.tsx`, `ToBeCompleted`): controller name and address, `NEXT_PUBLIC_PRIVACY_EMAIL`, hosting provider and region, supervisory authority.
 - **Privacy notices** are English only.
 - **Redaction** misses a bare first name in unlabelled prose (worse in German).
 - **Test addresses** (`apps/backend/tests/platform/test_redaction.py`): two invented addresses at real mail domains (gmail.com, outlook.com); switch to example domains.
 - **Graph backup** `apps/pipeline/data/backups/atlas-graph-2026-10-04.9.dump` falls under the 30-day backup rule in [`retention.md`](retention.md) and must be deleted by 2026-11-03.
 - **Second read** for texts shortened next to compliance wording: the contribute-consent note on suggested links, the age line, the export text, the delete text.
+- **Work details: legal basis** (`api/services/professional.py`): counsel should confirm contract (Art. 6(1)(b)) as the basis for the optional work details of doctors and researchers.
+- **Work details: name prefill** (`auth.stored_name_claims`, `professional.suggested_name`): reading `given_name` / `family_name` from the real OpenAI ID token is unverified; the mock is the only source tested, and without the claims the code splits the account name (last word = last name).
+- **Work details: role switch** (`on_role_change` in `api/services/account.py`): switching to patient deletes them today; the user has not decided between deleting and keeping them hidden. Keeping them means dropping the clear there.
+- **Professionals for others:** listing doctors and researchers to other users, contacting them and credit on contributions are deferred to the connect work and need real verification first; the work details verify nothing today.
 
 ## Documents
 
