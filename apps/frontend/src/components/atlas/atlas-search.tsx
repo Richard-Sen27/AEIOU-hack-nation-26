@@ -132,11 +132,13 @@ export function AtlasSearch({ index, onPick, onAskWu, className }: AtlasSearchPr
   const searching = entityQuery && server.kind === "loading";
   const nodeCount = options.filter((o) => o.kind === "node").length;
 
-  // Reset the highlighted option whenever the results change.
+  // Reset the highlighted option when the query changes; server results
+  // arriving later only append, so they keep the highlight in place.
   useEffect(() => {
-    // eslint-disable-next-line react-hooks/set-state-in-effect -- derived from results
+    // eslint-disable-next-line react-hooks/set-state-in-effect -- derived from input
     setActive(-1);
-  }, [options]);
+  }, [q]);
+  const activeIndex = active < options.length ? active : -1;
 
   // Tell screen readers how many results there are, once the search settles.
   useEffect(() => {
@@ -183,17 +185,17 @@ export function AtlasSearch({ index, onPick, onAskWu, className }: AtlasSearchPr
       case "ArrowDown":
         e.preventDefault();
         if (!open) setOpen(true);
-        else if (n > 0) setActive((i) => (i + 1) % n);
+        else if (n > 0) setActive((i) => (i >= n - 1 ? 0 : i + 1));
         break;
       case "ArrowUp":
         e.preventDefault();
         if (!open) setOpen(true);
-        else if (n > 0) setActive((i) => (i <= 0 ? n - 1 : i - 1));
+        else if (n > 0) setActive((i) => (i <= 0 || i >= n ? n - 1 : i - 1));
         break;
       case "Home":
       case "End":
         // Only while an option is highlighted; otherwise the caret moves as usual.
-        if (open && active >= 0 && n > 0) {
+        if (open && activeIndex >= 0 && n > 0) {
           e.preventDefault();
           setActive(e.key === "Home" ? 0 : n - 1);
         }
@@ -201,7 +203,7 @@ export function AtlasSearch({ index, onPick, onAskWu, className }: AtlasSearchPr
       case "Enter":
         if (!open || n === 0) return;
         e.preventDefault();
-        choose(options[active >= 0 ? active : 0]);
+        choose(options[activeIndex >= 0 ? activeIndex : 0]);
         break;
       case "Escape":
         if (open && q) {
@@ -222,7 +224,7 @@ export function AtlasSearch({ index, onPick, onAskWu, className }: AtlasSearchPr
   };
 
   const showList = open;
-  const activeId = active >= 0 && options[active] ? `${uid}-opt-${active}` : undefined;
+  const activeId = activeIndex >= 0 ? `${uid}-opt-${activeIndex}` : undefined;
   const failed = server.kind === "failed" && server.q === q;
 
   return (
@@ -305,7 +307,7 @@ export function AtlasSearch({ index, onPick, onAskWu, className }: AtlasSearchPr
           className="max-h-[min(60vh,26rem)] overflow-y-auto overscroll-contain p-1"
         >
           {options.map((opt, i) => {
-            const selected = i === active;
+            const selected = i === activeIndex;
             const common = {
               id: `${uid}-opt-${i}`,
               role: "option" as const,
