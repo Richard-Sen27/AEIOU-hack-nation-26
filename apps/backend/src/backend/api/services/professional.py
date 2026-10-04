@@ -1,8 +1,9 @@
 """Work details of doctors and researchers: name, institutions, ORCID iD, own atlas entry.
 
-Self-declared and private to the account (contract, Art. 6(1)(b)): never shown to other users,
-never in atlas data, never sent to a model, never logged. Linking an atlas entry is not a claim
-and not a verification; `role_verified` stays false.
+Self-declared and private to the account (contract, Art. 6(1)(b)): never in atlas data, never
+sent to a model, never logged, and never shown to other users unless the person verifies their
+identity and switches on the public card (api/services/people.py), which shows only the fields
+they chose. Linking an atlas entry is not a claim and not a verification.
 """
 
 import json
@@ -38,10 +39,28 @@ PERSON_TYPES = frozenset({NodeType.researcher, NodeType.doctor})
 MAX_CANDIDATES = 5
 
 _COLUMNS = "first_name, last_name, institutions, orcid_id, atlas_node_id, professional_updated_at"
+# Verification and the card rest on the work details: clearing those clears these too.
+_VERIFICATION_CLEAR = (
+    "role_verified = false, orcid_verified_at = NULL, verified_name = NULL,"
+    " verification_method = NULL, verified_at = NULL, verification_reason = NULL,"
+    " verification_request = NULL, atlas_link_verified = false, card_visible = false,"
+    " card_visible_since = NULL"
+)
 _CLEAR_SQL = text(
     "UPDATE profiles SET first_name = NULL, last_name = NULL, institutions = '[]'::jsonb,"
-    " orcid_id = NULL, atlas_node_id = NULL, professional_updated_at = NULL, updated_at = now()"
+    " orcid_id = NULL, atlas_node_id = NULL, professional_updated_at = NULL,"
+    f" {_VERIFICATION_CLEAR}, card_id = NULL, card_headline = NULL,"
+    " card_show_institutions = true, card_show_atlas_entry = true,"
+    " accepts_patient_messages = false, updated_at = now()"
     " WHERE user_id = :uid"
+)
+_CLEAR_VERIFICATION_SQL = text(
+    f"UPDATE profiles SET {_VERIFICATION_CLEAR}, updated_at = now() WHERE user_id = :uid"
+)
+_EXPORT_COLUMNS = (
+    "orcid_verified_at, verified_name, verification_method, verified_at, verification_reason,"
+    " verification_request, atlas_link_verified, card_id, card_visible, card_visible_since,"
+    " card_headline, card_show_institutions, card_show_atlas_entry, accepts_patient_messages"
 )
 
 
@@ -227,32 +246,84 @@ async def put_professional(
         node = store.nodes.get(body.atlas_node_id)
         if node is None or node.type not in PERSON_TYPES:
             raise _invalid("atlas_node_id")
+    current = (
+        (
+            await db.execute(
+                text(
+                    f"SELECT {_COLUMNS}, orcid_verified_at, atlas_link_verified,"
+                    " verification_method FROM profiles WHERE user_id = :uid FOR UPDATE"
+                ),
+                {"uid": user.id},
+            )
+        )
+        .mappings()
+        .one()
+    )
+    if current["orcid_verified_at"] is not None and body.orcid_id != current["orcid_id"]:
+        # A confirmed ORCID iD is locked; deleting the work details removes it.
+        raise _invalid("orcid_id")
+    inst = [i.model_dump() for i in institutions]
+    # A manual review checked the name and institutions: editing them ends the verification.
+    reviewed_changed = current["verification_method"] == "institutional_email" and (
+        body.first_name != current["first_name"]
+        or body.last_name != current["last_name"]
+        or inst != [i.model_dump() for i in _institutions_from_row(current["institutions"])]
+    )
     await db.execute(
         text(
             "UPDATE profiles SET first_name = :first, last_name = :last,"
             " institutions = CAST(:inst AS jsonb), orcid_id = :orcid, atlas_node_id = :node,"
+            " atlas_link_verified = atlas_link_verified AND atlas_node_id IS NOT DISTINCT FROM"
+            " CAST(:node AS text),"
             " professional_updated_at = now(), updated_at = now() WHERE user_id = :uid"
         ),
         {
             "uid": user.id,
             "first": body.first_name,
             "last": body.last_name,
-            "inst": json.dumps([i.model_dump() for i in institutions]),
+            "inst": json.dumps(inst),
             "orcid": body.orcid_id,
             "node": body.atlas_node_id,
         },
     )
+    if reviewed_changed:
+        await db.execute(_CLEAR_VERIFICATION_SQL, {"uid": user.id})
+    await _refresh_cards(db)
     return await get_professional(db, user)
 
 
+async def _refresh_cards(db: AsyncSession) -> None:
+    from backend.api.services.people import refresh_cards
+
+    await refresh_cards(db)
+
+
 async def clear_professional(db: AsyncSession, user_id: UUID) -> None:
-    """Delete every work detail (DELETE /me/professional and the switch to patient)."""
+    """Delete every work detail (DELETE /me/professional and the switch to patient), with the
+    verification and the public card built on them."""
     await db.execute(_CLEAR_SQL, {"uid": user_id})
+    await _refresh_cards(db)
+
+
+async def clear_verification(db: AsyncSession, user_id: UUID) -> None:
+    """End the verification and hide the card (role change between doctor and researcher)."""
+    await db.execute(_CLEAR_VERIFICATION_SQL, {"uid": user_id})
+    await _refresh_cards(db)
 
 
 async def export_professional(db: AsyncSession, user_id: UUID) -> ProfessionalExport | None:
     """The stored work details, or None if there are none."""
     row = await _row(db, user_id)
+    extra = (
+        (
+            await db.execute(
+                text(f"SELECT {_EXPORT_COLUMNS} FROM profiles WHERE user_id = :uid"),
+                {"uid": user_id},
+            )
+        )
+        .mappings()
+        .one()
+    )
     export = ProfessionalExport(
         first_name=row["first_name"],
         last_name=row["last_name"],
@@ -260,6 +331,7 @@ async def export_professional(db: AsyncSession, user_id: UUID) -> ProfessionalEx
         orcid_id=row["orcid_id"],
         atlas_node_id=row["atlas_node_id"],
         updated_at=row["professional_updated_at"],
+        **dict(extra),
     )
     return export if export != ProfessionalExport() else None
 

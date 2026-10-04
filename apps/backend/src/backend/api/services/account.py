@@ -19,9 +19,11 @@ from backend.api.services import follows as follows_service
 from backend.api.services.chat import message_from_row as chat_message_from_row
 from backend.api.services.chat import runs as chat_runs
 from backend.api.services.contributions import contribution_from_row, refresh_shared_graph
+from backend.api.services.people import refresh_cards
 from backend.api.services.professional import (
     PROFESSIONAL_ROLES,
     clear_professional,
+    clear_verification,
     export_professional,
 )
 from backend.config import get_settings
@@ -116,11 +118,15 @@ async def on_role_change(db: AsyncSession, user_id: UUID, new_role: Role) -> Non
     """What happens to the work details when the role changes.
 
     Decision pending (delete vs. keep hidden). Today: leaving the doctor and researcher roles
-    deletes them. To keep them hidden instead, drop the clear below: the /me/professional routes
-    already answer 403 for patients and the session name only uses them for those two roles.
+    deletes them, with the verification and the public card. To keep them hidden instead, drop
+    the clear below: the /me/professional routes already answer 403 for patients and the session
+    name only uses them for those two roles. Any other role change ends the verification and
+    hides the card (it was checked for the old role).
     """
     if new_role not in PROFESSIONAL_ROLES:
         await clear_professional(db, user_id)
+    else:
+        await clear_verification(db, user_id)
 
 
 async def update_settings(db: AsyncSession, user: CurrentUser, body: SettingsUpdate) -> SessionUser:
@@ -707,3 +713,4 @@ async def delete_account(db: AsyncSession, user: CurrentUser) -> None:
     if deleted is None:
         raise ApiError(401, ErrorCode.sign_in_required)
     await refresh_shared_graph(db, contributions=True, flags=True)
+    await refresh_cards(db)

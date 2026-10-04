@@ -23,6 +23,7 @@ from backend.api.routes import (
     graph,
     health,
     path,
+    people,
     proposal,
     session,
     stats,
@@ -50,6 +51,7 @@ ROUTERS = (
     contributions,
     proposal,
     follows,
+    people,
 )
 
 
@@ -144,6 +146,11 @@ def create_app(settings: Settings | None = None) -> FastAPI:
     install_error_handlers(app)
     for module in ROUTERS:
         app.include_router(module.router)
+    # Simulated ORCID sign-in: every route answers 404 unless ORCID_MOCK is on, which settings
+    # refuse outside loopback (backend.devtools.mock_orcid).
+    from backend.devtools.mock_orcid.router import router as mock_orcid_router
+
+    app.include_router(mock_orcid_router)
     _clean_event_stream_schemas(app)
     return app
 

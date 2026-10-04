@@ -1,10 +1,10 @@
 from fastapi import APIRouter, Request
 from fastapi.responses import Response
 
-from backend.api.deps import LensDep
+from backend.api.deps import DB, LensDep, OptionalUser
 from backend.api.errors import responses
 from backend.api.routes.graph import ATLAS_CACHE_CONTROL
-from backend.api.services import atlas_summary, atlas_tree
+from backend.api.services import atlas_summary, atlas_tree, people
 from backend.schemas.atlas import AtlasSummary, AtlasTree
 
 router = APIRouter(tags=["graph"])
@@ -33,6 +33,12 @@ async def get_atlas_tree(request: Request) -> Response:
     responses=responses(404, 501),
     operation_id="getAtlasSummary",
 )
-async def get_atlas_summary(node_id: str, lens: LensDep) -> AtlasSummary:
-    """A node's connections grouped into sections for the Atlas side panel."""
-    return atlas_summary.atlas_summary(node_id, lens)
+async def get_atlas_summary(
+    node_id: str, lens: LensDep, db: DB, user: OptionalUser
+) -> AtlasSummary:
+    """A node's connections grouped into sections for the Atlas side panel. For signed-in users,
+    researcher and doctor items carry `card_id` when the person has a visible, verified card."""
+    summary = atlas_summary.atlas_summary(node_id, lens)
+    if user is not None and user.age_confirmed:
+        await people.attach_card_ids(db, summary)
+    return summary

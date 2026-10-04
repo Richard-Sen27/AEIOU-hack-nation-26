@@ -2,6 +2,7 @@
 
 from enum import StrEnum
 from typing import Literal
+from uuid import UUID
 
 from pydantic import Field
 
@@ -130,6 +131,9 @@ class SummaryItem(ApiModel):
     via_label: str | None  # e.g. "via 4 papers", "via gene SCN1A"
     # Why the link exists, when the best chain is a single inferred edge carrying one.
     explanation: str | None = None
+    # Researcher and doctor items only, for signed-in users: the person's public card in Amber
+    # (verified, switched on, linked to this entry by a verified link). Null otherwise.
+    card_id: UUID | None = None
 
 
 class SummarySection(ApiModel):

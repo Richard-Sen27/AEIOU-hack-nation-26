@@ -1,7 +1,7 @@
 import re
 import unicodedata
 from datetime import datetime
-from typing import Literal
+from typing import Any, Literal
 from uuid import UUID
 
 from pydantic import ConfigDict, Field, ValidationInfo, field_validator, model_validator
@@ -332,6 +332,21 @@ class ProfessionalExport(ApiModel):
     orcid_id: str | None = None
     atlas_node_id: str | None = None
     updated_at: datetime | None = None
+    # Verification and the opt-in public card (schemas/people.py).
+    orcid_verified_at: datetime | None = None
+    verified_name: str | None = None
+    verification_method: str | None = None
+    verified_at: datetime | None = None
+    verification_reason: str | None = Field(None, description="The operator's logged reason.")
+    verification_request: dict[str, Any] | None = None
+    atlas_link_verified: bool = False
+    card_id: UUID | None = None
+    card_visible: bool = False
+    card_visible_since: datetime | None = None
+    card_headline: str | None = None
+    card_show_institutions: bool = True
+    card_show_atlas_entry: bool = True
+    accepts_patient_messages: bool = False
 
 
 class DataExport(ApiModel):
