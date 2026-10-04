@@ -10678,6 +10678,22 @@
             ],
             "title": "Retry After",
             "description": "rate_limited only: seconds to wait, as in the Retry-After header."
+          },
+          "scope": {
+            "anyOf": [
+              {
+                "type": "string",
+                "enum": [
+                  "account",
+                  "server"
+                ]
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Scope",
+            "description": "budget only: account (this account's daily limit) or server (Amber's daily limit for everyone)."
           }
         },
         "type": "object",

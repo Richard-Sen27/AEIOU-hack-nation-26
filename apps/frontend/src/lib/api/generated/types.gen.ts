@@ -2586,6 +2586,12 @@ export type ErrorDetail = {
      * rate_limited only: seconds to wait, as in the Retry-After header.
      */
     retry_after?: number | null;
+    /**
+     * Scope
+     *
+     * budget only: account (this account's daily limit) or server (Amber's daily limit for everyone).
+     */
+    scope?: 'account' | 'server' | null;
 };
 
 /**
