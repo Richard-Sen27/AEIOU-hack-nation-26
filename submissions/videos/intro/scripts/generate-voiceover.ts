@@ -1,5 +1,5 @@
 // Writes public/voiceover/*.mp3 from the narration in src/content.ts.
-// Usage: npm run voiceover              (all ten clips)
+// Usage: npm run voiceover              (all twelve clips)
 //        npm run voiceover -- hello     (only the listed clip ids)
 // Needs ELEVENLABS_API_KEY and ELEVENLABS_VOICE_ID, from the environment or .env.
 // Each run calls the paid ElevenLabs API once per clip.

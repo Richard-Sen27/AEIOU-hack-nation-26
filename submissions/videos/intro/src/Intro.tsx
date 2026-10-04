@@ -37,40 +37,54 @@ const transition = () => (
 );
 
 const FPS = 30;
-// Frames of quiet after a clip ends, before the next fade starts.
+// Frames of quiet after a scene's last clip, before the next fade starts.
 const BREATH = 8;
-// The title scene has no incoming fade; its clip starts once "Amber" has popped in.
-const TITLE_LEAD = 15;
+// Frames of quiet between two clips spoken over the same picture.
+const CLIP_GAP = 6;
+// The title scene has no incoming fade; its clip starts almost at once.
+const TITLE_LEAD = 6;
 // How long the last scene stays on screen after the final clip.
 const OUTRO_HOLD = 60;
 
-// Scenes in playback order, each with the clip spoken over it.
+// Scenes in playback order, each with the clips spoken over it.
 const SCENE_CLIPS = {
-  title: 'hello',
-  school: 'school',
-  mindstorm: 'robotics',
-  pizza: 'vienna',
-  lsz: 'hackathons',
-  france1: 'challenges',
-  france2: 'goal',
-  dai: 'awards',
-  team: 'challenge',
-  outro: 'decision',
-} as const satisfies Record<string, ClipId>;
+  title: ['hello'],
+  school: ['studies', 'school'],
+  // No photo of the Vienna schools yet, so the robots stay for that sentence.
+  mindstorm: ['robotics', 'vienna'],
+  france1: ['hackathons'],
+  france2: ['challenges'],
+  lsz: ['goal'],
+  dai: ['awards'],
+  pizza: ['challenge'],
+  team: ['members'],
+  outro: ['decision'],
+} as const satisfies Record<string, readonly ClipId[]>;
 
 type SceneId = keyof typeof SCENE_CLIPS;
 const SCENE_ORDER = Object.keys(SCENE_CLIPS) as SceneId[];
 
-// A clip starts once its picture has fully faded in, and ends BREATH frames
-// before the fade to the next picture begins, so no word plays over a fade.
-const leadFrames = (scene: SceneId) =>
-  scene === SCENE_ORDER[0] ? TITLE_LEAD : TRANSITION;
+const clipFrames = (clip: ClipId) => Math.ceil(clipSeconds(clip) * FPS);
 
-const sceneFrames = (scene: SceneId) =>
-  leadFrames(scene) +
-  Math.ceil(clipSeconds(SCENE_CLIPS[scene]) * FPS) +
-  BREATH +
-  (scene === SCENE_ORDER[SCENE_ORDER.length - 1] ? OUTRO_HOLD : TRANSITION);
+// Where each of the scene's clips starts, in frames from the scene's start.
+// The first starts once the picture has fully faded in; the last ends BREATH
+// frames before the fade to the next picture begins, so no word plays over a fade.
+const clipStarts = (scene: SceneId): number[] => {
+  let at = scene === SCENE_ORDER[0] ? TITLE_LEAD : TRANSITION;
+  return SCENE_CLIPS[scene].map((clip) => {
+    const start = at;
+    at += clipFrames(clip) + CLIP_GAP;
+    return start;
+  });
+};
+
+const sceneFrames = (scene: SceneId) => {
+  const clips = SCENE_CLIPS[scene];
+  const last = clips[clips.length - 1];
+  const speechEnd = clipStarts(scene)[clips.length - 1] + clipFrames(last);
+  const isLast = scene === SCENE_ORDER[SCENE_ORDER.length - 1];
+  return speechEnd + BREATH + (isLast ? OUTRO_HOLD : TRANSITION);
+};
 
 export const SCENES = Object.fromEntries(
   SCENE_ORDER.map((scene) => [scene, sceneFrames(scene)]),
@@ -80,20 +94,25 @@ export const TOTAL_DURATION =
   Object.values(SCENES).reduce((a, b) => a + b, 0) -
   (Object.keys(SCENES).length - 1) * TRANSITION;
 
-// Plays the scene's clip if public/ holds it; silent until it is generated.
+// Plays the scene's clips that public/ holds; silent until they are generated.
 const Voiceover: React.FC<{scene: SceneId}> = ({scene}) => {
   const {fps} = useVideoConfig();
-  const file = CLIPS[SCENE_CLIPS[scene]].voiceover;
-  if (!getStaticFiles().some((f) => f.name === file)) {
-    return null;
-  }
+  const available = new Set(getStaticFiles().map((f) => f.name));
+  const starts = clipStarts(scene);
   return (
-    <Audio
-      name={`Voiceover ${scene}`}
-      src={staticFile(file)}
-      from={leadFrames(scene)}
-      premountFor={fps}
-    />
+    <>
+      {SCENE_CLIPS[scene].map((clip, i) =>
+        available.has(CLIPS[clip].voiceover) ? (
+          <Audio
+            key={clip}
+            name={`Voiceover ${clip}`}
+            src={staticFile(CLIPS[clip].voiceover)}
+            from={starts[i]}
+            premountFor={fps}
+          />
+        ) : null,
+      )}
+    </>
   );
 };
 
@@ -136,31 +155,6 @@ export const Intro: React.FC = () => {
         </TransitionSeries.Sequence>
         {transition()}
 
-        {/* Stand-in for the Vienna schools (Spengergasse, Rennweg) until a photo exists. */}
-        <TransitionSeries.Sequence durationInFrames={SCENES.pizza}>
-          <PhotoScene
-            src={teamPizza}
-            eyebrow="One team"
-            caption="Fueled by pizza and big ideas"
-            durationInFrames={SCENES.pizza}
-            objectPosition="50% 40%"
-          />
-          <Voiceover scene="pizza" />
-        </TransitionSeries.Sequence>
-        {transition()}
-
-        <TransitionSeries.Sequence durationInFrames={SCENES.lsz}>
-          <PhotoScene
-            src={lszHackathon}
-            eyebrow="LSZ Hackathon 2024"
-            caption="Then hackathons became our thing"
-            durationInFrames={SCENES.lsz}
-            objectPosition="50% 35%"
-          />
-          <Voiceover scene="lsz" />
-        </TransitionSeries.Sequence>
-        {transition()}
-
         <TransitionSeries.Sequence durationInFrames={SCENES.france1}>
           <PhotoScene
             src={france1}
@@ -184,7 +178,18 @@ export const Intro: React.FC = () => {
         </TransitionSeries.Sequence>
         {transition()}
 
-        {/* Stand-in for the national AI championship (BWKI) and AI for Green award until photos exist. */}
+        <TransitionSeries.Sequence durationInFrames={SCENES.lsz}>
+          <PhotoScene
+            src={lszHackathon}
+            eyebrow="LSZ Hackathon 2024"
+            caption="Then hackathons became our thing"
+            durationInFrames={SCENES.lsz}
+            objectPosition="50% 35%"
+          />
+          <Voiceover scene="lsz" />
+        </TransitionSeries.Sequence>
+        {transition()}
+
         <TransitionSeries.Sequence durationInFrames={SCENES.dai}>
           <PhotoScene
             src={daiHouse}
@@ -195,6 +200,18 @@ export const Intro: React.FC = () => {
             containOnBlur
           />
           <Voiceover scene="dai" />
+        </TransitionSeries.Sequence>
+        {transition()}
+
+        <TransitionSeries.Sequence durationInFrames={SCENES.pizza}>
+          <PhotoScene
+            src={teamPizza}
+            eyebrow="One team"
+            caption="Fueled by pizza and big ideas"
+            durationInFrames={SCENES.pizza}
+            objectPosition="50% 40%"
+          />
+          <Voiceover scene="pizza" />
         </TransitionSeries.Sequence>
         {transition()}
 
