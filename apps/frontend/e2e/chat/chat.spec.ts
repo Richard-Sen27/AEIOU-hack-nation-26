@@ -53,8 +53,8 @@ test.describe("chat", () => {
     await expect(t.locator('[data-testid="chip"][data-negated]')).toContainText("Excluded");
     await expect(t.getByTestId("vus-notice").first()).toBeVisible();
     await expect(t.getByTestId("claim")).toHaveCount(3);
-    await expect(t.getByTestId("claim").first().getByTestId("origin-badge")).toHaveText("Hypothesis");
-    await expect(t.getByTestId("claim").nth(1).getByTestId("origin-badge")).toHaveText("Data");
+    await expect(t.getByTestId("claim").first().getByTestId("claim-hypothesis")).toContainText("Hypothesis");
+    await expect(t.getByTestId("claim").nth(1).getByTestId("claim-hypothesis")).toHaveCount(0);
     await expect(t.getByTestId("missing-evidence")).toContainText("SYNGAP1");
     await expect(t.getByTestId("mini-graph")).toBeVisible();
     await expect(t.getByTestId("mini-graph").locator('[data-edge-origin="inferred"] line').first()).toHaveAttribute("stroke-dasharray", "6 4");
@@ -107,7 +107,7 @@ test.describe("chat", () => {
       return !!(u.compareDocumentPosition(s) & Node.DOCUMENT_POSITION_FOLLOWING);
     });
     expect(before).toBe(true);
-    await expect(t.getByTestId("claim-confidence")).toContainText("Low");
+    await expect(t.getByTestId("claim-confidence")).toContainText("Weak evidence");
   });
 
   test("uncertainty event renders above the summary before the reply is final", async ({ page }) => {
@@ -132,19 +132,16 @@ test.describe("chat", () => {
     expect(before).toBe(true);
   });
 
-  test("claim evidence expands, with the contradiction next to its claim", async ({ page }) => {
+  test("sources open from one line, with the contradiction next to its claim", async ({ page }) => {
     await signedIn(page, { "POST /chat": turnBody() });
     await page.goto("/chat");
     await ask(page);
     const claim = turn(page).getByTestId("claim").first();
     await expect(claim.getByTestId("contradiction")).toContainText("seizures are only occasional");
-    await claim.getByRole("button", { name: /Evidence · 1 link/ }).click();
-    const item = claim.locator('[data-edge-id="e_3b8845b635b8"]');
-    await expect(item).toContainText("SCN2A developmental and epileptic encephalopathy");
-    await item.getByRole("button", { name: /Show 1 source/ }).click();
-    await expect(item.getByTestId("evidence-list")).toContainText("fixture:80.1");
-    await claim.getByRole("button", { name: "Show contradicting sources" }).click();
-    await expect(claim.locator('[data-edge-id="e_9a6ff6e0e247"]')).toBeVisible();
+    await turn(page).getByTestId("sources").getByRole("button", { name: /^Sources/ }).click();
+    const list = turn(page).getByTestId("sources-list");
+    await expect(list.getByTestId("source").first()).toBeVisible();
+    await expect(list).toContainText("disagrees");
   });
 
   test("chips: confirm, remove and correct update the profile", async ({ page }) => {
@@ -644,7 +641,7 @@ test.describe("chat", () => {
     await page.goto("/chat");
     await ask(page);
     await expect(turn(page)).toHaveAttribute("data-phase", "done");
-    await turn(page).getByTestId("claim").first().getByRole("button", { name: /Evidence/ }).click();
+    await turn(page).getByTestId("sources").getByRole("button", { name: /^Sources/ }).click();
     expect(urls.some((u) => /daughter|seizures|walking/i.test(decodeURIComponent(u)))).toBe(false);
     const stored = await page.evaluate(() => JSON.stringify({ ...localStorage }) + JSON.stringify({ ...sessionStorage }));
     expect(stored).not.toMatch(/daughter|seizures|STXBP1|Dr\. Wu/);
@@ -659,8 +656,8 @@ test.describe("chat", () => {
       await shot(page, `chat-empty-${theme}`);
       await ask(page);
       await expect(turn(page)).toHaveAttribute("data-phase", "done");
-      await turn(page).getByTestId("claim").first().getByRole("button", { name: /Evidence/ }).click();
-      await expect(turn(page).locator('[data-edge-id="e_3b8845b635b8"]').first()).toBeVisible();
+      await turn(page).getByTestId("sources").getByRole("button", { name: /^Sources/ }).click();
+      await expect(turn(page).getByTestId("sources-list")).toBeVisible();
       await page.getByTestId("chat-log").evaluate((el) => {
         el.style.overflow = "visible";
         el.style.height = "auto";

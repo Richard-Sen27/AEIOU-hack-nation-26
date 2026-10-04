@@ -1,13 +1,16 @@
 "use client";
 
-import { ArrowRight, ChevronDown } from "lucide-react";
-import { useState } from "react";
+import { Lightbulb } from "lucide-react";
+import Link from "next/link";
 
-import { EdgeTrustRow, EvidenceList, NodeChip, VusNotice } from "@/components/graph-ui";
+import { VusNotice } from "@/components/graph-ui";
 import { Skeleton } from "@/components/ui/skeleton";
+import { relationLabel } from "@/lib/graph/meta";
 import { isVus } from "@/lib/graph/types";
 import { cn } from "@/lib/utils";
 
+import { useNodes } from "./graph-data";
+import { collectSources, paperIdsToLoad, SourceRow } from "./sources";
 import type { EdgeEvidence } from "./types";
 
 type Node = EdgeEvidence["source"];
@@ -17,22 +20,22 @@ export function nodeIsVus(node: Node | undefined | null): boolean {
 }
 
 /**
- * One cited link: source → target, its trust row (relation, confidence,
- * origin, status) and, on click, every supporting and contradicting source.
+ * One cited link in plain words: "A can cause B", a hypothesis marked with its reason, and the
+ * sources by what they are (papers by title, trials by registry number, databases by name).
+ * The full trust breakdown stays on the node and edge pages.
  */
 export function EdgeItem({
   id,
   data,
-  defaultOpen = false,
   tone = "default",
 }: {
   id: string;
   /** `undefined` while loading, `null` if unavailable. */
   data: EdgeEvidence | null | undefined;
+  /** Kept for callers; the sources are always shown now. */
   defaultOpen?: boolean;
   tone?: "default" | "contradiction";
 }) {
-  const [open, setOpen] = useState(defaultOpen);
   if (data === undefined) {
     return (
       <div className="space-y-2 rounded-lg border bg-card p-3" aria-busy="true">
@@ -44,41 +47,53 @@ export function EdgeItem({
   if (data === null) {
     return (
       <p className="rounded-lg border border-dashed bg-card/60 px-3 py-2 text-xs text-muted-foreground">
-        The sources for link <span className="font-mono">{id}</span> could not be loaded right now.
+        The sources for this link could not be loaded right now.
       </p>
     );
   }
-  const evidence = [...data.supporting, ...data.contradicting];
   const vus = nodeIsVus(data.source) || nodeIsVus(data.target);
+  const inferred = data.edge.origin === "inferred";
+  const nodeLink = (n: Node) => (
+    <Link href={`/node/${encodeURIComponent(n.id)}`} className="font-medium underline-offset-2 hover:underline">
+      {n.label}
+    </Link>
+  );
   return (
     <div
-      className={cn(
-        "rounded-lg border bg-card p-3",
-        tone === "contradiction" && "border-confidence-low/40",
-      )}
+      className={cn("rounded-lg border bg-card px-3 py-2", tone === "contradiction" && "border-confidence-low/40")}
       data-testid="edge-item"
       data-edge-id={id}
     >
-      <div className="flex flex-wrap items-center gap-1.5">
-        <NodeChip id={data.source.id} type={data.source.type} label={data.source.label} size="sm" />
-        <ArrowRight className="size-3.5 text-muted-foreground" aria-label="to" />
-        <NodeChip id={data.target.id} type={data.target.type} label={data.target.label} size="sm" />
-      </div>
-      <EdgeTrustRow className="mt-2" edge={{ ...data.edge, evidence }} />
+      {/* The link as a plain sentence, never an internal relation name. */}
+      <p className="text-[13px] leading-snug" dir="auto">
+        {nodeLink(data.source)} <span className="text-muted-foreground">{relationLabel(data.edge.relation, "plain")}</span>{" "}
+        {nodeLink(data.target)}
+        {data.edge.status !== "active" && <span className="ml-1.5 text-xs text-status-flag">(under review)</span>}
+      </p>
+      {inferred && (
+        <p className="mt-1 flex items-start gap-1.5 text-xs text-muted-foreground">
+          <span className="inline-flex shrink-0 items-center gap-1 rounded-full border border-dashed border-foreground/40 px-1.5 leading-4 font-medium text-foreground">
+            <Lightbulb className="size-3" aria-hidden /> Hypothesis
+          </span>
+          <span dir="auto">{data.edge.explanation ?? "Worked out from the data, not confirmed by a study."}</span>
+        </p>
+      )}
       {vus && <VusNotice compact className="mt-2" />}
-      <button
-        type="button"
-        aria-expanded={open}
-        onClick={() => setOpen((o) => !o)}
-        className="mt-2 inline-flex items-center gap-1 rounded text-xs font-medium text-muted-foreground outline-none hover:text-foreground focus-visible:ring-2 focus-visible:ring-ring"
-      >
-        <ChevronDown className={cn("size-3.5 transition-transform motion-reduce:transition-none", open && "rotate-180")} aria-hidden />
-        {open ? "Hide sources" : `Show ${evidence.length} source${evidence.length === 1 ? "" : "s"}`}
-        {data.contradicting.length > 0 && (
-          <span className="text-confidence-low">· {data.contradicting.length} contradicting</span>
-        )}
-      </button>
-      {open && <EvidenceList className="mt-2" evidence={evidence} />}
+      <EdgeSources data={data} />
     </div>
+  );
+}
+
+/** The link's own sources, by what they are (papers by title, databases by name). */
+function EdgeSources({ data }: { data: EdgeEvidence }) {
+  const papers = useNodes(paperIdsToLoad([data]).slice(0, 6));
+  const docs = collectSources([{ edgeIds: [data.edge.id] }], { [data.edge.id]: data }, papers);
+  if (docs.length === 0) return <p className="mt-1 text-xs text-muted-foreground">No sources listed for this link.</p>;
+  return (
+    <ul className="mt-1 divide-y">
+      {docs.map((d) => (
+        <SourceRow key={d.key} doc={d} />
+      ))}
+    </ul>
   );
 }

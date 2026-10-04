@@ -68,7 +68,7 @@ test.describe("chat with Dr. Wu", () => {
       // Claims cite real edges; their evidence opens with sources.
       const claim = turn.getByTestId("claim").first();
       await expect(claim).toBeVisible();
-      await expect(claim.getByTestId("origin-badge").first()).toBeVisible();
+      await expect(turn.getByTestId("sources")).toBeVisible();
       await shot(page, "chat-reply", { fullPage: true });
 
       // Confirm the first matched chip; the profile takes the consent's child answer.

@@ -6,6 +6,7 @@ import { useCallback, useEffect, useId, useMemo, useRef, useState, useSyncExtern
 import { toast } from "sonner";
 
 import { useNodes } from "@/components/chat/graph-data";
+import { Claims } from "@/components/chat/claims";
 import { SymptomMatchCard } from "@/components/chat/symptom-match";
 import { isEmergencyReply, rankedIds, replyNames, type AssistantTurn, type PartialReply, type TurnError } from "@/components/chat/types";
 import { useChat } from "@/components/chat/use-chat";
@@ -544,6 +545,7 @@ function CompactTurn({
             </p>
           )}
           {turn.final && r.symptom_match && <SymptomMatchCard match={r.symptom_match} isOnMap={isOnMap} onSelect={onSelectNode} />}
+          {turn.final && <Claims reply={r} compact />}
           {turn.final && foundCount === 0 && (
             <p className="text-xs text-muted-foreground" data-testid="atlas-wu-none">
               Nothing found.

@@ -1,14 +1,13 @@
 "use client";
 
-import { ChevronDown, CircleHelp, CircleSlash } from "lucide-react";
-import { useState } from "react";
+import { CircleHelp, CircleSlash, Lightbulb } from "lucide-react";
+import { useMemo } from "react";
 
-import { OriginBadge } from "@/components/graph-ui";
 import { CONFIDENCE_LABEL, ORIGIN_META } from "@/lib/graph/meta";
 import { cn } from "@/lib/utils";
 
-import { EdgeItem } from "./edge-item";
 import { useEdges } from "./graph-data";
+import { SourcesToggle } from "./sources";
 import type { Claim, PartialReply } from "./types";
 
 const LEVEL_CLASS = {
@@ -38,14 +37,31 @@ export function LevelBadge({ level }: { level: Claim["confidence"] }) {
   );
 }
 
-function EdgeList({ ids, tone }: { ids: string[]; tone?: "contradiction" }) {
-  const edges = useEdges(ids);
+const HYPOTHESIS_FALLBACK = "Worked out from the data, not confirmed by a study.";
+
+/**
+ * A computed hypothesis stays visibly marked, with its one-line reason (the cited link's
+ * explanation); patient-reported and user-added statements say so in plain words.
+ */
+function OriginNote({ claim }: { claim: Claim }) {
+  const edges = useEdges(claim.origin === "inferred" ? claim.edge_ids : []);
+  if (claim.origin === "observed") return null;
+  if (claim.origin !== "inferred") {
+    return (
+      <p className="mt-1 text-xs text-muted-foreground" data-testid="claim-origin">
+        <span className="font-medium text-status-flag">{ORIGIN_META[claim.origin]?.label.plain}</span> ·{" "}
+        {ORIGIN_META[claim.origin]?.description}
+      </p>
+    );
+  }
+  const reason = claim.edge_ids.map((id) => edges[id]?.edge.explanation).find(Boolean);
   return (
-    <div className="space-y-2">
-      {ids.map((id) => (
-        <EdgeItem key={id} id={id} data={edges[id]} tone={tone} defaultOpen={tone === "contradiction"} />
-      ))}
-    </div>
+    <p className="mt-1 flex items-start gap-1.5 text-xs text-muted-foreground" data-testid="claim-hypothesis">
+      <span className="inline-flex shrink-0 items-center gap-1 rounded-full border border-dashed border-foreground/40 px-1.5 leading-4 font-medium text-foreground">
+        <Lightbulb className="size-3" aria-hidden /> Hypothesis
+      </span>
+      <span dir="auto">{reason ?? HYPOTHESIS_FALLBACK}</span>
+    </p>
   );
 }
 
@@ -53,112 +69,81 @@ function ClaimItem({
   claim,
   index,
   contradictions,
+  compact,
 }: {
   claim: Claim;
   index: number;
   contradictions: PartialReply["contradictions"];
+  compact?: boolean;
 }) {
-  const [open, setOpen] = useState(false);
-  const [contraOpen, setContraOpen] = useState(false);
-  const line = ORIGIN_META[claim.origin]?.line ?? "solid";
+  const weak = claim.confidence === "low";
   return (
-    <li
-      className={cn(
-        "rounded-lg border-l-[3px] bg-card/60 py-2.5 pr-3 pl-3.5",
-        line === "solid" && "border-solid border-l-foreground/40",
-        line === "dashed" && "border-dashed border-l-foreground/40",
-        line === "dotted" && "border-dotted border-l-status-flag",
-      )}
-      data-testid="claim"
-      data-origin={claim.origin}
-    >
-      <p dir="auto" className="text-[15px] leading-relaxed">
-        {claim.text}
-      </p>
-      <div className="mt-1.5 flex flex-wrap items-center gap-1.5">
-        <OriginBadge origin={claim.origin} />
-        <LevelBadge level={claim.confidence} />
-        {claim.edge_ids.length > 0 && (
-          <button
-            type="button"
-            aria-expanded={open}
-            onClick={() => setOpen((o) => !o)}
-            className="inline-flex h-6 items-center gap-1 rounded-md px-1.5 text-xs font-medium text-muted-foreground outline-none hover:bg-muted hover:text-foreground focus-visible:ring-2 focus-visible:ring-ring"
-          >
-            <ChevronDown className={cn("size-3.5 transition-transform motion-reduce:transition-none", open && "rotate-180")} aria-hidden />
-            {open ? "Hide evidence" : `Evidence · ${claim.edge_ids.length} link${claim.edge_ids.length === 1 ? "" : "s"}`}
-          </button>
-        )}
-      </div>
-
-      {contradictions.map((c, ci) => (
-        <div
-          key={ci}
-          className="mt-2.5 rounded-md border border-confidence-low/50 bg-confidence-low/5 px-3 py-2"
-          data-testid="contradiction"
-        >
-          <p className="flex items-start gap-2 text-sm">
-            <CircleSlash className="mt-0.5 size-4 shrink-0 text-confidence-low" aria-hidden />
+    <li className="flex items-start gap-2" data-testid="claim" data-origin={claim.origin}>
+      <span className="mt-[3px] w-4 shrink-0 text-right font-mono text-[11px] text-muted-foreground tabular-nums" aria-hidden>
+        {index + 1}
+      </span>
+      <div className="min-w-0 flex-1">
+        <p dir="auto" className={cn("leading-relaxed", compact ? "text-[13px]" : "text-[15px]")}>
+          {claim.text}
+          {weak && (
+            <span className="ml-1.5 inline-flex rounded-full border border-confidence-low/40 px-1.5 align-[1px] text-[11px] leading-4 text-confidence-low" data-testid="claim-confidence">
+              Weak evidence
+            </span>
+          )}
+        </p>
+        <OriginNote claim={claim} />
+        {contradictions.map((c, ci) => (
+          <p key={ci} className="mt-1 flex items-start gap-1.5 text-xs" data-testid="contradiction">
+            <CircleSlash className="mt-px size-3.5 shrink-0 text-confidence-low" aria-hidden />
             <span dir="auto">
-              <span className="font-medium">Contradicting evidence: </span>
+              <span className="font-medium text-confidence-low">Some sources disagree: </span>
               {c.note}
             </span>
           </p>
-          {c.edge_ids.length > 0 && (
-            <>
-              <button
-                type="button"
-                aria-expanded={contraOpen}
-                onClick={() => setContraOpen((o) => !o)}
-                className="mt-1 ml-6 inline-flex items-center gap-1 rounded text-xs font-medium text-muted-foreground outline-none hover:text-foreground focus-visible:ring-2 focus-visible:ring-ring"
-              >
-                <ChevronDown className={cn("size-3.5 transition-transform motion-reduce:transition-none", contraOpen && "rotate-180")} aria-hidden />
-                {contraOpen ? "Hide contradicting sources" : "Show contradicting sources"}
-              </button>
-              {contraOpen && (
-                <div className="mt-2">
-                  <EdgeList ids={c.edge_ids} tone="contradiction" />
-                </div>
-              )}
-            </>
-          )}
-        </div>
-      ))}
-
-      {open && (
-        <div className="mt-2.5" data-testid={`claim-${index}-evidence`}>
-          <EdgeList ids={claim.edge_ids} />
-        </div>
-      )}
+        ))}
+      </div>
     </li>
   );
 }
 
 /**
- * Claims with origin (data vs hypothesis), confidence and cited edges.
- * Contradictions sit directly under the claim they contradict; missing
- * evidence is listed as what is not known.
+ * The cited statements in plain words, numbered: hypotheses marked with their reason,
+ * contradictions right under their statement. Their sources sit behind one short
+ * "Sources · N" line, collapsed by default; every statement keeps its sources there.
+ * Missing evidence is listed as what is not known.
  */
-export function Claims({ reply }: { reply: PartialReply }) {
+export function Claims({ reply, compact = false }: { reply: PartialReply; compact?: boolean }) {
+  const groups = useMemo(
+    () =>
+      reply.claims.map((c, i) => ({
+        ref: i + 1,
+        edgeIds: [...new Set([...c.edge_ids, ...reply.contradictions.filter((x) => x.claim_index === i).flatMap((x) => x.edge_ids)])],
+      })),
+    [reply.claims, reply.contradictions],
+  );
   if (reply.claims.length === 0 && reply.missing_evidence.length === 0) return null;
   return (
-    <section aria-label="What the evidence says" className="space-y-3">
+    <section aria-label="What the sources say" className={compact ? "space-y-2" : "space-y-3"} data-testid="claims">
       {reply.claims.length > 0 && (
-        <>
-          <h3 className="font-mono text-[10.5px] uppercase tracking-[0.14em] text-muted-foreground">What the evidence says</h3>
-          <ol className="space-y-2">
+        <div>
+          <h3 className="mb-1.5 text-xs font-medium text-muted-foreground">What the sources say</h3>
+          <ol className="space-y-1.5">
             {reply.claims.map((claim, i) => (
               <ClaimItem
                 key={i}
                 claim={claim}
                 index={i}
+                compact={compact}
                 contradictions={reply.contradictions.filter((c) => c.claim_index === i)}
               />
             ))}
           </ol>
-        </>
+          <div className="mt-1 -ml-1.5">
+            <SourcesToggle groups={groups} />
+          </div>
+        </div>
       )}
-      {reply.missing_evidence.length > 0 && (
+      {reply.missing_evidence.length > 0 && !compact && (
         <div className="rounded-lg border border-dashed px-3.5 py-3" data-testid="missing-evidence">
           <h3 className="text-sm font-medium">What is not known yet</h3>
           <ul className="mt-1.5 space-y-1">

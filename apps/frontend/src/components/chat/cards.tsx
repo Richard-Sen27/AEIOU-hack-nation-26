@@ -20,7 +20,7 @@ import type { Card, NodeDetail } from "./types";
 const CARD_META = {
   mini_graph: { icon: Share2, title: "How these connect" },
   patient_group: { icon: HeartHandshake, title: "Patient groups" },
-  evidence: { icon: FileSearch, title: "Evidence" },
+  evidence: { icon: FileSearch, title: "Where this comes from" },
   open_in_atlas: { icon: MapIcon, title: "Open in Atlas" },
 } as const;
 
