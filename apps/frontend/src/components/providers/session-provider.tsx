@@ -14,6 +14,7 @@ import {
 import { apiUrl } from "@/lib/api/config";
 import { getSession, logout, unwrap } from "@/lib/api";
 import type { SessionInfo, SessionUser } from "@/lib/api/types";
+import type { AuthProvider } from "@/lib/api/generated/types.gen";
 
 type SessionStatus = "loading" | "ready" | "offline";
 
@@ -26,11 +27,13 @@ type SessionContextValue = {
   dataVersion: string | null;
   /** `offline`: the API could not be reached; the app runs as a guest. */
   status: SessionStatus;
+  /** Sign-in methods the API offers (`google` only when the server enables it). */
+  signInMethods: AuthProvider[];
   /**
-   * Navigate to the ChatGPT sign-in. `returnTo` must be a relative path
-   * (defaults to the current page); never put health data in it.
+   * Navigate to the ChatGPT (default) or Google sign-in. `returnTo` must be a
+   * relative path (defaults to the current page); never put health data in it.
    */
-  signIn: (returnTo?: string) => void;
+  signIn: (returnTo?: string, method?: AuthProvider) => void;
   signOut: () => Promise<void>;
   /** Re-fetch `/auth/session` (e.g. after a consent or role change). */
   refresh: () => Promise<SessionInfo | null>;
@@ -38,7 +41,13 @@ type SessionContextValue = {
 
 const SessionContext = createContext<SessionContextValue | null>(null);
 
-const GUEST: SessionInfo = { user: null, gpc: false, demo_mode: false, data_version: null };
+const GUEST: SessionInfo = {
+  user: null,
+  gpc: false,
+  demo_mode: false,
+  data_version: null,
+  sign_in_methods: ["openai"],
+};
 
 const noopSubscribe = () => () => {};
 const readBrowserGpc = () =>
@@ -77,14 +86,13 @@ export function SessionProvider({ children }: { children: React.ReactNode }) {
   }, [refresh]);
 
   const signIn = useCallback(
-    (returnTo?: string) => {
+    (returnTo?: string, method: AuthProvider = "openai") => {
       // Keep only the path: query strings could carry user input.
       const target = safeReturnTo(returnTo ?? pathname ?? "/");
+      const start = method === "google" ? "/auth/google/start" : "/auth/chatgpt/start";
       // Full navigation to the API's OAuth start (another origin).
       // eslint-disable-next-line @next/next/no-location-assign-relative-destination
-      window.location.assign(
-        `${apiUrl("/auth/chatgpt/start")}?return_to=${encodeURIComponent(target)}`,
-      );
+      window.location.assign(`${apiUrl(start)}?return_to=${encodeURIComponent(target)}`);
     },
     [pathname],
   );
@@ -110,6 +118,7 @@ export function SessionProvider({ children }: { children: React.ReactNode }) {
       demoMode: !!session.demo_mode,
       dataVersion: session.data_version ?? null,
       status,
+      signInMethods: session.sign_in_methods?.length ? session.sign_in_methods : ["openai"],
       signIn,
       signOut,
       refresh,

@@ -2,7 +2,7 @@
 
 import { LockKeyhole } from "lucide-react";
 
-import { ContinueWithChatGPT } from "@/components/gates/continue-with-chatgpt";
+import { SignInButtons } from "@/components/gates/sign-in-buttons";
 import { useSession } from "@/components/providers/session-provider";
 import { Skeleton } from "@/components/ui/skeleton";
 
@@ -34,7 +34,7 @@ export function SignInPrompt({
           Amber&apos;s server can&apos;t be reached, so sign-in is unavailable for now.
         </p>
       ) : (
-        <ContinueWithChatGPT returnTo={returnTo} />
+        <SignInButtons returnTo={returnTo} />
       )}
       <p className="text-xs text-muted-foreground">Accounts are for people aged 16 or older.</p>
     </section>

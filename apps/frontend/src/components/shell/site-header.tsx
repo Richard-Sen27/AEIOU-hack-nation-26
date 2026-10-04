@@ -6,7 +6,7 @@ import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { useState } from "react";
 
-import { ContinueWithChatGPT } from "@/components/gates/continue-with-chatgpt";
+import { HeaderSignIn, SignInButtons } from "@/components/gates/sign-in-buttons";
 import { CountBadge, NotificationBell, unreadLabel } from "@/components/notifications/notification-bell";
 import { NotificationList } from "@/components/notifications/notification-list";
 import { useUnreadCount } from "@/components/notifications/use-unread-count";
@@ -121,7 +121,7 @@ export function SiteHeader() {
             ) : status === "loading" ? (
               <span className="h-9 w-[178px]" aria-hidden />
             ) : (
-              <ContinueWithChatGPT size="compact" />
+              <HeaderSignIn />
             )}
           </div>
 
@@ -205,7 +205,7 @@ export function SiteHeader() {
                   </div>
                 ) : (
                   <>
-                    <ContinueWithChatGPT className="w-full" onClick={() => setMobileOpen(false)} />
+                    <SignInButtons buttonClassName="w-full" onClick={() => setMobileOpen(false)} />
                     <p className="mt-4 flex gap-4 text-sm">
                       <Link href="/privacy" onClick={() => setMobileOpen(false)} className="text-muted-foreground underline-offset-4 hover:text-foreground hover:underline">
                         Privacy

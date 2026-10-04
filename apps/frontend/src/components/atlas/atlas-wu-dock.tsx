@@ -8,7 +8,7 @@ import { toast } from "sonner";
 import { useNodes } from "@/components/chat/graph-data";
 import { isEmergencyReply, type AssistantTurn, type PartialReply, type TurnError } from "@/components/chat/types";
 import { useChat } from "@/components/chat/use-chat";
-import { ContinueWithChatGPT } from "@/components/gates/continue-with-chatgpt";
+import { SignInButtons } from "@/components/gates/sign-in-buttons";
 import { useGate } from "@/components/providers/gate-provider";
 import { useLens } from "@/components/providers/lens-provider";
 import { useSession } from "@/components/providers/session-provider";
@@ -298,7 +298,7 @@ function GuestDock({ index, pendingQuestion, onPendingConsumed, found, onClear, 
         <div className="space-y-3" data-testid="atlas-wu-guest">
           <p className="text-sm">Describe the problem, Dr. Wu finds the dots.</p>
           <AiNote />
-          <ContinueWithChatGPT />
+          <SignInButtons />
           <p className="text-[11px] text-muted-foreground">
             16+ only · nothing sold or shared ·{" "}
             <Link href="/privacy" className="underline underline-offset-2">
@@ -480,12 +480,13 @@ function SignedInDock({
 }
 
 const ERROR_COPY: Record<string, { icon: typeof CircleAlert; title: string; retry: boolean }> = {
-  rate_limited: { icon: Clock, title: "ChatGPT usage limit reached", retry: true },
+  rate_limited: { icon: Clock, title: "The usage limit is reached", retry: true },
   reauth_required: { icon: KeyRound, title: "Please sign in again", retry: false },
   sign_in_required: { icon: KeyRound, title: "Please sign in again", retry: false },
   timeout: { icon: Clock, title: "No answer in time", retry: true },
   network_error: { icon: WifiOff, title: "Connection dropped", retry: true },
   not_implemented: { icon: CircleAlert, title: "Dr. Wu is not available yet", retry: true },
+  assistant_unavailable: { icon: CircleAlert, title: "Dr. Wu is not available for this sign-in", retry: false },
 };
 
 function errorCopy(err: TurnError) {

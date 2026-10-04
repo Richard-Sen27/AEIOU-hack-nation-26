@@ -11,7 +11,7 @@ import {
   DialogTitle,
 } from "@/components/ui/dialog";
 
-import { ContinueWithChatGPT } from "./continue-with-chatgpt";
+import { SignInButtons, useGoogleSignIn } from "./sign-in-buttons";
 
 /**
  * The inline sign-in dialog (system spec, Sign-in → Flow, step 2) with the
@@ -30,6 +30,7 @@ export function SignInDialog({
   returnTo?: string;
   onOpenChange: (open: boolean) => void;
 }) {
+  const google = useGoogleSignIn();
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogContent className="gap-0 overflow-hidden p-0 sm:max-w-md" data-testid="sign-in-dialog">
@@ -43,12 +44,13 @@ export function SignInDialog({
             </DialogTitle>
             <DialogDescription className="text-sm leading-relaxed text-muted-foreground">
               {reason ? `${reason} ` : ""}
-              Dr. Wu, the AI assistant, runs on your own ChatGPT plan. The atlas stays open to
-              everyone.
+              {google
+                ? "With ChatGPT, Dr. Wu runs on your own plan. The atlas stays open to everyone."
+                : "Dr. Wu, the AI assistant, runs on your own ChatGPT plan. The atlas stays open to everyone."}
             </DialogDescription>
           </DialogHeader>
 
-          <ContinueWithChatGPT returnTo={returnTo} className="w-full" />
+          <SignInButtons returnTo={returnTo} buttonClassName="w-full" />
 
           <p className="text-xs text-muted-foreground">
             By continuing you confirm that you are <strong className="font-medium text-foreground">16 or older</strong>.
@@ -64,10 +66,10 @@ export function SignInDialog({
           </h3>
           <ul className="list-disc space-y-1 pl-4">
             <li>
-              <span className="text-foreground">From OpenAI:</span> your name, email address and
-              ChatGPT account ID to create your account, and an access token, stored encrypted, so
-              Dr. Wu&apos;s requests run on your ChatGPT plan. Doctors and researchers may add work
-              details later, optional and private.
+              <span className="text-foreground">{google ? "From OpenAI or Google:" : "From OpenAI:"}</span>{" "}
+              your name, email address and account ID to create your account. With ChatGPT also an
+              access token, stored encrypted, so Dr. Wu&apos;s requests run on your ChatGPT plan.
+              Doctors and researchers may add work details later, optional and private.
             </li>
             <li>
               <span className="text-foreground">A session cookie</span> that keeps you signed in.
