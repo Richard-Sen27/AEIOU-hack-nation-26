@@ -307,7 +307,7 @@ One database: Postgres (with pgvector) holds the pipeline's staging schema, the 
 | --- | --- |
 | `users` | `id` (UUID), `chatgpt_sub` (unique), `email`, `name`, `created_at`, `last_login_at` |
 | `openai_tokens` | `user_id`, encrypted access and refresh token, `expires_at`, `scopes` (used to bill LLM calls to the user's ChatGPT plan) |
-| `profiles` | `user_id`, `role` (patient / doctor / researcher), `role_verified`, `orcid_id`, `language`, `gpc_opt_out` |
+| `profiles` | `user_id`, `role` (patient / doctor / researcher), `role_verified`, `orcid_id`, `language`, `gpc_opt_out`; work details of doctors and researchers: `first_name`, `last_name`, `institutions` (JSON, at most 3), `atlas_node_id`, `professional_updated_at` |
 | `consents` | `user_id`, `consent_type` (health_data / contribute), `version`, `granted_at`, `revoked_at` |
 | `patient_profiles` | `user_id`, `profile` (JSON matching the `PatientProfile` schema), `updated_at` |
 | `chat_sessions` / `chat_messages` | `user_id`, session and message content |
@@ -352,7 +352,7 @@ Guests never trigger an LLM call, so there is no team key for guests; the team's
    2. `GET /auth/chatgpt/callback` validates `state`, exchanges the code, and verifies the ID token: signature against OpenAI's published keys, `iss`, `aud`, `exp`, `nonce`.
    3. The backend calls `auth_find_or_create_user` with `sub`, `email`, `name`: a known `chatgpt_sub` signs into the existing user, a new one creates a user. The OpenAI tokens are stored encrypted in `openai_tokens`.
    4. The backend sets the session cookie (below) and redirects back to where the user was.
-4. First sign-in: the user picks a role (patient, doctor, researcher). Before the first chat message, profile save or upload, whichever comes first, one consent screen covers all processing of the user's own health and genetic data (`health_data`). It explains what is processed, that personal data is redacted, that raw files are deleted after extraction, and that nothing is shared without the separate `contribute` opt-in. The consent is stored with timestamp and text version (GDPR Article 9).
+4. First sign-in: the user picks a role (patient, doctor, researcher). Doctors and researchers then see an optional, skippable step for their work details: first and last name (prefilled from the ChatGPT account, nothing saved until they save), up to three institutions (atlas institutions or free text), an ORCID iD, and a private link to their own researcher or doctor entry, picked from up to five candidates matched by exact ORCID iD or by name, shared institutions first. The details are self-declared and private: never shown to others, never sent to a model, never a verification (`role_verified` stays false). While the role is doctor or researcher, the confirmed name is the display name. Switching the role to patient deletes them today (whether to delete or keep them hidden is not finally decided). Before the first chat message, profile save or upload, whichever comes first, one consent screen covers all processing of the user's own health and genetic data (`health_data`). It explains what is processed, that personal data is redacted, that raw files are deleted after extraction, and that nothing is shared without the separate `contribute` opt-in. The consent is stored with timestamp and text version (GDPR Article 9).
 5. The requested feature proceeds.
 
 ### Sessions
@@ -477,6 +477,9 @@ Detailed design in [`agent.md`](agent.md).
 | POST | `/contributions` | Signed in + contribute consent | Contribution with status |
 | POST | `/edges/{id}/flag` | Signed in | Flag recorded, edge `under_review` |
 | POST | `/proposal` | Signed in | One-page sourced proposal (HTML) |
+| GET / PUT | `/me/professional` | Signed in, doctor or researcher | Private work details, a name suggestion from the ChatGPT account (not stored) and the linked atlas entry · replace them |
+| DELETE | `/me/professional` | Signed in (any role) | Work details deleted |
+| POST | `/me/professional/matches` | Signed in, doctor or researcher, rate-limited | Up to five atlas entries that may be the user; stores nothing |
 | GET | `/me/export` · DELETE `/me` | Signed in | Data export · account deletion |
 
 ## Build order
