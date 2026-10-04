@@ -89,10 +89,10 @@ test.describe("chat with Dr. Wu", () => {
         await expect(hint).toHaveAttribute("data-state", "confirmed");
       }
 
-      // "Show in graph" opens the Atlas focused on the reply.
+      // "Show in graph" opens the Atlas; the finds go along in memory, never in the URL.
       const showInGraph = turn.getByTestId("show-in-graph");
       if (await showInGraph.count()) {
-        await expect(showInGraph).toHaveAttribute("href", /^\/atlas\?focus=/);
+        await expect(showInGraph).toHaveAttribute("href", "/atlas");
       }
 
       // Session list, reopen, delete.

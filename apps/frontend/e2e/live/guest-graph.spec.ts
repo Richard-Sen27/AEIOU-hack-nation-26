@@ -1,6 +1,6 @@
 /**
  * Live guest journey through the graph: landing → search → node → connection
- * → evidence → lens switch → Atlas (focus, filters, list, tour) → clusters.
+ * → evidence → lens switch → Atlas (search, focus, filters, outline, tour) → clusters.
  * Start the processes as described in live-helpers.ts, then `PORT=3106 pnpm test:e2e:live`.
  */
 import { expect, test, type Page } from "@playwright/test";
@@ -81,14 +81,23 @@ test.describe("guest graph journey", () => {
     expect(problems()).toEqual([]);
   });
 
-  test("atlas loads the real graph, focuses, filters, lists and tours", async ({ page }) => {
+  test("atlas loads the real tree, searches, focuses, filters and lists", async ({ page }) => {
     const problems = trackProblems(page);
     await page.goto("/atlas");
     await expect(page.getByTestId("atlas-counts")).toContainText(/[\d,]+ items · [\d,]+ connections/, { timeout: 30_000 });
     const canvas = page.getByTestId("atlas-canvas");
     await expect(canvas.locator("canvas").first()).toBeVisible({ timeout: 30_000 });
+    // The logo hub and the nine category names, mixed case.
+    await expect(page.getByTestId("atlas-logo")).toBeVisible();
+    const labels = page.getByTestId("atlas-category-label");
+    await expect(labels).toHaveCount(9);
+    for (const text of await labels.allTextContents()) {
+      expect(text.trim().length).toBeGreaterThan(0);
+      expect(text).not.toBe(text.toUpperCase());
+    }
+    await expect(page.getByTestId("atlas-panel")).toHaveCount(0);
 
-    // Pan and zoom stay responsive on ~6k nodes / ~17k edges.
+    // Pan and zoom stay responsive on ~7k tree nodes / ~17k edges.
     const box = (await canvas.boundingBox())!;
     const cx = box.x + box.width / 2;
     const cy = box.y + box.height / 2;
@@ -110,30 +119,34 @@ test.describe("guest graph journey", () => {
     expect(Date.now() - t0).toBeLessThan(8_000);
     expect(frameMs, "average frame time while idle after pan/zoom").toBeLessThan(100);
 
-    // Focus by URL.
+    // Focus by URL: the summary panel opens.
     await page.goto(`/atlas?focus=${encodeURIComponent(IDS.stxbp1)}`);
     const atlasPanel = page.getByTestId("atlas-panel");
     await expect(atlasPanel.getByRole("heading", { level: 2 })).toHaveText("STXBP1", { timeout: 30_000 });
+    await expect(atlasPanel.getByTestId("atlas-summary-section").first()).toBeVisible();
     await expect(page.getByTestId("atlas-open-node")).toHaveAttribute("href", `/node/${encodeURIComponent(IDS.stxbp1)}`);
     await shot(page, "guest-atlas-focus");
 
-    // Find on map.
-    await page.getByTestId("atlas-find").click();
-    await page.getByRole("combobox", { name: "Find on the map" }).fill("Dravet syndrome");
-    await page.getByRole("option", { name: /Dravet syndrome/ }).first().click();
+    // Search the map.
+    const search = page.getByTestId("atlas-search");
+    await search.getByRole("combobox", { name: "Search the map" }).fill("Dravet syndrome");
+    await search.locator('[data-node-id="MONDO:0100135"]').click();
     await expect(atlasPanel.getByRole("heading", { level: 2 })).toHaveText(/Dravet syndrome/i);
     await expect(page).toHaveURL(/focus=MONDO%3A0100135/);
 
-    // List view and filters.
-    await page.getByRole("radio", { name: "List" }).click();
-    const list = page.getByTestId("atlas-list");
-    await expect(list.getByTestId("atlas-list-row").first()).toBeVisible();
-    await list.getByRole("textbox").fill("dravet");
-    await expect(list.getByTestId("atlas-list-row").first()).toContainText(/dravet/i);
+    // Filters: connection kinds drawn on click.
     await page.getByTestId("atlas-filters").click();
-    await page.getByRole("checkbox", { name: /^Symptoms/ }).click();
+    const chip = page.getByTestId("family-chip-symptoms");
+    await chip.click();
+    await expect(chip).toHaveAttribute("aria-pressed", "false");
     await page.keyboard.press("Escape");
-    await expect(list.getByTestId("atlas-list-row").first()).toBeVisible();
+
+    // List view: the same trees as an outline, with the selection revealed.
+    await page.getByTestId("view-toggle").getByRole("radio", { name: "List" }).click();
+    const outline = page.getByTestId("atlas-outline");
+    await expect(outline.locator('[data-testid="atlas-outline-item"][data-id="MONDO:0100135"]')).toHaveAttribute("aria-selected", "true");
+    await outline.getByTestId("atlas-outline-filter").fill("dravet");
+    await expect(outline.getByTestId("atlas-outline-status")).toContainText(/match/);
     expect(problems()).toEqual([]);
   });
 
@@ -142,16 +155,18 @@ test.describe("guest graph journey", () => {
     await page.goto("/atlas?tour=1");
     const tour = page.getByTestId("atlas-tour");
     await expect(tour).toBeVisible({ timeout: 30_000 });
+    await expect(tour).toContainText("One map, many trees");
     await shot(page, "guest-tour-1");
     await expect(page.getByText("Drawing the map")).toBeHidden({ timeout: 30_000 });
     const next = page.getByTestId("tour-next");
-    for (let i = 0; i < 10; i++) {
-      const isLast = /Start exploring/.test((await next.textContent()) ?? "");
+    for (let i = 0; i < 4; i++) {
       await next.click();
-      if (isLast) break;
-      await expect(tour).toContainText(`${i + 2} of`);
+      await expect(tour).toContainText(`${i + 2} of 5`);
     }
+    await expect(tour).toContainText("Ask Dr. Wu");
+    await expect(next).toHaveText(/Start exploring/);
     await shot(page, "guest-tour-end");
+    await next.click();
     await expect(tour).toBeHidden();
     expect(problems()).toEqual([]);
   });
