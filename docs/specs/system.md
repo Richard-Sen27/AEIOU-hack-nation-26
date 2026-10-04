@@ -345,7 +345,7 @@ One database: Postgres (with pgvector) holds the pipeline's staging schema, the 
 | --- | --- |
 | `users` | `id` (UUID), `auth_provider` (`openai` \| `google`), `auth_subject` (the provider's `sub`; unique together with `auth_provider`), `email`, `name`, `created_at`, `last_login_at` |
 | `openai_tokens` | `user_id`, encrypted access and refresh token, `expires_at`, `scopes` (used to bill LLM calls to the user's ChatGPT plan) |
-| `profiles` | `user_id`, `role` (patient / doctor / researcher), `role_verified`, `orcid_id`, `language`, `gpc_opt_out`; work details of doctors and researchers: `first_name`, `last_name`, `institutions` (JSON, at most 3), `atlas_node_id`, `professional_updated_at`; verification: `orcid_verified_at`, `verified_name`, `verification_method` (orcid / institutional_email, or orcid_simulated / manual_simulated in local demos), `verified_at`, `verification_reason`, `verification_request` (JSON), `atlas_link_verified`; public card (off by default): `card_id`, `card_visible`, `card_visible_since`, `card_headline`, `card_show_institutions`, `card_show_atlas_entry`, `accepts_patient_messages`; `connect_age_group` (18_plus / 16_17, self-declared), `connect_age_group_at` |
+| `profiles` | `user_id`, `role` (patient / doctor / researcher), `role_verified`, `orcid_id`, `language`, `gpc_opt_out`; work details of doctors and researchers: `first_name`, `last_name`, `institutions` (JSON, at most 3), `atlas_node_id`, `professional_updated_at`; verification: `orcid_verified_at`, `verified_name`, `verification_method` (orcid / institutional_email, or orcid_simulated / manual_simulated in local demos), `verified_at`, `verification_reason`, `verification_request` (JSON), `atlas_link_verified`; public card (off by default): `card_id`, `card_visible`, `card_visible_since`, `card_headline`, `card_show_institutions`, `card_show_atlas_entry`, `accepts_patient_messages`; `connect_age_group` (18_plus / 16_17, self-declared), `connect_age_group_at`; `suggestions_enabled` (off by default), `suggestions_enabled_at` |
 | `consents` | `user_id`, `consent_type` (health_data / contribute / connect), `version`, `granted_at`, `revoked_at` |
 | `patient_profiles` | `user_id`, `profile` (JSON matching the `PatientProfile` schema), `updated_at` |
 | `chat_sessions` / `chat_messages` | `user_id`, session and message content |
@@ -357,11 +357,13 @@ One database: Postgres (with pgvector) holds the pipeline's staging schema, the 
 | `jobs` | `id`, `user_id`, `kind`, `status`, `progress`, `result` |
 | `threads` | `id`, `opener_id` (the patient), `recipient_id` (the professional), `origin` (card / signup), `call_id`, `signup_id`, `recipient_card_id`, name snapshots, `status` (requested / open / declined / closed / blocked), times; readable by both participants |
 | `thread_reads` | `thread_id`, `user_id`, `last_read_at`, `hidden_at`, `guardian_agreed_at`, `guardian_text_version` (own rows) |
+| `call_signups` | `id`, `call_id` (SET NULL), `patient_id`, `call_title_snapshot`, `call_closes_at`, `recipient_name`, `display_name`, `shared` (only the ticked items), `about_child`, `note`, `authorization_version`, `authorized_at`, `guardian_agreed_at`, `guardian_text_version`, `status` (active / withdrawn / declined / call_closed), `withdrawn_at`, `declined_at`, `call_ended_at`, `purge_after`, `thread_id`; the patient's own rows, readable by the call's publisher |
 | `messages` | `id`, `thread_id`, `sender_id`, `body_enc` (Fernet, `MESSAGE_ENCRYPTION_KEY`), `created_at`; readable by both participants, deletable by the sender |
 | `blocks` / `reports` | the blocker's / reporter's own rows; a report authorizes a logged operator read of that conversation (`admin_access_log`, no API access) |
 
 **Rules**
 
+- **`call_signups`** has the patient's owner policy plus a SELECT policy for the call's publisher (`EXISTS (calls c WHERE c.id = call_id AND c.publisher_id = me)`); the trigger `call_signups_guard` lets the patient only withdraw and link the sign-up's conversation, `call_signups_admit` (definer) admits a sign-up only to a published, open call of somebody else with a visible card below `max_signups`, `decline_call_signup(id)` is the publisher's decline, `calls_end_signups` marks the sign-ups of a closed call. `threads.call_id` / `signup_id` are foreign keys, and a sign-up conversation can be inserted only by that sign-up's patient, addressed to the call's publisher.
 - **Messaging tables** use participant policies instead (`opener_id = me OR recipient_id = me`); a card conversation is created only by the `SECURITY DEFINER` function `open_card_thread(card_id, …)`, which resolves the card to the professional without returning a user ID, and the trigger `threads_guard` allows only the planned status changes.
 - **Row-level security** on every user table, with `FORCE ROW LEVEL SECURITY` and the policy `user_id = current_setting('app.user_id', true)::uuid` (on `users`: `id = …`). FastAPI runs `SELECT set_config('app.user_id', :user_id, true)` at the start of every request transaction, so the setting is scoped to that transaction. A bug in the API still cannot leak one user's rows to another; a request without a user sees no user rows at all.
 - **Database roles:**
@@ -507,6 +509,13 @@ Detailed design in [`agent.md`](agent.md).
 - With `CALLS_REVIEW_REQUIRED=true`: draft -> submit (same wording check) -> the operator approves or rejects with `backend.cli calls ...` through the definer functions `pending_calls()` and `review_call()`, every action logged in `call_reviews`.
 - The trigger `calls_guard` stops the API role from publishing any other way, from changing review fields, `demo` or `self_published`, and from editing a published call. Published calls are listed to every signed-in user while the publisher's card stays visible (`call_publisher_cards()` joined with `professional_cards()`); nothing about readers is stored. `backend.cli demo-calls` seeds labelled demo calls locally.
 
+### Suggestions and sign-ups
+
+- Both are held under the `connect` consent, given to its current text (`connect-signups-2026-10-04`; the earlier text named messaging only). They are user-initiated: nothing connects a patient to a study automatically.
+- **Suggestions** (`GET /calls/suggested`) need that consent plus the user's own switch `profiles.suggestions_enabled` (off by default). They are computed in the patient's own request from confirmed, non-excluded profile items against published calls and never stored, except as `call_match` rows in the patient's own `notifications` (filled lazily with the other notifications). Reasons and score: an exact disease of the profile among the call's diseases (3), a gene or a variant's gene among its genes (2), at least two exact HPO ids among its symptoms (1). Age and country are returned as information and never hide a suggestion. Sentence: "Suggested because your profile lists …. This is not an eligibility check; only the study team decides." Publishers never learn who was suggested; nothing about suggestions is logged.
+- **Sign-ups** (`POST /calls/{id}/signup`) share only the items the patient ticks, from confirmed profile items the call asks for (`requested_fields`) and targets; only a matching diagnosis is pre-ticked. Each is an authorization stored with its text version and time and the named recipient; a display name the patient chooses and an optional note (≤ 1,000). Patients and caregivers only; refused for experts, the publisher's own call, a duplicate, a full, closed or expired call and a hidden publisher card. A child's profile needs `parental_responsibility_confirmed`. A user who said 16 or 17 ticks the guardian checkbox on every sign-up (stored on the row); the publisher sees "Participant is 16 or 17; a parent or guardian agreed (self-declared)"; a call with `min_age` 18 or more takes no sign-up from them. Optionally the sign-up opens a conversation with the publisher (`open_conversation`).
+- Withdrawing a sign-up or the publisher's decline clears the items and the note at once and keeps a stub for 30 days; sign-ups of a closed call are deleted 90 days after it closed (by date: `call_closes_at`), at once turned into stubs when the call is deleted. Rows past their time are deleted when the patient lists their sign-ups and by `backend.cli purge-messages`; the publisher never sees them. Withdrawing `connect` withdraws every sign-up, switches suggestions off and deletes the `call_match` notifications.
+
 ### Proposal export and data rights
 
 - Generates a one-page sourced proposal from a path, its assets and contacts (HTML for print-to-PDF).
@@ -564,6 +573,11 @@ Detailed design in [`agent.md`](agent.md).
 | GET | `/me/calls` · `/me/calls/{id}` | Signed in | Own calls in every status with review note and wording-check result · one |
 | POST · PUT | `/me/calls` · `/me/calls/{id}` | Verified doctor or researcher with a visible card, rate-limited | New draft (at most 10 open calls) · replace a draft, rejected or pending call (back to draft) |
 | POST | `/me/calls/{id}/submit` · `/close` · DELETE `/me/calls/{id}` | Submit: as above, 10 a day; close and delete: owner | Publish at once after the wording check (to review instead when `CALLS_REVIEW_REQUIRED` is on) · close a published call or withdraw an unpublished one · delete |
+| GET | `/calls/suggested` | Signed in (16+); items only with the connect consent and suggestions on | Published calls that overlap my confirmed profile, with reasons, score and the sign-up availability |
+| GET · PUT | `/me/connect/suggestions` | Signed in (PUT on: + connect consent) | Suggestions switch · switch on or off (off deletes the suggestion notifications) |
+| GET · POST | `/calls/{id}/signup` | Signed in (POST: + connect consent, age group, patients only, 20 a day) | The sign-up screen (items, authorization and guardian texts) · sign up |
+| GET · DELETE | `/me/signups` · `/me/signups/{id}` | Signed in | My sign-ups with stubs · withdraw |
+| GET · POST | `/me/calls/{id}/signups` · `/me/calls/{id}/signups/{sid}/decline` | The call's publisher | Sign-ups to my call (display name, ticked items, note, 16-17 label) · decline |
 | GET | `/me/export` · DELETE `/me` | Signed in | Data export · account deletion |
 
 ## Build order
@@ -592,7 +606,7 @@ Build the graph and the read path first, so the frontend can integrate early; au
 - Autonomous ingestion engine for existing papers and resources.
 - Automatic reach-out from patients to other patients. (Patients writing to verified doctors and researchers themselves is built: messaging under the `connect` consent.)
 - Automatic warm introductions between research groups.
-- Automatically connecting patients to studies and trials.
+- Automatically connecting patients to studies and trials. (Patients switching on suggestions and signing up themselves is built: see Suggestions and sign-ups.)
 
 ## Project names
 

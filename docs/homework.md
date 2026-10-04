@@ -92,13 +92,12 @@ Work deliberately left for later. Add an item when you leave something for later
 ## Messaging (connect)
 
 - **Before real patients use messaging:** `docs/dpia.md`, `docs/ropa.md` (messaging and the `connect` consent as a purpose) and `docs/incident.md` must exist; counsel must review the `connect` consent text and the banners.
-- **Minors:** messaging and sign-ups are open from 16 with a self-declared age group and a self-declared guardian agreement (`thread_reads.guardian_*`). A legal check is needed on contacting 16- and 17-year-olds and on whether a self-declared guardian agreement is enough. The professional is not told the writer is 16 or 17 today.
+- **Minors:** messaging and sign-ups are open from 16 with a self-declared age group and a self-declared guardian agreement (`thread_reads.guardian_*`, `call_signups.guardian_*`). Before real use a legal check is needed on contacting and recruiting 16- and 17-year-olds for studies, surveys and trials, and on whether a self-declared guardian agreement is enough. The study team sees "Participant is 16 or 17; a parent or guardian agreed (self-declared)" on a sign-up; in messages the professional is not told the writer is 16 or 17 today.
 - **Moderation:** reports are read only through `backend.cli read-reported-thread` (logged). There is no moderation UI, no service level, no process for acting on a report (warning, suspending a card) and no evidence copy: a reported message the sender deletes is gone.
 - **E-mail notifications:** none; new messages show only through `GET /me/threads/unread-count`. Messages are not written into the stage 1 `notifications` table (its kinds and bell are graph-shaped and its rows are filled lazily from public data; an unread count is what a stored row would add). Any future e-mail must never contain message text or health data.
-- **Daily clean-up:** `backend.cli purge-messages` (12-month inactive threads, orphaned threads, reports after 12 months, access log after 24 months) needs a scheduler on the deployment; today only the user's own threads are purged when they read their list.
+- **Daily clean-up:** `backend.cli purge-messages` (12-month inactive threads, orphaned threads, reports after 12 months, access log after 24 months, sign-ups past their 30- or 90-day time) needs a scheduler on the deployment; today only the user's own threads and sign-ups are purged when they read their lists (publishers never see expired sign-ups either way).
 - **Development key:** without `MESSAGE_ENCRYPTION_KEY` the API derives a key from `SESSION_SECRET` while API and frontend are loopback; messages stored that way cannot be read after `SESSION_SECRET` or the key changes unless the derived key is listed in `MESSAGE_ENCRYPTION_KEY` and rotated.
 - **Operator role:** the CLI uses `atlas_owner`, which has policies on `threads`, `messages` and `reports`; a separate least-privilege operator role would be better.
-- **Sign-up threads (stage 4):** `messaging.open_signup_thread` exists; stage 4 must add foreign keys from `threads.call_id` / `signup_id` and tighten the `threads_signup_insert` policy to the sign-up's own patient.
 - **Messaging tables outside `USER_TABLES`:** `threads`, `messages`, `thread_reads`, `blocks` and `reports` are in `MESSAGING_TABLES` (`db/models.py`), because the generic owner-column tests in `tests/test_rls.py` and `test_data_rights.py` cannot seed shared rows; their RLS is proven in `tests/account/test_messaging.py`.
 - **Banners** ("You are writing to a person, not Dr. Wu", "not a medical consultation; in an emergency call 112/911", "do not give individual medical advice or prescribe through Amber") and the just-in-time `connect` dialog are frontend work still to do.
 
@@ -120,6 +119,11 @@ Work deliberately left for later. Add an item when you leave something for later
 - **Expired calls** stay `published` after `closes_at` (only hidden from the list); no job closes them.
 - **Wording check** (`WORDING_RULES` in `api/services/calls.py`) is a coarse English/German blocklist; counsel should review the drug-advertising wording before real use.
 - **Call frontend:** browsing, the publisher form and the "for adults" label for 16-17 users are not built yet (frontend task).
+- **Sign-up and suggestion frontend:** the endpoints and SDK exist (`listSuggestedCalls`, `get/setSuggestionSettings`, `getSignupOptions`, `signUpToCall`, `listMySignups`, `withdrawSignup`, `listCallSignups`, `declineCallSignup`, `call_match` notifications); the screens are not built.
+- **Connect consent text in the frontend:** the backend's `connect` text now names suggestions and sign-ups (version `connect-signups-2026-10-04`, `schemas/messaging.py` `CONNECT_CONSENT_TEXT`); `components/privacy/consent-texts.ts` has the new version but still the old messaging-only wording, which must be updated to match before the dialog is shown. Counsel should review it.
+- **Suggestions match exact ids only:** no symptom similarity, no disease or gene neighbours; a profile with only one matching symptom gets no suggestion.
+- **`max_signups` is fixed once published:** published calls are never edited, so a full call cannot be widened (close it and publish a new one); there is no waiting list.
+- **Demo sign-ups:** `backend.cli demo-calls` seeds calls a Dravet or STXBP1 profile is suggested, but no demo sign-ups, and the demo publisher cannot sign in, so the publisher's sign-up view is shown only with a real verified account.
 
 ## Tests and tooling
 
