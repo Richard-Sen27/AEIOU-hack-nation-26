@@ -11,9 +11,11 @@ import { DataRights, GpcStatus } from "./privacy-choices";
 import { ProfileEditor } from "./profile-editor";
 import { SettingsSection } from "./settings-section";
 import { SessionLoading, SignInPrompt } from "./sign-in-prompt";
+import { WORK_DETAILS_NOTE, WorkDetailsForm } from "./work-details";
 
 const SECTIONS = [
   { id: "health-profile", title: "Health profile" },
+  { id: "your-work", title: "Your work" },
   { id: "settings", title: "Settings" },
   { id: "consents", title: "Consents" },
   { id: "contributions", title: "Contributions" },
@@ -60,11 +62,15 @@ export function ProfilePage() {
     );
   }
 
+  // Work details are for doctors and researchers only.
+  const professional = user.role === "doctor" || user.role === "researcher";
+  const sections = SECTIONS.filter((s) => s.id !== "your-work" || professional);
+
   return (
     <div className="grid gap-8 lg:grid-cols-[200px_minmax(0,1fr)]">
       <nav aria-label="Profile sections" className="hidden lg:block">
         <ul className="sticky top-20 space-y-0.5 text-sm">
-          {SECTIONS.map((s) => (
+          {sections.map((s) => (
             <li key={s.id}>
               <a href={`#${s.id}`} className="block rounded-md px-2.5 py-1.5 text-muted-foreground hover:bg-muted hover:text-foreground">
                 {s.title}
@@ -88,6 +94,11 @@ export function ProfilePage() {
         >
           <ProfileEditor />
         </Panel>
+        {professional && (
+          <Panel id="your-work" title="Your work" description={WORK_DETAILS_NOTE}>
+            <WorkDetailsForm variant="profile" />
+          </Panel>
+        )}
         <Panel id="settings" title="Settings">
           <SettingsSection user={user} />
         </Panel>

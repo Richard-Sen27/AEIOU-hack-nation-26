@@ -46,6 +46,11 @@ export function SettingsSection({ user }: { user: SessionUser }) {
         <p className="text-sm text-muted-foreground">
           Changes the starting point and wording, never what you can see.
         </p>
+        {(role === "doctor" || role === "researcher") && (
+          <p className="text-sm text-muted-foreground" data-testid="role-switch-note">
+            Switching to {ROLE_COPY.patient.label} removes your work details.
+          </p>
+        )}
         <RadioGroup
           value={role}
           onValueChange={(v) => void patch({ role: v as SelectableRole }, "Role")}
