@@ -259,7 +259,7 @@ async def load_graph(db: AsyncSession) -> GraphStore:
                 await refresh(db)
         except Exception as exc:  # noqa: BLE001 - overlays are optional at startup
             log.warning("%s failed (%s)", refresh.__name__, type(exc).__name__)
-    atlas_payload()
+    # /atlas.json is no longer used by the frontend: its payload is built on first request.
     from backend.api.services import atlas_tree, search
 
     atlas_tree.tree_payload()
