@@ -293,3 +293,106 @@ async def test_template_subject_summary(app, client):
     assert "hypothesis" in out  # the inferred similar-disease links are labelled
     de = template_explanation(data, Role.patient, "de")
     assert de.startswith("So ist Dravet syndrome im Atlas verbunden")
+
+
+# ---- steps (the Atlas panel's streamed "Write a summary") -----------------------------------
+
+
+def _types(events: list[dict]) -> list[str]:
+    return [e["type"] for e in events]
+
+
+async def test_steps_stream_status_then_checked_text(make_user, user_llm, client):
+    edges = await _dravet_edges(client)
+    user = await make_user(role="doctor")  # the patient text is cached by an earlier test
+    body = {"edge_ids": edges, "subject_node_id": DRAVET, "steps": True}
+    status, events = await post_sse(user.client, "/explain", body)
+    assert status == 200, events
+    statuses = [e for e in events if e["type"] == "status"]
+    assert [e["step"] for e in statuses][:3] == ["reading", "writing", "checking"]
+    assert statuses[0]["message"] == f"Reading {len(edges)} links"
+    # every status comes before the first text: no text is shown before the checks passed
+    first_delta = _types(events).index("delta")
+    assert set(_types(events)[:first_delta]) == {"status"}
+    assert set(_types(events)[first_delta:-1]) == {"delta"}
+    final = events[-1]
+    assert final["type"] == "final" and final["cached"] is False
+    assert "".join(e["text"] for e in events[first_delta:-1]) == final["text"]
+
+
+async def test_steps_report_a_rewrite(make_user, user_llm):
+    user = await make_user(role="researcher")  # patient texts are cached by earlier tests
+    user_llm.enqueue({"text": "These diseases share a gene [e_ffffffffffff]."}, {"text": SIMPLE})
+    status, events = await post_sse(
+        user.client, "/explain", {"edge_ids": [COUNTEREXAMPLE], "steps": True, "language": "de"}
+    )
+    steps = [e["step"] for e in events if e["type"] == "status"]
+    assert steps == ["reading", "writing", "checking", "fixing_sources", "checking"]
+    assert events[2]["message"] == "Prüft die Quellen"
+    assert "e_ffffffffffff" not in "".join(e.get("text", "") for e in events)
+
+
+async def test_steps_off_keeps_the_plain_stream(make_user, user_llm):
+    user = await make_user(role="patient")
+    user_llm.enqueue({"text": SIMPLE})
+    status, events = await post_sse(user.client, "/explain", {"edge_ids": [COUNTEREXAMPLE]})
+    assert status == 200
+    assert set(_types(events)[:-1]) == {"delta"} and events[-1]["type"] == "final"
+
+
+async def test_steps_on_a_cached_text_replay_it(client):
+    body = {"edge_ids": DEMO["path_edge_ids"], "role": "guest", "steps": True}
+    status, events = await post_sse(client, "/explain", body)
+    assert status == 200
+    assert set(_types(events)[:-1]) == {"delta"} and events[-1]["cached"] is True
+
+
+async def test_steps_error_is_an_event(make_user, user_llm):
+    user = await make_user(role="patient")
+    user_llm.configure(fail_mode="usage_limit")
+    status, events = await post_sse(user.client, "/explain", {"edge_ids": [PENDING], "steps": True})
+    assert status == 200
+    assert events[0]["type"] == "status" and events[0]["step"] == "reading"
+    assert "delta" not in _types(events)
+    assert events[-1]["type"] == "error" and events[-1]["code"] == "rate_limited"
+
+
+async def test_steps_errors_before_the_stream_stay_http(make_user, user_llm, client):
+    resp = await client.post(
+        "/explain", json={"edge_ids": [COUNTEREXAMPLE], "role": "guest", "steps": True}
+    )
+    assert resp.status_code == 401
+    user = await make_user(role="patient", age_confirmed=False)
+    resp = await user.client.post("/explain", json={"edge_ids": [PENDING], "steps": True})
+    assert resp.status_code == 403
+
+
+async def test_steps_closing_the_stream_cancels_the_model_call(app, monkeypatch, mock_llm):
+    import asyncio
+
+    from backend.api.services import explanation
+    from backend.schemas.common import Lens
+
+    started, cancelled = asyncio.Event(), asyncio.Event()
+
+    async def slow(llm, data, role, language, *, on_step=None, **_):
+        on_step("writing")
+        started.set()
+        try:
+            await asyncio.sleep(30)
+        except asyncio.CancelledError:
+            cancelled.set()
+            raise
+
+    monkeypatch.setattr(explanation, "generate_explanation", slow)
+    async with user_transaction(None) as db:
+        data = await load_path_data(db, [COUNTEREXAMPLE])
+    lens = Lens(role=Role.patient, language="en")
+    user = type("U", (), {"id": "00000000-0000-0000-0000-000000000000"})()
+    stream = explanation._stream(data, lens, user, mock_llm, steps=True)
+    first = await anext(stream)
+    second = await anext(stream)
+    assert (first.root.step, second.root.step) == ("reading", "writing")
+    await started.wait()
+    await stream.aclose()  # the client went away
+    await asyncio.wait_for(cancelled.wait(), 2)
