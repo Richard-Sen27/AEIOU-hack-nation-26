@@ -4,7 +4,7 @@ import { Boxes, ChevronDown, ChevronUp, Compass, Minus, Plus, RotateCcw, Sliders
 import dynamic from "next/dynamic";
 import Link from "next/link";
 import { useSearchParams } from "next/navigation";
-import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { memo, useCallback, useEffect, useMemo, useRef, useState } from "react";
 
 import { GraphLegend } from "@/components/graph-ui";
 import { FamilyChips } from "@/components/node/family-chips";
@@ -192,6 +192,11 @@ export function AtlasView() {
    * summary opens in the panel) or an id that does not exist at all (the summary says 404).
    */
   const [missingIds, setMissingIds] = useState<ReadonlySet<string>>(() => new Set());
+  // The floating card stays mounted while it slides out; it keeps showing the last node meanwhile.
+  const cardOpen = !!index && !!selected && (index.nodes.has(selected) || !missingIds.has(selected));
+  const card = usePresence(cardOpen, reducedMotion ? 0 : PANEL_EXIT_MS);
+  const [cardNodeId, setCardNodeId] = useState<string | null>(selected);
+  if (cardOpen && selected !== cardNodeId) setCardNodeId(selected);
   const offMap = index && selected && !index.nodes.has(selected) ? selected : null;
   const missingFocus = offMap && missingIds.has(offMap) ? offMap : null;
   // The reworded notice is for `?focus=` links only, not for a pick from search or Dr. Wu.
@@ -421,7 +426,7 @@ export function AtlasView() {
     const panel = (className: string) => (
       <AtlasPanel
         index={idx}
-        nodeId={selected}
+        nodeId={panelOpen ? selected : cardNodeId}
         onSelect={(id) => select(id, { center: true })}
         onShowChain={setPanelChain}
         onClose={() => select(null)}
@@ -455,7 +460,7 @@ export function AtlasView() {
         {showGraph ? (
           <div
             className={cn(
-              "bg-atlas-grid relative min-w-0 flex-1",
+              "bg-atlas-grid relative min-w-0 flex-1 animate-in duration-200 ease-out fade-in-0",
               TOUR_SPOT,
               "data-[tour-active]:ring-inset data-[tour-active]:ring-offset-0",
             )}
@@ -511,7 +516,12 @@ export function AtlasView() {
             </div>
           </div>
         ) : (
-          <div className={cn("flex min-h-0 min-w-0 flex-1 flex-col", panelOpen && "lg:pr-[23.5rem]")}>
+          <div
+            className={cn(
+              "flex min-h-0 min-w-0 flex-1 animate-in flex-col duration-200 ease-out fade-in-0",
+              panelOpen && "lg:pr-[23.5rem]",
+            )}
+          >
             {canvasFailed && view === "graph" && (
               <p className="shrink-0 border-b bg-status-flag/10 px-4 py-2 text-sm" role="status">
                 The map can&apos;t be drawn on this device, so the outline is shown instead.
@@ -544,7 +554,7 @@ export function AtlasView() {
           )}
           {pathEdgeIds.length > 0 && panelChain.length === 0 && showGraph && (
             <div
-              className="pointer-events-auto flex items-center gap-3 rounded-full border bg-card py-1 pr-1 pl-3 text-sm shadow-md"
+              className="pointer-events-auto flex animate-in items-center gap-3 rounded-full border bg-card py-1 pr-1 pl-3 text-sm shadow-md duration-200 ease-out fade-in-0 slide-in-from-top-1"
               role="status"
               data-testid="atlas-path-banner"
             >
@@ -565,7 +575,7 @@ export function AtlasView() {
           )}
           {offMapNotice && (
             <div
-              className="pointer-events-auto w-[min(28rem,100%)] rounded-lg border bg-card px-3 py-2 text-sm shadow-md"
+              className="pointer-events-auto w-[min(28rem,100%)] animate-in rounded-lg border bg-card px-3 py-2 text-sm shadow-md duration-200 ease-out fade-in-0 slide-in-from-top-1"
               role="status"
               data-testid="atlas-missing-focus"
               data-reason="off-map"
@@ -575,7 +585,7 @@ export function AtlasView() {
           )}
           {missingFocus && (
             <div
-              className="pointer-events-auto w-[min(28rem,100%)] rounded-lg border bg-card px-3 py-2 text-sm shadow-md"
+              className="pointer-events-auto w-[min(28rem,100%)] animate-in rounded-lg border bg-card px-3 py-2 text-sm shadow-md duration-200 ease-out fade-in-0 slide-in-from-top-1"
               role="status"
               data-testid="atlas-missing-focus"
               data-reason="unknown"
@@ -604,7 +614,20 @@ export function AtlasView() {
 
         {/* The panel exists only while something is selected: no card, no reserved space otherwise.
             Desktop: floating on the right. Phone: a short sheet over the map that can be expanded. */}
-        {panelOpen && wide && panel("absolute top-3 right-3 bottom-3 z-30 w-[22rem]")}
+        {card.mounted && wide && (
+          <div
+            className={cn(
+              "absolute top-3 right-3 bottom-3 z-30 flex w-[22rem] flex-col motion-reduce:animate-none",
+              card.closing
+                ? "pointer-events-none animate-out fill-mode-forwards fade-out-0 slide-out-to-right-6 duration-150 ease-in"
+                : "animate-in fade-in-0 slide-in-from-right-6 duration-200 ease-out",
+            )}
+            data-state={card.closing ? "closed" : "open"}
+            data-testid="atlas-panel-frame"
+          >
+            <Freeze frozen={card.closing}>{panel("min-h-0 flex-1")}</Freeze>
+          </div>
+        )}
         {panelOpen && !wide && showGraph && sheet("absolute inset-x-2 bottom-2 z-30", false)}
       </div>
     );
@@ -628,6 +651,33 @@ export function AtlasView() {
       )}
     </div>
   );
+}
+
+/** How long the summary card takes to slide out before it unmounts (matches its `duration-150`). */
+const PANEL_EXIT_MS = 150;
+
+/** Renders its children, and stops re-rendering them while `frozen` (a card sliding out). */
+const Freeze = memo(
+  function Freeze({ children }: { children: React.ReactNode; frozen: boolean }) {
+    return children;
+  },
+  (_, next) => next.frozen,
+);
+
+/**
+ * Keeps something mounted for `exitMs` after `open` turns false, so it can animate out.
+ * `closing` is true during that time. With `exitMs` 0 (reduced motion) it unmounts at once.
+ */
+function usePresence(open: boolean, exitMs: number): { mounted: boolean; closing: boolean } {
+  const [mounted, setMounted] = useState(open);
+  if (open && !mounted) setMounted(true);
+  if (!open && mounted && exitMs <= 0) setMounted(false);
+  useEffect(() => {
+    if (open || !mounted || exitMs <= 0) return;
+    const t = window.setTimeout(() => setMounted(false), exitMs);
+    return () => window.clearTimeout(t);
+  }, [open, mounted, exitMs]);
+  return { mounted: open || (mounted && exitMs > 0), closing: !open && mounted && exitMs > 0 };
 }
 
 /** "Dr. Wu found 3 items, 2 on the map." */

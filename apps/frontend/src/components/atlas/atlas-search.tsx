@@ -352,7 +352,7 @@ export function AtlasSearch({ index, onPick, onAskWu, className }: AtlasSearchPr
 
       <div
         className={cn(
-          "absolute inset-x-0 top-full z-30 mt-1.5 overflow-hidden rounded-xl border bg-popover text-popover-foreground shadow-xl ring-1 ring-foreground/10",
+          "absolute inset-x-0 top-full z-30 mt-1.5 animate-in overflow-hidden rounded-xl border bg-popover text-popover-foreground shadow-xl ring-1 ring-foreground/10 duration-150 ease-out fade-in-0 slide-in-from-top-1",
           !showList && "hidden",
         )}
       >
