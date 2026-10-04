@@ -338,6 +338,56 @@ def check_counterexamples(t, resolve, cases: list[dict]) -> list[dict[str, Any]]
     return out
 
 
+def check_core(t: dict[str, pl.DataFrame], min_qualified: int | None) -> list[dict[str, Any]]:
+    """Wide core: enough diseases with a gene and a symptom, a tier on every disease, gene and
+    phenotype node, and the HPO term table covering every phenotype node."""
+    nodes, edges = t["nodes"], t["edges"]
+    out = []
+    if min_qualified:
+        with_gene = set(
+            edges.filter(pl.col("relation") == "caused_by_variant_in")["source_id"].to_list()
+        )
+        with_phen = set(edges.filter(pl.col("relation") == "has_phenotype")["source_id"].to_list())
+        diseases = set(nodes.filter(pl.col("type") == "disease")["id"].to_list())
+        n = len(diseases & with_gene & with_phen)
+        out.append(
+            {
+                "check": f"at least {min_qualified} diseases with a gene and a recorded symptom",
+                "ok": n >= min_qualified,
+                "detail": {"n": n, "diseases": len(diseases)},
+            }
+        )
+    tiers: dict[str, dict[str, int]] = {}
+    bad = []
+    for nid, typ, attrs in nodes.select("id", "type", "attrs").iter_rows():
+        if typ not in ("disease", "gene", "phenotype"):
+            continue
+        tier = (json.loads(attrs) if attrs else {}).get("tier")
+        if tier not in ("focus", "core"):
+            bad.append(nid)
+        tiers.setdefault(typ, {}).setdefault(str(tier), 0)
+        tiers[typ][str(tier)] += 1
+    out.append(
+        {
+            "check": "every disease, gene and phenotype has attrs.tier focus or core",
+            "ok": not bad,
+            "detail": {"by_type": tiers, "missing": bad[:20], "n": len(bad)},
+        }
+    )
+    hpo = t.get("hpo_terms")
+    if hpo is not None:
+        phen = set(nodes.filter(pl.col("type") == "phenotype")["id"].to_list())
+        missing = sorted(phen - set(hpo["id"].to_list()))
+        out.append(
+            {
+                "check": "hpo_terms export covers every phenotype node",
+                "ok": not missing and hpo.height > 0,
+                "detail": {"rows": hpo.height, "missing": missing[:20], "n": len(missing)},
+            }
+        )
+    return out
+
+
 def _report_counts(r: dict[str, Any]) -> tuple[int, int, int]:
     """(checked, passed, rejected) from a Stage 3 report.json or quote_report.json."""
     if "checked" in r:
@@ -375,6 +425,7 @@ def run() -> bool:
     results = check_structure(t)
     results += check_golden(t, resolve, seeds.get("golden", []))
     results += check_counterexamples(t, resolve, seeds.get("counterexamples", []))
+    results += check_core(t, seeds.get("min_qualified_diseases"))
     quotes = quote_reports()
     report = {
         "data_version": t["nodes"]["data_version"][0],
