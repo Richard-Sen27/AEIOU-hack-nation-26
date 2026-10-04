@@ -28,6 +28,7 @@ import {
 } from "@/components/ui/dropdown-menu";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Textarea } from "@/components/ui/textarea";
+import { announce } from "@/lib/a11y";
 import { ApiError } from "@/lib/api/errors";
 import {
   acceptThread,
@@ -132,7 +133,8 @@ export function ThreadView({ id }: { id: string }) {
       if (!(await flow.ensure())) return;
       const call = accept ? acceptThread : declineThread;
       setDetail(await unwrap(call({ path: { thread_id: id }, meta: { quiet: true } })));
-      toast(accept ? "Accepted. You can reply now." : "Declined.");
+      // No toast: the composer (or the "declined" line) says it, and a toast would cover Send.
+      announce(accept ? "Accepted. You can reply now." : "Declined.");
       await reload();
     });
 
