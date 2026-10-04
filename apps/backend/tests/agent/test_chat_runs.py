@@ -137,7 +137,12 @@ async def test_attach_replays_from_a_sequence_number(doctor, user_llm):
 
 
 async def test_disconnect_does_not_cancel_and_stop_does(doctor, user_llm, connect_as):
+    before = len(user_llm.state.recorded("responses"))
     run, turn = await slow_turn(doctor, user_llm, delay_s=5.0)
+    for _ in range(200):  # the slow final round has started (its script is consumed)
+        if len(user_llm.state.recorded("responses")) >= before + 2:
+            break
+        await asyncio.sleep(0.02)
     await asyncio.sleep(0.2)
     assert not run.done  # nobody is reading, it keeps running
     assert (await doctor.client.delete(f"/chat/runs/{run.id}")).status_code == 204
