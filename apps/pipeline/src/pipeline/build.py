@@ -42,6 +42,19 @@ DROP_FEATURE_KEYS = {"weight", "curated_file"}
 # Hypotheses (edges whose evidence is all inferred) keep a score-based confidence so strong ones
 # pass the 0.6 threshold, but are capped below "High" (0.8): a hypothesis is never shown as High.
 INFERRED_CONFIDENCE_CAP = 0.79
+# Weaker kinds of hypothesis have a lower ceiling. Proximity and candidate links stay below the
+# 0.6 "supported" threshold, so they can never carry a supported route.
+INFERRED_CONFIDENCE_CAPS: dict[str, float] = {
+    Relation.near_on_chromosome.value: 0.45,
+    Relation.candidate_phenotype.value: 0.55,
+    Relation.suggested_by_neighbour.value: 0.55,
+}
+# Features that describe a hypothesis; an edge that also has observed evidence is not one.
+HYPOTHESIS_FEATURE_KEYS = ("explanation", "method", "confidence_basis")
+
+
+def inferred_cap(relation: str) -> float:
+    return INFERRED_CONFIDENCE_CAPS.get(relation, INFERRED_CONFIDENCE_CAP)
 
 
 def evidence_weight(tier: str, features: dict | None, origin: str = "observed") -> float:
@@ -234,12 +247,13 @@ def merge(
         confidence = compute_confidence(support, n_contra)
         merged = merge_features(feats)
         if origin == Origin.inferred.value:
-            merged = {
-                **(merged or {}),
-                "confidence_raw": confidence,
-                "confidence_cap": INFERRED_CONFIDENCE_CAP,
-            }
-            confidence = min(confidence, INFERRED_CONFIDENCE_CAP)
+            cap = inferred_cap(rel)
+            merged = {**(merged or {}), "confidence_raw": confidence, "confidence_cap": cap}
+            confidence = min(confidence, cap)
+        elif merged:
+            for k in HYPOTHESIS_FEATURE_KEYS:
+                merged.pop(k, None)
+            merged = merged or None
         status = EdgeStatus.active.value
         if origin in (Origin.user_contributed.value, Origin.patient_reported.value):
             status = EdgeStatus.pending_review.value
