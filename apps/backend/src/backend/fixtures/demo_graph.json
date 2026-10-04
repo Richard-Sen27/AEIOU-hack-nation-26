@@ -680,7 +680,17 @@
    "description": null,
    "url": "https://hpo.jax.org/browse/term/HP:0001250",
    "attrs": {
-    "fixture": true
+    "fixture": true,
+    "hpo_lineage": [
+     {
+      "id": "HP:0000707",
+      "label": "Abnormality of the nervous system"
+     },
+     {
+      "id": "HP:0012638",
+      "label": "Abnormal nervous system physiology"
+     }
+    ]
    },
    "cluster_id": null,
    "synonyms": [
@@ -708,7 +718,25 @@
    "description": null,
    "url": "https://hpo.jax.org/browse/term/HP:0001263",
    "attrs": {
-    "fixture": true
+    "fixture": true,
+    "hpo_lineage": [
+     {
+      "id": "HP:0000707",
+      "label": "Abnormality of the nervous system"
+     },
+     {
+      "id": "HP:0012638",
+      "label": "Abnormal nervous system physiology"
+     },
+     {
+      "id": "HP:0012759",
+      "label": "Neurodevelopmental abnormality"
+     },
+     {
+      "id": "HP:0012758",
+      "label": "Neurodevelopmental delay"
+     }
+    ]
    },
    "cluster_id": null,
    "synonyms": [
@@ -732,7 +760,21 @@
    "description": null,
    "url": "https://hpo.jax.org/browse/term/HP:0001252",
    "attrs": {
-    "fixture": true
+    "fixture": true,
+    "hpo_lineage": [
+     {
+      "id": "HP:0033127",
+      "label": "Abnormality of the musculature"
+     },
+     {
+      "id": "HP:0011804",
+      "label": "Abnormal muscle physiology"
+     },
+     {
+      "id": "HP:0003808",
+      "label": "Abnormal muscle tone"
+     }
+    ]
    },
    "cluster_id": null,
    "synonyms": [
@@ -756,7 +798,13 @@
    "description": null,
    "url": "https://hpo.jax.org/browse/term/HP:0011968",
    "attrs": {
-    "fixture": true
+    "fixture": true,
+    "hpo_lineage": [
+     {
+      "id": "HP:0025031",
+      "label": "Abnormality of the digestive system"
+     }
+    ]
    },
    "cluster_id": null,
    "synonyms": [
@@ -780,7 +828,21 @@
    "description": null,
    "url": "https://hpo.jax.org/browse/term/HP:0001249",
    "attrs": {
-    "fixture": true
+    "fixture": true,
+    "hpo_lineage": [
+     {
+      "id": "HP:0000707",
+      "label": "Abnormality of the nervous system"
+     },
+     {
+      "id": "HP:0012638",
+      "label": "Abnormal nervous system physiology"
+     },
+     {
+      "id": "HP:0012759",
+      "label": "Neurodevelopmental abnormality"
+     }
+    ]
    },
    "cluster_id": null,
    "synonyms": [
@@ -800,7 +862,25 @@
    "description": null,
    "url": "https://hpo.jax.org/browse/term/HP:0001251",
    "attrs": {
-    "fixture": true
+    "fixture": true,
+    "hpo_lineage": [
+     {
+      "id": "HP:0000707",
+      "label": "Abnormality of the nervous system"
+     },
+     {
+      "id": "HP:0012638",
+      "label": "Abnormal nervous system physiology"
+     },
+     {
+      "id": "HP:0100022",
+      "label": "Abnormality of movement"
+     },
+     {
+      "id": "HP:0011443",
+      "label": "Abnormality of coordination"
+     }
+    ]
    },
    "cluster_id": null,
    "synonyms": [
@@ -820,7 +900,25 @@
    "description": null,
    "url": "https://hpo.jax.org/browse/term/HP:0000729",
    "attrs": {
-    "fixture": true
+    "fixture": true,
+    "hpo_lineage": [
+     {
+      "id": "HP:0000707",
+      "label": "Abnormality of the nervous system"
+     },
+     {
+      "id": "HP:0012638",
+      "label": "Abnormal nervous system physiology"
+     },
+     {
+      "id": "HP:0011446",
+      "label": "Abnormality of mental function"
+     },
+     {
+      "id": "HP:0000708",
+      "label": "Behavioral abnormality"
+     }
+    ]
    },
    "cluster_id": null,
    "synonyms": [
@@ -840,7 +938,21 @@
    "description": null,
    "url": "https://hpo.jax.org/browse/term/HP:0002373",
    "attrs": {
-    "fixture": true
+    "fixture": true,
+    "hpo_lineage": [
+     {
+      "id": "HP:0000707",
+      "label": "Abnormality of the nervous system"
+     },
+     {
+      "id": "HP:0012638",
+      "label": "Abnormal nervous system physiology"
+     },
+     {
+      "id": "HP:0001250",
+      "label": "Seizure"
+     }
+    ]
    },
    "cluster_id": null,
    "synonyms": [
@@ -864,7 +976,25 @@
    "description": null,
    "url": "https://hpo.jax.org/browse/term/HP:0012469",
    "attrs": {
-    "fixture": true
+    "fixture": true,
+    "hpo_lineage": [
+     {
+      "id": "HP:0000707",
+      "label": "Abnormality of the nervous system"
+     },
+     {
+      "id": "HP:0012638",
+      "label": "Abnormal nervous system physiology"
+     },
+     {
+      "id": "HP:0001250",
+      "label": "Seizure"
+     },
+     {
+      "id": "HP:0011097",
+      "label": "Epileptic spasm"
+     }
+    ]
    },
    "cluster_id": null,
    "synonyms": [
@@ -884,7 +1014,21 @@
    "description": null,
    "url": "https://hpo.jax.org/browse/term/HP:0002133",
    "attrs": {
-    "fixture": true
+    "fixture": true,
+    "hpo_lineage": [
+     {
+      "id": "HP:0000707",
+      "label": "Abnormality of the nervous system"
+     },
+     {
+      "id": "HP:0012638",
+      "label": "Abnormal nervous system physiology"
+     },
+     {
+      "id": "HP:0001250",
+      "label": "Seizure"
+     }
+    ]
    },
    "cluster_id": null,
    "synonyms": [
@@ -904,7 +1048,25 @@
    "description": null,
    "url": "https://hpo.jax.org/browse/term/HP:0002076",
    "attrs": {
-    "fixture": true
+    "fixture": true,
+    "hpo_lineage": [
+     {
+      "id": "HP:0000707",
+      "label": "Abnormality of the nervous system"
+     },
+     {
+      "id": "HP:0012638",
+      "label": "Abnormal nervous system physiology"
+     },
+     {
+      "id": "HP:0012531",
+      "label": "Pain"
+     },
+     {
+      "id": "HP:0002315",
+      "label": "Headache"
+     }
+    ]
    },
    "cluster_id": null,
    "synonyms": [],

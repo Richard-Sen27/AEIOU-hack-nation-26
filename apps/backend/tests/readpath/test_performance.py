@@ -5,7 +5,7 @@ import time
 
 import pytest
 
-from backend.api.services import export
+from backend.api.services import atlas_tree, export
 from backend.api.services import graph as graph_service
 from backend.api.services import path as path_service
 from backend.schemas.common import Lens
@@ -129,6 +129,11 @@ def test_synthetic_graph_is_fast(synthetic, restore_graph):
     started = time.perf_counter()
     graph_service.atlas_payload()
     assert time.perf_counter() - started < 3
+
+    started = time.perf_counter()
+    atlas_tree.tree_payload()
+    tree_s = time.perf_counter() - started
+    assert tree_s < 3, tree_s
 
     hub = max(store.degree, key=store.degree.get)
     timings = {}
