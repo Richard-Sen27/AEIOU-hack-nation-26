@@ -56,9 +56,16 @@ def evidence_weight(tier: str, features: dict | None, origin: str = "observed") 
     return base
 
 
+def _num(v: Any) -> bool:
+    return isinstance(v, int | float) and not isinstance(v, bool)
+
+
 def merge_features(items: list[dict]) -> dict[str, Any] | None:
+    """Numbers keep the maximum, dicts merge key by key (numbers again by maximum), anything else
+    keeps the first value. ``frequency_label`` follows the evidence row whose ``frequency`` won."""
     out: dict[str, Any] = {}
     diseases: list[str] = []
+    best_freq: float | None = None
     for f in items:
         for k, v in f.items():
             if k in DROP_FEATURE_KEYS or v is None:
@@ -67,9 +74,19 @@ def merge_features(items: list[dict]) -> dict[str, Any] | None:
                 if v not in diseases:
                     diseases.append(v)
             elif k not in out:
-                out[k] = v
-            elif isinstance(v, int | float) and isinstance(out[k], int | float):
+                out[k] = dict(v) if isinstance(v, dict) else v
+            elif _num(v) and _num(out[k]):
                 out[k] = max(out[k], v)
+            elif isinstance(v, dict) and isinstance(out[k], dict):
+                for kk, vv in v.items():
+                    cur = out[k].get(kk)
+                    if cur is None or (_num(vv) and _num(cur) and vv > cur):
+                        out[k][kk] = vv
+        freq = f.get("frequency")
+        if _num(freq) and (best_freq is None or freq > best_freq):
+            best_freq = freq
+            if f.get("frequency_label") is not None:
+                out["frequency_label"] = f["frequency_label"]
     if diseases:
         out["diseases"] = diseases
     return out or None

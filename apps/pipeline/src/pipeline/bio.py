@@ -36,8 +36,11 @@ GO_URL = "https://amigo.geneontology.org/amigo/term/{}"
 CLINVAR_URL = "https://www.ncbi.nlm.nih.gov/clinvar/variation/{}/"
 
 
-def _cached(name: str, sources: list[tuple[str, str]]):
-    """Cache a parser's DataFrame in data/cache/parsed/<name>.parquet keyed by raw SHA-256s."""
+def _cached(name: str, sources: list[tuple[str, str]], version: int = 1):
+    """Cache a parser's DataFrame in data/cache/parsed/<name>.parquet keyed by raw SHA-256s.
+
+    Bump ``version`` when the parser's output columns change, so stale caches are re-parsed.
+    """
 
     def deco(fn: Callable[[], pl.DataFrame]):
         @cache
@@ -48,6 +51,8 @@ def _cached(name: str, sources: list[tuple[str, str]]):
                 if rec is None:
                     raise FileNotFoundError(f"raw {source}/{file} missing; run fetch first")
                 key.append(rec["sha256"])
+            if version > 1:
+                key.append(f"v{version}")
             out = PARSED / f"{name}.parquet"
             stamp = PARSED / f"{name}.key"
             if out.exists() and stamp.exists() and stamp.read_text() == ",".join(key):
@@ -243,6 +248,97 @@ def resolve_gene(name: str) -> str | None:
     return gene_lookup().get(name.upper())
 
 
+# ---------------------------------------------------------------- MANE (gene coordinates)
+
+MANE_FILE = "MANE.GRCh38.v1.5.summary.txt.gz"
+ASSEMBLY = "GRCh38"
+_REFSEQ_CHROMOSOMES = {23: "X", 24: "Y"}
+
+
+def refseq_chromosome(accession: str) -> str | None:
+    """NC_000019.10 -> "19", NC_000023.11 -> "X", NC_012920.1 -> "MT"; anything else -> None."""
+    m = re.match(r"NC_0+(\d+)\.\d+$", accession or "")
+    if not m:
+        return None
+    n = int(m.group(1))
+    if n == 12920:
+        return "MT"
+    if 1 <= n <= 22:
+        return str(n)
+    return _REFSEQ_CHROMOSOMES.get(n)
+
+
+def parse_mane(lines) -> pl.DataFrame:
+    """MANE summary rows -> one GRCh38 span per HGNC gene, from its MANE Select transcript.
+
+    The span is the transcript's (MANE Select), which for nearly every gene is the gene's
+    extent. Genes with several Select rows keep the outermost coordinates.
+    """
+    rows = []
+    reader = csv.DictReader((line.lstrip("#") for line in lines), delimiter="\t")
+    for r in reader:
+        if r.get("MANE_status") != "MANE Select" or not r.get("HGNC_ID", "").startswith("HGNC:"):
+            continue
+        chrom = refseq_chromosome(r["GRCh38_chr"])
+        if chrom is None:
+            continue
+        rows.append(
+            {
+                "hgnc_id": r["HGNC_ID"],
+                "chromosome": chrom,
+                "start": int(r["chr_start"]),
+                "end": int(r["chr_end"]),
+                "strand": r["chr_strand"],
+            }
+        )
+    schema = {
+        "hgnc_id": pl.String,
+        "chromosome": pl.String,
+        "start": pl.Int64,
+        "end": pl.Int64,
+        "strand": pl.String,
+    }
+    df = pl.DataFrame(rows, schema=schema)
+    return df.group_by("hgnc_id", maintain_order=True).agg(
+        pl.col("chromosome").first(),
+        pl.col("start").min(),
+        pl.col("end").max(),
+        pl.col("strand").first(),
+    )
+
+
+_CYTOBAND_CHROMOSOME = re.compile(r"^\s*(\d{1,2}|X|Y)(?=[pq\s]|cen|$)", re.IGNORECASE)
+
+
+def cytoband_chromosome(location: str | None) -> str | None:
+    """HGNC location -> chromosome: "9q34.11" -> "9", "Xp22.13" -> "X", "mitochondria" -> "MT"."""
+    if not location:
+        return None
+    if location.strip().lower().startswith("mito"):
+        return "MT"
+    m = _CYTOBAND_CHROMOSOME.match(location)
+    return m.group(1).upper() if m else None
+
+
+@_cached("mane", [("mane", MANE_FILE)])
+def mane_genes() -> pl.DataFrame:
+    with gzip.open(RAW / "mane" / MANE_FILE, "rt") as f:
+        return parse_mane(f)
+
+
+def gene_coordinates() -> dict[str, dict]:
+    """HGNC id -> {chromosome, start, end, strand} on GRCh38; {} when MANE was not fetched."""
+    try:
+        df = mane_genes()
+    except FileNotFoundError:
+        log.warning("MANE summary not fetched; genes get no coordinates")
+        return {}
+    return {
+        r["hgnc_id"]: {k: r[k] for k in ("chromosome", "start", "end", "strand")}
+        for r in df.iter_rows(named=True)
+    }
+
+
 # ---------------------------------------------------------------- HPO
 
 
@@ -297,7 +393,7 @@ def parse_frequency(v: str | None) -> float | None:
     return None
 
 
-@_cached("hpoa", [("hpo", "phenotype.hpoa")])
+@_cached("hpoa", [("hpo", "phenotype.hpoa")], version=2)
 def hpoa() -> pl.DataFrame:
     """Disease -> phenotype annotations (aspect P only, NOT-qualified rows kept with a flag)."""
     rows = []
@@ -316,9 +412,28 @@ def hpoa() -> pl.DataFrame:
                     "evidence": r["evidence"],
                     "frequency_raw": r["frequency"],
                     "frequency": parse_frequency(r["frequency"]),
+                    "onset": r.get("onset") or None,
                 }
             )
     return pl.DataFrame(rows, infer_schema_length=None)
+
+
+def frequency_label(raw: str | None) -> str | None:
+    """Readable form of an HPO frequency: the HPO term's name, or the ratio / percentage as is."""
+    if not raw or raw == "-":
+        return None
+    if raw in FREQ_HP:
+        return hpo_label(raw)
+    return raw
+
+
+@cache
+def _hpo_labels() -> dict[str, str]:
+    return {hid: label for hid, label in hpo_terms().select("id", "label").iter_rows() if label}
+
+
+def hpo_label(hpo_id: str) -> str:
+    return _hpo_labels().get(hpo_id, hpo_id)
 
 
 @_cached("hpo_g2p", [("hpo", "genes_to_phenotype.txt")])
@@ -478,6 +593,98 @@ def orphanet_prevalence() -> pl.DataFrame:
                 }
             )
     return pl.DataFrame(rows, infer_schema_length=None)
+
+
+ORPHA_EXACT = "E (Exact mapping"
+NOMENCLATURE_SCHEMA = {
+    "orpha": pl.String,
+    "name": pl.String,
+    "disorder_type": pl.String,
+    "mondo_ids": pl.List(pl.String),
+    "omim_ids": pl.List(pl.String),
+}
+
+
+def parse_orphanet_nomenclature(source) -> pl.DataFrame:
+    """Orphanet product1 (nomenclature) -> one row per disorder with its exact MONDO / OMIM ids.
+
+    Only external references with an exact mapping ("E") that Orphanet marks as validated are
+    kept; narrower / broader mappings (NTBT, BTNT, ...) would attach the wrong entity.
+    """
+    rows = []
+    for _, el in ET.iterparse(source, events=("end",)):
+        if el.tag != "Disorder" or el.find("OrphaCode") is None:
+            continue
+        exact: dict[str, list[str]] = {"MONDO": [], "OMIM": []}
+        for ref in el.iter("ExternalReference"):
+            src = ref.findtext("Source")
+            if src not in exact:
+                continue
+            relation = ref.findtext("DisorderMappingRelation/Name") or ""
+            status = ref.findtext("DisorderMappingValidationStatus/Name") or ""
+            value = (ref.findtext("Reference") or "").strip()
+            if relation.startswith(ORPHA_EXACT) and status == "Validated" and value:
+                exact[src].append(f"{src}:{value}")
+        rows.append(
+            {
+                "orpha": f"ORPHA:{el.findtext('OrphaCode')}",
+                "name": el.findtext("Name"),
+                "disorder_type": el.findtext("DisorderType/Name"),
+                "mondo_ids": sorted(set(exact["MONDO"])),
+                "omim_ids": sorted(set(exact["OMIM"])),
+            }
+        )
+        el.clear()
+    return pl.DataFrame(rows, schema=NOMENCLATURE_SCHEMA)
+
+
+@_cached("orphanet_nomenclature", [("orphanet", "en_product1.xml")])
+def orphanet_nomenclature() -> pl.DataFrame:
+    return parse_orphanet_nomenclature(RAW / "orphanet" / "en_product1.xml")
+
+
+def disease_xref_ids(
+    exact_matches: dict[str, list[str]], nomenclature: pl.DataFrame
+) -> dict[str, dict[str, list[str]]]:
+    """MONDO id -> {"orpha_ids": [...], "omim_ids": [...], "orphanet_added": [...]}.
+
+    Starts from MONDO's own exact matches, then adds what Orphanet product1 maps exactly:
+    ORPHA codes whose validated exact MONDO mapping is the disease, and the OMIM ids those ORPHA
+    codes map exactly. An ORPHA or OMIM id that MONDO already assigns to another disease is
+    skipped. ``orphanet_added`` lists the ids that came only from product1.
+    """
+    owner: dict[str, str] = {}
+    for mid, xs in exact_matches.items():
+        for x in xs:
+            owner.setdefault(x, mid)
+    by_orpha = {r["orpha"]: r for r in nomenclature.iter_rows(named=True)}
+    orpha_by_mondo: dict[str, set[str]] = {}
+    for r in by_orpha.values():
+        for m in r["mondo_ids"]:
+            orpha_by_mondo.setdefault(m, set()).add(r["orpha"])
+    out: dict[str, dict[str, list[str]]] = {}
+    for mid, xs in exact_matches.items():
+        orpha = {x for x in xs if x.startswith("ORPHA:")}
+        omim = {x for x in xs if x.startswith("OMIM:")}
+        base = orpha | omim
+        for o in orpha_by_mondo.get(mid, ()):
+            if owner.get(o, mid) == mid:
+                orpha.add(o)
+        for o in sorted(orpha):
+            for x in by_orpha[o]["omim_ids"] if o in by_orpha else ():
+                if owner.get(x, mid) == mid:
+                    omim.add(x)
+        out[mid] = {
+            "orpha_ids": sorted(orpha, key=_id_sort),
+            "omim_ids": sorted(omim, key=_id_sort),
+            "orphanet_added": sorted((orpha | omim) - base, key=_id_sort),
+        }
+    return out
+
+
+def _id_sort(curie_id: str) -> tuple[str, int]:
+    prefix, _, acc = curie_id.partition(":")
+    return (prefix, int(acc) if acc.isdigit() else 0)
 
 
 ORPHA_FREQ = {
@@ -686,19 +893,30 @@ def gene_disease() -> pl.DataFrame:
 
 
 @cache
-def disease_phenotypes() -> pl.DataFrame:
-    """MONDO disease -> HPO term with frequency, merged from HPO annotations and Orphanet."""
+def _phenotype_annotations() -> pl.DataFrame:
+    """Every MONDO-mapped annotation from HPO and Orphanet, with an ``excluded`` flag.
+
+    Excluded = an HPO "NOT" qualifier, or a frequency of 0 (HPO "Excluded (0%)" HP:0040285,
+    Orphanet "Excluded (0%)").
+    """
     x2m = xref_to_mondo()
-    a = hpoa().filter(~pl.col("negated"))
-    a = a.with_columns(
-        pl.col("disease_id").replace_strict(x2m, default=None).alias("mondo_id")
-    ).drop_nulls("mondo_id")
+    a = (
+        hpoa()
+        .with_columns(pl.col("disease_id").replace_strict(x2m, default=None).alias("mondo_id"))
+        .drop_nulls("mondo_id")
+    )
+    labels = {raw: frequency_label(raw) for raw in a["frequency_raw"].unique().to_list()}
+    onsets = {o: hpo_label(o) for o in a["onset"].drop_nulls().unique().to_list()}
     a = a.select(
         "mondo_id",
         "hpo_id",
         "frequency",
+        pl.col("frequency_raw").replace_strict(labels, default=None).alias("frequency_label"),
+        pl.col("onset").alias("onset_id"),
+        pl.col("onset").replace_strict(onsets, default=None).alias("onset"),
         pl.col("disease_id").alias("ref"),
         pl.lit("hpo").alias("source"),
+        (pl.col("negated") | (pl.col("frequency") == 0).fill_null(False)).alias("excluded"),
     )
     o = orphanet_phenotypes()
     o = o.with_columns(
@@ -709,11 +927,35 @@ def disease_phenotypes() -> pl.DataFrame:
         "mondo_id",
         "hpo_id",
         "frequency",
+        pl.col("frequency_raw").alias("frequency_label"),
+        pl.lit(None, dtype=pl.String).alias("onset_id"),
+        pl.lit(None, dtype=pl.String).alias("onset"),
         pl.col("orpha").alias("ref"),
         pl.lit("orphanet").alias("source"),
+        (pl.col("frequency") == 0).fill_null(False).alias("excluded"),
     )
-    df = pl.concat([a, o], how="vertical_relaxed")
-    return df.filter(pl.col("frequency").is_null() | (pl.col("frequency") > 0))
+    return pl.concat([a, o], how="vertical_relaxed")
+
+
+@cache
+def disease_phenotypes() -> pl.DataFrame:
+    """MONDO disease -> HPO term with frequency, merged from HPO annotations and Orphanet.
+
+    Columns: mondo_id, hpo_id, frequency (0-1 or null), frequency_label, onset_id, onset, ref,
+    source (hpo | orphanet). Excluded annotations are in ``disease_excluded_phenotypes``.
+    """
+    return _phenotype_annotations().filter(~pl.col("excluded")).drop("excluded")
+
+
+@cache
+def disease_excluded_phenotypes() -> pl.DataFrame:
+    """MONDO disease -> HPO term recorded as excluded (absent) for that disease."""
+    return (
+        _phenotype_annotations()
+        .filter(pl.col("excluded"))
+        .select("mondo_id", "hpo_id", "ref", "source")
+        .unique(maintain_order=True)
+    )
 
 
 # ---------------------------------------------------------------- normalizers
@@ -724,7 +966,19 @@ def _retrieved(source: str, file: str) -> str | None:
     return rec["retrieved_at"] if rec else None
 
 
+def _nomenclature_or_empty() -> pl.DataFrame:
+    try:
+        return orphanet_nomenclature()
+    except FileNotFoundError:
+        log.warning("Orphanet product1 not fetched; disease ids come from MONDO only")
+        return pl.DataFrame(schema=NOMENCLATURE_SCHEMA)
+
+
 def normalize_mondo(scope: Scope) -> None:
+    live = mondo_terms().filter(~pl.col("deprecated"))
+    ids = disease_xref_ids(
+        dict(live.select("id", "exact_matches").iter_rows()), _nomenclature_or_empty()
+    )
     terms = mondo_terms().filter(pl.col("id").is_in(list(scope.disease_ids)))
     nodes, syns = [], []
     for t in terms.iter_rows(named=True):
@@ -733,6 +987,11 @@ def normalize_mondo(scope: Scope) -> None:
             for x in t["xrefs"]
             if x.split(":")[0] in ("OMIM", "Orphanet", "MEDGEN", "GARD", "DOID", "NORD")
         ]
+        own = ids.get(t["id"]) or {  # a deprecated MONDO term: its own exact matches only
+            "orpha_ids": [x for x in t["exact_matches"] if x.startswith("ORPHA:")],
+            "omim_ids": [x for x in t["exact_matches"] if x.startswith("OMIM:")],
+            "orphanet_added": [],
+        }
         nodes.append(
             {
                 "id": t["id"],
@@ -740,12 +999,24 @@ def normalize_mondo(scope: Scope) -> None:
                 "label": t["label"],
                 "description": t["definition"],
                 "url": MONDO_URL.format(t["id"]),
-                "attrs": {"xrefs": xrefs, "exact_matches": t["exact_matches"], "rare": t["rare"]},
+                "attrs": {
+                    "xrefs": xrefs,
+                    "exact_matches": t["exact_matches"],
+                    "rare": t["rare"],
+                    "orpha_ids": own["orpha_ids"],
+                    "omim_ids": own["omim_ids"],
+                },
             }
         )
         syns.append({"node_id": t["id"], "synonym": t["label"], "source": "mondo"})
         for s in t["exact_synonyms"] + t["other_synonyms"]:
             syns.append({"node_id": t["id"], "synonym": s, "source": "mondo"})
+        # ORPHA:/OMIM: ids as synonyms, so search finds a disease by its standard ids.
+        added = set(own["orphanet_added"])
+        for x in own["orpha_ids"] + own["omim_ids"]:
+            syns.append(
+                {"node_id": t["id"], "synonym": x, "source": "orphanet" if x in added else "mondo"}
+            )
     # Disease -> gene from MONDO itself.
     retrieved = _retrieved("mondo", "mondo.json")
     gd = gene_disease().filter(
@@ -776,8 +1047,12 @@ def _gd_assertion(r: dict, retrieved: str | None) -> dict:
 def normalize_hgnc(scope: Scope) -> None:
     genes = hgnc().filter(pl.col("hgnc_id").is_in(list(scope.gene_ids)))
     dosage = {r["symbol"]: r for r in clingen_dosage().iter_rows(named=True)}
-    nodes, syns = [], []
+    coords = gene_coordinates()
+    nodes, syns, missing = [], [], []
     for g in genes.iter_rows(named=True):
+        c = coords.get(g["hgnc_id"])
+        if c is None:
+            missing.append(g["symbol"])
         attrs = {
             "symbol": g["symbol"],
             "locus_group": g["locus_group"],
@@ -786,6 +1061,13 @@ def normalize_hgnc(scope: Scope) -> None:
             "ensembl_id": g["ensembl_id"],
             "uniprot_ids": g["uniprot_ids"],
             "omim_ids": g["omim_ids"],
+            # Position on GRCh38 from the MANE Select transcript; null when MANE has none.
+            "chromosome": c["chromosome"] if c else cytoband_chromosome(g["location"]),
+            "cytoband": g["location"] or None,
+            "start": c["start"] if c else None,
+            "end": c["end"] if c else None,
+            "strand": c["strand"] if c else None,
+            "assembly": ASSEMBLY if c else None,
         }
         if d := dosage.get(g["symbol"]):
             attrs["clingen_hi_score"] = d["hi_score"]
@@ -802,10 +1084,83 @@ def normalize_hgnc(scope: Scope) -> None:
         )
         for s in [g["symbol"], g["name"], *g["aliases"], *g["prev_symbols"], *g["alias_names"]]:
             syns.append({"node_id": g["hgnc_id"], "synonym": s, "source": "hgnc"})
+    if missing:
+        log.warning("%d genes without MANE coordinates: %s", len(missing), ", ".join(missing))
     write_tables("hgnc", nodes, syns, [])
 
 
 PHENOTYPES_PER_DISEASE = 40
+
+
+def phenotype_rows(scope: Scope, source: str) -> pl.DataFrame:
+    """One row per (disease, term, source record) in scope: the highest frequency recorded with
+    its label, and the first recorded onset (several hpoa lines can share a record)."""
+    dp = disease_phenotypes().filter(
+        (pl.col("source") == source)
+        & pl.col("mondo_id").is_in(list(scope.disease_ids))
+        & pl.col("hpo_id").is_in(list(scope.phenotype_ids))
+    )
+    keys = ["mondo_id", "hpo_id", "ref"]
+    best = (
+        dp.sort([*keys, "frequency"], descending=[False, False, False, True], nulls_last=True)
+        .group_by(keys, maintain_order=True)
+        .agg(pl.col("frequency").first(), pl.col("frequency_label").first())
+    )
+    onset = (
+        dp.drop_nulls("onset_id")
+        .sort([*keys, "onset_id"])
+        .group_by(keys, maintain_order=True)
+        .agg(pl.col("onset_id").first(), pl.col("onset").first())
+    )
+    return best.join(onset, on=keys, how="left").sort(keys)
+
+
+def phenotype_features(r: dict, source: str) -> dict | None:
+    """has_phenotype features of one source record (None values left out).
+
+    frequency: 0-1, the value Stage 4 compares across sources (it keeps the maximum);
+    frequency_label: the source's own wording ("Very frequent", "7/13", "Frequent (79-30%)");
+    frequency_by_source: {"hpo": 0.9, "orphanet": 0.55}, merged per source in Stage 4;
+    onset / onset_id: HPO onset term of the annotation (HPO annotations only).
+    """
+    f = r.get("frequency")
+    out = {
+        "frequency": f,
+        "frequency_label": r.get("frequency_label") if f is not None else None,
+        "frequency_by_source": {source: f} if f is not None else None,
+        "onset": r.get("onset"),
+        "onset_id": r.get("onset_id"),
+    }
+    out = {k: v for k, v in out.items() if v is not None}
+    return out or None
+
+
+def excluded_phenotype_nodes(scope: Scope) -> list[dict]:
+    """Disease stubs carrying ``attrs.excluded_phenotypes`` (merged onto the MONDO node in Stage 4).
+
+    Each item: {"id": "HP:...", "label": ..., "sources": ["hpo", "orphanet"], "refs": [...]}.
+    Terms outside the phenotype scope are kept too: ranking needs every recorded absence.
+    """
+    ex = disease_excluded_phenotypes().filter(pl.col("mondo_id").is_in(list(scope.disease_ids)))
+    grouped = (
+        ex.group_by("mondo_id", "hpo_id")
+        .agg(pl.col("source").unique().sort(), pl.col("ref").unique().sort())
+        .sort("mondo_id", "hpo_id")
+    )
+    items: dict[str, list[dict]] = {}
+    for r in grouped.iter_rows(named=True):
+        items.setdefault(r["mondo_id"], []).append(
+            {
+                "id": r["hpo_id"],
+                "label": hpo_label(r["hpo_id"]),
+                "sources": r["source"],
+                "refs": r["ref"],
+            }
+        )
+    return [
+        {"id": mid, "type": "disease", "attrs": {"excluded_phenotypes": lst}}
+        for mid, lst in items.items()
+    ]
 
 
 def normalize_hpo(scope: Scope) -> None:
@@ -828,13 +1183,7 @@ def normalize_hpo(scope: Scope) -> None:
             syns.append({"node_id": t["id"], "synonym": s, "source": "hpo"})
     retrieved = _retrieved("hpo", "phenotype.hpoa")
     rows = []
-    dp = disease_phenotypes().filter(
-        (pl.col("source") == "hpo")
-        & pl.col("mondo_id").is_in(list(scope.disease_ids))
-        & pl.col("hpo_id").is_in(list(keep))
-    )
-    for r in dp.unique(["mondo_id", "hpo_id", "ref"]).iter_rows(named=True):
-        db, acc = r["ref"].split(":", 1)
+    for r in phenotype_rows(scope, "hpo").iter_rows(named=True):
         rows.append(
             assertion(
                 r["mondo_id"],
@@ -845,9 +1194,11 @@ def normalize_hpo(scope: Scope) -> None:
                 source_ref=r["ref"],
                 url=f"https://hpo.jax.org/browse/disease/{r['ref']}",
                 retrieved_at=retrieved,
-                features={"frequency": r["frequency"]} if r["frequency"] is not None else None,
+                features=phenotype_features(r, "hpo"),
             )
         )
+    # Excluded terms (HPO "NOT" and frequency 0, from HPO and Orphanet) go onto the disease node.
+    nodes += excluded_phenotype_nodes(scope)
     gd = gene_disease().filter(
         (pl.col("source") == "hpo")
         & pl.col("mondo_id").is_in(list(scope.disease_ids))
@@ -902,12 +1253,7 @@ def normalize_orphanet(scope: Scope) -> None:
     )
     rows = [_gd_assertion(r, retrieved) for r in gd.iter_rows(named=True)]
     p_retrieved = _retrieved("orphanet", "en_product4.xml")
-    dp = disease_phenotypes().filter(
-        (pl.col("source") == "orphanet")
-        & pl.col("mondo_id").is_in(list(scope.disease_ids))
-        & pl.col("hpo_id").is_in(list(scope.phenotype_ids))
-    )
-    for r in dp.unique(["mondo_id", "hpo_id", "ref"]).iter_rows(named=True):
+    for r in phenotype_rows(scope, "orphanet").iter_rows(named=True):
         rows.append(
             assertion(
                 r["mondo_id"],
@@ -918,7 +1264,7 @@ def normalize_orphanet(scope: Scope) -> None:
                 source_ref=r["ref"],
                 url=ORPHA_URL.format(r["ref"].split(":")[1]),
                 retrieved_at=p_retrieved,
-                features={"frequency": r["frequency"]} if r["frequency"] is not None else None,
+                features=phenotype_features(r, "orphanet"),
             )
         )
     # Prevalence goes onto the disease node as attrs (merged in Stage 4).
@@ -1131,7 +1477,46 @@ def consequence(name: str, vtype: str) -> str:
 TRUNCATING = {"frameshift", "nonsense", "splice", "start_lost"}
 
 
-@_cached("clinvar", [("clinvar", "variant_summary.scope.tsv.gz")])
+ALLELE_MAX_LEN = 50  # longer VCF alleles (large indels) are left out of the node attrs
+
+
+def _int_or_none(v: str | None) -> int | None:
+    v = (v or "").strip()
+    return int(v) if v.lstrip("-").isdigit() and int(v) > 0 else None
+
+
+def _allele(v: str | None) -> str | None:
+    v = (v or "").strip()
+    if not v or v in ("na", "-") or len(v) > ALLELE_MAX_LEN:
+        return None
+    return v
+
+
+def clinvar_position(r: dict) -> dict:
+    """GRCh38 position columns of one variant_summary row; missing values become None."""
+    chrom = (r.get("Chromosome") or "").strip()
+    band = (r.get("Cytogenetic") or "").strip()
+    start, stop = _int_or_none(r.get("Start")), _int_or_none(r.get("Stop"))
+    if not chrom or chrom in ("na", "Un") or start is None:
+        chrom, start, stop = None, None, None
+    return {
+        "chromosome": chrom,
+        "start": start,
+        "stop": stop if stop is not None else start,
+        "cytoband": band if band and band not in ("-", "na") else None,
+        "assembly": (r.get("Assembly") or None) if start is not None else None,
+        "position_vcf": _int_or_none(r.get("PositionVCF")),
+        "ref": _allele(r.get("ReferenceAlleleVCF")),
+        "alt": _allele(r.get("AlternateAlleleVCF")),
+    }
+
+
+def vcv(variation_id: str) -> str:
+    """ClinVar VariationID -> its VCV accession without version: 15087 -> VCV000015087."""
+    return f"VCV{int(variation_id):09d}"
+
+
+@_cached("clinvar", [("clinvar", "variant_summary.scope.tsv.gz")], version=2)
 def clinvar_variants() -> pl.DataFrame:
     rows = []
     with gzip.open(RAW / "clinvar" / "variant_summary.scope.tsv.gz", "rt") as f:
@@ -1143,6 +1528,7 @@ def clinvar_variants() -> pl.DataFrame:
             ids = r["PhenotypeIDS"].replace("|", ";").replace(",", ";").split(";")
             rows.append(
                 {
+                    **clinvar_position(r),
                     "variation_id": r["VariationID"],
                     "hgnc_id": r["HGNC_ID"] if r["HGNC_ID"].startswith("HGNC:") else None,
                     "symbol": r["GeneSymbol"],
@@ -1164,7 +1550,9 @@ def clinvar_variants() -> pl.DataFrame:
                     "submitters": int(r["NumberSubmitters"] or 0),
                 }
             )
-    return pl.DataFrame(rows).unique("variation_id")
+    return pl.DataFrame(rows, infer_schema_length=None).unique(
+        "variation_id", keep="first", maintain_order=True
+    )
 
 
 def clinvar_disease_ids(phenotype_ids: list[str]) -> list[str]:
@@ -1182,6 +1570,46 @@ def clinvar_disease_ids(phenotype_ids: list[str]) -> list[str]:
             out.add(m)
         elif i.startswith("MedGen:") and (m := x2m.get("MEDGEN:" + i.split(":", 1)[1])):
             out.add(m)
+    return sorted(out)
+
+
+VARIANT_POSITION_ATTRS = (
+    "chromosome",
+    "start",
+    "stop",
+    "cytoband",
+    "assembly",
+    "position_vcf",
+    "ref",
+    "alt",
+)
+# Variant types that can span several genes; smaller events stay with ClinVar's own gene.
+SPANNING_TYPES = {"copy number loss", "copy number gain", "deletion", "duplication"}
+SPANNING_MIN_BP = 1000
+
+
+def spanned_genes(v: dict, coords: dict[str, dict]) -> list[tuple[str, int]]:
+    """(HGNC id, overlap in bp) of every gene in ``coords`` that a large variant overlaps.
+
+    Only copy-number variants and deletions / duplications of at least SPANNING_MIN_BP are
+    considered, on the same chromosome and assembly (MANE coordinates are GRCh38).
+    """
+    if (
+        (v.get("type") or "").lower() not in SPANNING_TYPES
+        or v.get("start") is None
+        or v.get("assembly") != ASSEMBLY
+    ):
+        return []
+    start, stop = v["start"], v.get("stop") or v["start"]
+    if stop - start + 1 < SPANNING_MIN_BP:
+        return []
+    out = []
+    for hid, c in coords.items():
+        if c.get("chromosome") != v.get("chromosome"):
+            continue
+        overlap = min(stop, c["end"]) - max(start, c["start"]) + 1
+        if overlap > 0:
+            out.append((hid, overlap))
     return sorted(out)
 
 
@@ -1203,21 +1631,23 @@ def select_variants(df: pl.DataFrame, per_gene: int = VARIANTS_PER_GENE, vus: in
         .replace_strict({"pathogenic": 0, "likely_pathogenic": 1, "uncertain_significance": 2})
         .alias("_cls"),
         pl.col("phenotype_ids").list.len().alias("_nph"),
+        pl.col("variation_id").str.zfill(12).alias("_vid"),
     )
-    order = ["hgnc_id", "stars", "submitters", "_cls"]
+    # The VariationID breaks ties, so the selection does not depend on the parse order.
+    order = ["hgnc_id", "stars", "submitters", "_cls", "_vid"]
     path = (
         df.filter(pl.col("_cls") < 2)
-        .sort(order, descending=[False, True, True, False])
+        .sort(order, descending=[False, True, True, False, False])
         .group_by("hgnc_id", maintain_order=True)
         .head(per_gene - vus)
     )
     unc = (
         df.filter(pl.col("_cls") == 2)
-        .sort(order, descending=[False, True, True, False])
+        .sort(order, descending=[False, True, True, False, False])
         .group_by("hgnc_id", maintain_order=True)
         .head(vus)
     )
-    return pl.concat([path, unc]).drop("_cls", "_nph")
+    return pl.concat([path, unc]).drop("_cls", "_nph", "_vid")
 
 
 def normalize_clinvar(scope: Scope) -> None:
@@ -1241,6 +1671,8 @@ def normalize_clinvar(scope: Scope) -> None:
         ]
     )
     retrieved = _retrieved("clinvar", "variant_summary.scope.tsv.gz")
+    coords = {g: c for g, c in gene_coordinates().items() if g in scope.gene_ids}
+    symbols = {g["hgnc_id"]: g["symbol"] for g in scope.genes}
     nodes, syns, rows = [], [], []
     for v in chosen.iter_rows(named=True):
         vid = f"CLINVAR:{v['variation_id']}"
@@ -1265,6 +1697,8 @@ def normalize_clinvar(scope: Scope) -> None:
                     "rs": v["rs"] if v["rs"] not in ("-1", "") else None,
                     "last_evaluated": v["last_evaluated"],
                     "origin": v["origin"],
+                    "vcv": vcv(v["variation_id"]),
+                    **{k: v[k] for k in VARIANT_POSITION_ATTRS},
                 },
             }
         )
@@ -1286,6 +1720,29 @@ def normalize_clinvar(scope: Scope) -> None:
                 retrieved_at=retrieved,
             )
         )
+        # Copy-number and other large variants: every further in-scope gene they overlap.
+        for hid, overlap in spanned_genes(v, coords):
+            if hid == v["hgnc_id"]:
+                continue
+            c = coords[hid]
+            rows.append(
+                assertion(
+                    vid,
+                    hid,
+                    "variant_of",
+                    tier="curated_db",
+                    source_type="clinvar",
+                    source_ref=v["variation_id"],
+                    url=url,
+                    quote=(
+                        f"{v['type']} chr{v['chromosome']}:{v['start']}-{v['stop']} "
+                        f"({v['assembly']}) overlaps {symbols.get(hid, hid)} "
+                        f"(MANE chr{c['chromosome']}:{c['start']}-{c['end']})"
+                    ),
+                    retrieved_at=retrieved,
+                    features={"basis": "coordinate_overlap", "overlap_bp": overlap},
+                )
+            )
         for mid in clinvar_disease_ids(v["phenotype_ids"]):
             if mid in scope.disease_ids:
                 rows.append(
