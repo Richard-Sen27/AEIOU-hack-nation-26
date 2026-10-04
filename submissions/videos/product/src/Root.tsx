@@ -2,6 +2,7 @@ import {Composition, Folder} from 'remotion';
 import {Caption} from './components/Caption';
 import {LogoOutro} from './components/LogoOutro';
 import {SCENES} from './content';
+import {ProductShort} from './ProductShort';
 import {ProductVideo} from './ProductVideo';
 import {ArriveScene} from './scenes/ArriveScene';
 import {CloseScene} from './scenes/CloseScene';
@@ -19,6 +20,14 @@ export const RemotionRoot: React.FC = () => {
         id="ProductVideo"
         component={ProductVideo}
         durationInFrames={1713}
+        fps={30}
+        width={1920}
+        height={1080}
+      />
+      <Composition
+        id="ProductShort"
+        component={ProductShort}
+        durationInFrames={912}
         fps={30}
         width={1920}
         height={1080}
