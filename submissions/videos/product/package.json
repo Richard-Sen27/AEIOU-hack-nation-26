@@ -20,6 +20,7 @@
     "@types/react": "19.2.7",
     "@types/web": "0.0.166",
     "eslint": "9.39.5",
+    "playwright": "1.63.0",
     "prettier": "3.8.1",
     "typescript": "5.9.3"
   },
@@ -28,6 +29,7 @@
     "render": "remotion render ProductVideo out/product.mp4",
     "still": "remotion still ProductVideo",
     "voiceover": "node --env-file-if-exists=.env --experimental-strip-types scripts/generate-voiceover.ts",
+    "record": "node --experimental-strip-types --no-warnings=ExperimentalWarning recording/record.ts",
     "build": "remotion bundle",
     "upgrade": "remotion upgrade",
     "lint": "eslint src && tsc"
