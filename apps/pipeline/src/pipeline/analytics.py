@@ -1684,11 +1684,21 @@ def hpo_terms_table(corpus: hpo_sim.Corpus, extra: Iterable[str] = ()) -> pl.Dat
     return pl.DataFrame(rows, schema=schema)
 
 
+TIERED_TYPES = ("disease", "gene", "phenotype", "pathway")
+
+
+def pathway_focus(edges: pl.DataFrame, focus_genes: set[str]) -> set[str]:
+    """Pathways with a participates_in link from at least one focus gene (tier "focus"); every
+    other pathway is "core"."""
+    pi = edges.filter(pl.col("relation") == "participates_in")
+    return set(pi.filter(pl.col("source_id").is_in(list(focus_genes)))["target_id"].to_list())
+
+
 def tier_summary(nodes: pl.DataFrame) -> dict[str, dict[str, int]]:
     """Count of focus and core nodes per tiered type."""
     out: dict[str, dict[str, int]] = {}
     for typ, attrs in nodes.select("type", "attrs").iter_rows():
-        if typ in ("disease", "gene", "phenotype"):
+        if typ in TIERED_TYPES:
             tier = (json.loads(attrs) if attrs else {}).get("tier", "focus")
             out.setdefault(typ, {}).setdefault(tier, 0)
             out[typ][tier] += 1
@@ -1794,6 +1804,7 @@ async def run() -> dict[str, Any]:
     lineage = taxonomy.hpo_lineages(n.filter(pl.col("type") == "phenotype")["id"].to_list())
 
     types = dict(n.select("id", "type").iter_rows())
+    focus_pathways = pathway_focus(tables["edges"], scope.focus_gene_ids)
 
     def _attrs(s: dict) -> str:
         a = {**json.loads(s["attrs"]), "degree": s["degree"]}
@@ -1801,6 +1812,8 @@ async def run() -> dict[str, Any]:
             # Disease, gene and phenotype nodes: "focus" (literature, people, variants, on the
             # map) or "core" (biology only). Nodes outside the scope file count as focus.
             a["tier"] = scope.tier(s["id"]) or "focus"
+        elif types.get(s["id"]) == "pathway":
+            a["tier"] = "focus" if s["id"] in focus_pathways else "core"
         if s["id"] in lineage:
             a["hpo_lineage"] = lineage[s["id"]]
             a["ic"] = round(corpus.ic.get(s["id"], 0.0), 4)

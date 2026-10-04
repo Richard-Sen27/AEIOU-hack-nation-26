@@ -339,8 +339,8 @@ def check_counterexamples(t, resolve, cases: list[dict]) -> list[dict[str, Any]]
 
 
 def check_core(t: dict[str, pl.DataFrame], min_qualified: int | None) -> list[dict[str, Any]]:
-    """Wide core: enough diseases with a gene and a symptom, a tier on every disease, gene and
-    phenotype node, and the HPO term table covering every phenotype node."""
+    """Wide core: enough diseases with a gene and a symptom, a tier on every disease, gene,
+    phenotype and pathway node, and the HPO term table covering every phenotype node."""
     nodes, edges = t["nodes"], t["edges"]
     out = []
     if min_qualified:
@@ -360,7 +360,7 @@ def check_core(t: dict[str, pl.DataFrame], min_qualified: int | None) -> list[di
     tiers: dict[str, dict[str, int]] = {}
     bad = []
     for nid, typ, attrs in nodes.select("id", "type", "attrs").iter_rows():
-        if typ not in ("disease", "gene", "phenotype"):
+        if typ not in ("disease", "gene", "phenotype", "pathway"):
             continue
         tier = (json.loads(attrs) if attrs else {}).get("tier")
         if tier not in ("focus", "core"):
@@ -369,7 +369,7 @@ def check_core(t: dict[str, pl.DataFrame], min_qualified: int | None) -> list[di
         tiers[typ][str(tier)] += 1
     out.append(
         {
-            "check": "every disease, gene and phenotype has attrs.tier focus or core",
+            "check": "every disease, gene, phenotype and pathway has attrs.tier focus or core",
             "ok": not bad,
             "detail": {"by_type": tiers, "missing": bad[:20], "n": len(bad)},
         }

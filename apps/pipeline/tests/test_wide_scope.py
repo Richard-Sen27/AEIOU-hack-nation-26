@@ -267,6 +267,27 @@ def test_top_k_cap_stats_on_a_hub():
     assert out["cap_bite_percentile_random"] == pytest.approx(66.67)
 
 
+def test_pathway_tier_is_focus_when_a_focus_gene_takes_part():
+    edges = pl.DataFrame(
+        {
+            "source_id": ["HGNC:F", "HGNC:C", "HGNC:C", "M:1"],
+            "target_id": ["REACT:1", "REACT:1", "REACT:2", "REACT:3"],
+            "relation": ["participates_in", "participates_in", "participates_in", "about"],
+        }
+    )
+    assert analytics.pathway_focus(edges, {"HGNC:F"}) == {"REACT:1"}
+    nodes = pl.DataFrame(
+        {
+            "type": ["pathway", "pathway", "gene"],
+            "attrs": [json.dumps({"tier": "focus"}), json.dumps({"tier": "core"}), "{}"],
+        }
+    )
+    assert analytics.tier_summary(nodes) == {
+        "pathway": {"focus": 1, "core": 1},
+        "gene": {"focus": 1},
+    }
+
+
 # ---------------------------------------------------------------- HPO term export
 
 
@@ -473,14 +494,14 @@ def test_plp_parser_keeps_lean_columns(tmp_path, monkeypatch):
 # ---------------------------------------------------------------- validation
 
 
-def _graph(tier_missing: bool = False):
+def _graph(tier_missing: bool = False, pathway_tier: str | None = "core"):
     attrs = lambda tier: json.dumps({} if tier is None else {"tier": tier})  # noqa: E731
     nodes = pl.DataFrame(
         {
-            "id": ["M:1", "M:2", "HGNC:1", "HP:1"],
-            "type": ["disease", "disease", "gene", "phenotype"],
+            "id": ["M:1", "M:2", "HGNC:1", "HP:1", "REACT:1"],
+            "type": ["disease", "disease", "gene", "phenotype", "pathway"],
             "attrs": [attrs("focus"), attrs("core"), attrs(None if tier_missing else "core"),
-                      attrs("core")],
+                      attrs("core"), attrs(pathway_tier)],
         }
     )  # fmt: skip
     edges = pl.DataFrame(
@@ -501,6 +522,8 @@ def test_check_core_counts_tiers_and_hpo_terms():
     assert not res["at least 2 diseases with a gene and a recorded symptom"]["ok"]
     res = validate.check_core(_graph(tier_missing=True), None)
     assert [r["ok"] for r in res] == [False, True]
+    tiers = validate.check_core(_graph(pathway_tier=None), None)[0]
+    assert not tiers["ok"] and tiers["detail"]["missing"] == ["REACT:1"]
     g = _graph()
     g["hpo_terms"] = pl.DataFrame({"id": ["HP:9"]})
     assert not validate.check_core(g, None)[-1]["ok"]
