@@ -25,6 +25,7 @@ import type { ApiError } from "@/lib/api/errors";
 
 import { callErrorText, callHref, fieldLabel, formatDate, reviewRequired, type OwnCall } from "./call-meta";
 import { DemoMark, KindBadge, StatusBadge } from "./call-parts";
+import { CallSignups } from "./call-signups";
 import { invalidatePublishedCalls } from "./use-published-calls";
 
 type Load = { kind: "loading" } | { kind: "ready"; data: Schemas.OwnCallList } | { kind: "error"; error: ApiError | null };
@@ -183,6 +184,7 @@ function OwnCallItem({
         </Button>
       </div>
       {canSubmit && review && <p className="text-xs text-muted-foreground">The Amber team reviews it before it is listed.</p>}
+      {(call.status === "published" || call.status === "closed") && <CallSignups callId={call.id} />}
 
       <AlertDialog open={confirm !== null} onOpenChange={(o) => !busy && !o && setConfirm(null)}>
         <AlertDialogContent className="sm:max-w-md" data-testid="own-call-confirm">
