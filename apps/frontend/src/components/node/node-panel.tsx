@@ -4,6 +4,7 @@ import { ArrowUpRight, Boxes, ChevronRight } from "lucide-react";
 import Link from "next/link";
 import { useMemo } from "react";
 
+import { DiseaseCalls } from "@/components/calls/disease-calls";
 import { EdgeTrustRow, NodeChip, OriginBadge, VusNotice } from "@/components/graph-ui";
 import { useLens } from "@/components/providers/lens-provider";
 import type { Schemas } from "@/lib/api";
@@ -207,6 +208,8 @@ export function NodePanel({
           </Link>
         )}
       </section>
+
+      {node.type === "disease" && <DiseaseCalls diseaseId={node.id} className="border-b px-4 py-4" />}
 
       {node.type === "cluster" && (
         <section aria-labelledby="node-members-title" className="border-b px-4 py-4" data-testid="cluster-members">

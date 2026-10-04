@@ -26,6 +26,7 @@ export const PRIMARY_NAV = [
   { href: "/atlas", label: "Atlas" },
   { href: "/clusters", label: "Clusters" },
   { href: "/chat", label: "Ask Dr. Wu" },
+  { href: "/calls", label: "Studies" },
   { href: "/documents", label: "Documents" },
 ] as const;
 
