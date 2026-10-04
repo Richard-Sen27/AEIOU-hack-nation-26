@@ -136,8 +136,9 @@ export function ClustersView() {
             </p>
             <ul className="grid gap-4 sm:grid-cols-2 xl:grid-cols-3" data-testid="clusters-list">
               {clusters.map((c) => {
-                const genes = idList(c.attrs?.genes);
-                const pathways = idList(c.attrs?.pathways);
+                // Older builds list gene ids under `genes`; current ones the lead symbols under `top_genes`.
+                const genes = idList(c.attrs?.genes).length ? idList(c.attrs?.genes) : idList(c.attrs?.top_genes);
+                const pathways = idList(c.attrs?.pathways).length ? idList(c.attrs?.pathways) : idList(c.attrs?.top_pathways);
                 const href = `/node/${encodeURIComponent(c.id)}`;
                 return (
                   <li key={c.id} className="group relative flex flex-col rounded-xl border bg-card p-5 transition-shadow hover:shadow-md" data-testid="cluster-card">
