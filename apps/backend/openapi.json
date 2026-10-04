@@ -10637,6 +10637,47 @@
             "type": "string",
             "title": "Message",
             "description": "Human-readable message. Never echoes user content."
+          },
+          "request_id": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Request Id",
+            "description": "The request's id, as in the X-Request-ID header and the server log."
+          },
+          "reason": {
+            "anyOf": [
+              {
+                "type": "string",
+                "enum": [
+                  "rate",
+                  "busy",
+                  "budget"
+                ]
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Reason",
+            "description": "rate_limited only: rate (too many requests), busy (too many answers running at once) or budget (the daily AI usage limit)."
+          },
+          "retry_after": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Retry After",
+            "description": "rate_limited only: seconds to wait, as in the Retry-After header."
           }
         },
         "type": "object",

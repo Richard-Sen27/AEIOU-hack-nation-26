@@ -18,6 +18,7 @@ import asyncio
 import contextlib
 import json
 import logging
+import time
 import uuid
 from collections.abc import AsyncIterator, Awaitable, Callable
 from dataclasses import dataclass, field
@@ -307,14 +308,49 @@ async def create(
     return run
 
 
-def start(run: Run, body: Callable[[Run], Awaitable[None]]) -> None:
-    """Run `body` detached from the request; the run is closed and later dropped after it."""
+_counts = {"started": 0, "finished": 0, "cancelled": 0, "failed": 0}
+
+
+def running_count() -> int:
+    return sum(1 for r in _runs.values() if not r.done)
+
+
+def stats_text() -> str:
+    return " ".join(f"chat_runs_{k}={v}" for k, v in _counts.items())
+
+
+def start(
+    run: Run,
+    body: Callable[[Run], Awaitable[None]],
+    on_end: Callable[[], None] | None = None,
+) -> None:
+    """Run `body` detached from the request; the run is closed and later dropped after it.
+    `on_end` runs once when it ends however it ends (frees its model slot)."""
 
     async def _main() -> None:
+        started = time.monotonic()
+        outcome = "finished"
+        _counts["started"] += 1
+        log.info("chat run start running=%d", running_count())
         try:
             await body(run)
+        except asyncio.CancelledError:
+            outcome = "cancelled"
+            raise
+        except Exception:
+            outcome = "failed"
+            raise
         finally:
             run.finish()
+            if on_end is not None:
+                on_end()
+            _counts[outcome] += 1
+            log.info(
+                "chat run end outcome=%s ms=%d running=%d",
+                "discarded" if run.discard else outcome,
+                round((time.monotonic() - started) * 1000),
+                running_count(),
+            )
             saver.forget(run.id)
             if run.discard:
                 _runs.pop(run.id, None)

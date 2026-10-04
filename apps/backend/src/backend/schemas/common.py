@@ -1,3 +1,5 @@
+from typing import Literal
+
 from pydantic import BaseModel, ConfigDict, Field
 
 from backend.schemas.enums import ErrorCode, Role
@@ -24,6 +26,17 @@ class Lens(ApiModel):
 class ErrorDetail(ApiModel):
     code: ErrorCode = Field(description="Stable machine-readable error code.")
     message: str = Field(description="Human-readable message. Never echoes user content.")
+    request_id: str | None = Field(
+        None, description="The request's id, as in the X-Request-ID header and the server log."
+    )
+    reason: Literal["rate", "busy", "budget"] | None = Field(
+        None,
+        description="rate_limited only: rate (too many requests), busy (too many answers "
+        "running at once) or budget (the daily AI usage limit).",
+    )
+    retry_after: int | None = Field(
+        None, description="rate_limited only: seconds to wait, as in the Retry-After header."
+    )
 
 
 class ErrorResponse(ApiModel):

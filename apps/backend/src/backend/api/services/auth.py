@@ -443,6 +443,15 @@ async def _auth_provider(user_id: UUID) -> str | None:
 _providers: dict[UUID, str] = {}
 
 
+async def uses_server_key(user_id: UUID) -> bool:
+    """True when this account's model calls run on the operator's OPENAI_API_KEY (the same
+    choice as `llm_for_user`); ChatGPT accounts use their own plan."""
+    provider = await _auth_provider(user_id)
+    return (
+        provider is not None and provider != "openai" and bool(get_openai_settings().openai_api_key)
+    )
+
+
 async def llm_for_user(user_id: UUID) -> LLMClient:
     """The model gateway for this user (services, SSE handlers, background jobs).
 

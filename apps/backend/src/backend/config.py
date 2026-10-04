@@ -70,6 +70,28 @@ class Settings(BaseSettings):
     # Switch it on before real patients use the product.
     calls_review_required: bool = False
 
+    # Logs: one key=value line per request and lifecycle events on stdout (backend.observability
+    # .logs); never request bodies, query strings, raw paths, names or raw ids. debug adds health
+    # checks and model-call timings.
+    log_level: str = "info"
+
+    # Rate limits (backend.api.ratelimit), counters in process memory. TRUSTED_PROXY_HOPS: how many
+    # proxies in front of the API append the client's address to X-Forwarded-For; 0 (local) uses
+    # the connection's address and ignores the header. Hosted on Railway: 1 (the Railway edge
+    # appends it; the Next.js proxy passes it through unchanged).
+    trusted_proxy_hops: int = Field(0, ge=0, le=5)
+    # Every API request per client (account, or browser for guests), in the `limits` notation.
+    rate_limit_general: str = "600/minute"
+    # Model-calling requests (chat, new explanations, document uploads, gap search) per account
+    # and UTC day, for accounts on the operator's OPENAI_API_KEY only (not ChatGPT plans). 0 = off.
+    model_daily_budget: int = Field(200, ge=0)
+    # The same requests for all such accounts together, per API process and UTC day: a kill
+    # switch for the operator's bill. 0 = off.
+    model_daily_ceiling: int = Field(2000, ge=0)
+    # Model-calling runs (chat turns, explanations, gap searches) running at once.
+    model_max_concurrent: int = Field(16, ge=1)
+    model_max_concurrent_per_account: int = Field(3, ge=1)
+
     @property
     def is_local(self) -> bool:
         """API and frontend both on loopback addresses (local development and demos)."""

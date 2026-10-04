@@ -127,6 +127,16 @@ async def app(test_db: TestDatabase):
         yield application
 
 
+@pytest.fixture(autouse=True)
+def _fresh_rate_limits():
+    """Every test starts with empty rate-limit counters, model slots and budgets (the app and
+    its in-memory counters live for the whole session)."""
+    from backend.api import ratelimit
+
+    ratelimit.reset()
+    yield
+
+
 @pytest.fixture
 async def client(app) -> AsyncIterator[httpx.AsyncClient]:
     async with httpx.AsyncClient(transport=httpx.ASGITransport(app=app), base_url=BASE_URL) as c:

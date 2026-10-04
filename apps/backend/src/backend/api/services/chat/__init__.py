@@ -12,7 +12,7 @@ redacted text only."""
 import asyncio
 import contextlib
 import logging
-from collections.abc import AsyncIterator
+from collections.abc import AsyncIterator, Callable
 from dataclasses import dataclass
 from typing import Any
 from uuid import UUID
@@ -271,12 +271,16 @@ async def _user_llm(user_id: UUID) -> LLMClient:
 
 
 async def start_turn(
-    request: ChatRequest, user: CurrentUser, lens: Lens
+    request: ChatRequest,
+    user: CurrentUser,
+    lens: Lens,
+    on_end: Callable[[], None] | None = None,
 ) -> AsyncIterator[tuple[int, ChatEvent]]:
     """Request-level checks (404 unknown session or message, 409 retry of an answered message
     or a session that is still answering, 401 no usable ChatGPT sign-in), redaction and
     emergency detection; stores the message, starts the run and returns its events with their
-    sequence numbers. The run does not depend on the returned stream being read."""
+    sequence numbers. The run does not depend on the returned stream being read. `on_end` is
+    called once when the run ends (not when this raises before the run starts)."""
     lens = _effective_lens(request, lens)
     if request.retry_message_id is not None and request.session_id is None:
         raise ApiError(422, ErrorCode.validation_error, "A retry needs its session_id.")
@@ -310,7 +314,7 @@ async def start_turn(
         prepared.llm = await llm_task
     run = await runs.create(user.id, prepared.session_id, prepared.message, prepared.retry_of)
     _open(run, prepared, lens)
-    runs.start(run, lambda r: _execute(r, prepared, lens))
+    runs.start(run, lambda r: _execute(r, prepared, lens), on_end)
     return runs.follow(run, 0)
 
 

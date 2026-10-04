@@ -4,7 +4,7 @@ from fastapi import APIRouter, Query, Request
 
 from backend.api.deps import DB, HealthDataConsentUser, User, build_lens
 from backend.api.errors import responses
-from backend.api.ratelimit import limiter
+from backend.api.ratelimit import admit_model_request, limiter
 from backend.api.services import chat
 from backend.api.sse import EventStream, sse_doc, sse_response
 from backend.schemas.chat import ChatRequest, ChatRun, ChatSession, ChatSessionDetail
@@ -35,9 +35,16 @@ async def post_chat(
 
     The turn runs on the server and keeps running when this stream is closed; follow it again
     with streamChatRun. 409 when the session is still answering. Needs the health_data
-    consent: the message may carry the user's health data."""
+    consent: the message may carry the user's health data. 429 when the account's or the
+    server's model limits are reached (reason busy or budget)."""
     lens = build_lens(user, expert_mode=body.expert_mode)
-    return sse_response(await chat.start_turn(body, user, lens))
+    ticket = await admit_model_request(request, user.id)
+    try:
+        stream = await chat.start_turn(body, user, lens, on_end=ticket.release)
+    except BaseException:
+        ticket.cancel()
+        raise
+    return sse_response(stream)
 
 
 @router.get(

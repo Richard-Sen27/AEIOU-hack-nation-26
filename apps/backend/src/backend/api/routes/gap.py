@@ -2,7 +2,7 @@ from fastapi import APIRouter, Request
 
 from backend.api.deps import DB, User
 from backend.api.errors import responses
-from backend.api.ratelimit import GAP_SEARCH_LIMIT, limiter
+from backend.api.ratelimit import GAP_SEARCH_LIMIT, admit_model_request, hold_stream, limiter
 from backend.api.services import gap_search
 from backend.api.sse import EventStream, sse_doc, sse_response
 from backend.schemas.events import GapSearchEvent
@@ -30,5 +30,10 @@ async def post_gap_search(
 
     Queries are built from the two nodes' public graph terms only, never from user data.
     """
-    prepared = await gap_search.prepare(db, body, user)
-    return sse_response(gap_search.run(body, user, prepared=prepared))
+    ticket = await admit_model_request(request, user.id)
+    try:
+        prepared = await gap_search.prepare(db, body, user)
+    except BaseException:
+        ticket.cancel()
+        raise
+    return sse_response(hold_stream(gap_search.run(body, user, prepared=prepared), ticket))

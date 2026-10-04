@@ -5,7 +5,7 @@ from fastapi import APIRouter, BackgroundTasks, File, Request, UploadFile
 
 from backend.api.deps import DB, HealthDataConsentUser, User
 from backend.api.errors import responses
-from backend.api.ratelimit import UPLOAD_LIMIT, limiter
+from backend.api.ratelimit import UPLOAD_LIMIT, admit_model_request, limiter
 from backend.api.services import documents
 from backend.api.sse import EventStream, sse_doc, sse_response
 from backend.schemas.documents import Document, Finding, JobAccepted
@@ -33,8 +33,14 @@ async def upload_document(
     ],
     user: HealthDataConsentUser,
 ) -> JobAccepted:
-    """Upload a document for extraction; returns the job to follow."""
-    return await documents.accept_upload(db, user, file, background)
+    """Upload a document for extraction; returns the job to follow. Counts against the
+    account's daily model budget (jobs queue, two at a time per process)."""
+    ticket = await admit_model_request(request, user.id, slot=False)
+    try:
+        return await documents.accept_upload(db, user, file, background)
+    except BaseException:
+        ticket.cancel()
+        raise
 
 
 @router.get(

@@ -1,5 +1,6 @@
 """SSE helpers. Wire format: ``event: <type>`` + ``data: <json>`` (JSON repeats ``type``)."""
 
+import contextlib
 import json
 import logging
 from collections.abc import AsyncIterator
@@ -55,9 +56,17 @@ def sse_response(
     as (seq, event) carry their sequence number as the SSE `id`."""
 
     async def _gen() -> AsyncIterator[dict[str, str]]:
+        # Closing the source when this stream ends or the client leaves runs its clean-up at
+        # once (cancelled work, a freed model slot) instead of whenever it is garbage collected.
+        closing = (
+            contextlib.aclosing(events)  # type: ignore[type-var]
+            if hasattr(events, "aclose")
+            else contextlib.nullcontext(events)
+        )
         try:
-            async for item in events:
-                yield _encode(item[1], item[0]) if isinstance(item, tuple) else _encode(item)
+            async with closing as items:
+                async for item in items:
+                    yield _encode(item[1], item[0]) if isinstance(item, tuple) else _encode(item)
         except ApiError as exc:
             yield _error(exc.code, exc.message)
         except NotImplementedError:

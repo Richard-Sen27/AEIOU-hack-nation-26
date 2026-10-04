@@ -63,6 +63,7 @@ async def test_require_user(client):
         "error": {
             "code": "sign_in_required",
             "message": "Sign in to use this feature.",
+            "request_id": r.headers["x-request-id"],
         }
     }
 
