@@ -7,8 +7,7 @@ import { useEffect, useState } from "react";
 import { ROLE_LABELS, useLens } from "@/components/providers/lens-provider";
 import { useSession } from "@/components/providers/session-provider";
 import { useSearch } from "@/components/search/search-provider";
-import { apiFetch } from "@/lib/api/fetch";
-import type { Schemas } from "@/lib/api";
+import { getProfile, unwrap } from "@/lib/api";
 import type { Role } from "@/lib/graph/types";
 import { setPendingChatMessage } from "@/lib/handoff";
 import { cn } from "@/lib/utils";
@@ -41,7 +40,7 @@ export function EntryPoints({ onStartFromSymptoms }: { onStartFromSymptoms: () =
   useEffect(() => {
     if (!user) return;
     const ctrl = new AbortController();
-    apiFetch<Schemas.PatientProfile>("/profile", { quiet: true, signal: ctrl.signal })
+    unwrap(getProfile({ meta: { quiet: true }, signal: ctrl.signal }))
       .then((p) => {
         const d = p?.diseases?.[0];
         if (d) setDisease({ id: d.id, label: d.label });

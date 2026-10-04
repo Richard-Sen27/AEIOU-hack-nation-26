@@ -6,7 +6,7 @@ import { toast } from "sonner";
 import { useGate } from "@/components/providers/gate-provider";
 import { announce } from "@/lib/a11y";
 import { ApiError, reportApiError } from "@/lib/api/errors";
-import { apiFetch } from "@/lib/api/fetch";
+import { deleteChatSession, getChatSession, getProfile, listChatSessions, listConsents, putProfile, unwrap } from "@/lib/api";
 import { streamSSE } from "@/lib/api/sse";
 
 import {
@@ -148,7 +148,7 @@ export function useChat({ expertMode }: { expertMode: boolean }) {
 
   const refreshSessions = useCallback(async () => {
     try {
-      const items = await apiFetch<ChatSession[]>("/chat/sessions", { quiet: true, cache: "no-store" });
+      const items = await unwrap(listChatSessions({ meta: { quiet: true }, cache: "no-store" }));
       setSessions({ status: "ready", items: Array.isArray(items) ? items : [] });
     } catch {
       setSessions((s) => ({ status: s.items.length ? "ready" : "unavailable", items: s.items }));
@@ -327,10 +327,7 @@ export function useChat({ expertMode }: { expertMode: boolean }) {
     ctrlRef.current?.abort();
     setLoadingSession(true);
     try {
-      const detail = await apiFetch<Schemas.ChatSessionDetail>(`/chat/sessions/${encodeURIComponent(id)}`, {
-        quiet: true,
-        cache: "no-store",
-      });
+      const detail = await unwrap(getChatSession({ path: { session_id: id }, meta: { quiet: true }, cache: "no-store" }));
       setTurns(turnsFromHistory(detail.messages ?? []));
       setSessionId(id);
       sessionRef.current = id;
@@ -345,7 +342,7 @@ export function useChat({ expertMode }: { expertMode: boolean }) {
   const deleteSession = useCallback(
     async (id: string) => {
       try {
-        await apiFetch(`/chat/sessions/${encodeURIComponent(id)}`, { method: "DELETE", quiet: true });
+        await unwrap(deleteChatSession({ path: { session_id: id }, meta: { quiet: true } }));
         setSessions((s) => ({ ...s, items: s.items.filter((x) => x.id !== id) }));
         if (sessionRef.current === id) newConversation();
         announce("Conversation deleted.");
@@ -366,7 +363,7 @@ export function useChat({ expertMode }: { expertMode: boolean }) {
 
   const loadProfile = useCallback(async (): Promise<PatientProfile> => {
     try {
-      profileRef.current = (await apiFetch<PatientProfile>("/profile", { quiet: true, cache: "no-store" })) ?? {};
+      profileRef.current = (await unwrap(getProfile({ meta: { quiet: true }, cache: "no-store" }))) ?? {};
     } catch (e) {
       if (e instanceof ApiError && e.status === 404) profileRef.current = {};
       else throw e;
@@ -390,7 +387,7 @@ export function useChat({ expertMode }: { expertMode: boolean }) {
    */
   const consentSubject = useCallback(async (): Promise<Pick<PatientProfile, "about_child" | "parental_responsibility_confirmed">> => {
     try {
-      const list = await apiFetch<Schemas.Consent[]>("/consents", { quiet: true, cache: "no-store" });
+      const list = await unwrap(listConsents({ meta: { quiet: true }, cache: "no-store" }));
       const c = (list ?? []).find((x) => x.consent_type === "health_data" && x.active);
       if (c?.about_child && c.parental_responsibility_confirmed) {
         return { about_child: true, parental_responsibility_confirmed: true };
@@ -413,7 +410,7 @@ export function useChat({ expertMode }: { expertMode: boolean }) {
         let next = change(current);
         if (isEmptyProfile(current) && !next.about_child) next = { ...next, ...(await consentSubject()) };
         try {
-          const saved = await apiFetch<PatientProfile>("/profile", { method: "PUT", json: next, quiet: true });
+          const saved = await unwrap(putProfile({ body: next, meta: { quiet: true } }));
           profileRef.current = saved && typeof saved === "object" ? saved : next;
           return profileRef.current;
         } catch (e) {

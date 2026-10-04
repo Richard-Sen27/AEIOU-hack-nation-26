@@ -9,8 +9,7 @@ import { useSession } from "@/components/providers/session-provider";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { ApiError } from "@/lib/api/errors";
-import { apiFetch } from "@/lib/api/fetch";
-import type { DataExport } from "@/lib/api/generated/types.gen";
+import { exportMyData, unwrap } from "@/lib/api";
 
 import { DeleteAccountButton } from "./delete-account";
 
@@ -61,7 +60,7 @@ export function DataRights() {
   async function exportData() {
     setBusy(true);
     try {
-      download(await apiFetch<DataExport>("/me/export", { quiet: true, cache: "no-store" }));
+      download(await unwrap(exportMyData({ meta: { quiet: true }, cache: "no-store" })));
       toast("Your data is downloading", { description: "A JSON file with everything Amber stores about you." });
     } catch (e) {
       const code = e instanceof ApiError ? e.code : "";

@@ -15,7 +15,7 @@ import {
 } from "@/components/ui/alert-dialog";
 import { Button } from "@/components/ui/button";
 import { ApiError } from "@/lib/api/errors";
-import { apiFetch } from "@/lib/api/fetch";
+import { deleteMe, unwrap } from "@/lib/api";
 
 export const DELETED_ON_ACCOUNT_DELETION = [
   "Your account, settings and ChatGPT connection",
@@ -38,7 +38,7 @@ export function DeleteAccountButton({ variant = "default" }: { variant?: "defaul
     setBusy(true);
     setError(null);
     try {
-      await apiFetch("/me", { method: "DELETE", quiet: true });
+      await unwrap(deleteMe({ meta: { quiet: true } }));
       await signOut();
     } catch (e) {
       const code = e instanceof ApiError ? e.code : "";

@@ -18,7 +18,7 @@ import {
 import { Badge } from "@/components/ui/badge";
 import { Button, buttonVariants } from "@/components/ui/button";
 import { announce } from "@/lib/a11y";
-import { apiFetch } from "@/lib/api/fetch";
+import { deleteDocument, unwrap } from "@/lib/api";
 import type { Document, DocumentStatus } from "@/lib/api/generated/types.gen";
 import { cn } from "@/lib/utils";
 
@@ -43,7 +43,7 @@ export function DeleteDocumentButton({
   async function remove() {
     setBusy(true);
     try {
-      await apiFetch(`/documents/${encodeURIComponent(id)}`, { method: "DELETE", quiet: true });
+      await unwrap(deleteDocument({ path: { document_id: id }, meta: { quiet: true } }));
       setOpen(false);
       toast("Document deleted", { description: "Its findings were deleted too." });
       announce("Document and its findings deleted.");

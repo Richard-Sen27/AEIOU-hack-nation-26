@@ -16,9 +16,9 @@ import { Button } from "@/components/ui/button";
 import { Checkbox } from "@/components/ui/checkbox";
 import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group";
 import { ApiError, reportApiError } from "@/lib/api/errors";
-import { apiFetch } from "@/lib/api/fetch";
+import { grantConsent, unwrap } from "@/lib/api";
 import type { ConsentType } from "@/lib/api/types";
-import type { Consent, ConsentGrant } from "@/lib/api/generated/types.gen";
+import type { ConsentGrant } from "@/lib/api/generated/types.gen";
 
 export type ConsentContentProps = {
   type: ConsentType;
@@ -74,7 +74,7 @@ export function ConsentContent({ type, onGranted, onCancel }: ConsentContentProp
       parental_responsibility_confirmed: subject === "child" ? parental : false,
     };
     try {
-      await apiFetch<Consent>("/consents", { method: "POST", json: body, quiet: true });
+      await unwrap(grantConsent({ body, meta: { quiet: true } }));
       onGranted();
     } catch (e) {
       const err = e instanceof ApiError ? e : null;

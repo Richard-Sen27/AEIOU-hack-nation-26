@@ -19,7 +19,7 @@ import { Badge } from "@/components/ui/badge";
 import { Button, buttonVariants } from "@/components/ui/button";
 import { Skeleton } from "@/components/ui/skeleton";
 import { announce } from "@/lib/a11y";
-import { apiFetch } from "@/lib/api/fetch";
+import { confirmFinding, getProfile, listDocuments, listFindings, putProfile, rejectFinding, unwrap } from "@/lib/api";
 import type {
   Document,
   Finding,
@@ -275,8 +275,8 @@ export function FindingsReview({ documentId }: { documentId: string }) {
   const fetchAll = useCallback(async () => {
     try {
       const [docs, list] = await Promise.all([
-        apiFetch<Document[]>("/documents", { quiet: true, cache: "no-store" }),
-        apiFetch<Finding[]>(`/documents/${encodeURIComponent(documentId)}/findings`, { quiet: true, cache: "no-store" }),
+        unwrap(listDocuments({ meta: { quiet: true }, cache: "no-store" })),
+        unwrap(listFindings({ path: { document_id: documentId }, meta: { quiet: true }, cache: "no-store" })),
       ]);
       setDoc(docs.find((d) => d.id === documentId) ?? null);
       setFindings(list);
@@ -306,7 +306,7 @@ export function FindingsReview({ documentId }: { documentId: string }) {
   async function decide(f: Finding, confirm: boolean) {
     setBusy(f.id);
     try {
-      await apiFetch(`/findings/${encodeURIComponent(f.id)}/${confirm ? "confirm" : "reject"}`, { method: "POST", quiet: true });
+      await unwrap((confirm ? confirmFinding : rejectFinding)({ path: { finding_id: f.id }, meta: { quiet: true } }));
       setFindings((list) => list.map((x) => (x.id === f.id ? { ...x, confirmed: confirm, decided_at: new Date().toISOString() } : x)));
       announce(
         confirm
@@ -333,12 +333,12 @@ export function FindingsReview({ documentId }: { documentId: string }) {
     setBusy(f.id);
     try {
       if (f.confirmed !== false) {
-        await apiFetch(`/findings/${encodeURIComponent(f.id)}/reject`, { method: "POST", quiet: true });
+        await unwrap(rejectFinding({ path: { finding_id: f.id }, meta: { quiet: true } }));
       }
       for (let attempt = 0; ; attempt++) {
-        const current = (await apiFetch<PatientProfile>("/profile", { quiet: true, cache: "no-store" })) ?? {};
+        const current = (await unwrap(getProfile({ meta: { quiet: true }, cache: "no-store" }))) ?? {};
         try {
-          await apiFetch<PatientProfile>("/profile", { method: "PUT", json: addCorrected(current, f, pick), quiet: true });
+          await unwrap(putProfile({ body: addCorrected(current, f, pick), meta: { quiet: true } }));
           break;
         } catch (e) {
           if (attempt === 0 && (e as { status?: number }).status === 409) continue;

@@ -1,4 +1,4 @@
-import { apiFetch } from "@/lib/api/fetch";
+import { search, unwrap } from "@/lib/api";
 import type { SearchHit, SearchResponse } from "@/lib/api/types";
 
 /**
@@ -25,10 +25,6 @@ export function isEntityQuery(q: string): boolean {
 /** Typeahead against the API. Throws `ApiError` (quietly, no global toast). */
 export async function searchEntities(q: string, signal?: AbortSignal): Promise<SearchHit[]> {
   if (!isEntityQuery(q)) return [];
-  const res = await apiFetch<SearchResponse>("/search", {
-    query: { q: q.trim() },
-    signal,
-    quiet: true,
-  });
+  const res: SearchResponse | SearchHit[] = await unwrap(search({ query: { q: q.trim() }, signal, meta: { quiet: true } }));
   return Array.isArray(res) ? res : (res?.results ?? []);
 }

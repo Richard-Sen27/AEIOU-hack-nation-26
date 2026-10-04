@@ -11,7 +11,7 @@ import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { announce } from "@/lib/a11y";
 import { ApiError } from "@/lib/api/errors";
-import { apiFetch } from "@/lib/api/fetch";
+import { listConsents, revokeConsent, unwrap } from "@/lib/api";
 import type { Consent } from "@/lib/api/generated/types.gen";
 import type { ConsentType } from "@/lib/api/types";
 
@@ -33,7 +33,7 @@ export function ConsentsSection({ onChanged }: { onChanged?: () => void }) {
 
   const load = useCallback(async () => {
     try {
-      setList(await apiFetch<Consent[]>("/consents", { quiet: true, cache: "no-store" }));
+      setList(await unwrap(listConsents({ meta: { quiet: true }, cache: "no-store" })));
       setError(null);
     } catch (e) {
       const code = e instanceof ApiError ? e.code : "";
@@ -52,7 +52,7 @@ export function ConsentsSection({ onChanged }: { onChanged?: () => void }) {
   async function withdraw(type: ConsentType) {
     setBusy(type);
     try {
-      await apiFetch(`/consents/${type}`, { method: "DELETE", quiet: true });
+      await unwrap(revokeConsent({ path: { consent_type: type }, meta: { quiet: true } }));
       await Promise.all([refresh(), load()]);
       onChanged?.();
       const msg = `${CONSENT_LABELS[type].title} consent withdrawn.`;

@@ -21,7 +21,7 @@ import {
 import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group";
 import { announce } from "@/lib/a11y";
 import { ApiError } from "@/lib/api/errors";
-import { apiFetch } from "@/lib/api/fetch";
+import { unwrap, updateSettings } from "@/lib/api";
 import type { SessionUser, SettingsUpdate } from "@/lib/api/generated/types.gen";
 import { cn } from "@/lib/utils";
 
@@ -122,7 +122,7 @@ function WelcomeForm({ user, next }: { user: SessionUser; next?: string }) {
     setError(null);
     const body: SettingsUpdate = { role, language, age_confirmed_16: true };
     try {
-      await apiFetch<SessionUser>("/me/settings", { method: "PATCH", json: body, quiet: true });
+      await unwrap(updateSettings({ body, meta: { quiet: true } }));
       resetRole();
       await refresh();
       toast("You're all set", { description: `${ROLE_COPY[role].label} view. Change it any time in your profile.` });

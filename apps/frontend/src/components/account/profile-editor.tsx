@@ -13,7 +13,7 @@ import { Input } from "@/components/ui/input";
 import { Skeleton } from "@/components/ui/skeleton";
 import { ToggleGroup, ToggleGroupItem } from "@/components/ui/toggle-group";
 import { announce } from "@/lib/a11y";
-import { apiFetch } from "@/lib/api/fetch";
+import { getProfile, putProfile, unwrap } from "@/lib/api";
 import type {
   AgeRange,
   PatientProfile,
@@ -120,7 +120,7 @@ export function ProfileEditor() {
 
   const fetchProfile = useCallback(async () => {
     try {
-      const p = normalise(await apiFetch<PatientProfile>("/profile", { quiet: true, cache: "no-store" }));
+      const p = normalise(await unwrap(getProfile({ meta: { quiet: true }, cache: "no-store" })));
       setSaved(p);
       setDraft(p);
       setAgeMode(p.age_range && p.age_years == null ? "range" : "years");
@@ -162,7 +162,7 @@ export function ProfileEditor() {
     const body: PatientProfile = { ...draft, updated_at: saved.updated_at ?? null };
     if (!body.about_child) body.parental_responsibility_confirmed = false;
     try {
-      const p = normalise(await apiFetch<PatientProfile>("/profile", { method: "PUT", json: body, quiet: true }));
+      const p = normalise(await unwrap(putProfile({ body, meta: { quiet: true } })));
       setSaved(p);
       setDraft(p);
       toast("Profile saved");

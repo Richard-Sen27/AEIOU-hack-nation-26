@@ -27,4 +27,14 @@ if (!installed) {
   });
 }
 
+/**
+ * Await a generated SDK call the way `apiFetch` behaves: resolve to the data,
+ * or throw the call's `ApiError` (already reported unless `meta.quiet`).
+ */
+export async function unwrap<T>(call: Promise<{ data?: T; error?: unknown }>): Promise<T> {
+  const { data, error } = await call;
+  if (error !== undefined) throw error;
+  return data as T;
+}
+
 export { client };

@@ -8,7 +8,7 @@ import { SessionLoading, SignInPrompt } from "@/components/account/sign-in-promp
 import { useGate } from "@/components/providers/gate-provider";
 import { needsOnboarding } from "@/components/account/onboarding";
 import { useSession } from "@/components/providers/session-provider";
-import { apiFetch } from "@/lib/api/fetch";
+import { listDocuments, unwrap } from "@/lib/api";
 import type { Document } from "@/lib/api/generated/types.gen";
 import { takePendingUploads } from "@/lib/handoff";
 
@@ -34,7 +34,7 @@ export function DocumentsPage() {
 
   const loadDocuments = useCallback(async () => {
     try {
-      setDocuments(await apiFetch<Document[]>("/documents", { quiet: true, cache: "no-store" }));
+      setDocuments(await unwrap(listDocuments({ meta: { quiet: true }, cache: "no-store" })));
       setListError(null);
     } catch (e) {
       const err = routeGlobalError(e);

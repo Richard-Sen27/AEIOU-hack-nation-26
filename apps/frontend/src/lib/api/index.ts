@@ -1,5 +1,5 @@
 // Public entry point of the API layer.
-export { client } from "./client";
+export { client, unwrap } from "./client";
 export * from "./generated/sdk.gen";
 // Generated schema types, namespaced so they never clash with ./types.
 export type * as Schemas from "./generated/types.gen";

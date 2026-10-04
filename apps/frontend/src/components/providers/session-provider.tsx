@@ -12,7 +12,7 @@ import {
 } from "react";
 
 import { apiUrl } from "@/lib/api/config";
-import { apiFetch } from "@/lib/api/fetch";
+import { getSession, logout, unwrap } from "@/lib/api";
 import type { SessionInfo, SessionUser } from "@/lib/api/types";
 
 type SessionStatus = "loading" | "ready" | "offline";
@@ -57,10 +57,7 @@ export function SessionProvider({ children }: { children: React.ReactNode }) {
 
   const refresh = useCallback(async () => {
     try {
-      const data = await apiFetch<SessionInfo>("/auth/session", {
-        quiet: true,
-        cache: "no-store",
-      });
+      const data = await unwrap(getSession({ meta: { quiet: true }, cache: "no-store" }));
       const next = { ...GUEST, ...data };
       setSession(next);
       setStatus("ready");
@@ -94,7 +91,7 @@ export function SessionProvider({ children }: { children: React.ReactNode }) {
 
   const signOut = useCallback(async () => {
     try {
-      await apiFetch("/auth/logout", { method: "POST", quiet: true });
+      await unwrap(logout({ meta: { quiet: true } }));
     } catch {
       /* the cookie may already be gone; fall through */
     }

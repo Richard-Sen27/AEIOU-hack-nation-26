@@ -8,7 +8,7 @@ import { useSession } from "@/components/providers/session-provider";
 import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group";
 import { Switch } from "@/components/ui/switch";
 import { ApiError } from "@/lib/api/errors";
-import { apiFetch } from "@/lib/api/fetch";
+import { unwrap, updateSettings } from "@/lib/api";
 import type { SessionUser, SettingsUpdate } from "@/lib/api/generated/types.gen";
 import { cn } from "@/lib/utils";
 
@@ -26,7 +26,7 @@ export function SettingsSection({ user }: { user: SessionUser }) {
     const key = Object.keys(body)[0] as keyof SettingsUpdate;
     setPending(key);
     try {
-      await apiFetch<SessionUser>("/me/settings", { method: "PATCH", json: body, quiet: true });
+      await unwrap(updateSettings({ body, meta: { quiet: true } }));
       if (body.role) resetRole();
       await refresh();
       toast(`${what} saved`);

@@ -2,7 +2,7 @@
 
 import { useEffect, useMemo, useState } from "react";
 
-import { apiFetch } from "@/lib/api/fetch";
+import { getEdgeEvidence, getNode, unwrap } from "@/lib/api";
 import type { Schemas } from "@/lib/api";
 
 type EdgeEvidence = Schemas.EdgeEvidence;
@@ -30,12 +30,12 @@ function cached<T>(cache: Map<string, Promise<T | null>>, key: string, load: () 
 
 export function loadEdge(id: string) {
   return cached(edgeCache, id, () =>
-    apiFetch<EdgeEvidence>(`/edge/${encodeURIComponent(id)}/evidence`, { quiet: true }),
+    unwrap(getEdgeEvidence({ path: { edge_id: id }, meta: { quiet: true } })),
   );
 }
 
 export function loadNode(id: string) {
-  return cached(nodeCache, id, () => apiFetch<NodeDetail>(`/node/${encodeURIComponent(id)}`, { quiet: true }));
+  return cached(nodeCache, id, () => unwrap(getNode({ path: { node_id: id }, meta: { quiet: true } })));
 }
 
 /** `undefined` while loading, `null` if it could not be loaded. */

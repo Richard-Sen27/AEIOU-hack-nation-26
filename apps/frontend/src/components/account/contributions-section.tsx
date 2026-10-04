@@ -13,7 +13,7 @@ import { Textarea } from "@/components/ui/textarea";
 import { ToggleGroup, ToggleGroupItem } from "@/components/ui/toggle-group";
 import { announce } from "@/lib/a11y";
 import { ApiError, reportApiError } from "@/lib/api/errors";
-import { apiFetch } from "@/lib/api/fetch";
+import { createContribution, deleteContribution, getProfile, listContributions, unwrap } from "@/lib/api";
 import type {
   AgeRange,
   AssetType,
@@ -87,7 +87,7 @@ function ContributionForm({
   async function prefill() {
     let profile: PatientProfile;
     try {
-      profile = await apiFetch<PatientProfile>("/profile", { quiet: true, cache: "no-store" });
+      profile = await unwrap(getProfile({ meta: { quiet: true }, cache: "no-store" }));
     } catch {
       toast("Your profile could not be loaded");
       return;
@@ -130,7 +130,7 @@ function ContributionForm({
             },
           };
     try {
-      const created = await apiFetch<Contribution>("/contributions", { method: "POST", json: body, quiet: true });
+      const created = await unwrap(createContribution({ body, meta: { quiet: true } }));
       onCreated(created);
     } catch (err) {
       const ae = routeGlobalError(err);
@@ -318,7 +318,7 @@ export function ContributionsSection() {
 
   const load = useCallback(async () => {
     try {
-      setList(await apiFetch<Contribution[]>("/contributions", { quiet: true, cache: "no-store" }));
+      setList(await unwrap(listContributions({ meta: { quiet: true }, cache: "no-store" })));
       setError(null);
     } catch (e) {
       const code = e instanceof ApiError ? e.code : "";
@@ -335,7 +335,7 @@ export function ContributionsSection() {
   async function remove(id: string) {
     setRemoving(id);
     try {
-      await apiFetch(`/contributions/${encodeURIComponent(id)}`, { method: "DELETE", quiet: true });
+      await unwrap(deleteContribution({ path: { contribution_id: id }, meta: { quiet: true } }));
       setList((l) => (l ?? []).filter((c) => c.id !== id));
       toast("Contribution removed from the atlas");
       announce("Contribution removed.");
