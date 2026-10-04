@@ -530,6 +530,203 @@
         }
       }
     },
+    "/me/professional": {
+      "get": {
+        "tags": [
+          "account"
+        ],
+        "summary": "Get Professional Profile",
+        "description": "The user's private work details, a name suggestion from the ChatGPT account (not stored)\nand a public summary of the linked atlas entry. 403 unless doctor or researcher.",
+        "operationId": "getProfessionalProfile",
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProfessionalProfile"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "sign_in_required: guest, or the session expired.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "consent_required (no active consent of the needed type) or forbidden.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          }
+        }
+      },
+      "put": {
+        "tags": [
+          "account"
+        ],
+        "summary": "Put Professional Profile",
+        "description": "Replace the work details. Institutions are atlas `institution` nodes or free text;\n`atlas_node_id` must be a `researcher` or `doctor` node. 403 unless doctor or researcher.",
+        "operationId": "putProfessionalProfile",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ProfessionalProfileUpdate"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProfessionalProfile"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "sign_in_required: guest, or the session expired.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "consent_required (no active consent of the needed type) or forbidden.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "validation_error: lists invalid field names only.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          }
+        }
+      },
+      "delete": {
+        "tags": [
+          "account"
+        ],
+        "summary": "Delete Professional Profile",
+        "description": "Delete every work detail. Open to every role so removal never depends on the role.",
+        "operationId": "deleteProfessionalProfile",
+        "responses": {
+          "204": {
+            "description": "Successful Response"
+          },
+          "401": {
+            "description": "sign_in_required: guest, or the session expired.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/me/professional/matches": {
+      "post": {
+        "tags": [
+          "account"
+        ],
+        "summary": "Match Atlas Entry",
+        "description": "Up to five researcher or doctor entries that may be the user (exact ORCID iD, then the\nsame name, shared institutions first). Stores nothing. 403 unless doctor or researcher.",
+        "operationId": "matchAtlasEntry",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/AtlasMatchRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/AtlasMatches"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "sign_in_required: guest, or the session expired.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "consent_required (no active consent of the needed type) or forbidden.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "validation_error: lists invalid field names only.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "429": {
+            "description": "rate_limited",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
     "/search": {
       "get": {
         "tags": [
@@ -3127,6 +3324,104 @@
         ],
         "title": "AtlasEdge"
       },
+      "AtlasEntry": {
+        "properties": {
+          "node_id": {
+            "type": "string",
+            "title": "Node Id"
+          },
+          "type": {
+            "$ref": "#/components/schemas/NodeType",
+            "description": "researcher or doctor."
+          },
+          "label": {
+            "type": "string",
+            "title": "Label"
+          },
+          "orcid_id": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Orcid Id",
+            "description": "Public ORCID iD of the node, if any."
+          },
+          "institutions": {
+            "items": {
+              "$ref": "#/components/schemas/Institution"
+            },
+            "type": "array",
+            "title": "Institutions",
+            "description": "Affiliated atlas institutions (at most three)."
+          }
+        },
+        "type": "object",
+        "required": [
+          "node_id",
+          "type",
+          "label"
+        ],
+        "title": "AtlasEntry",
+        "description": "Public fields of a researcher or doctor node."
+      },
+      "AtlasEntryCandidate": {
+        "properties": {
+          "node_id": {
+            "type": "string",
+            "title": "Node Id"
+          },
+          "type": {
+            "$ref": "#/components/schemas/NodeType",
+            "description": "researcher or doctor."
+          },
+          "label": {
+            "type": "string",
+            "title": "Label"
+          },
+          "orcid_id": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Orcid Id",
+            "description": "Public ORCID iD of the node, if any."
+          },
+          "institutions": {
+            "items": {
+              "$ref": "#/components/schemas/Institution"
+            },
+            "type": "array",
+            "title": "Institutions",
+            "description": "Affiliated atlas institutions (at most three)."
+          },
+          "matched_by": {
+            "type": "string",
+            "enum": [
+              "orcid",
+              "name_and_institution",
+              "name"
+            ],
+            "title": "Matched By",
+            "description": "orcid: exact ORCID iD; name_and_institution: same name and a shared institution; name: same name only."
+          }
+        },
+        "type": "object",
+        "required": [
+          "node_id",
+          "type",
+          "label",
+          "matched_by"
+        ],
+        "title": "AtlasEntryCandidate"
+      },
       "AtlasLayout": {
         "properties": {
           "nodes": {
@@ -3169,6 +3464,76 @@
         ],
         "title": "AtlasLayout",
         "description": "Compact whole-graph layout for the Atlas view."
+      },
+      "AtlasMatchRequest": {
+        "properties": {
+          "first_name": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "First Name",
+            "description": "1-100 characters; blank means none."
+          },
+          "last_name": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Last Name",
+            "description": "1-100 characters; blank means none."
+          },
+          "orcid_id": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Orcid Id",
+            "description": "ORCID iD, 0000-0000-0000-000X, with a valid check digit."
+          },
+          "institutions": {
+            "items": {
+              "$ref": "#/components/schemas/InstitutionInput"
+            },
+            "type": "array",
+            "maxItems": 3,
+            "title": "Institutions",
+            "description": "At most three."
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "title": "AtlasMatchRequest",
+        "description": "A draft of the work details to look up candidate atlas entries. Nothing is stored."
+      },
+      "AtlasMatches": {
+        "properties": {
+          "candidates": {
+            "items": {
+              "$ref": "#/components/schemas/AtlasEntryCandidate"
+            },
+            "type": "array",
+            "title": "Candidates",
+            "description": "At most five, best first."
+          }
+        },
+        "type": "object",
+        "required": [
+          "candidates"
+        ],
+        "title": "AtlasMatches"
       },
       "AtlasNode": {
         "properties": {
@@ -4785,6 +5150,17 @@
               }
             ]
           },
+          "professional": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/ProfessionalExport"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "Work details (doctor and researcher roles); null if none are stored."
+          },
           "chat_sessions": {
             "items": {
               "$ref": "#/components/schemas/ChatSessionExport"
@@ -5965,6 +6341,64 @@
         "type": "object",
         "title": "Health"
       },
+      "Institution": {
+        "properties": {
+          "node_id": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Node Id",
+            "description": "Atlas institution node, null for free text."
+          },
+          "label": {
+            "type": "string",
+            "title": "Label"
+          }
+        },
+        "type": "object",
+        "required": [
+          "label"
+        ],
+        "title": "Institution"
+      },
+      "InstitutionInput": {
+        "properties": {
+          "node_id": {
+            "anyOf": [
+              {
+                "type": "string",
+                "maxLength": 200
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Node Id",
+            "description": "ID of an `institution` node in the atlas."
+          },
+          "label": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Label",
+            "description": "Free-text institution name (max 200 characters), used when `node_id` is null. Ignored when `node_id` is set: the atlas label is stored instead."
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "title": "InstitutionInput",
+        "description": "An atlas institution (`node_id`, its label comes from the atlas) or free text (`label`)."
+      },
       "Job": {
         "properties": {
           "id": {
@@ -6966,6 +7400,240 @@
         ],
         "title": "Polarity"
       },
+      "ProfessionalExport": {
+        "properties": {
+          "first_name": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "First Name"
+          },
+          "last_name": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Last Name"
+          },
+          "institutions": {
+            "items": {
+              "$ref": "#/components/schemas/Institution"
+            },
+            "type": "array",
+            "title": "Institutions"
+          },
+          "orcid_id": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Orcid Id"
+          },
+          "atlas_node_id": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Atlas Node Id"
+          },
+          "updated_at": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "date-time"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Updated At"
+          }
+        },
+        "type": "object",
+        "title": "ProfessionalExport"
+      },
+      "ProfessionalProfile": {
+        "properties": {
+          "first_name": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "First Name"
+          },
+          "last_name": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Last Name"
+          },
+          "institutions": {
+            "items": {
+              "$ref": "#/components/schemas/Institution"
+            },
+            "type": "array",
+            "title": "Institutions"
+          },
+          "orcid_id": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Orcid Id"
+          },
+          "atlas_node_id": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Atlas Node Id"
+          },
+          "linked_entry": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/AtlasEntry"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "Public summary of `atlas_node_id` while the node is in the atlas."
+          },
+          "linked_entry_missing": {
+            "type": "boolean",
+            "title": "Linked Entry Missing",
+            "description": "`atlas_node_id` is set but the node is no longer in the atlas.",
+            "default": false
+          },
+          "updated_at": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "date-time"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Updated At",
+            "description": "Last save; null if never saved."
+          },
+          "suggested": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/SuggestedName"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "Name prefill from the ChatGPT account; null if it has no name."
+          }
+        },
+        "type": "object",
+        "title": "ProfessionalProfile",
+        "description": "The user's private work details. Self-declared, not a verification; visible to nobody\nelse and never sent to a model."
+      },
+      "ProfessionalProfileUpdate": {
+        "properties": {
+          "first_name": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "First Name",
+            "description": "1-100 characters; blank means none."
+          },
+          "last_name": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Last Name",
+            "description": "1-100 characters; blank means none."
+          },
+          "orcid_id": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Orcid Id",
+            "description": "ORCID iD, 0000-0000-0000-000X, with a valid check digit."
+          },
+          "institutions": {
+            "items": {
+              "$ref": "#/components/schemas/InstitutionInput"
+            },
+            "type": "array",
+            "maxItems": 3,
+            "title": "Institutions",
+            "description": "At most three."
+          },
+          "atlas_node_id": {
+            "anyOf": [
+              {
+                "type": "string",
+                "maxLength": 200
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Atlas Node Id",
+            "description": "The user's own `researcher` or `doctor` node (private link, not a claim)."
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "title": "ProfessionalProfileUpdate",
+        "description": "Replaces all work details (PUT). Every field is optional."
+      },
       "ProfileDisease": {
         "properties": {
           "source": {
@@ -7867,6 +8535,41 @@
           "tour"
         ],
         "title": "StartLayout"
+      },
+      "SuggestedName": {
+        "properties": {
+          "first_name": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "First Name"
+          },
+          "last_name": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Last Name"
+          },
+          "source": {
+            "type": "string",
+            "const": "chatgpt",
+            "title": "Source",
+            "default": "chatgpt"
+          }
+        },
+        "type": "object",
+        "title": "SuggestedName",
+        "description": "Prefill from the ChatGPT account, computed on request and never stored."
       },
       "SummaryItem": {
         "properties": {

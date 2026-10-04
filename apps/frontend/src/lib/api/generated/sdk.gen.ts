@@ -2,7 +2,7 @@
 
 import { type Client, type ClientMeta, formDataBodySerializer, type Options as Options2, type RequestResult, type ServerSentEventsResult, type TDataShape } from './client';
 import { client } from './client.gen';
-import type { AuthCallbackData, AuthLoopbackCallbackData, AuthStartData, AuthStartErrors, ChatData, ChatErrors, ChatResponse, ChatResponses, ConfirmFindingData, ConfirmFindingErrors, ConfirmFindingResponses, CreateContributionData, CreateContributionErrors, CreateContributionResponses, CreateProposalData, CreateProposalErrors, CreateProposalResponses, DeleteChatSessionData, DeleteChatSessionErrors, DeleteChatSessionResponses, DeleteContributionData, DeleteContributionErrors, DeleteContributionResponses, DeleteDocumentData, DeleteDocumentErrors, DeleteDocumentResponses, DeleteMeData, DeleteMeErrors, DeleteMeResponses, ExplainPathData, ExplainPathErrors, ExplainPathResponse, ExplainPathResponses, ExportGraphData, ExportGraphErrors, ExportGraphResponses, ExportMyDataData, ExportMyDataErrors, ExportMyDataResponses, FindPathData, FindPathErrors, FindPathResponses, FlagEdgeData, FlagEdgeErrors, FlagEdgeResponses, GapSearchData, GapSearchErrors, GapSearchResponse, GapSearchResponses, GetAtlasData, GetAtlasErrors, GetAtlasResponses, GetAtlasSummaryData, GetAtlasSummaryErrors, GetAtlasSummaryResponses, GetAtlasTreeData, GetAtlasTreeErrors, GetAtlasTreeResponses, GetChatSessionData, GetChatSessionErrors, GetChatSessionResponses, GetEdgeEvidenceData, GetEdgeEvidenceErrors, GetEdgeEvidenceResponses, GetNeighborhoodData, GetNeighborhoodErrors, GetNeighborhoodResponses, GetNodeData, GetNodeErrors, GetNodeResponses, GetProfileData, GetProfileErrors, GetProfileResponses, GetSessionData, GetSessionResponses, GrantConsentData, GrantConsentErrors, GrantConsentResponses, HealthData, HealthResponses, ListChatSessionsData, ListChatSessionsErrors, ListChatSessionsResponses, ListClustersData, ListClustersErrors, ListClustersResponses, ListConsentsData, ListConsentsErrors, ListConsentsResponses, ListContributionsData, ListContributionsErrors, ListContributionsResponses, ListDocumentsData, ListDocumentsErrors, ListDocumentsResponses, ListFindingsData, ListFindingsErrors, ListFindingsResponses, LogoutData, LogoutResponses, PutProfileData, PutProfileErrors, PutProfileResponses, RejectFindingData, RejectFindingErrors, RejectFindingResponses, RevokeConsentData, RevokeConsentErrors, RevokeConsentResponses, SearchData, SearchErrors, SearchResponses, StreamJobData, StreamJobErrors, StreamJobResponse, StreamJobResponses, UpdateSettingsData, UpdateSettingsErrors, UpdateSettingsResponses, UploadDocumentData, UploadDocumentErrors, UploadDocumentResponses } from './types.gen';
+import type { AuthCallbackData, AuthLoopbackCallbackData, AuthStartData, AuthStartErrors, ChatData, ChatErrors, ChatResponse, ChatResponses, ConfirmFindingData, ConfirmFindingErrors, ConfirmFindingResponses, CreateContributionData, CreateContributionErrors, CreateContributionResponses, CreateProposalData, CreateProposalErrors, CreateProposalResponses, DeleteChatSessionData, DeleteChatSessionErrors, DeleteChatSessionResponses, DeleteContributionData, DeleteContributionErrors, DeleteContributionResponses, DeleteDocumentData, DeleteDocumentErrors, DeleteDocumentResponses, DeleteMeData, DeleteMeErrors, DeleteMeResponses, DeleteProfessionalProfileData, DeleteProfessionalProfileErrors, DeleteProfessionalProfileResponses, ExplainPathData, ExplainPathErrors, ExplainPathResponse, ExplainPathResponses, ExportGraphData, ExportGraphErrors, ExportGraphResponses, ExportMyDataData, ExportMyDataErrors, ExportMyDataResponses, FindPathData, FindPathErrors, FindPathResponses, FlagEdgeData, FlagEdgeErrors, FlagEdgeResponses, GapSearchData, GapSearchErrors, GapSearchResponse, GapSearchResponses, GetAtlasData, GetAtlasErrors, GetAtlasResponses, GetAtlasSummaryData, GetAtlasSummaryErrors, GetAtlasSummaryResponses, GetAtlasTreeData, GetAtlasTreeErrors, GetAtlasTreeResponses, GetChatSessionData, GetChatSessionErrors, GetChatSessionResponses, GetEdgeEvidenceData, GetEdgeEvidenceErrors, GetEdgeEvidenceResponses, GetNeighborhoodData, GetNeighborhoodErrors, GetNeighborhoodResponses, GetNodeData, GetNodeErrors, GetNodeResponses, GetProfessionalProfileData, GetProfessionalProfileErrors, GetProfessionalProfileResponses, GetProfileData, GetProfileErrors, GetProfileResponses, GetSessionData, GetSessionResponses, GrantConsentData, GrantConsentErrors, GrantConsentResponses, HealthData, HealthResponses, ListChatSessionsData, ListChatSessionsErrors, ListChatSessionsResponses, ListClustersData, ListClustersErrors, ListClustersResponses, ListConsentsData, ListConsentsErrors, ListConsentsResponses, ListContributionsData, ListContributionsErrors, ListContributionsResponses, ListDocumentsData, ListDocumentsErrors, ListDocumentsResponses, ListFindingsData, ListFindingsErrors, ListFindingsResponses, LogoutData, LogoutResponses, MatchAtlasEntryData, MatchAtlasEntryErrors, MatchAtlasEntryResponses, PutProfessionalProfileData, PutProfessionalProfileErrors, PutProfessionalProfileResponses, PutProfileData, PutProfileErrors, PutProfileResponses, RejectFindingData, RejectFindingErrors, RejectFindingResponses, RevokeConsentData, RevokeConsentErrors, RevokeConsentResponses, SearchData, SearchErrors, SearchResponses, StreamJobData, StreamJobErrors, StreamJobResponse, StreamJobResponses, UpdateSettingsData, UpdateSettingsErrors, UpdateSettingsResponses, UploadDocumentData, UploadDocumentErrors, UploadDocumentResponses } from './types.gen';
 
 export type Options<TData extends TDataShape = TDataShape, ThrowOnError extends boolean = boolean, TResponse = unknown> = Options2<TData, ThrowOnError, TResponse> & {
     /**
@@ -135,6 +135,51 @@ export const grantConsent = <ThrowOnError extends boolean = false>(options: Opti
  * Revoke a consent and delete the data held under it.
  */
 export const revokeConsent = <ThrowOnError extends boolean = false>(options: Options<RevokeConsentData, ThrowOnError>): RequestResult<RevokeConsentResponses, RevokeConsentErrors, ThrowOnError> => (options.client ?? client).delete<RevokeConsentResponses, RevokeConsentErrors, ThrowOnError>({ url: '/consents/{consent_type}', ...options });
+
+/**
+ * Delete Professional Profile
+ *
+ * Delete every work detail. Open to every role so removal never depends on the role.
+ */
+export const deleteProfessionalProfile = <ThrowOnError extends boolean = false>(options?: Options<DeleteProfessionalProfileData, ThrowOnError>): RequestResult<DeleteProfessionalProfileResponses, DeleteProfessionalProfileErrors, ThrowOnError> => (options?.client ?? client).delete<DeleteProfessionalProfileResponses, DeleteProfessionalProfileErrors, ThrowOnError>({ url: '/me/professional', ...options });
+
+/**
+ * Get Professional Profile
+ *
+ * The user's private work details, a name suggestion from the ChatGPT account (not stored)
+ * and a public summary of the linked atlas entry. 403 unless doctor or researcher.
+ */
+export const getProfessionalProfile = <ThrowOnError extends boolean = false>(options?: Options<GetProfessionalProfileData, ThrowOnError>): RequestResult<GetProfessionalProfileResponses, GetProfessionalProfileErrors, ThrowOnError> => (options?.client ?? client).get<GetProfessionalProfileResponses, GetProfessionalProfileErrors, ThrowOnError>({ url: '/me/professional', ...options });
+
+/**
+ * Put Professional Profile
+ *
+ * Replace the work details. Institutions are atlas `institution` nodes or free text;
+ * `atlas_node_id` must be a `researcher` or `doctor` node. 403 unless doctor or researcher.
+ */
+export const putProfessionalProfile = <ThrowOnError extends boolean = false>(options: Options<PutProfessionalProfileData, ThrowOnError>): RequestResult<PutProfessionalProfileResponses, PutProfessionalProfileErrors, ThrowOnError> => (options.client ?? client).put<PutProfessionalProfileResponses, PutProfessionalProfileErrors, ThrowOnError>({
+    url: '/me/professional',
+    ...options,
+    headers: {
+        'Content-Type': 'application/json',
+        ...options.headers
+    }
+});
+
+/**
+ * Match Atlas Entry
+ *
+ * Up to five researcher or doctor entries that may be the user (exact ORCID iD, then the
+ * same name, shared institutions first). Stores nothing. 403 unless doctor or researcher.
+ */
+export const matchAtlasEntry = <ThrowOnError extends boolean = false>(options: Options<MatchAtlasEntryData, ThrowOnError>): RequestResult<MatchAtlasEntryResponses, MatchAtlasEntryErrors, ThrowOnError> => (options.client ?? client).post<MatchAtlasEntryResponses, MatchAtlasEntryErrors, ThrowOnError>({
+    url: '/me/professional/matches',
+    ...options,
+    headers: {
+        'Content-Type': 'application/json',
+        ...options.headers
+    }
+});
 
 /**
  * Search Nodes

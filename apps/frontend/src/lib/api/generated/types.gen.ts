@@ -261,6 +261,74 @@ export type AtlasEdge = {
 };
 
 /**
+ * AtlasEntry
+ *
+ * Public fields of a researcher or doctor node.
+ */
+export type AtlasEntry = {
+    /**
+     * Node Id
+     */
+    node_id: string;
+    /**
+     * researcher or doctor.
+     */
+    type: NodeType;
+    /**
+     * Label
+     */
+    label: string;
+    /**
+     * Orcid Id
+     *
+     * Public ORCID iD of the node, if any.
+     */
+    orcid_id?: string | null;
+    /**
+     * Institutions
+     *
+     * Affiliated atlas institutions (at most three).
+     */
+    institutions?: Array<Institution>;
+};
+
+/**
+ * AtlasEntryCandidate
+ */
+export type AtlasEntryCandidate = {
+    /**
+     * Node Id
+     */
+    node_id: string;
+    /**
+     * researcher or doctor.
+     */
+    type: NodeType;
+    /**
+     * Label
+     */
+    label: string;
+    /**
+     * Orcid Id
+     *
+     * Public ORCID iD of the node, if any.
+     */
+    orcid_id?: string | null;
+    /**
+     * Institutions
+     *
+     * Affiliated atlas institutions (at most three).
+     */
+    institutions?: Array<Institution>;
+    /**
+     * Matched By
+     *
+     * orcid: exact ORCID iD; name_and_institution: same name and a shared institution; name: same name only.
+     */
+    matched_by: 'orcid' | 'name_and_institution' | 'name';
+};
+
+/**
  * AtlasLayout
  *
  * Compact whole-graph layout for the Atlas view.
@@ -282,6 +350,50 @@ export type AtlasLayout = {
      * Data Version
      */
     data_version?: string | null;
+};
+
+/**
+ * AtlasMatchRequest
+ *
+ * A draft of the work details to look up candidate atlas entries. Nothing is stored.
+ */
+export type AtlasMatchRequest = {
+    /**
+     * First Name
+     *
+     * 1-100 characters; blank means none.
+     */
+    first_name?: string | null;
+    /**
+     * Last Name
+     *
+     * 1-100 characters; blank means none.
+     */
+    last_name?: string | null;
+    /**
+     * Orcid Id
+     *
+     * ORCID iD, 0000-0000-0000-000X, with a valid check digit.
+     */
+    orcid_id?: string | null;
+    /**
+     * Institutions
+     *
+     * At most three.
+     */
+    institutions?: Array<InstitutionInput>;
+};
+
+/**
+ * AtlasMatches
+ */
+export type AtlasMatches = {
+    /**
+     * Candidates
+     *
+     * At most five, best first.
+     */
+    candidates: Array<AtlasEntryCandidate>;
 };
 
 /**
@@ -1289,6 +1401,10 @@ export type DataExport = {
     consents: Array<Consent>;
     patient_profile: PatientProfile | null;
     /**
+     * Work details (doctor and researcher roles); null if none are stored.
+     */
+    professional?: ProfessionalExport | null;
+    /**
      * Chat Sessions
      */
     chat_sessions: Array<ChatSessionExport>;
@@ -2027,6 +2143,42 @@ export type Health = {
 };
 
 /**
+ * Institution
+ */
+export type Institution = {
+    /**
+     * Node Id
+     *
+     * Atlas institution node, null for free text.
+     */
+    node_id?: string | null;
+    /**
+     * Label
+     */
+    label: string;
+};
+
+/**
+ * InstitutionInput
+ *
+ * An atlas institution (`node_id`, its label comes from the atlas) or free text (`label`).
+ */
+export type InstitutionInput = {
+    /**
+     * Node Id
+     *
+     * ID of an `institution` node in the atlas.
+     */
+    node_id?: string | null;
+    /**
+     * Label
+     *
+     * Free-text institution name (max 200 characters), used when `node_id` is null. Ignored when `node_id` is set: the atlas label is stored instead.
+     */
+    label?: string | null;
+};
+
+/**
  * Job
  */
 export type Job = {
@@ -2643,6 +2795,123 @@ export type PhenotypeProfilePayload = {
 export type Polarity = 'supports' | 'contradicts';
 
 /**
+ * ProfessionalExport
+ */
+export type ProfessionalExport = {
+    /**
+     * First Name
+     */
+    first_name?: string | null;
+    /**
+     * Last Name
+     */
+    last_name?: string | null;
+    /**
+     * Institutions
+     */
+    institutions?: Array<Institution>;
+    /**
+     * Orcid Id
+     */
+    orcid_id?: string | null;
+    /**
+     * Atlas Node Id
+     */
+    atlas_node_id?: string | null;
+    /**
+     * Updated At
+     */
+    updated_at?: string | null;
+};
+
+/**
+ * ProfessionalProfile
+ *
+ * The user's private work details. Self-declared, not a verification; visible to nobody
+ * else and never sent to a model.
+ */
+export type ProfessionalProfile = {
+    /**
+     * First Name
+     */
+    first_name?: string | null;
+    /**
+     * Last Name
+     */
+    last_name?: string | null;
+    /**
+     * Institutions
+     */
+    institutions?: Array<Institution>;
+    /**
+     * Orcid Id
+     */
+    orcid_id?: string | null;
+    /**
+     * Atlas Node Id
+     */
+    atlas_node_id?: string | null;
+    /**
+     * Public summary of `atlas_node_id` while the node is in the atlas.
+     */
+    linked_entry?: AtlasEntry | null;
+    /**
+     * Linked Entry Missing
+     *
+     * `atlas_node_id` is set but the node is no longer in the atlas.
+     */
+    linked_entry_missing?: boolean;
+    /**
+     * Updated At
+     *
+     * Last save; null if never saved.
+     */
+    updated_at?: string | null;
+    /**
+     * Name prefill from the ChatGPT account; null if it has no name.
+     */
+    suggested?: SuggestedName | null;
+};
+
+/**
+ * ProfessionalProfileUpdate
+ *
+ * Replaces all work details (PUT). Every field is optional.
+ */
+export type ProfessionalProfileUpdate = {
+    /**
+     * First Name
+     *
+     * 1-100 characters; blank means none.
+     */
+    first_name?: string | null;
+    /**
+     * Last Name
+     *
+     * 1-100 characters; blank means none.
+     */
+    last_name?: string | null;
+    /**
+     * Orcid Id
+     *
+     * ORCID iD, 0000-0000-0000-000X, with a valid check digit.
+     */
+    orcid_id?: string | null;
+    /**
+     * Institutions
+     *
+     * At most three.
+     */
+    institutions?: Array<InstitutionInput>;
+    /**
+     * Atlas Node Id
+     *
+     * The user's own `researcher` or `doctor` node (private link, not a claim).
+     */
+    atlas_node_id?: string | null;
+};
+
+/**
  * ProfileDisease
  */
 export type ProfileDisease = {
@@ -3164,6 +3433,26 @@ export type SourceCount = {
 export type StartLayout = 'ring' | 'force' | 'hierarchy' | 'cluster' | 'tour';
 
 /**
+ * SuggestedName
+ *
+ * Prefill from the ChatGPT account, computed on request and never stored.
+ */
+export type SuggestedName = {
+    /**
+     * First Name
+     */
+    first_name?: string | null;
+    /**
+     * Last Name
+     */
+    last_name?: string | null;
+    /**
+     * Source
+     */
+    source?: 'chatgpt';
+};
+
+/**
  * SummaryItem
  */
 export type SummaryItem = {
@@ -3665,6 +3954,130 @@ export type RevokeConsentResponses = {
 };
 
 export type RevokeConsentResponse = RevokeConsentResponses[keyof RevokeConsentResponses];
+
+export type DeleteProfessionalProfileData = {
+    body?: never;
+    path?: never;
+    query?: never;
+    url: '/me/professional';
+};
+
+export type DeleteProfessionalProfileErrors = {
+    /**
+     * sign_in_required: guest, or the session expired.
+     */
+    401: ErrorResponse;
+};
+
+export type DeleteProfessionalProfileError = DeleteProfessionalProfileErrors[keyof DeleteProfessionalProfileErrors];
+
+export type DeleteProfessionalProfileResponses = {
+    /**
+     * Successful Response
+     */
+    204: void;
+};
+
+export type DeleteProfessionalProfileResponse = DeleteProfessionalProfileResponses[keyof DeleteProfessionalProfileResponses];
+
+export type GetProfessionalProfileData = {
+    body?: never;
+    path?: never;
+    query?: never;
+    url: '/me/professional';
+};
+
+export type GetProfessionalProfileErrors = {
+    /**
+     * sign_in_required: guest, or the session expired.
+     */
+    401: ErrorResponse;
+    /**
+     * consent_required (no active consent of the needed type) or forbidden.
+     */
+    403: ErrorResponse;
+};
+
+export type GetProfessionalProfileError = GetProfessionalProfileErrors[keyof GetProfessionalProfileErrors];
+
+export type GetProfessionalProfileResponses = {
+    /**
+     * Successful Response
+     */
+    200: ProfessionalProfile;
+};
+
+export type GetProfessionalProfileResponse = GetProfessionalProfileResponses[keyof GetProfessionalProfileResponses];
+
+export type PutProfessionalProfileData = {
+    body: ProfessionalProfileUpdate;
+    path?: never;
+    query?: never;
+    url: '/me/professional';
+};
+
+export type PutProfessionalProfileErrors = {
+    /**
+     * sign_in_required: guest, or the session expired.
+     */
+    401: ErrorResponse;
+    /**
+     * consent_required (no active consent of the needed type) or forbidden.
+     */
+    403: ErrorResponse;
+    /**
+     * validation_error: lists invalid field names only.
+     */
+    422: ErrorResponse;
+};
+
+export type PutProfessionalProfileError = PutProfessionalProfileErrors[keyof PutProfessionalProfileErrors];
+
+export type PutProfessionalProfileResponses = {
+    /**
+     * Successful Response
+     */
+    200: ProfessionalProfile;
+};
+
+export type PutProfessionalProfileResponse = PutProfessionalProfileResponses[keyof PutProfessionalProfileResponses];
+
+export type MatchAtlasEntryData = {
+    body: AtlasMatchRequest;
+    path?: never;
+    query?: never;
+    url: '/me/professional/matches';
+};
+
+export type MatchAtlasEntryErrors = {
+    /**
+     * sign_in_required: guest, or the session expired.
+     */
+    401: ErrorResponse;
+    /**
+     * consent_required (no active consent of the needed type) or forbidden.
+     */
+    403: ErrorResponse;
+    /**
+     * validation_error: lists invalid field names only.
+     */
+    422: ErrorResponse;
+    /**
+     * rate_limited
+     */
+    429: ErrorResponse;
+};
+
+export type MatchAtlasEntryError = MatchAtlasEntryErrors[keyof MatchAtlasEntryErrors];
+
+export type MatchAtlasEntryResponses = {
+    /**
+     * Successful Response
+     */
+    200: AtlasMatches;
+};
+
+export type MatchAtlasEntryResponse = MatchAtlasEntryResponses[keyof MatchAtlasEntryResponses];
 
 export type SearchData = {
     body?: never;
