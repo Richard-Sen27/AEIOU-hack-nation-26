@@ -1380,7 +1380,7 @@ export type CardVerification = {
     /**
      * Simulated
      *
-     * True when verified by a local demo shortcut (ORCID mock or auto-approved manual request): show the label, which says 'demo, verification simulated'.
+     * True when verified by a demo shortcut (local ORCID mock, or a manual request auto-approved by ORCID_MOCK or DEMO_AUTO_VERIFY): show the label, which says 'demo, verification simulated'.
      */
     simulated: boolean;
 };
@@ -6548,6 +6548,12 @@ export type VerificationState = {
      * ORCID sign-in is the local simulated mock.
      */
     orcid_simulated: boolean;
+    /**
+     * Request Auto Approved
+     *
+     * Demo: a manual request is approved at once and marked simulated (ORCID_MOCK locally, DEMO_AUTO_VERIFY on a hosted demo). Say so on the request form.
+     */
+    request_auto_approved?: boolean;
 };
 
 /**

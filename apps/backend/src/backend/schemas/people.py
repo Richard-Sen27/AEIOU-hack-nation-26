@@ -50,8 +50,9 @@ class CardVerification(ApiModel):
     method: VerificationMethod
     label: str = Field(description="What was checked, ready to show.")
     simulated: bool = Field(
-        description="True when verified by a local demo shortcut (ORCID mock or auto-approved "
-        "manual request): show the label, which says 'demo, verification simulated'."
+        description="True when verified by a demo shortcut (local ORCID mock, or a manual "
+        "request auto-approved by ORCID_MOCK or DEMO_AUTO_VERIFY): show the label, which says "
+        "'demo, verification simulated'."
     )
 
 
@@ -111,6 +112,11 @@ class VerificationState(ApiModel):
     request: VerificationRequestState | None = None
     orcid_available: bool = Field(description="ORCID sign-in can be started on this server.")
     orcid_simulated: bool = Field(description="ORCID sign-in is the local simulated mock.")
+    request_auto_approved: bool = Field(
+        False,
+        description="Demo: a manual request is approved at once and marked simulated "
+        "(ORCID_MOCK locally, DEMO_AUTO_VERIFY on a hosted demo). Say so on the request form.",
+    )
 
 
 class CardSettings(ApiModel):

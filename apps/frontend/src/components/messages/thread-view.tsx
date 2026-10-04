@@ -6,6 +6,8 @@ import { useRouter } from "next/navigation";
 import { useCallback, useEffect, useId, useRef, useState } from "react";
 import { toast } from "sonner";
 
+import { usePersonCard } from "@/components/people/use-people";
+import { VerificationLabel } from "@/components/people/verification-label";
 import {
   AlertDialog,
   AlertDialogAction,
@@ -53,6 +55,13 @@ const THREAD_POLL_MS = 15_000;
 
 type Detail = Schemas.ThreadDetail;
 type Confirm = { kind: "block" } | { kind: "delete"; messageId: string } | null;
+
+/** "Demo, verification simulated" next to a professional whose card was verified by a demo shortcut. */
+function SimulatedMark({ cardId }: { cardId: string }) {
+  const card = usePersonCard(cardId);
+  if (card.kind !== "ready" || !card.data.verification.simulated) return null;
+  return <VerificationLabel verification={card.data.verification} short />;
+}
 
 /** One conversation: messages, the composer or the request buttons, and the actions. */
 export function ThreadView({ id }: { id: string }) {
@@ -176,6 +185,7 @@ export function ThreadView({ id }: { id: string }) {
                 <UserRound className="size-3" aria-hidden /> Card
               </Link>
             )}
+            {t.counterpart.card_id && !t.counterpart.deleted && <SimulatedMark cardId={t.counterpart.card_id} />}
           </p>
         </div>
         {label && (

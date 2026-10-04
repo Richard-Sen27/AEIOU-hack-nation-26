@@ -64,6 +64,13 @@ class Settings(BaseSettings):
     orcid_redirect_uri: str = ""
     orcid_mock: bool = False
 
+    # Hosted demo only (e.g. for judges): a manual verification request of a doctor or researcher
+    # is approved at once instead of waiting for `backend.cli verify-professional`, marked
+    # 'manual_simulated' ("Demo, verification simulated") everywhere the card appears; the
+    # submitted e-mail and link are not kept. Allowed off loopback, unlike ORCID_MOCK (the ORCID
+    # sign-in stays real or off). Switch it off before real patients use the product.
+    demo_auto_verify: bool = False
+
     # Calls (surveys, studies, trials). False: a verified professional with a visible card
     # publishes their own call from the form at once (after the wording check); the call says it
     # was not reviewed. True: every call waits for the operator (`backend.cli calls approve`).

@@ -59,12 +59,13 @@ Limits (in memory, per process): every request 600/minute per client (account; g
 | `OPENAI_API_KEY` | the operator's key; without it set `GOOGLE_LOGIN_ENABLED=true` and Dr. Wu answers 503 | secret, you |
 | `OPENAI_API_MODEL_MAIN`, `OPENAI_API_MODEL_SMALL` | optional, default `gpt-5`, `gpt-5-mini` | you |
 | `CALLS_REVIEW_REQUIRED` | `false` (default) or `true` | you |
+| `DEMO_AUTO_VERIFY` | `true` for the judged demo only: manual verification requests of doctors and researchers are approved at once and labelled "Demo, verification simulated" (start-up logs a warning). Default `false`; set it back to `false` before real patients use the product (`docs/compliance.md`, MUST NOT) | you |
 | `TRUSTED_PROXY_HOPS` | `1` (see Rate limits below; without it every guest shares the frontend's address) | fixed |
 | `MODEL_DAILY_BUDGET`, `MODEL_DAILY_CEILING` | optional, default `200` per account and `2000` per process and UTC day (model-calling requests on `OPENAI_API_KEY`) | you |
 | `LOG_LEVEL`, `RATE_LIMIT_GENERAL`, `MODEL_MAX_CONCURRENT`, `MODEL_MAX_CONCURRENT_PER_ACCOUNT` | optional, defaults `info`, `600/minute`, `16`, `3` | you |
 | `NCBI_API_KEY`, `BRIGHTDATA_API_KEY`, `BRIGHTDATA_SERP_ZONE` | optional (gap search) | you |
 
-Leave unset: `ORCID_MOCK` (refused off loopback; experts verify through the manual request and `backend.cli`, or set real `ORCID_CLIENT_ID`, `ORCID_CLIENT_SECRET`, `ORCID_BASE_URL` and register `https://<F>/api/me/professional/orcid/callback`), `DEMO_MODE`, `LANGFUSE_*`, `LANGSMITH_*`, `PIPELINE_DATABASE_URL`, `BOOTSTRAP_DATABASE_URL`.
+Leave unset: `ORCID_MOCK` (refused off loopback; experts verify through the manual request and `backend.cli`, or with `DEMO_AUTO_VERIFY=true` at once as a simulated verification, or set real `ORCID_CLIENT_ID`, `ORCID_CLIENT_SECRET`, `ORCID_BASE_URL` and register `https://<F>/api/me/professional/orcid/callback`), `DEMO_MODE`, `LANGFUSE_*`, `LANGSMITH_*`, `PIPELINE_DATABASE_URL`, `BOOTSTRAP_DATABASE_URL`.
 
 **frontend** (the first three are build arguments: changing them needs a new build)
 

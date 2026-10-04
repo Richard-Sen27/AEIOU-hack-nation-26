@@ -499,6 +499,77 @@ async def test_manual_request_waits_without_demo_settings(make_user):
     me = (await user.client.post("/me/professional/verification-request", json=body)).json()
     assert me["verification"]["verified"] is False
     assert me["verification"]["request"]["status"] == "pending"
+    assert me["verification"]["request_auto_approved"] is False
+
+
+@pytest.fixture
+def demo_auto_verify(monkeypatch):
+    monkeypatch.setenv("DEMO_AUTO_VERIFY", "true")
+    get_settings.cache_clear()
+    yield
+    monkeypatch.delenv("DEMO_AUTO_VERIFY")
+    get_settings.cache_clear()
+
+
+async def test_demo_auto_verify_approves_labels_and_keeps_nothing(
+    make_user, demo_auto_verify, superuser
+):
+    """Hosted demo (DEMO_AUTO_VERIFY on, ORCID_MOCK off): approved at once, marked simulated."""
+    user = await make_user(role="researcher")
+    await user.client.put("/me/professional", json=WORK)
+    before = (await user.client.get("/me/professional/card")).json()["verification"]
+    assert before["request_auto_approved"] is True
+    assert before["orcid_simulated"] is False  # the ORCID sign-in is not simulated by this switch
+    body = {"institutional_email": "ada@uni.test", "profile_url": "https://uni.test/ada"}
+    me = (await user.client.post("/me/professional/verification-request", json=body)).json()
+    assert me["verification"]["verified"] and me["verification"]["method"] == "manual_simulated"
+    assert me["verification"]["simulated"] is True and me["verification"]["request"] is None
+    shown = await _show(user)
+    card = shown["preview"]
+    assert card["verification"]["simulated"] is True
+    assert card["verification"]["label"] == "Demo, verification simulated (no real identity check)"
+    assert card["name_source"] == "self_declared"
+    # Others see the same label on the public card.
+    viewer = await make_user(role="patient")
+    public = (await viewer.client.get(f"/people/{shown['card_id']}")).json()
+    assert public["verification"]["simulated"] is True
+    row = await superuser.fetchrow(
+        "SELECT verification_request, verification_reason FROM profiles WHERE user_id = $1",
+        user.id,
+    )
+    assert row["verification_request"] is None  # the e-mail and link are not kept
+    assert row["verification_reason"] == "demo: approved automatically"
+
+
+def test_demo_auto_verify_allowed_off_loopback_but_orcid_mock_is_not():
+    prod = {
+        "api_url": "https://api.amber.example",
+        "frontend_url": "https://amber.example",
+        "session_secret": "a-real-random-secret-for-this-test-only",
+        "cookie_secure": True,
+    }
+    assert Settings(**prod).demo_auto_verify is False  # off by default
+    assert Settings(**prod, demo_auto_verify=True).demo_auto_verify is True
+    with pytest.raises(ValidationError, match="ORCID_MOCK"):
+        Settings(**prod, demo_auto_verify=True, orcid_mock=True)
+
+
+def test_demo_auto_verify_does_not_enable_the_orcid_mock(monkeypatch):
+    from types import SimpleNamespace
+
+    from backend.api.services import orcid
+
+    fake = SimpleNamespace(
+        orcid_mock=False,
+        demo_auto_verify=True,
+        is_local=False,
+        orcid_client_id="",
+        orcid_client_secret="",
+    )
+    monkeypatch.setattr(orcid, "get_settings", lambda: fake)
+    monkeypatch.setattr(people_service, "get_settings", lambda: fake)
+    assert orcid.mock_enabled() is False and orcid.mode() is None
+    assert people_service.auto_verify_enabled() is True
 
 
 async def test_manual_review_reject_and_withdraw(make_user, superuser):

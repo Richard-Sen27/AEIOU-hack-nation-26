@@ -1,6 +1,7 @@
-import { BadgeCheck, ChevronRight } from "lucide-react";
+import { ChevronRight } from "lucide-react";
 import Link from "next/link";
 
+import { VerificationLabel } from "@/components/people/verification-label";
 import type { Schemas } from "@/lib/api";
 import { cn } from "@/lib/utils";
 
@@ -23,10 +24,7 @@ export function PublisherLine({ card, className }: { card: Schemas.PublicCard; c
           {ROLE[card.role] ?? card.role} (self-declared)
           {institutions && ` · ${institutions}`}
         </span>
-        <span className="mt-0.5 flex items-center gap-1 text-xs text-muted-foreground">
-          <BadgeCheck className="size-3.5 shrink-0 text-primary" aria-hidden />
-          <span className="truncate">{card.verification.label}</span>
-        </span>
+        <VerificationLabel verification={card.verification} className="mt-0.5 font-normal" />
       </span>
       <ChevronRight className="size-4 shrink-0 text-muted-foreground transition-transform group-hover:translate-x-0.5" aria-hidden />
     </Link>

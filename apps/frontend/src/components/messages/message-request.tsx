@@ -6,6 +6,7 @@ import { useRouter } from "next/navigation";
 import { useId, useState } from "react";
 import { toast } from "sonner";
 
+import { VerificationLabel } from "@/components/people/verification-label";
 import { useSession } from "@/components/providers/session-provider";
 import { Button } from "@/components/ui/button";
 import { Checkbox } from "@/components/ui/checkbox";
@@ -13,13 +14,13 @@ import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } f
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
 import { ApiError } from "@/lib/api/errors";
-import { openThread, unwrap } from "@/lib/api";
+import { openThread, unwrap, type Schemas } from "@/lib/api";
 import { trackEvent } from "@/lib/analytics";
 
 import { Busy, guardianText, messagingErrorText, useConnectFlow, type ConnectStatus } from "./connect-flow";
 import { MAX_BODY, MAX_NAME, PatientBanner } from "./labels";
 
-type Recipient = { card_id: string; name: string; accepts_patient_messages: boolean };
+type Recipient = { card_id: string; name: string; accepts_patient_messages: boolean; verification?: Schemas.CardVerification };
 
 /** Whether this viewer may write to this card: only patients, only cards that accept messages. */
 export function canMessageCard(role: string | null | undefined, card: { accepts_patient_messages: boolean }) {
@@ -128,6 +129,7 @@ function MessageRequestDialog({
         <DialogHeader>
           <DialogTitle>Message {card.name}</DialogTitle>
           <DialogDescription>A request. They accept or decline it.</DialogDescription>
+          {card.verification?.simulated && <VerificationLabel verification={card.verification} />}
         </DialogHeader>
         <PatientBanner />
         <div className="space-y-3">

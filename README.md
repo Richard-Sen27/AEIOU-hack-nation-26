@@ -99,6 +99,9 @@ Doctors and researchers:
 - **See sign-ups:** display name, ticked items and note, never an e-mail or account.
 - **Answer messages:** accept or decline patients' requests; experts never write first.
 
+On the hosted demo, verification requests are approved automatically and labelled "Demo,
+verification simulated", so judges can try the expert features with any Google account.
+
 ### Your own data
 
 - **Health profile** of confirmed diagnoses, genes and symptoms; Dr. Wu uses it as context.
@@ -465,8 +468,8 @@ the Google sign-in setup are in [`docs/deploy-railway.md`](docs/deploy-railway.m
   Personal data is redacted with Presidio before any model call, raw uploads are deleted after
   extraction, nothing extracted is used until the user confirms it, and every user table is under
   row-level security. The API writes no access log.
-- **Simulated in the demo.** Expert verification (ORCID runs in mock mode locally; institutional
-  verification is a manual operator step), demo studies seeded by a CLI command, and expert cards
+- **Simulated in the demo.** Expert verification (ORCID runs in mock mode locally; on the hosted
+  demo `DEMO_AUTO_VERIFY` approves manual requests at once, otherwise they wait for the operator), demo studies seeded by a CLI command, and expert cards
   marked "demo, verification simulated". The hosted site must not take real patients' data
   during the judging week.
 

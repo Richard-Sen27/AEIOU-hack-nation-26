@@ -381,7 +381,7 @@ export const GUIDE: GuideSection[] = [
         title: "Get verified, show a card",
         what: "A public card signed-in users can find, with only what you switch on.",
         steps: [
-          "Confirm with ORCID, or ask for a manual review.",
+          "Confirm with ORCID, or ask for a manual review (in a demo it is approved at once and marked simulated).",
           "Switch on the card and choose what it shows.",
           "Optionally accept messages from patients.",
         ],

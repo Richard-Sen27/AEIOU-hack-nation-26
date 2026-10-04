@@ -5,13 +5,14 @@ import Link from "next/link";
 import { useId, useState } from "react";
 
 import { Busy } from "@/components/messages/connect-flow";
+import { VerificationLabel } from "@/components/people/verification-label";
 import { Button, buttonVariants } from "@/components/ui/button";
 import { Checkbox } from "@/components/ui/checkbox";
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
 import { trackEvent } from "@/lib/analytics";
-import { signUpToCall, unwrap } from "@/lib/api";
+import { signUpToCall, unwrap, type Schemas } from "@/lib/api";
 import { ApiError } from "@/lib/api/errors";
 import { cn } from "@/lib/utils";
 
@@ -44,11 +45,14 @@ function Tick({ id, checked, onChange, children, testId }: { id: string; checked
  */
 export function SignupDialog({
   options: initial,
+  verification,
   onClose,
   onSent,
   renew,
 }: {
   options: SignupOptions;
+  /** The publisher's card verification; a simulated (demo) one is marked here. */
+  verification?: Schemas.CardVerification;
   onClose: () => void;
   onSent: (signup: MySignup) => void;
   renew: () => Promise<SignupOptions | null>;
@@ -155,6 +159,7 @@ export function SignupDialog({
               <DialogDescription data-testid="signup-recipient">
                 To {options.recipient}, who runs this call.
               </DialogDescription>
+              {verification?.simulated && <VerificationLabel verification={verification} />}
             </DialogHeader>
 
             <fieldset className="space-y-2" data-testid="signup-items">

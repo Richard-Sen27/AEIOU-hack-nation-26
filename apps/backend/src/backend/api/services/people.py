@@ -313,6 +313,7 @@ def _my_card(row: Any) -> MyCard:
             request=_request_state(row["verification_request"]),
             orcid_available=orcid.mode() is not None,
             orcid_simulated=orcid.mode() == "mock",
+            request_auto_approved=auto_verify_enabled(),
         ),
         settings=CardSettings(
             visible=row["card_visible"] and blocked is None,
@@ -372,6 +373,11 @@ async def put_my_card(db: AsyncSession, user: CurrentUser, body: CardSettingsUpd
 # ---- manual verification request -------------------------------------------------------------
 
 
+def auto_verify_enabled() -> bool:
+    """Manual requests are approved at once as 'manual_simulated' (demo only)."""
+    return orcid.mock_enabled() or get_settings().demo_auto_verify
+
+
 async def request_verification(
     db: AsyncSession, user: CurrentUser, body: VerificationRequestCreate
 ) -> MyCard:
@@ -387,9 +393,10 @@ async def request_verification(
         "profile_url": body.profile_url,
         "requested_at": datetime.now(UTC).isoformat(),
     }
-    if orcid.mock_enabled():
-        # Local demo only (ORCID_MOCK on, loopback): approve at once, labelled as simulated.
-        # The e-mail and link are not kept. In production the request waits for the operator.
+    if auto_verify_enabled():
+        # Local demo (ORCID_MOCK on, loopback) or hosted demo (DEMO_AUTO_VERIFY): approve at
+        # once, labelled as simulated. The e-mail and link are not kept. Otherwise the request
+        # waits for the operator.
         await db.execute(
             text(
                 "UPDATE profiles SET role_verified = true,"

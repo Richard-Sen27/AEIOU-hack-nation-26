@@ -264,7 +264,7 @@ function VerificationBlock({
 
           {showForm && (
             <RequestForm
-              simulated={!!v.orcid_simulated}
+              simulated={!!(v.request_auto_approved || v.orcid_simulated)}
               onCancel={v.orcid_available ? () => setFormOpen(false) : undefined}
               onDone={async (c) => {
                 setFormOpen(false);
@@ -336,10 +336,17 @@ function RequestForm({
 
   return (
     <form onSubmit={(e) => void submit(e)} className="space-y-3 rounded-lg border bg-background p-3" data-testid="request-form" noValidate>
-      <p className="text-sm">
-        <span className="font-medium">Manual check.</span>{" "}
-        <span className="text-muted-foreground">The Amber team checks your work e-mail and a public staff page.</span>
-      </p>
+      {simulated ? (
+        <p className="text-sm">
+          <span className="font-medium">Demo check.</span>{" "}
+          <span className="text-muted-foreground">Nobody checks the e-mail or the page in this demo, and neither is kept.</span>
+        </p>
+      ) : (
+        <p className="text-sm">
+          <span className="font-medium">Manual check.</span>{" "}
+          <span className="text-muted-foreground">The Amber team checks your work e-mail and a public staff page.</span>
+        </p>
+      )}
       <div className="grid gap-3 sm:grid-cols-2">
         <label className="space-y-1 text-sm">
           <span className="font-medium">Work e-mail</span>
@@ -375,7 +382,7 @@ function RequestForm({
       </div>
       {simulated && (
         <p className="text-xs text-status-flag" data-testid="request-simulated">
-          Demo: approved at once and marked simulated.
+          Demo: approved automatically and marked “Demo, verification simulated” wherever your card appears.
         </p>
       )}
       {error && (

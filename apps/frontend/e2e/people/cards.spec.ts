@@ -7,6 +7,7 @@ import { CARD_ID, cardBackend, LABELS, publicCard, type Req, verification } from
 const SHOTS = process.env.CARDS_SHOTS_DIR;
 
 const work = (page: Page) => page.locator("#your-work");
+const DEMO_HINT = "Demo: approved automatically and marked “Demo, verification simulated” wherever your card appears.";
 
 test.describe("verification and the public card on the profile", () => {
   test("ORCID: start sends return_to, the confirmed return shows the verified state", async ({ page, baseURL }) => {
@@ -124,7 +125,7 @@ test.describe("verification and the public card on the profile", () => {
     await page.goto("/profile");
     const w = work(page);
     await w.getByTestId("request-open").click();
-    await expect(w.getByTestId("request-simulated")).toHaveText("Demo: approved at once and marked simulated.");
+    await expect(w.getByTestId("request-simulated")).toHaveText(DEMO_HINT);
     await w.getByRole("textbox", { name: "Work e-mail" }).fill("maria@bch.org");
     await w.getByRole("textbox", { name: "Staff or profile page" }).fill("https://bch.org/maria");
     await w.getByRole("button", { name: "Send request" }).click();
@@ -132,6 +133,34 @@ test.describe("verification and the public card on the profile", () => {
     await expect(page.getByText("Verified (demo, simulated)").first()).toBeVisible();
     await expect(w.getByTestId("card-preview").getByTestId("verification-label")).toHaveText(LABELS.manual_simulated);
     await expect(w.getByTestId("card-preview").getByTestId("card-role")).toContainText("name self-declared");
+  });
+
+  test("manual request: the hosted demo (DEMO_AUTO_VERIFY, no ORCID) says approval is automatic", async ({ page }) => {
+    const be = cardBackend({ orcidAvailable: false, requestAutoApproved: true }, { autoApprove: true });
+    await mockApi(page, be.mocks);
+    await page.goto("/profile");
+    const w = work(page);
+    const form = w.getByTestId("request-form");
+    await expect(w.getByTestId("orcid-start")).toHaveCount(0);
+    await expect(form).toContainText("Demo check. Nobody checks the e-mail or the page in this demo, and neither is kept.");
+    await expect(form).not.toContainText("The Amber team checks");
+    await expect(form.getByTestId("request-simulated")).toHaveText(DEMO_HINT);
+    await form.getByRole("textbox", { name: "Work e-mail" }).fill("maria@bch.org");
+    await form.getByRole("textbox", { name: "Staff or profile page" }).fill("https://bch.org/maria");
+    await form.getByRole("button", { name: "Send request" }).click();
+    const label = w.getByTestId("verified").getByTestId("verification-label");
+    await expect(label).toHaveText(LABELS.manual_simulated);
+    await expect(label).toHaveAttribute("data-simulated", "true");
+    await expect(w.getByTestId("card-preview").getByTestId("verification-label")).toHaveText(LABELS.manual_simulated);
+  });
+
+  test("manual request: without a demo switch the form names the Amber team's check", async ({ page }) => {
+    const be = cardBackend({ orcidAvailable: false });
+    await mockApi(page, be.mocks);
+    await page.goto("/profile");
+    const form = work(page).getByTestId("request-form");
+    await expect(form).toContainText("Manual check. The Amber team checks your work e-mail and a public staff page.");
+    await expect(form.getByTestId("request-simulated")).toHaveCount(0);
   });
 
   test("card: switch on and off, settings, preview and the note", async ({ page }) => {

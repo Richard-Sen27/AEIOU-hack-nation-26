@@ -1,6 +1,7 @@
 import { ChevronRight, Globe2, MapPin } from "lucide-react";
 import Link from "next/link";
 
+import { VerificationLabel } from "@/components/people/verification-label";
 import { cn } from "@/lib/utils";
 
 import { ageText, callHref, countryName, formatDate, KIND_META, runByText, STATUS_META, type Call, type CallKind, type CallStatus } from "./call-meta";
@@ -92,6 +93,7 @@ export function CallRow({ call, compact = false }: { call: Call; compact?: boole
         <span className="flex flex-wrap items-center gap-1.5">
           <KindBadge kind={call.kind} />
           {call.demo && <DemoMark />}
+          {call.publisher?.verification.simulated && <VerificationLabel verification={call.publisher.verification} short />}
         </span>
         <span className={cn("block font-medium text-pretty", compact ? "text-sm" : "text-[15px]")}>{call.title}</span>
         {!compact && (

@@ -69,6 +69,7 @@ type CardState = {
   request: null | { status: "pending" | "rejected"; institutional_email?: string; profile_url?: string; decided_at?: string };
   orcidAvailable: boolean;
   orcidSimulated: boolean;
+  requestAutoApproved: boolean;
   hasName: boolean;
   visible: boolean;
   headline: string | null;
@@ -86,6 +87,7 @@ const unverified: CardState = {
   request: null,
   orcidAvailable: true,
   orcidSimulated: false,
+  requestAutoApproved: false,
   hasName: true,
   visible: false,
   headline: null,
@@ -111,6 +113,7 @@ export function myCard(s: CardState) {
       request: s.request ? { requested_at: "2026-10-04T07:00:00Z", decided_at: null, ...s.request } : null,
       orcid_available: s.orcidAvailable,
       orcid_simulated: s.orcidSimulated,
+      request_auto_approved: s.requestAutoApproved,
     },
     settings: {
       visible: s.visible && blocked === null,
@@ -143,8 +146,8 @@ export function myCard(s: CardState) {
 
 /**
  * A stateful card backend for one test. `state` is mutable, `calls` logs every
- * card-related request; `opts.autoApprove` mimics ORCID_MOCK (requests approved
- * at once as `manual_simulated`).
+ * card-related request; `opts.autoApprove` mimics ORCID_MOCK or DEMO_AUTO_VERIFY
+ * (requests approved at once as `manual_simulated`).
  */
 export function cardBackend(initial: Partial<CardState> = {}, opts: { role?: string; autoApprove?: boolean } = {}) {
   const state: CardState = { ...unverified, ...initial };

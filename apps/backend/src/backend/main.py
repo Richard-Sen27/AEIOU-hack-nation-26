@@ -150,6 +150,7 @@ def settings_summary(settings: Settings) -> str:
         "api_models": f"{openai.openai_api_model_main},{openai.openai_api_model_small}",
         "google_login": google_login_available(),
         "orcid": "mock" if settings.orcid_mock else is_set(settings.orcid_client_id),
+        "demo_auto_verify": settings.demo_auto_verify,
         "calls_review": settings.calls_review_required,
         "demo": settings.demo_mode,
         "log_level": settings.log_level.lower(),
@@ -197,6 +198,11 @@ async def lifespan(app: FastAPI) -> AsyncIterator[None]:
     started = time.perf_counter()
     settings = app.state.settings
     log.info("starting %s", settings_summary(settings))
+    if settings.demo_auto_verify:
+        log.warning(
+            "demo_auto_verify on: verification requests are approved without review and labelled"
+            " simulated; switch it off before real use"
+        )
     configure_engine(settings.database_url)
     await log_migrations()
     await load_graph_on_startup()

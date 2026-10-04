@@ -8784,7 +8784,7 @@
           "simulated": {
             "type": "boolean",
             "title": "Simulated",
-            "description": "True when verified by a local demo shortcut (ORCID mock or auto-approved manual request): show the label, which says 'demo, verification simulated'."
+            "description": "True when verified by a demo shortcut (local ORCID mock, or a manual request auto-approved by ORCID_MOCK or DEMO_AUTO_VERIFY): show the label, which says 'demo, verification simulated'."
           }
         },
         "type": "object",
@@ -17330,6 +17330,12 @@
             "type": "boolean",
             "title": "Orcid Simulated",
             "description": "ORCID sign-in is the local simulated mock."
+          },
+          "request_auto_approved": {
+            "type": "boolean",
+            "title": "Request Auto Approved",
+            "description": "Demo: a manual request is approved at once and marked simulated (ORCID_MOCK locally, DEMO_AUTO_VERIFY on a hosted demo). Say so on the request form.",
+            "default": false
           }
         },
         "type": "object",

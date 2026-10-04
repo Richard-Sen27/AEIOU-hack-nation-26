@@ -291,6 +291,35 @@ test.describe("starting a conversation from a card", () => {
     });
   }
 
+  test("a card verified by a demo shortcut is marked in the request and in the conversation", async ({ page }) => {
+    const LABEL = "Demo, verification simulated (no real identity check)";
+    const demo = card({ name_source: "self_declared", orcid_id: null, orcid_url: null, verification: { method: "manual_simulated", label: LABEL, simulated: true } });
+    const m = messagingMocks();
+    await mockApi(page, { ...m.mocks, "GET /people/*": demo });
+    await openDialog(page);
+    const label = page.getByTestId("message-request-dialog").getByTestId("verification-label");
+    await expect(label).toHaveText(LABEL);
+    await expect(label).toHaveAttribute("data-simulated", "true");
+    await page.keyboard.press("Escape");
+
+    await page.goto(`/messages/${OPEN}`);
+    const mark = page.getByTestId("thread-view").getByTestId("verification-label");
+    await expect(mark).toHaveText("Demo, verification simulated");
+    await expect(mark).toHaveAttribute("data-simulated", "true");
+  });
+
+  test("a really verified card gets no demo mark in the request or the conversation", async ({ page }) => {
+    const m = messagingMocks();
+    await mockApi(page, m.mocks);
+    await openDialog(page);
+    await expect(page.getByTestId("message-request-dialog")).toBeVisible();
+    await expect(page.getByTestId("message-request-dialog").getByTestId("verification-label")).toHaveCount(0);
+    await page.keyboard.press("Escape");
+    await page.goto(`/messages/${OPEN}`);
+    await expect(page.getByTestId("thread-name")).toHaveText("Dr. Anna Berg");
+    await expect(page.getByTestId("thread-view").getByTestId("verification-label")).toHaveCount(0);
+  });
+
   test("a professional has no way to start a conversation", async ({ page }) => {
     const m = messagingMocks({ role: "doctor", threads: [] });
     await mockApi(page, m.mocks);

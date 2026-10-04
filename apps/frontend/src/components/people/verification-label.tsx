@@ -12,7 +12,7 @@ export function shortVerification(v: Verification): string {
 }
 
 /**
- * What was checked, worded by the backend. A simulated (local demo) verification
+ * What was checked, worded by the backend. A simulated (demo) verification
  * is drawn in the warning colour so it can never pass for a real one.
  */
 export function VerificationLabel({

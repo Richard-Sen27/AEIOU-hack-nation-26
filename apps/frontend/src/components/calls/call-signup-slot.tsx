@@ -125,6 +125,7 @@ export function CallSignupSlot({ call }: { call: Call }) {
       {open && (
         <SignupDialog
           options={open}
+          verification={call.publisher?.verification}
           onClose={() => setOpen(null)}
           onSent={() => void fetchOptions()}
           renew={() => prepare(true)}

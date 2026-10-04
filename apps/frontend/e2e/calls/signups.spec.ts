@@ -383,6 +383,43 @@ test.describe("signing up", () => {
     expect(bodies(m.log, "POST", /^\/consents$/)).toHaveLength(1);
   });
 
+  test("a publisher verified by a demo shortcut is marked in the list, on the call and in the sign-up", async ({ page }) => {
+    const LABEL = "Demo, verification simulated (no real identity check)";
+    const demoCard = { ...card, name_source: "self_declared", orcid_id: null, orcid_url: null, verification: { method: "manual_simulated", label: LABEL, simulated: true } };
+    const demoCall = call(CALL_ID, { publisher: demoCard });
+    const m = mocks();
+    await mockApi(page, {
+      ...m.table,
+      "GET /calls": { heading: "Find trials and studies looking for participants", items: [demoCall, ADULT] },
+      "GET /calls/*": (r: Req) => ({ json: new URL(r.url).pathname.endsWith(CALL_ID) ? demoCall : ADULT }),
+    });
+    await page.goto("/calls");
+    const rows = page.getByTestId("call-row");
+    await expect(rows.first().getByTestId("verification-label")).toHaveText("Demo, verification simulated");
+    await expect(rows.first().getByTestId("verification-label")).toHaveAttribute("data-simulated", "true");
+    // A really verified publisher gets no extra mark in the list.
+    await expect(rows.nth(1).getByTestId("verification-label")).toHaveCount(0);
+
+    await page.goto(`/calls/${CALL_ID}`);
+    const publisher = page.getByTestId("call-publisher").getByTestId("verification-label");
+    await expect(publisher).toHaveText(LABEL);
+    await expect(publisher).toHaveAttribute("data-simulated", "true");
+    await page.getByTestId("signup-start").click();
+    const dialog = page.getByTestId("signup-dialog");
+    await expect(dialog.getByTestId("verification-label")).toHaveText(LABEL);
+    await expect(dialog.getByTestId("verification-label")).toHaveAttribute("data-simulated", "true");
+  });
+
+  test("a really verified publisher gets no demo mark in the sign-up", async ({ page }) => {
+    const m = mocks();
+    await mockApi(page, m.table);
+    await page.goto(`/calls/${CALL_ID}`);
+    await expect(page.getByTestId("call-publisher").getByTestId("verification-label")).not.toHaveAttribute("data-simulated", "true");
+    await page.getByTestId("signup-start").click();
+    await expect(page.getByTestId("signup-dialog").getByTestId("signup-recipient")).toBeVisible();
+    await expect(page.getByTestId("signup-dialog").getByTestId("verification-label")).toHaveCount(0);
+  });
+
   test("16 or 17: the guardian box is required on the sign-up", async ({ page }) => {
     const m = mocks({ ageGroup: null });
     await mockApi(page, m.table);
