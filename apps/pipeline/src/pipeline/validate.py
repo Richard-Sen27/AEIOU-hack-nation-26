@@ -18,7 +18,7 @@ from backend.schemas.enums import (
     edge_id,
 )
 
-from pipeline import bio
+from pipeline import bio, taxonomy
 from pipeline.build import FINAL, read_graph
 from pipeline.paths import EXTRACTED
 from pipeline.scope import load_seeds
@@ -107,7 +107,93 @@ def check_structure(t: dict[str, pl.DataFrame]) -> list[dict[str, Any]]:
     )
     clustered = nodes.filter((pl.col("type") == "disease") & pl.col("cluster_id").is_null())
     add("every disease has a cluster", clustered.height == 0, {"n": clustered.height})
+    results += check_positions(nodes)
+    results += check_lineage(nodes)
     return results
+
+
+def _attrs_by_id(nodes: pl.DataFrame, node_type: str) -> dict[str, dict]:
+    sub = nodes.filter(pl.col("type") == node_type)
+    if "attrs" not in sub.columns:
+        return {nid: {} for nid in sub["id"].to_list()}
+    return {
+        nid: (json.loads(a) if a else {})
+        for nid, a in zip(sub["id"].to_list(), sub["attrs"].to_list(), strict=True)
+    }
+
+
+def _well_formed_span(a: dict, end_key: str) -> bool:
+    start, end = a.get("start"), a.get(end_key)
+    return (
+        isinstance(a.get("chromosome"), str)
+        and isinstance(start, int)
+        and isinstance(end, int)
+        and 0 < start <= end
+        and bool(a.get("assembly"))
+    )
+
+
+def check_positions(nodes: pl.DataFrame) -> list[dict[str, Any]]:
+    """Genes and variants either carry a well-formed GRCh38 position or are listed as missing.
+
+    Missing positions are reported, not failed (MANE has no coordinates for some loci, ClinVar
+    for some records); a position that is present but malformed fails the check.
+    """
+    out = []
+    for node_type, end_key, label in (
+        ("gene", "end", "every gene has coordinates or is listed as missing"),
+        ("variant", "stop", "every variant has a position or is listed as missing"),
+    ):
+        attrs = _attrs_by_id(nodes, node_type)
+        missing = sorted(
+            (a.get("symbol") or nid) if node_type == "gene" else nid
+            for nid, a in attrs.items()
+            if a.get("start") is None
+        )
+        malformed = sorted(
+            nid
+            for nid, a in attrs.items()
+            if a.get("start") is not None and not _well_formed_span(a, end_key)
+        )
+        out.append(
+            {
+                "check": label,
+                "ok": not malformed,
+                "detail": {
+                    "n": len(attrs),
+                    "with_position": len(attrs) - len(missing) - len(malformed),
+                    "missing": missing,
+                    "malformed": malformed[:20],
+                },
+            }
+        )
+    return out
+
+
+def check_lineage(nodes: pl.DataFrame) -> list[dict[str, Any]]:
+    """Every phenotype carries an hpo_lineage that starts at an organ system and follows is_a."""
+    lineages = {nid: a.get("hpo_lineage") for nid, a in _attrs_by_id(nodes, "phenotype").items()}
+    problems = taxonomy.lineage_problems(lineages) if lineages else {}
+    missing = problems.get("missing", [])
+    bad_root = problems.get("bad_root", [])
+    broken = problems.get("broken_path", [])
+    return [
+        {
+            "check": "every phenotype has an hpo_lineage",
+            "ok": not missing,
+            "detail": {"missing": missing[:20], "n": len(missing)},
+        },
+        {
+            "check": "hpo_lineage starts at an organ system and follows is_a",
+            "ok": not bad_root and not broken,
+            "detail": {
+                "bad_root": bad_root[:20],
+                "broken_path": broken[:20],
+                "n": len(bad_root) + len(broken),
+                "empty": len(problems.get("empty", [])),
+            },
+        },
+    ]
 
 
 def check_golden(t, resolve, golden: list[dict]) -> list[dict[str, Any]]:
