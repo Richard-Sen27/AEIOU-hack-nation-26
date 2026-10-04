@@ -14,6 +14,7 @@ from backend.api.routes import (
     account,
     atlas,
     auth,
+    calls,
     chat,
     contributions,
     documents,
@@ -54,6 +55,7 @@ ROUTERS = (
     follows,
     people,
     messaging,
+    calls,
 )
 
 

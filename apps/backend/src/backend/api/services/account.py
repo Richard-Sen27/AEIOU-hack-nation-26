@@ -16,6 +16,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from backend.api.errors import ApiError
 from backend.api.services import connect as connect_service
+from backend.api.services import calls as calls_service
 from backend.api.services import follows as follows_service
 from backend.api.services import messaging as messaging_service
 from backend.api.services.chat import message_from_row as chat_message_from_row
@@ -130,6 +131,7 @@ async def on_role_change(db: AsyncSession, user_id: UUID, new_role: Role) -> Non
     """
     if new_role not in PROFESSIONAL_ROLES:
         await clear_professional(db, user_id)
+        await calls_service.end_all(db, user_id)
     else:
         await clear_verification(db, user_id)
     await messaging_service.on_role_change(db, user_id, new_role)
@@ -692,6 +694,7 @@ async def export_data(db: AsyncSession, user: CurrentUser) -> DataExport:
         follows=follows,
         notifications=notifications,
         connect=await messaging_service.export(db, uid),
+        **dict(zip(("calls", "call_reviews"), await calls_service.export(db, uid), strict=True)),
     )
 
 
