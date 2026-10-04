@@ -89,7 +89,7 @@ test.describe("welcome", () => {
 });
 
 test.describe("consent dialog", () => {
-  for (const type of ["upload", "contribute"] as const) {
+  for (const type of ["health_data", "contribute"] as const) {
     test(`${type}: notice content, no pre-ticked boxes, child needs parental confirmation`, async ({ page }) => {
       let granted: Record<string, unknown> | null = null;
       await mockApi(page, {
@@ -113,9 +113,10 @@ test.describe("consent dialog", () => {
       }
       await expect(dialog).toContainText("Nothing is sold or shared");
       await expect(dialog.getByRole("link", { name: "privacy notice" })).toHaveAttribute("href", "/privacy");
-      if (type === "upload") {
-        await expect(dialog).toContainText("removed on our server before any AI model sees the text");
-        await expect(dialog).toContainText("original file is deleted right after the text is extracted");
+      if (type === "health_data") {
+        await expect(dialog).toContainText("What you type to Dr. Wu");
+        await expect(dialog).toContainText("removed on our server before any AI model sees your text or documents");
+        await expect(dialog).toContainText("Original files are deleted right after the text is extracted");
         await expect(dialog).toContainText("unless you separately agree to contribute");
       } else {
         await expect(dialog).toContainText("labelled patient-reported");
@@ -136,7 +137,7 @@ test.describe("consent dialog", () => {
       await expect(dialog).toBeHidden();
       expect(granted).toEqual({
         consent_type: type,
-        version: `${type}-2026-10-04`,
+        version: type === "health_data" ? "health-data-2026-10-04" : "contribute-2026-10-04",
         about_child: true,
         parental_responsibility_confirmed: true,
       });
@@ -157,7 +158,7 @@ test.describe("consent dialog", () => {
       },
     });
     await page.goto("/profile");
-    await page.getByTestId("grant-upload").click();
+    await page.getByTestId("grant-health_data").click();
     const dialog = page.getByTestId("consent-dialog");
     await dialog.getByRole("button", { name: "Not now" }).click();
     await expect(dialog).toBeHidden();
@@ -174,7 +175,7 @@ test.describe("consent dialog", () => {
     });
     for (const theme of ["light", "dark"] as const) {
       await setTheme(page, theme);
-      for (const type of ["upload", "contribute"] as const) {
+      for (const type of ["health_data", "contribute"] as const) {
         await page.goto("/profile");
         await page.getByTestId(`grant-${type}`).click();
         await page.getByTestId("consent-dialog").getByRole("radio", { name: "A child I care for" }).click();

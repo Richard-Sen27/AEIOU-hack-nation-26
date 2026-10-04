@@ -62,7 +62,7 @@ const JOB_EVENTS = [
 
 function mocks(extra: Record<string, unknown> = {}) {
   return {
-    "GET /auth/session": signedInSession({ consents: ["upload"] }),
+    "GET /auth/session": signedInSession({ consents: ["health_data"] }),
     "GET /documents": [DOC],
     "GET /documents/*/findings": FINDINGS,
     "POST /documents": { status: 202, json: { job_id: "j1", document_id: DOC_ID } },
@@ -80,7 +80,7 @@ test("upload: consent gate, real stages, then findings review with confirm and r
     mocks({
       "GET /auth/session": () => ({ json: session }),
       "POST /consents": (req: { body: unknown }) => {
-        session = signedInSession({ consents: ["upload"] });
+        session = signedInSession({ consents: ["health_data"] });
         return { status: 201, json: { id: "c1", ...(req.body as object), granted_at: new Date().toISOString(), active: true } };
       },
       "POST /documents": async (req: { request: import("@playwright/test").Request }) => {
@@ -103,7 +103,7 @@ test("upload: consent gate, real stages, then findings review with confirm and r
   await page.getByTestId("file-input").setInputFiles(PDF);
 
   // Consent first.
-  const consent = page.getByTestId("consent-content-upload");
+  const consent = page.getByTestId("consent-content-health_data");
   await expect(consent).toBeVisible();
   await consent.getByRole("radio", { name: "My own" }).click();
   await consent.getByRole("checkbox", { name: /explicitly consent/ }).click();

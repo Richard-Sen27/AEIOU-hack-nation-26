@@ -12,7 +12,7 @@ const sessions = [
 
 async function signedIn(page: Page, mocks: Record<string, unknown> = {}, user: Record<string, unknown> = {}) {
   await mockApi(page, {
-    "GET /auth/session": signedInSession(user),
+    "GET /auth/session": signedInSession({ consents: ["health_data"], ...user }),
     "GET /chat/sessions": [],
     "GET /profile": { updated_at: "2026-10-03T00:00:00Z" },
     ...graphMocks,
@@ -193,6 +193,58 @@ test.describe("chat", () => {
     expect(puts.at(-1)!.phenotypes).toEqual(
       expect.arrayContaining([expect.objectContaining({ id: "HP:0012469", label: "Infantile spasms", excluded: false })]),
     );
+  });
+
+  test("chips into an empty profile carry the consent's child answer", async ({ page }) => {
+    const puts: Array<Record<string, unknown>> = [];
+    await signedIn(page, {
+      "POST /chat": turnBody(),
+      "GET /profile": { updated_at: null },
+      "GET /consents": [
+        { id: "c1", consent_type: "health_data", version: "health-data-2026-10-04", granted_at: "2026-10-03T00:00:00Z", active: true, about_child: true, parental_responsibility_confirmed: true },
+      ],
+      "PUT /profile": (req: Req) => {
+        puts.push(req.body as Record<string, unknown>);
+        return { json: { ...(req.body as object), updated_at: "2026-10-03T00:00:01Z" } };
+      },
+    });
+    await page.goto("/chat");
+    await ask(page);
+    await turn(page).getByTestId("chips").getByRole("button", { name: "Confirm STXBP1 encephalopathy" }).click();
+    await expect.poll(() => puts.length).toBe(1);
+    expect(puts[0]).toMatchObject({ about_child: true, parental_responsibility_confirmed: true });
+  });
+
+  test("profile hints are confirmed one by one; a suspected child is offered once", async ({ page }) => {
+    const puts: Array<Record<string, unknown>> = [];
+    const withHints = { ...reply, profile_hints: { age_years: 2, onset: null, country: "AT", about_child_suspected: true } };
+    await signedIn(page, {
+      "POST /chat": turnBody(withHints),
+      // Not empty and set to "own data": the reply suspecting a child offers to change it.
+      "GET /profile": () => ({ json: { diseases: [{ id: "MONDO:9900007", label: "STXBP1 encephalopathy", source: "chat" }], about_child: false, ...(puts.at(-1) ?? {}), updated_at: null } }),
+      "PUT /profile": (req: Req) => {
+        puts.push(req.body as Record<string, unknown>);
+        return { json: { ...(req.body as object), updated_at: null } };
+      },
+    });
+    await page.goto("/chat");
+    await ask(page);
+    const hints = turn(page).getByTestId("profile-hints");
+    await expect(hints.getByTestId("profile-hint")).toHaveCount(2);
+    await hints.getByRole("button", { name: "Confirm Age 2" }).click();
+    await expect(hints.getByTestId("profile-hint").first()).toHaveAttribute("data-state", "confirmed");
+    expect(puts.at(-1)).toMatchObject({ age_years: 2 });
+    await hints.getByRole("button", { name: "Dismiss Country: AT" }).click();
+    await expect(hints.getByTestId("profile-hint")).toHaveCount(1);
+
+    const offer = turn(page).getByTestId("child-offer");
+    await expect(offer).toBeVisible();
+    const yes = offer.getByRole("button", { name: "Yes, it is about a child" });
+    await expect(yes).toBeDisabled();
+    await offer.getByRole("checkbox", { name: /parental responsibility/ }).click();
+    await yes.click();
+    await expect(offer).toBeHidden();
+    expect(puts.at(-1)).toMatchObject({ about_child: true, parental_responsibility_confirmed: true });
   });
 
   test("profile conflict is retried once with a fresh read", async ({ page }) => {
@@ -447,14 +499,14 @@ test.describe("chat", () => {
   });
 
   test("drop zone hands files to the documents flow behind the consent gate", async ({ page }) => {
-    await signedIn(page, { "GET /documents": [] }, { consents: ["upload"] });
+    await signedIn(page, { "GET /documents": [] }, { consents: ["health_data"] });
     await page.goto("/chat");
     await page.getByTestId("chat-file-input").setInputFiles({ name: "report.pdf", mimeType: "application/pdf", buffer: Buffer.from("%PDF-1.4") });
     await expect(page).toHaveURL(/\/documents$/);
   });
 
   test("drop without consent opens the consent dialog", async ({ page }) => {
-    await signedIn(page);
+    await signedIn(page, {}, { consents: [] });
     await page.goto("/chat");
     const dt = await page.evaluateHandle(() => {
       const d = new DataTransfer();
@@ -467,6 +519,20 @@ test.describe("chat", () => {
     await zone.dispatchEvent("drop", { dataTransfer: dt });
     await expect(page.getByRole("dialog")).toBeVisible();
     await expect(page).toHaveURL(/\/chat$/);
+  });
+
+  test("first message without consent asks for it and keeps the text", async ({ page }) => {
+    let posted = false;
+    await signedIn(page, { "POST /chat": () => ((posted = true), turnBody()) }, { consents: [] });
+    await page.goto("/chat");
+    await ask(page);
+    const dialog = page.getByTestId("consent-dialog");
+    await expect(dialog).toBeVisible();
+    await expect(dialog).toContainText("Use of your health information");
+    await dialog.getByRole("button", { name: "Not now" }).click();
+    await expect(page.getByRole("textbox", { name: "Message Dr. Wu" })).toHaveValue(STORY);
+    await expect(page.getByTestId("user-message")).toHaveCount(0);
+    expect(posted).toBe(false);
   });
 
   test("message text never reaches URLs or browser storage", async ({ page }) => {

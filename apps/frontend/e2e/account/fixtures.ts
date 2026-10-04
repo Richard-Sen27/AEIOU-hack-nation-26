@@ -24,7 +24,7 @@ export async function expectNoHealthDataInBrowser(page: Page, terms: string[]) {
   }
 }
 
-export const consentRecord = (type: "upload" | "contribute", extra: Record<string, unknown> = {}) => ({
+export const consentRecord = (type: "health_data" | "contribute", extra: Record<string, unknown> = {}) => ({
   id: `c-${type}`,
   consent_type: type,
   version: `${type}-2026-10-04`,

@@ -27,9 +27,9 @@ const PROFILE = {
 
 function baseMocks(extra: Record<string, unknown> = {}) {
   return {
-    "GET /auth/session": signedInSession({ consents: ["upload"] }),
+    "GET /auth/session": signedInSession({ consents: ["health_data"] }),
     "GET /profile": PROFILE,
-    "GET /consents": [consentRecord("upload"), consentRecord("contribute", { id: "old", active: false, revoked_at: "2026-10-02T10:00:00Z", granted_at: "2026-09-20T10:00:00Z" })],
+    "GET /consents": [consentRecord("health_data"), consentRecord("contribute", { id: "old", active: false, revoked_at: "2026-10-02T10:00:00Z", granted_at: "2026-09-20T10:00:00Z" })],
     "GET /contributions": [],
     "GET /search": (req: { url: string }) => {
       const q = new URL(req.url).searchParams.get("q") ?? "";
@@ -147,7 +147,7 @@ test("settings: role, language and expert mode save immediately", async ({ page 
 
 test("consents: state, history and one-click withdraw", async ({ page }) => {
   let revoked = "";
-  let session = signedInSession({ consents: ["upload"] });
+  let session = signedInSession({ consents: ["health_data"] });
   await mockApi(
     page,
     baseMocks({
@@ -160,14 +160,14 @@ test("consents: state, history and one-click withdraw", async ({ page }) => {
     }),
   );
   await page.goto("/profile");
-  const upload = page.getByTestId("consent-upload");
-  await expect(page.getByTestId("consent-upload-state")).toHaveText("Given");
+  const upload = page.getByTestId("consent-health_data");
+  await expect(page.getByTestId("consent-health_data-state")).toHaveText("Given");
   await expect(page.getByTestId("consent-contribute-state")).toHaveText("Not given");
-  await expect(upload).toContainText("deletes your uploaded documents, their findings and processing jobs");
+  await expect(upload).toContainText("deletes your profile, your chats with Dr. Wu, and your documents with their findings and processing jobs");
   await page.getByText("Consent history").click();
   await expect(page.getByTestId("consent-history").getByRole("listitem")).toHaveCount(2);
-  await page.getByTestId("withdraw-upload").click();
-  await expect.poll(() => revoked).toBe("upload");
+  await page.getByTestId("withdraw-health_data").click();
+  await expect.poll(() => revoked).toBe("health_data");
 });
 
 test("contributions: create behind contribute consent, list and remove", async ({ page }) => {
@@ -176,7 +176,7 @@ test("contributions: create behind contribute consent, list and remove", async (
   await mockApi(
     page,
     baseMocks({
-      "GET /auth/session": signedInSession({ consents: ["upload", "contribute"] }),
+      "GET /auth/session": signedInSession({ consents: ["health_data", "contribute"] }),
       "GET /contributions": [
         { id: "k1", kind: "asset", payload: { asset_type: "registry", name: "STXBP1 family registry" }, status: "pending_review", created_at: "2026-10-01T10:00:00Z" },
       ],

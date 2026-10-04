@@ -61,7 +61,7 @@ test.describe("landing", () => {
   test("signed-in free text arrives in the chat, never in the URL", async ({ page }) => {
     const bodies: unknown[] = [];
     await mockApi(page, {
-      "GET /auth/session": signedInSession(),
+      "GET /auth/session": signedInSession({ consents: ["health_data"] }),
       "GET /profile": {},
       "GET /chat/sessions": [],
       "POST /chat": (req: { body: unknown }) => {
@@ -83,15 +83,15 @@ test.describe("landing", () => {
     expect(urls.some((u) => u.includes("daughter"))).toBe(false);
   });
 
-  test("dropping a file goes through the upload consent gate", async ({ page }) => {
+  test("dropping a file goes through the health-data consent gate", async ({ page }) => {
     let consentPosted = false;
     await mockApi(page, {
       "GET /auth/session": () =>
-        ({ json: signedInSession({ consents: consentPosted ? ["upload"] : [] }) }),
+        ({ json: signedInSession({ consents: consentPosted ? ["health_data"] : [] }) }),
       "GET /profile": {},
       "POST /consents": () => {
         consentPosted = true;
-        return { json: { consent_type: "upload", version: "1", granted_at: new Date().toISOString(), revoked_at: null } };
+        return { json: { consent_type: "health_data", version: "1", granted_at: new Date().toISOString(), revoked_at: null } };
       },
       "GET /documents": [],
     });
