@@ -42,15 +42,19 @@ _RELATION_PRIORITY = {
     Relation.same_gene_different_mechanism: 0,
     Relation.shared_pathway: 0,
     Relation.similar_symptoms: 0,
+    Relation.shared_gene: 0,
     Relation.shared_researcher: 1,
+    Relation.suggested_by_neighbour: 1,
     Relation.serves: 1,
     Relation.runs: 1,
     Relation.studies: 1,
     Relation.funds_research_on: 2,
     Relation.caused_by_variant_in: 2,
     Relation.acts_via: 2,
+    Relation.candidate_phenotype: 2,
     Relation.investigator_of: 3,
     Relation.pi_of: 3,
+    Relation.near_on_chromosome: 3,
 }
 
 STATUS_TEXT = {
@@ -218,6 +222,8 @@ def _edge_view(edge: Edge) -> dict[str, Any]:
     }
     if edge.contradiction_count:
         view["contradicting_evidence"] = edge.contradiction_count
+    if edge.explanation:
+        view["explanation"] = edge.explanation  # why a computed link exists (a hypothesis)
     return view
 
 

@@ -1,7 +1,7 @@
 from datetime import datetime
 from typing import Any
 
-from pydantic import Field
+from pydantic import Field, model_validator
 
 from backend.schemas.common import ApiModel
 from backend.schemas.enums import (
@@ -36,6 +36,12 @@ class Node(ApiModel):
     centrality: float | None = Field(None, description="Precomputed centrality score (0..1).")
 
 
+def feature_explanation(features: dict[str, Any] | None) -> str | None:
+    """The one-line explanation an inferred edge carries in features.explanation, if any."""
+    text = (features or {}).get("explanation")
+    return (text.strip() or None) if isinstance(text, str) else None
+
+
 class Edge(ApiModel):
     id: str = Field(description="Edge ID, 'e_' + 12 hex chars.")
     source_id: str = Field(description="Source node ID.")
@@ -55,6 +61,17 @@ class Edge(ApiModel):
     evidence_count: int = Field(0, ge=0, description="Number of evidence rows.")
     contradiction_count: int = Field(0, ge=0, description="Evidence rows that contradict.")
     flagged: bool = Field(False, description="True when the edge has open user flags.")
+    explanation: str | None = Field(
+        None,
+        description="One line on why an inferred (computed) link exists, from "
+        "features.explanation. A hypothesis, never an established fact; null when absent.",
+    )
+
+    @model_validator(mode="after")
+    def _explanation_from_features(self) -> "Edge":
+        if self.explanation is None:
+            self.explanation = feature_explanation(self.features)
+        return self
 
 
 class Evidence(ApiModel):
@@ -177,6 +194,9 @@ class AtlasEdge(ApiModel):
     confidence: float
     origin: Origin
     status: EdgeStatus
+    explanation: str | None = Field(
+        None, description="Why an inferred link exists (one line, a hypothesis); null if absent."
+    )
 
 
 class AtlasLayout(ApiModel):

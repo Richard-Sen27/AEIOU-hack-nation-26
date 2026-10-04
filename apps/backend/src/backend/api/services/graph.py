@@ -796,6 +796,7 @@ def atlas_layout() -> AtlasLayout:
                 confidence=e.confidence,
                 origin=e.origin,
                 status=e.status,
+                explanation=e.explanation,
             )
             for e in all_edges
         ],
@@ -847,6 +848,17 @@ def confidence_breakdown(supporting: list[Evidence], n_contradicting: int) -> Co
     )
 
 
+def _weight_computed_rows(supporting: list[Evidence], confidence: float) -> None:
+    """Computed rows carry no weight of their own: they share the link's score so that together
+    they give exactly that score (capped at the computed tier's ceiling)."""
+    computed = [e for e in supporting if e.tier == EvidenceTier.computed]
+    if computed:
+        share = 1.0 - (1.0 - confidence) ** (1.0 / len(computed))
+        weight = round(min(TIER_WEIGHTS[EvidenceTier.computed], share), 6)
+        for e in computed:
+            e.tier_weight = weight
+
+
 async def edge_evidence(db: AsyncSession, edge_id: str) -> EdgeEvidence:
     """Sources, quotes, tiers, contradictions and the confidence breakdown of one edge."""
     store = get_graph()
@@ -882,6 +894,7 @@ async def edge_evidence(db: AsyncSession, edge_id: str) -> EdgeEvidence:
                 log.warning("evidence row %s skipped (invalid tier or polarity)", row["id"])
     supporting = [e for e in items if e.polarity == Polarity.supports]
     contradicting = [e for e in items if e.polarity == Polarity.contradicts]
+    _weight_computed_rows(supporting, edge.confidence)
     return EdgeEvidence(
         edge=edge,
         source=source,

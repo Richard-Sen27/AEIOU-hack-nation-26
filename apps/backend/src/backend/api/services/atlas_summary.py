@@ -243,7 +243,15 @@ class _Target:
             under_review=any(not graph.edge_is_active(store, e) for e in edges),
             via=[e.id for e in edges],
             via_label=self.via_label(),
+            explanation=_single_inferred_explanation(edges),
         )
+
+
+def _single_inferred_explanation(edges: tuple[Edge, ...]) -> str | None:
+    """The explanation of a best chain that is one inferred edge (a computed link), else None."""
+    if len(edges) == 1 and edges[0].origin == Origin.inferred:
+        return edges[0].explanation
+    return None
 
 
 def _membership_item(node: Node, via_label: str) -> SummaryItem:

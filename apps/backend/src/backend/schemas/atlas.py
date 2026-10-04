@@ -125,6 +125,8 @@ class SummaryItem(ApiModel):
     under_review: bool  # any edge of the best chain not active / flagged
     via: list[str]  # edge ids of the best chain, subject outward
     via_label: str | None  # e.g. "via 4 papers", "via gene SCN1A"
+    # Why the link exists, when the best chain is a single inferred edge carrying one.
+    explanation: str | None = None
 
 
 class SummarySection(ApiModel):
