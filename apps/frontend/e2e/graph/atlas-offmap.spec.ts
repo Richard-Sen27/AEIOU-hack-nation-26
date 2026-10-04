@@ -124,7 +124,9 @@ test.describe("nodes that are not on the map", () => {
     await page.goto("/atlas?focus=MONDO%3A9900007");
     await expect(panel(page).getByRole("heading", { level: 2 })).toHaveText("STXBP1 encephalopathy");
     await expect(panel(page).getByTestId("atlas-coverage")).toHaveCount(0);
-    await expect(panel(page).getByTestId("atlas-panel-ids")).toHaveCount(0);
+    // Its ids are linked too, but it is on the map: no off-map mark.
+    await expect(panel(page).getByTestId("atlas-panel-id-link")).toHaveText([/MONDO:9900007/]);
+    await expect(panel(page).getByTestId("atlas-panel-ids").getByTestId("atlas-offmap")).toHaveCount(0);
     await expect(panel(page).getByTestId("atlas-summary-chain").first()).toBeVisible();
   });
 });

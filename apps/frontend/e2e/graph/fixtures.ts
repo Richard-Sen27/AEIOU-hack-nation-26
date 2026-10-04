@@ -489,7 +489,26 @@ export function stxbp1Summary() {
           summaryItem("MONDO:9900010", ["e_275854103db5"], { inferred: true, best_confidence: 0.4 }),
         ],
       },
-      { key: "genes", node_type: "gene", total: 1, items: [summaryItem("HGNC:11444", ["e_e5f778ac8a21"], { best_confidence: 0.97 })] },
+      {
+        key: "shared_gene_diseases",
+        node_type: "disease",
+        total: 1,
+        items: [
+          // A computed link that is not on the map: no "Show the link".
+          summaryItem("MONDO:9900008", ["e_fx_shared_stxbp1"], {
+            inferred: true,
+            best_confidence: 0.77,
+            via_label: "gene STXBP1",
+            explanation: "Both are linked to variants in STXBP1 (ClinVar); whether they share a mechanism is not established.",
+          }),
+        ],
+      },
+      {
+        key: "genes",
+        node_type: "gene",
+        total: 1,
+        items: [summaryItem("HGNC:11444", ["e_e5f778ac8a21"], { best_confidence: 0.97, sources: ["clinvar", "orphanet"] })],
+      },
       {
         key: "researchers",
         node_type: "researcher",
@@ -551,6 +570,7 @@ const CORE_NODES: CoreNode[] = [
     attrs: { tier: "core", orpha_ids: [], omim_ids: ["OMIM:615482"] },
   },
   { id: "MONDO:0011989", type: "disease", label: "progressive osseous heteroplasia", attrs: { tier: "core", orpha_ids: ["ORPHA:2762"], omim_ids: ["OMIM:166350"] } },
+  { id: "MONDO:9910001", type: "disease", label: "ACVR1-related fixture condition", attrs: { tier: "core", orpha_ids: [], omim_ids: [] } },
   { id: CORE.acvr1, type: "gene", label: "ACVR1", attrs: { tier: "core", symbol: "ACVR1" } },
   { id: "HP:0011987", type: "phenotype", label: "Ectopic ossification in muscle tissue", attrs: { tier: "core" } },
   { id: "HP:0001788", type: "phenotype", label: "Hallux valgus", attrs: { tier: "core" } },
@@ -596,13 +616,33 @@ export function coreDiseaseSummary() {
           coreItem("MONDO:9900003", ["e_core_fop_scn2a"], { inferred: true, best_confidence: 0.46, explanation: "Both list Hearing impairment." }),
         ],
       },
-      { key: "genes", node_type: "gene", total: 1, items: [coreItem(CORE.acvr1, [CORE.fopGeneEdge], { best_confidence: 0.99 })] },
+      {
+        key: "shared_gene_diseases",
+        node_type: "disease",
+        total: 1,
+        items: [
+          coreItem("MONDO:9910001", ["e_core_fop_shared"], {
+            inferred: true,
+            best_confidence: 0.76,
+            via_label: "gene ACVR1",
+            explanation: "Both are linked to variants in ACVR1 (Orphanet; HPO annotations); whether they share a mechanism is not established.",
+          }),
+        ],
+      },
+      {
+        key: "genes",
+        node_type: "gene",
+        total: 1,
+        items: [coreItem(CORE.acvr1, [CORE.fopGeneEdge], { best_confidence: 0.99, sources: ["orphanet", "hpo"] })],
+      },
       {
         key: "symptoms",
         node_type: "phenotype",
         total: 52,
-        // The summary's own order (not by frequency); the panel sorts by frequency.
-        items: FOP_SYMPTOMS.map(([edge, hp]) => coreItem(hp, [edge], { best_confidence: 0.99 })),
+        // The summary sorts symptoms by frequency and carries the source's label.
+        items: [...FOP_SYMPTOMS]
+          .sort((a, b) => b[2] - a[2])
+          .map(([edge, hp, frequency, label]) => coreItem(hp, [edge], { best_confidence: 0.99, frequency, frequency_label: label })),
       },
     ],
     explain_edge_ids: [CORE.fopGeneEdge, "e_core_fop_ossif"],
