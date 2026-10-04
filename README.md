@@ -184,7 +184,7 @@ about 10 of them for the literature fetches. The first run takes longer: the Cli
 alone takes about 90 seconds, and the first embedding pass about 5 minutes. API responses are
 cached for 30 days (`CACHE_TTL_DAYS`) and bulk files are kept as files, so re-runs are cheaper.
 `apps/pipeline/data` is about 720 MB. The data version loaded at the time of writing was
-`2026-10-04.9`, with 6,343 nodes, 16,883 edges and 9 clusters.
+`2026-10-04.16`, with 6,469 nodes, 17,729 edges and 8 clusters.
 
 **Restart the API after a load.** The API loads the graph into memory at startup and looks up
 cached explanations by `data_version`. Until it restarts, a running API keeps serving the old
