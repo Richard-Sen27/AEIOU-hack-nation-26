@@ -16,14 +16,14 @@ from backend.api.services.explanation.generator import (
     ExplanationError,
     generate_explanation,
 )
-from backend.api.services.explanation.pathdata import PathData, load_path_data
+from backend.api.services.explanation.pathdata import PathData, cache_key, load_path_data
 from backend.api.services.explanation.templates import template_explanation
 from backend.db.session import user_transaction
 from backend.llm import LLMClient, LLMError
 from backend.observability import tracing
 from backend.schemas.account import CurrentUser
 from backend.schemas.common import Lens
-from backend.schemas.enums import ErrorCode, path_id
+from backend.schemas.enums import ErrorCode
 from backend.schemas.events import (
     ExplainDeltaEvent,
     ExplainErrorEvent,
@@ -63,10 +63,11 @@ async def _data_version(db: AsyncSession) -> str:
 
 
 async def get_cached(
-    db: AsyncSession, edge_ids: Sequence[str], lens: Lens
+    db: AsyncSession, edge_ids: Sequence[str], lens: Lens, *, subject_node_id: str | None = None
 ) -> ExplainFinalEvent | None:
-    """Cached explanation for (path_id(edge_ids), role, language, data_version), or None."""
-    pid = path_id(list(edge_ids))
+    """Cached explanation for (cache_key, role, language, data_version), or None. The key is
+    path_id(edge_ids), or for a subject summary path_id(["subject:<id>", *edge_ids])."""
+    pid = cache_key(edge_ids, subject_node_id)
     dv = await _data_version(db)
     row = (
         (
@@ -110,14 +111,20 @@ async def store_explanation(
 
 
 async def start_generation(
-    edge_ids: Sequence[str], lens: Lens, user: CurrentUser
+    edge_ids: Sequence[str],
+    lens: Lens,
+    user: CurrentUser,
+    *,
+    subject_node_id: str | None = None,
 ) -> AsyncIterator[ExplainEvent]:
-    """Validate the request (404 unknown edges, 401 no usable ChatGPT sign-in) and return the
-    stream. Used by the route so request-level failures become HTTP errors."""
+    """Validate the request (404 unknown edges or subject, 401 no usable ChatGPT sign-in) and
+    return the stream. Used by the route so request-level failures become HTTP errors."""
     async with user_transaction(user.id) as db:
-        data = await load_path_data(db, edge_ids)
+        data = await load_path_data(db, edge_ids, subject_id=subject_node_id)
     if data.missing or not data.edges:
         raise not_found("Unknown edge IDs.")
+    if subject_node_id and data.subject is None:
+        raise not_found("Unknown subject node.")
     llm = await auth_service.llm_for_user(user.id)
     return _stream(data, lens, user, llm)
 

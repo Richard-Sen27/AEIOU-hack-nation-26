@@ -45,10 +45,16 @@ class PathData:
     evidence: dict[str, list[EvidenceItem]] = field(default_factory=dict)
     missing: list[str] = field(default_factory=list)
     data_version: str | None = None
+    # Set for a subject summary: the edges are a set of this node's connections, not a path.
+    subject_id: str | None = None
 
     @property
     def path_id(self) -> str:
-        return path_id(self.edge_ids)
+        return cache_key(self.edge_ids, self.subject_id)
+
+    @property
+    def subject(self) -> Node | None:
+        return self.nodes.get(self.subject_id) if self.subject_id else None
 
     def ordered_edges(self) -> list[Edge]:
         return [self.edges[e] for e in self.edge_ids if e in self.edges]
@@ -65,6 +71,13 @@ class PathData:
 
     def vus_nodes(self) -> list[Node]:
         return [n for n in self.nodes.values() if graph_service.is_vus(n)]
+
+
+def cache_key(edge_ids: Sequence[str], subject_id: str | None = None) -> str:
+    """Cache key of an explanation: the path id, or for a subject summary the path id over
+    ``subject:<id>`` plus the edges, so it never collides with a path over the same edges."""
+    ids = list(edge_ids)
+    return path_id([f"subject:{subject_id}", *ids] if subject_id else ids)
 
 
 def has_contradiction(edge: Edge, data: PathData | None = None) -> bool:
@@ -104,14 +117,20 @@ async def load_evidence(db: AsyncSession, edge_ids: Iterable[str]) -> dict[str, 
 
 
 async def load_path_data(
-    db: AsyncSession, edge_ids: Sequence[str], *, extra_node_ids: Iterable[str] = ()
+    db: AsyncSession,
+    edge_ids: Sequence[str],
+    *,
+    extra_node_ids: Iterable[str] = (),
+    subject_id: str | None = None,
 ) -> PathData:
     """Edges in the given order (unknown IDs listed in `missing`), their endpoint nodes and
-    evidence rows."""
+    evidence rows. With `subject_id` the edges are that node's connections (a summary)."""
     from backend.api.services.account import current_data_version
 
     ids = list(dict.fromkeys(edge_ids))
-    data = PathData(edge_ids=ids)
+    data = PathData(edge_ids=ids, subject_id=subject_id)
+    if subject_id:
+        extra_node_ids = [subject_id, *extra_node_ids]
     for eid in ids:
         edge = graph_service.get_edge(eid)
         if edge is None:

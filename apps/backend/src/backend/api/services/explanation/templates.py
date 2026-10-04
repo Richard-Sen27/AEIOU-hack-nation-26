@@ -140,11 +140,30 @@ def _detail(data: PathData, edge: Edge, role: Role) -> str:
     return f" (confidence {edge.confidence:.2f}, {level}; {tier_text}{ids})"
 
 
+SUBJECT_LEADS: dict[str, dict[str, str]] = {
+    "en": {
+        "lead": "Here is how {s} is connected in the atlas, strongest links first.",
+        "none": "The atlas lists no links for {s} here.",
+    },
+    "de": {
+        "lead": "So ist {s} im Atlas verbunden, die stärksten Verbindungen zuerst.",
+        "none": "Der Atlas zeigt hier keine Verbindungen für {s}.",
+    },
+}
+
+
 def template_explanation(data: PathData, role: Role, language: str) -> str:
-    """Honest, deterministic explanation from the edge data alone, one sentence per edge."""
+    """Honest, deterministic explanation from the edge data alone, one sentence per edge. A
+    subject summary opens with a lead sentence and lists the links strongest first."""
     lang = base_language(language) if base_language(language) in TEMPLATE_LANGUAGES else "en"
     sentences: list[str] = []
-    for edge in data.ordered_edges():
+    edges = data.ordered_edges()
+    if data.subject_id:
+        edges.sort(key=lambda e: -e.confidence)
+        leads = SUBJECT_LEADS[lang]
+        name = data.node_label(data.subject_id)
+        sentences.append((leads["lead"] if edges else leads["none"]).format(s=name))
+    for edge in edges:
         sentences.append(
             relation_sentence(data, edge, lang)
             + (_detail(data, edge, role) if lang == "en" else "")

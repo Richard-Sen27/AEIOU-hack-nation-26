@@ -1,4 +1,5 @@
 import io
+import json
 
 from agent_helpers import DEMO, post_sse
 from sqlalchemy import text
@@ -212,3 +213,83 @@ async def test_reading_level_regeneration_german(make_user, user_llm, llm_calls)
     bodies = llm_calls()
     assert len(bodies) == 2
     assert "simpler" in bodies[1]["input"][-1]["content"]
+
+
+# ---- subject summaries (Atlas "Write a summary") --------------------------------------------
+
+DRAVET = "MONDO:0100135"
+
+
+async def _dravet_edges(client) -> list[str]:
+    resp = await client.get(f"/atlas/summary/{DRAVET}")
+    assert resp.status_code == 200
+    return resp.json()["explain_edge_ids"]
+
+
+async def test_subject_summary_has_its_own_cache_key(make_user, user_llm, llm_calls, client):
+    from backend.api.services.explanation.pathdata import cache_key
+
+    edges = await _dravet_edges(client)
+    subject_key = cache_key(edges, DRAVET)
+    assert subject_key == path_id([f"subject:{DRAVET}", *edges]) != path_id(edges)
+
+    user = await make_user(role="patient")
+    body = {"edge_ids": edges, "subject_node_id": DRAVET}
+    status, events = await post_sse(user.client, "/explain", body)  # default mock responder
+    assert status == 200, events
+    final = events[-1]
+    assert final["type"] == "final" and final["cached"] is False
+    assert final["path_id"] == subject_key
+    assert final["citations"] and set(final["citations"]) <= set(edges)
+
+    sent = llm_calls()[0]
+    assert "Summarise how the subject node" in sent["instructions"]
+    assert "link by link" not in sent["instructions"]
+    payload = json.loads(sent["input"][0]["content"])
+    assert payload["subject"]["id"] == DRAVET and "path_edge_ids" not in payload
+    assert sorted(payload["link_edge_ids"]) == sorted(edges)
+    confidences = [link["confidence"] for link in payload["links"]]
+    assert confidences == sorted(confidences, reverse=True)  # strongest first
+
+    # cached for guests under the subject key only, never under the bare path key
+    status, events = await post_sse(client, "/explain", {**body, "role": "patient"})
+    assert status == 200 and events[-1]["cached"] is True
+    assert events[-1]["path_id"] == subject_key
+    resp = await client.post("/explain", json={"edge_ids": edges, "role": "patient"})
+    assert resp.status_code == 401
+
+
+async def test_subject_summary_guest_without_cache_gets_401(client):
+    edges = await _dravet_edges(client)
+    resp = await client.post(
+        "/explain", json={"edge_ids": edges, "subject_node_id": DRAVET, "role": "guest"}
+    )
+    assert resp.status_code == 401
+    assert resp.json()["error"]["code"] == "sign_in_required"
+
+
+async def test_subject_summary_unknown_subject_404(make_user, user_llm, client):
+    edges = await _dravet_edges(client)
+    for subject in ("MONDO:0000000", "T:diseases"):
+        body = {"edge_ids": edges, "subject_node_id": subject}
+        assert (await client.post("/explain", json=body)).status_code == 404
+    user = await make_user(role="patient")
+    resp = await user.client.post(
+        "/explain", json={"edge_ids": edges, "subject_node_id": "MONDO:0000000"}
+    )
+    assert resp.status_code == 404
+
+
+async def test_template_subject_summary(app, client):
+    edges = await _dravet_edges(client)
+    async with user_transaction(None) as db:
+        data = await load_path_data(db, edges, subject_id=DRAVET)
+    out = template_explanation(data, Role.patient, "en")
+    assert out.startswith(
+        "Here is how Dravet syndrome is connected in the atlas, strongest links first."
+    )
+    assert "link by link" not in out
+    assert all(f"[{e}]" in out for e in edges)
+    assert "hypothesis" in out  # the inferred similar-disease links are labelled
+    de = template_explanation(data, Role.patient, "de")
+    assert de.startswith("So ist Dravet syndrome im Atlas verbunden")

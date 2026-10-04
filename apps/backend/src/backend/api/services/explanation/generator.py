@@ -20,6 +20,7 @@ from backend.api.services.explanation.pathdata import (
 from backend.api.services.explanation.templates import enforce_trust_rules
 from backend.llm import LLMClient
 from backend.schemas.enums import Role, confidence_level
+from backend.schemas.graph import Edge
 
 MAX_ATTEMPTS = 3
 
@@ -51,20 +52,32 @@ class Explanation:
     added_notes: list[str] = field(default_factory=list)
 
 
-def instructions(role: Role, language: str) -> str:
+PATH_TASK = (
+    "Explain the path in the input: how its first node connects to its last node, link by link."
+)
+SUBJECT_TASK = (
+    "Summarise how the subject node in the input is connected in the atlas, using only the "
+    "listed links. The links are a set of its connections, not a path: group them by kind "
+    "(people, papers, studies, genes, symptoms, organisations ...) and start with the "
+    "strongest links (highest confidence). Do not list every link one by one."
+)
+
+
+def instructions(role: Role, language: str, *, subject: bool = False) -> str:
+    source = "the listed links" if subject else "the path data"
     return (
-        "You are Dr. Wu, the AI guide of the Amber rare-disease atlas. Explain the path in the "
-        "input: how its first node connects to its last node, link by link.\n"
+        "You are Dr. Wu, the AI guide of the Amber rare-disease atlas. "
+        f"{SUBJECT_TASK if subject else PATH_TASK}\n"
         f"{ROLE_STYLE.get(role, ROLE_STYLE[Role.patient])}\n"
         "Rules:\n"
-        "- Use only the facts in the path data. Never add facts from memory.\n"
+        f"- Use only the facts in {source}. Never add facts from memory.\n"
         "- End every sentence with the edge ids it relies on in square brackets, e.g. "
-        "[e_0123456789ab]. Cite only edge ids listed in the path data.\n"
+        f"[e_0123456789ab]. Cite only edge ids listed in {source}.\n"
         '- Edges with origin "inferred" are hypotheses computed from data: word them as '
         'possibilities ("may", "possibly"), never as facts.\n'
         "- If an edge has contradicting evidence, say so in the sentence about that edge.\n"
         '- If an edge\'s status is not "active", say that this link is under review.\n'
-        "- If the path contains a variant of uncertain significance, add this sentence "
+        "- If the input contains a variant of uncertain significance, add this sentence "
         f'unchanged: "{pick(VUS_NOTICES, language)}"\n'
         "- Never diagnose, recommend treatment or doses, give a prognosis or reclassify a "
         "variant.\n"
@@ -73,9 +86,17 @@ def instructions(role: Role, language: str) -> str:
     )
 
 
+def _edges_for_prompt(data: PathData) -> list[Edge]:
+    """Path edges in traversal order; a subject's connections strongest first."""
+    edges = data.ordered_edges()
+    if data.subject_id:
+        edges.sort(key=lambda e: -e.confidence)
+    return edges
+
+
 def path_payload(data: PathData) -> dict:
     steps = []
-    for edge in data.ordered_edges():
+    for edge in _edges_for_prompt(data):
         support = data.supporting(edge.id)[:3]
         steps.append(
             {
@@ -105,6 +126,14 @@ def path_payload(data: PathData) -> dict:
             }
         )
     vus = [{"id": n.id, "label": n.label} for n in data.vus_nodes()]
+    subject = data.subject
+    if subject is not None:
+        return {
+            "subject": {"id": subject.id, "label": subject.label, "type": subject.type.value},
+            "link_edge_ids": [step["edge_id"] for step in steps],
+            "links": steps,
+            "variants_of_uncertain_significance": vus,
+        }
     return {
         "path_edge_ids": data.edge_ids,
         "steps": steps,
@@ -117,12 +146,13 @@ def _clean(text: str) -> str:
     return " ".join(line for line in lines if line).replace("**", "")
 
 
-def _citation_problem(text: str, allowed: set[str]) -> str | None:
+def _citation_problem(text: str, allowed: set[str], *, subject: bool = False) -> str | None:
     cited = cited_edges(text)
     invalid = [c for c in cited if c not in allowed]
     if invalid:
+        scope = "among the listed links" if subject else "part of this path"
         return (
-            "You cited edge ids that are not part of this path: "
+            f"You cited edge ids that are not {scope}: "
             + ", ".join(invalid)
             + ". Cite only these edge ids: "
             + ", ".join(sorted(allowed))
@@ -143,11 +173,12 @@ async def generate_explanation(
     items: list[dict] = [{"role": "user", "content": payload}]
     best: Explanation | None = None
     for attempt in range(1, max_attempts + 1):
+        subject = data.subject_id is not None
         raw = await llm.complete_text(
-            instructions=instructions(role, language), input=items, kind="main"
+            instructions=instructions(role, language, subject=subject), input=items, kind="main"
         )
         text = _clean(raw)
-        problem = _citation_problem(text, allowed)
+        problem = _citation_problem(text, allowed, subject=subject)
         if problem is None:
             text, added = enforce_trust_rules(text, data, language)
             grade = reading_grade(text, language)
