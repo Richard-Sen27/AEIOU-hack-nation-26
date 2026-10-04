@@ -19,12 +19,12 @@ const jetbrainsMono = JetBrains_Mono({
 
 export const metadata: Metadata = {
   title: {
-    default: "Amber — Rare Disease Atlas",
-    template: "%s · Amber — Rare Disease Atlas",
+    default: "Amber",
+    template: "%s · Amber",
   },
   description:
     "A sourced knowledge graph of rare diseases: find who shares your disease's mechanism or symptoms, what research, registries and trials already exist, and what to do together next. Every connection is cited and rated for confidence.",
-  applicationName: "Amber — Rare Disease Atlas",
+  applicationName: "Amber",
   robots: { index: true, follow: true },
 };
 

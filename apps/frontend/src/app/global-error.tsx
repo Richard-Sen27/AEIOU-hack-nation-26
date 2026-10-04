@@ -15,7 +15,7 @@ export default function GlobalError({ retry }: { error: Error & { digest?: strin
           colorScheme: "light dark",
         }}
       >
-        <title>Amber — Rare Disease Atlas</title>
+        <title>Amber</title>
         <main style={{ maxWidth: 420, padding: 24, textAlign: "center" }}>
           <h1 style={{ fontSize: 20 }}>Amber could not load</h1>
           <p style={{ opacity: 0.7, fontSize: 14 }}>Please try again in a moment.</p>
