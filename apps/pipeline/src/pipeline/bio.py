@@ -166,15 +166,23 @@ def mondo_version() -> str | None:
 
 @cache
 def xref_to_mondo() -> dict[str, str]:
-    """OMIM:/ORPHA:/MEDGEN: id -> MONDO id, from MONDO's exact matches (unambiguous ones only)."""
+    """OMIM:/ORPHA:/MEDGEN: id -> MONDO id, from MONDO's exact matches (unambiguous ones only),
+    plus ORPHA codes that only Orphanet product1 maps exactly to one live MONDO term."""
     terms = mondo_terms().filter(~pl.col("deprecated"))
     pairs = terms.select("id", "exact_matches").explode("exact_matches").drop_nulls()
     counts = pairs.group_by("exact_matches").agg(pl.col("id").unique())
-    return {
+    out = {
         row["exact_matches"]: row["id"][0]
         for row in counts.iter_rows(named=True)
         if len(row["id"]) == 1
     }
+    live = set(terms["id"].to_list())
+    claimed = set(pairs["exact_matches"].to_list())
+    for orpha, mondo_ids in _nomenclature_or_empty().select("orpha", "mondo_ids").iter_rows():
+        targets = [m for m in mondo_ids if m in live]
+        if orpha not in claimed and len(targets) == 1:
+            out[orpha] = targets[0]
+    return out
 
 
 # ---------------------------------------------------------------- HGNC
@@ -1048,6 +1056,7 @@ def normalize_hgnc(scope: Scope) -> None:
     genes = hgnc().filter(pl.col("hgnc_id").is_in(list(scope.gene_ids)))
     dosage = {r["symbol"]: r for r in clingen_dosage().iter_rows(named=True)}
     coords = gene_coordinates()
+    clinvar = clinvar_gene_counts(scope)
     nodes, syns, missing = [], [], []
     for g in genes.iter_rows(named=True):
         c = coords.get(g["hgnc_id"])
@@ -1072,6 +1081,8 @@ def normalize_hgnc(scope: Scope) -> None:
         if d := dosage.get(g["symbol"]):
             attrs["clingen_hi_score"] = d["hi_score"]
             attrs["clingen_ts_score"] = d["ts_score"]
+        # ClinVar counts for every gene (variant nodes exist for focus genes only).
+        attrs.update(clinvar.get(g["hgnc_id"], {}))
         nodes.append(
             {
                 "id": g["hgnc_id"],
@@ -1219,7 +1230,8 @@ def normalize_clingen(scope: Scope) -> None:
     rows = [_gd_assertion(r, retrieved) for r in gd.iter_rows(named=True)]
     # Dosage: haploinsufficiency (score 3) is curated loss-of-function evidence.
     d_retrieved = _retrieved("clingen", "ClinGen_gene_curation_list_GRCh38.tsv")
-    sym2id = {g["symbol"]: g["hgnc_id"] for g in scope.genes}
+    # Gene -> mechanism links stay with the focus genes (mechanism nodes are focus-only).
+    sym2id = {g["symbol"]: g["hgnc_id"] for g in scope.focus().genes}
     for r in clingen_dosage().iter_rows(named=True):
         hid = sym2id.get(r["symbol"])
         if hid and r["hi_score"] == "3":
@@ -1284,12 +1296,23 @@ def normalize_orphanet(scope: Scope) -> None:
 
 
 PATHWAY_MAX_GENES = 300  # pathways larger than this (genome-wide) stay out of the graph
+CORE_PATHWAY_MAX_GENES = 60  # core-only genes: small pathways shared by at least two scope genes
+CORE_PATHWAY_MIN_GENES = 2
 
 
 def _pathway_rows(df: pl.DataFrame, id_col: str, scope: Scope) -> pl.DataFrame:
+    """Focus genes keep every pathway up to PATHWAY_MAX_GENES genes; other scope genes only
+    pathways of at most CORE_PATHWAY_MAX_GENES genes that hold at least two scope genes."""
     sizes = df.group_by(id_col).len("n_genes")
-    return df.join(sizes, on=id_col).filter(
-        pl.col("hgnc_id").is_in(list(scope.gene_ids)) & (pl.col("n_genes") <= PATHWAY_MAX_GENES)
+    df = df.join(sizes, on=id_col).filter(pl.col("hgnc_id").is_in(list(scope.gene_ids)))
+    in_scope = df.group_by(id_col).len("n_scope_genes")
+    df = df.join(in_scope, on=id_col)
+    focus = pl.col("hgnc_id").is_in(list(scope.focus_gene_ids))
+    core = (pl.col("n_genes") <= CORE_PATHWAY_MAX_GENES) & (
+        pl.col("n_scope_genes") >= CORE_PATHWAY_MIN_GENES
+    )
+    return df.filter((focus & (pl.col("n_genes") <= PATHWAY_MAX_GENES)) | core).drop(
+        "n_scope_genes"
     )
 
 
@@ -1333,8 +1356,9 @@ GO_MAX_PER_GENE = 5
 def normalize_go(scope: Scope) -> None:
     df = go_annotations()
     sizes = df.group_by("go_id").len("n_genes")
+    # GO processes for the focus genes only (the core uses Reactome).
     df = df.join(sizes, on="go_id").filter(
-        pl.col("hgnc_id").is_in(list(scope.gene_ids))
+        pl.col("hgnc_id").is_in(list(scope.focus_gene_ids))
         & pl.col("n_genes").is_between(GO_MIN_GENES, GO_MAX_GENES)
     )
     # Most specific (smallest) processes first, a handful per gene keeps the graph explorable.
@@ -1555,6 +1579,132 @@ def clinvar_variants() -> pl.DataFrame:
     )
 
 
+CLINVAR_PLP_FILE = "variant_summary.plp.tsv.gz"
+CLINVAR_COUNTS_FILE = "variant_summary.gene_counts.tsv"
+
+
+def _phenotype_id_list(raw: str) -> list[str]:
+    ids = raw.replace("|", ";").replace(",", ";").split(";")
+    return sorted({i.strip() for i in ids if i.strip() and i.strip() != "na"})
+
+
+@_cached("clinvar_plp", [("clinvar", CLINVAR_PLP_FILE)])
+def clinvar_plp_variants() -> pl.DataFrame:
+    """Pathogenic / likely pathogenic GRCh38 variants of every gene (lean columns), one row per
+    VariationID: gene counts, mechanism inference, ClinVar-supported gene-disease links and
+    copy-number spans all read this table."""
+    return parse_clinvar_plp(RAW / "clinvar" / CLINVAR_PLP_FILE)
+
+
+def parse_clinvar_plp(path: Path) -> pl.DataFrame:
+    cols: dict[str, list] = {
+        k: []
+        for k in (
+            "variation_id",
+            "hgnc_id",
+            "symbol",
+            "type",
+            "classification",
+            "consequence",
+            "phenotype_ids",
+            "chromosome",
+            "start",
+            "stop",
+            "assembly",
+        )
+    }
+    seen: set[str] = set()
+    with gzip.open(path, "rt") as f:
+        lines = (line.lstrip("#") for line in f)
+        for r in csv.DictReader(lines, delimiter="\t", quoting=csv.QUOTE_NONE):
+            cls = classify(r["ClinicalSignificance"])
+            if cls not in ("pathogenic", "likely_pathogenic") or r["VariationID"] in seen:
+                continue
+            seen.add(r["VariationID"])
+            pos = clinvar_position(r)
+            cols["variation_id"].append(r["VariationID"])
+            cols["hgnc_id"].append(r["HGNC_ID"] if r["HGNC_ID"].startswith("HGNC:") else None)
+            cols["symbol"].append(r["GeneSymbol"])
+            cols["type"].append(r["Type"])
+            cols["classification"].append(cls)
+            cols["consequence"].append(consequence(r["Name"], r["Type"]))
+            cols["phenotype_ids"].append(_phenotype_id_list(r["PhenotypeIDS"]))
+            for k in ("chromosome", "start", "stop", "assembly"):
+                cols[k].append(pos[k])
+    schema = {
+        "variation_id": pl.String,
+        "hgnc_id": pl.String,
+        "symbol": pl.String,
+        "type": pl.String,
+        "classification": pl.String,
+        "consequence": pl.String,
+        "phenotype_ids": pl.List(pl.String),
+        "chromosome": pl.String,
+        "start": pl.Int64,
+        "stop": pl.Int64,
+        "assembly": pl.String,
+    }
+    return pl.DataFrame(cols, schema=schema)
+
+
+def clinvar_plp_or_focus() -> pl.DataFrame:
+    """P/LP variants of every gene; falls back to the focus-gene file when only that is cached."""
+    try:
+        return clinvar_plp_variants()
+    except FileNotFoundError:
+        log.warning("ClinVar P/LP file not fetched; P/LP variants of the focus genes only")
+        return clinvar_variants().filter(
+            pl.col("classification").is_in(["pathogenic", "likely_pathogenic"])
+        )
+
+
+def with_scope_genes(df: pl.DataFrame, scope: Scope) -> pl.DataFrame:
+    """Fill a missing HGNC id from the gene symbol (scope genes only), keep scope genes."""
+    sym2id = {g["symbol"]: g["hgnc_id"] for g in scope.genes if g.get("symbol")}
+    return df.with_columns(
+        pl.coalesce(pl.col("hgnc_id"), pl.col("symbol").replace_strict(sym2id, default=None)).alias(
+            "hgnc_id"
+        )
+    ).filter(pl.col("hgnc_id").is_in(list(scope.gene_ids)))
+
+
+def clinvar_gene_counts(scope: Scope) -> dict[str, dict]:
+    """HGNC id -> {"clinvar_plp", "clinvar_vus", "clinvar_truncating_share"} for scope genes.
+
+    plp and vus: distinct GRCh38 VariationIDs per gene in the whole variant_summary; truncating
+    share: truncating (nonsense, frameshift, canonical splice, start lost) among P/LP variants
+    other than copy-number changes, null without such variants. {} when not fetched.
+    """
+    path = RAW / "clinvar" / CLINVAR_COUNTS_FILE
+    if not path.exists():
+        log.warning("ClinVar gene counts not fetched; genes get no ClinVar counts")
+        return {}
+    counts = pl.read_csv(path, separator="\t", schema_overrides={"hgnc_id": pl.String})
+    vus = dict(counts.select("hgnc_id", "vus").iter_rows())
+    plp = with_scope_genes(clinvar_plp_variants(), scope)
+    per = (
+        plp.group_by("hgnc_id")
+        .agg(
+            pl.len().alias("plp"),
+            (pl.col("consequence") != "copy_number").sum().alias("n_mech"),
+            pl.col("consequence").is_in(list(TRUNCATING)).sum().alias("trunc"),
+        )
+        .iter_rows(named=True)
+    )
+    stats = {r["hgnc_id"]: r for r in per}
+    out = {}
+    for hid in scope.gene_ids:
+        r = stats.get(hid)
+        out[hid] = {
+            "clinvar_plp": int(r["plp"]) if r else 0,
+            "clinvar_vus": int(vus.get(hid, 0)),
+            "clinvar_truncating_share": (
+                round(r["trunc"] / r["n_mech"], 3) if r and r["n_mech"] else None
+            ),
+        }
+    return out
+
+
 def clinvar_disease_ids(phenotype_ids: list[str]) -> list[str]:
     """ClinVar PhenotypeIDS (MONDO:/OMIM:/Orphanet:/MedGen:) -> MONDO ids."""
     x2m = xref_to_mondo()
@@ -1651,15 +1801,17 @@ def select_variants(df: pl.DataFrame, per_gene: int = VARIANTS_PER_GENE, vus: in
 
 
 def normalize_clinvar(scope: Scope) -> None:
+    # Variant nodes for the focus genes only; every other gene gets counts (normalize_hgnc).
+    focus = scope.focus()
     df = clinvar_variants()
-    sym2id = {g["symbol"]: g["hgnc_id"] for g in scope.genes}
+    sym2id = {g["symbol"]: g["hgnc_id"] for g in focus.genes}
     df = df.with_columns(
         pl.when(pl.col("hgnc_id").is_null())
         .then(pl.col("symbol").replace_strict(sym2id, default=None))
         .otherwise(pl.col("hgnc_id"))
         .alias("hgnc_id")
-    ).filter(pl.col("hgnc_id").is_in(list(scope.gene_ids)))
-    seeds = {g["hgnc_id"] for g in scope.genes if g.get("seed")}
+    ).filter(pl.col("hgnc_id").is_in(list(focus.gene_ids)))
+    seeds = {g["hgnc_id"] for g in focus.genes if g.get("seed")}
     chosen = pl.concat(
         [
             select_variants(df.filter(pl.col("hgnc_id").is_in(list(seeds)))),
@@ -1759,8 +1911,9 @@ def normalize_clinvar(scope: Scope) -> None:
                         features={"classification": v["classification"]},
                     )
                 )
-    # Disease -> gene links supported by (likely) pathogenic ClinVar variants with a phenotype.
-    path = df.filter(pl.col("classification").is_in(["pathogenic", "likely_pathogenic"]))
+    # Disease -> gene links supported by (likely) pathogenic ClinVar variants with a phenotype,
+    # for every gene in scope (core and focus).
+    path = with_scope_genes(clinvar_plp_or_focus(), scope)
     pair_counts: dict[tuple[str, str], list[str]] = {}
     for v in path.select("hgnc_id", "phenotype_ids", "variation_id").iter_rows(named=True):
         for mid in clinvar_disease_ids(v["phenotype_ids"]):

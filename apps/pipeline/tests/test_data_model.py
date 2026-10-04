@@ -118,6 +118,7 @@ def test_normalize_clinvar_positions_and_multi_gene_variant_of(monkeypatch):
         _variant("70000", "HGNC:2", "GENEB", "single nucleotide variant", 8100, 8100),
     ]
     monkeypatch.setattr(bio, "clinvar_variants", lambda: pl.DataFrame(rows))
+    monkeypatch.setattr(bio, "clinvar_plp_or_focus", lambda: pl.DataFrame(rows))
     monkeypatch.setattr(bio, "gene_coordinates", lambda: GENES)
     monkeypatch.setattr(bio, "_retrieved", lambda *_: "2026-10-04T00:00:00+00:00")
     monkeypatch.setattr(bio, "xref_to_mondo", lambda: {})
@@ -209,6 +210,7 @@ def test_normalize_hgnc_joins_coordinates_and_reports_missing(monkeypatch, caplo
     monkeypatch.setattr(bio, "clingen_dosage", lambda: pl.DataFrame({"symbol": []}))
     coords = {r["hgnc_id"]: r for r in bio.parse_mane(MANE_LINES).iter_rows(named=True)}
     monkeypatch.setattr(bio, "gene_coordinates", lambda: coords)
+    monkeypatch.setattr(bio, "clinvar_gene_counts", lambda scope: {})
     out = _capture(monkeypatch)
     scope = Scope(data_version="t", genes=[{"hgnc_id": "HGNC:11444"}, {"hgnc_id": "HGNC:7489"}])
     with caplog.at_level("WARNING"):
