@@ -1,11 +1,11 @@
 import { expect, test } from "@playwright/test";
 
 import { mockApi, setTheme, shot, trackConsoleErrors } from "../helpers";
-import { graphMocks } from "./fixtures";
+import { treeMocks } from "./tree-mock";
 
 test.describe("guided tour", () => {
   test("starts from ?tour=1, is keyboard operable and skippable", async ({ page }) => {
-    await mockApi(page, graphMocks());
+    await mockApi(page, treeMocks());
     const errors = trackConsoleErrors(page);
     await page.goto("/atlas?tour=1");
     const tour = page.getByTestId("atlas-tour");
@@ -31,7 +31,7 @@ test.describe("guided tour", () => {
   });
 
   test("runs to the end with Dr. Wu and sign-in; Escape closes", async ({ page }) => {
-    await mockApi(page, graphMocks());
+    await mockApi(page, treeMocks());
     await page.goto("/atlas");
     await page.getByTestId("tour-start").click();
     const tour = page.getByTestId("atlas-tour");
@@ -49,7 +49,7 @@ test.describe("guided tour", () => {
 
   test("screenshots", async ({ page }) => {
     await page.emulateMedia({ reducedMotion: "reduce" });
-    await mockApi(page, graphMocks());
+    await mockApi(page, treeMocks());
     for (const theme of ["light", "dark"] as const) {
       await setTheme(page, theme);
       await page.goto("/atlas?tour=1");
@@ -65,7 +65,7 @@ test.describe("guided tour", () => {
 
 test("tour on a phone @mobile", async ({ page }) => {
   await page.emulateMedia({ reducedMotion: "reduce" });
-  await mockApi(page, graphMocks());
+  await mockApi(page, treeMocks());
   await page.goto("/atlas?tour=1");
   await expect(page.getByTestId("atlas-tour")).toBeVisible();
   await page.getByTestId("tour-next").click();
