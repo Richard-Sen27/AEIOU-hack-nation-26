@@ -231,6 +231,7 @@ test.describe("atlas summary panel", () => {
       subject_node_id: "MONDO:9900007",
       role: expect.any(String),
       language: "en",
+      steps: true,
     });
   });
 
