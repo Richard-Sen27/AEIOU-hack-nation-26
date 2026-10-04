@@ -196,8 +196,8 @@ function FoundList({
         <h3 id="atlas-wu-found-title" className="flex-1 text-xs font-semibold">
           Dr. Wu found {found.nodeIds.length}
         </h3>
-        <Button variant="ghost" size="xs" onClick={onClear} data-testid="atlas-wu-clear">
-          <X aria-hidden /> Clear
+        <Button variant="ghost" size="icon-xs" onClick={onClear} aria-label="Clear what Dr. Wu found" data-testid="atlas-wu-clear">
+          <X aria-hidden />
         </Button>
       </div>
       <ul className="max-h-40 space-y-0.5 overflow-y-auto">
@@ -225,6 +225,20 @@ function FoundList({
   );
 }
 
+/**
+ * The shortest AI disclosure (EU AI Act Art. 50, docs/compliance.md): an AI
+ * system, not a doctor, can be wrong, never diagnoses. The header's
+ * "AI-generated · Dr. Wu" pill stays visible in every state as well.
+ */
+function AiNote() {
+  return (
+    <p role="note" aria-label="AI system disclosure" className="flex items-center gap-1.5 text-xs text-muted-foreground" data-testid="atlas-wu-ai-note">
+      <Bot className="size-3.5 shrink-0 text-primary" aria-hidden />
+      AI, not a doctor. Can be wrong, never diagnoses.
+    </p>
+  );
+}
+
 // ---------------------------------------------------------------------------
 // Guests: the sign-in offer
 
@@ -249,19 +263,13 @@ function GuestDock({ index, pendingQuestion, onPendingConsumed, found, onClear, 
       className={className}
       body={
         <div className="space-y-3" data-testid="atlas-wu-guest">
-          <p className="text-sm leading-relaxed text-pretty">
-            Tell Dr. Wu the problem in your own words, for example the symptoms and the family of conditions you
-            suspect, and he finds the matching dots on the map.
-          </p>
-          <AiDisclosure />
-          <p className="text-xs text-muted-foreground">
-            Dr. Wu runs on your own ChatGPT plan, so he needs you to sign in.
-          </p>
+          <p className="text-sm">Describe the problem, Dr. Wu finds the dots.</p>
+          <AiNote />
           <ContinueWithChatGPT />
           <p className="text-[11px] text-muted-foreground">
-            You must be 16 or older. Nothing is sold or shared.{" "}
+            16+ only · nothing sold or shared ·{" "}
             <Link href="/privacy" className="underline underline-offset-2">
-              Privacy notice
+              Privacy
             </Link>
           </p>
         </div>
@@ -352,13 +360,7 @@ function SignedInDock({
       body={
         <div className="space-y-3" data-testid="atlas-wu-chat">
           {!lastAssistant ? (
-            <>
-              <p className="text-sm leading-relaxed text-pretty">
-                Describe the problem in your own words, for example &ldquo;I have these symptoms and I think it is a
-                condition from this family&rdquo;. Dr. Wu finds the matching dots on the map.
-              </p>
-              <AiDisclosure className="text-xs" />
-            </>
+            <AiNote />
           ) : (
             <>
               {lastUser && lastUser.kind === "user" && (
@@ -378,7 +380,7 @@ function SignedInDock({
         </div>
       }
       footer={
-        <div className="space-y-2">
+        <div className="space-y-1.5">
           <form
             onSubmit={(e) => {
               e.preventDefault();
@@ -403,7 +405,7 @@ function SignedInDock({
               }}
               rows={1}
               maxLength={4000}
-              placeholder="Symptoms, a gene, a family of conditions…"
+              placeholder="Symptoms, a disease family…"
               className="field-sizing-content block max-h-28 min-h-10 flex-1 resize-none bg-transparent px-3 py-2 text-base leading-snug outline-none placeholder:text-muted-foreground sm:text-sm"
             />
             {chat.streaming ? (
@@ -426,41 +428,28 @@ function SignedInDock({
               </button>
             )}
           </form>
-          <div className="flex items-center justify-between gap-2 text-[11px] text-muted-foreground">
-            <span>Information, not medical advice.</span>
-            <Link href="/chat" className="inline-flex items-center gap-1 font-medium text-foreground underline-offset-2 hover:underline" data-testid="atlas-wu-full">
-              <MessageSquareText className="size-3.5" aria-hidden /> Open full conversation
-            </Link>
-          </div>
+          <Link href="/chat" className="flex items-center justify-end gap-1 text-[11px] font-medium underline-offset-2 hover:underline" data-testid="atlas-wu-full">
+            <MessageSquareText className="size-3.5" aria-hidden /> Full conversation
+          </Link>
         </div>
       }
     />
   );
 }
 
-const ERROR_COPY: Record<string, { icon: typeof CircleAlert; title: string; hint: string; retry: boolean }> = {
-  rate_limited: {
-    icon: Clock,
-    title: "Your ChatGPT plan's usage limit is reached",
-    hint: "Dr. Wu runs on your own ChatGPT plan. Try again when your plan allows more requests.",
-    retry: true,
-  },
-  reauth_required: { icon: KeyRound, title: "Please sign in again", hint: "Your ChatGPT sign-in has expired.", retry: false },
-  sign_in_required: { icon: KeyRound, title: "Please sign in again", hint: "Your session has ended.", retry: false },
-  timeout: { icon: Clock, title: "Dr. Wu took too long to answer", hint: "What arrived so far is kept. You can try again.", retry: true },
-  network_error: { icon: WifiOff, title: "The connection dropped", hint: "What arrived before the drop is kept. You can try again.", retry: true },
-  not_implemented: {
-    icon: CircleAlert,
-    title: "Dr. Wu is not available yet",
-    hint: "This part of Amber is still being built. You can keep exploring the atlas.",
-    retry: true,
-  },
+const ERROR_COPY: Record<string, { icon: typeof CircleAlert; title: string; retry: boolean }> = {
+  rate_limited: { icon: Clock, title: "ChatGPT usage limit reached", retry: true },
+  reauth_required: { icon: KeyRound, title: "Please sign in again", retry: false },
+  sign_in_required: { icon: KeyRound, title: "Please sign in again", retry: false },
+  timeout: { icon: Clock, title: "No answer in time", retry: true },
+  network_error: { icon: WifiOff, title: "Connection dropped", retry: true },
+  not_implemented: { icon: CircleAlert, title: "Dr. Wu is not available yet", retry: true },
 };
 
 function errorCopy(err: TurnError) {
   if (err.code === "upstream_error" && /usage|quota|limit/i.test(err.message)) return ERROR_COPY.rate_limited;
   if (err.code === "upstream_error" && /time/i.test(err.message)) return ERROR_COPY.timeout;
-  return ERROR_COPY[err.code] ?? { icon: CircleAlert, title: "Dr. Wu could not finish this answer", hint: "You can try again.", retry: true };
+  return ERROR_COPY[err.code] ?? { icon: CircleAlert, title: "Dr. Wu could not finish", retry: true };
 }
 
 /** The last reply, compact: progress, uncertainty, summary, error. Same wording as the chat. */
@@ -518,12 +507,7 @@ function CompactTurn({
           )}
           {turn.final && foundCount === 0 && (
             <p className="text-xs text-muted-foreground" data-testid="atlas-wu-none">
-              No dots on the map match this answer.
-            </p>
-          )}
-          {turn.final && r.chips.some((c) => c.state === "pending") && (
-            <p className="text-xs text-muted-foreground">
-              Open the full conversation to confirm what Dr. Wu understood before anything is saved.
+              Nothing on the map.
             </p>
           )}
         </>
@@ -546,23 +530,17 @@ function ErrorNotice({ error, onRetry, onSignIn }: { error: TurnError; onRetry: 
   const Icon = copy.icon;
   const signIn = error.code === "reauth_required" || error.code === "sign_in_required";
   return (
-    <div role="alert" className="space-y-2 rounded-lg border border-destructive/40 bg-destructive/5 px-3 py-2.5 text-sm" data-testid="turn-error" data-code={error.code}>
-      <p className="flex items-start gap-2 font-medium">
-        <Icon className="mt-0.5 size-4 shrink-0 text-destructive" aria-hidden />
-        {copy.title}
-      </p>
-      <p className="text-xs text-muted-foreground">
-        {error.message && error.message !== copy.title ? `${error.message} ` : ""}
-        {copy.hint}
-      </p>
+    <div role="alert" className="flex items-center gap-2 rounded-lg border border-destructive/40 bg-destructive/5 px-2.5 py-2 text-sm" data-testid="turn-error" data-code={error.code}>
+      <Icon className="size-4 shrink-0 text-destructive" aria-hidden />
+      <p className="min-w-0 flex-1 font-medium">{copy.title}</p>
       {signIn ? (
-        <Button size="sm" onClick={onSignIn}>
-          Sign in again
+        <Button size="xs" onClick={onSignIn}>
+          Sign in
         </Button>
       ) : (
         copy.retry && (
-          <Button size="sm" variant="outline" onClick={onRetry}>
-            <RotateCcw aria-hidden /> Try again
+          <Button size="xs" variant="outline" onClick={onRetry}>
+            <RotateCcw aria-hidden /> Retry
           </Button>
         )
       )}

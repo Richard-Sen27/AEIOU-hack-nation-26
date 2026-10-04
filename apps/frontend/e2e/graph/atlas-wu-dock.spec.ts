@@ -61,7 +61,8 @@ test.describe("atlas Dr. Wu dock", () => {
     await dock(page).getByRole("button", { name: "Ask Dr. Wu" }).click();
     const guest = dock(page).getByTestId("atlas-wu-guest");
     await expect(guest).toBeVisible();
-    await expect(guest.getByTestId("ai-disclosure")).toBeVisible();
+    await expect(guest.getByTestId("atlas-wu-ai-note")).toContainText("AI, not a doctor");
+    await expect(dock(page).getByText("AI-generated · Dr. Wu")).toBeVisible();
     await expect(guest.getByRole("button", { name: "Continue with ChatGPT" })).toBeVisible();
     await expect(dock(page).getByRole("textbox")).toHaveCount(0);
     expect(errors()).toEqual([]);
