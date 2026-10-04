@@ -1,6 +1,6 @@
 import { expect, test } from "@playwright/test";
 
-import { guestSession, hit, mockApi, setTheme, shot, signedInSession, trackConsoleErrors } from "../helpers";
+import { errorEnvelope, guestSession, hit, mockApi, setTheme, shot, signedInSession, trackConsoleErrors } from "../helpers";
 import { consentRecord, expectNoHealthDataInBrowser } from "./fixtures";
 
 const PROFILE = {
@@ -165,6 +165,134 @@ test("settings: a role change sets the lens at once, without a reload", async ({
   await page.getByRole("banner").getByRole("link", { name: "Clusters" }).click();
   await expect(page.getByRole("heading", { level: 1 })).toHaveText("Mechanism clusters");
   expect(await page.evaluate(() => (window as unknown as { __sameDocument?: boolean }).__sameDocument)).toBe(true);
+});
+
+const LINKED = {
+  node_id: "RES:0001",
+  type: "researcher",
+  label: "Maria Example",
+  orcid_id: "0000-0002-1825-0097",
+  institutions: [{ node_id: "INST:bch", label: "Boston Children's Hospital" }],
+};
+const WORK = {
+  first_name: "Maria",
+  last_name: "Example",
+  institutions: [
+    { node_id: "INST:bch", label: "Boston Children's Hospital" },
+    { node_id: null, label: "St. Jude Research" },
+  ],
+  orcid_id: "0000-0002-1825-0097",
+  atlas_node_id: "RES:0001",
+  linked_entry: LINKED,
+  linked_entry_missing: false,
+  updated_at: "2026-10-03T09:00:00Z",
+  suggested: { first_name: "Maria", last_name: "Example", source: "chatgpt" },
+};
+
+test("your work: shows the linked entry, edits, saves and removes", async ({ page }) => {
+  let put: Record<string, unknown> | null = null;
+  let deleted = false;
+  const urls: string[] = [];
+  page.on("request", (r) => urls.push(decodeURIComponent(r.url())));
+  await mockApi(
+    page,
+    baseMocks({
+      "GET /auth/session": signedInSession({ role: "researcher", consents: ["health_data"] }),
+      "GET /me/professional": () => ({ json: deleted ? { ...WORK, first_name: null, last_name: null, institutions: [], orcid_id: null, atlas_node_id: null, linked_entry: null, updated_at: null } : WORK }),
+      "PUT /me/professional": (req: { body: unknown }) => {
+        put = req.body as Record<string, unknown>;
+        return { json: { ...WORK, last_name: "Exampel", institutions: WORK.institutions.slice(0, 1), updated_at: "2026-10-04T12:00:00Z" } };
+      },
+      "DELETE /me/professional": () => {
+        deleted = true;
+        return { status: 204, body: "" };
+      },
+    }),
+  );
+  const errors = trackConsoleErrors(page);
+  await page.goto("/profile");
+  const panel = page.locator("#your-work");
+  await expect(panel.getByRole("heading", { name: "Your work" })).toBeVisible();
+  await expect(panel).toContainText("Private to you. Not a verification.");
+  await expect(page.getByRole("navigation", { name: "Profile sections" }).getByRole("link", { name: "Your work" })).toBeAttached();
+  await expect(page.getByTestId("role-switch-note")).toHaveText("Switching to Patient or family removes your work details.");
+
+  const entry = panel.getByTestId("linked-entry");
+  await expect(entry).toContainText("You said this is you");
+  await expect(entry).toContainText("Maria Example");
+  await expect(entry.getByRole("link", { name: "Your entry in the atlas" })).toHaveAttribute("href", "/node/RES%3A0001");
+  await expect(entry.getByRole("link", { name: "Claim or correct it" })).toHaveAttribute("href", "/about-data?entry=RES%3A0001#claim");
+  // Saved names are not labelled as a ChatGPT prefill.
+  await expect(panel).not.toContainText("From your ChatGPT account");
+
+  const save = panel.getByRole("button", { name: "Save", exact: true });
+  await expect(save).toBeDisabled();
+  await panel.getByRole("button", { name: "Remove St. Jude Research" }).click();
+  await panel.getByRole("textbox", { name: "Last name" }).fill("Exampel");
+  await save.click();
+  await expect(page.getByText("Work details saved").first()).toBeVisible();
+  expect(put).toEqual({
+    first_name: "Maria",
+    last_name: "Exampel",
+    orcid_id: "0000-0002-1825-0097",
+    institutions: [{ node_id: "INST:bch" }],
+    atlas_node_id: "RES:0001",
+  });
+
+  await panel.getByTestId("remove-work-details").click();
+  await expect.poll(() => deleted).toBe(true);
+  await expect(panel.getByTestId("linked-entry")).toHaveCount(0);
+  await expect(panel.getByRole("textbox", { name: "First name" })).toHaveValue("Maria");
+  await expect(panel).toContainText("From your ChatGPT account. Edit as needed.");
+
+  for (const name of ["Maria", "Example", "Exampel"]) {
+    expect(urls.filter((u) => u.includes(name)), `URL contains ${name}`).toEqual([]);
+  }
+  expect(errors()).toEqual([]);
+});
+
+test("your work: unlink, and a 403 is explained", async ({ page }) => {
+  let put: Record<string, unknown> | null = null;
+  let forbidden = false;
+  await mockApi(
+    page,
+    baseMocks({
+      "GET /auth/session": signedInSession({ role: "doctor", consents: ["health_data"] }),
+      "GET /me/professional": () => (forbidden ? errorEnvelope(403, "forbidden") : { json: WORK }),
+      "PUT /me/professional": (req: { body: unknown }) => {
+        put = req.body as Record<string, unknown>;
+        return { json: { ...WORK, atlas_node_id: null, linked_entry: null } };
+      },
+    }),
+  );
+  await page.goto("/profile");
+  const panel = page.locator("#your-work");
+  await panel.getByTestId("linked-entry").getByRole("button", { name: "Unlink" }).click();
+  await panel.getByRole("button", { name: "Save", exact: true }).click();
+  await expect.poll(() => (put as { atlas_node_id?: unknown } | null)?.atlas_node_id).toBeNull();
+
+  forbidden = true;
+  await page.reload();
+  await expect(panel.getByTestId("work-details-error")).toContainText("Work details are for doctors and researchers.");
+});
+
+test("your work: patients do not see it", async ({ page }) => {
+  let fetched = false;
+  await mockApi(
+    page,
+    baseMocks({
+      "GET /me/professional": () => {
+        fetched = true;
+        return errorEnvelope(403, "forbidden");
+      },
+    }),
+  );
+  await page.goto("/profile");
+  await expect(page.getByTestId("profile-disease")).toBeVisible();
+  await expect(page.locator("#your-work")).toHaveCount(0);
+  await expect(page.getByRole("link", { name: "Your work" })).toHaveCount(0);
+  await expect(page.getByTestId("role-switch-note")).toHaveCount(0);
+  expect(fetched).toBe(false);
 });
 
 test("consents: state, history and one-click withdraw", async ({ page }) => {
