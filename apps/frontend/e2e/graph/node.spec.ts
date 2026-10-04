@@ -337,6 +337,20 @@ test.describe("node view", () => {
       expect(m.widestLine, `${layout}: most nodes on one line`).toBeLessThanOrEqual(10);
       expect(m.width, `${layout}: width ${m.width} vs height ${m.height}`).toBeLessThanOrEqual(3 * Math.max(m.height, 1));
       expect(m.captions).toEqual([expect.stringMatching(/^48 researchers · /)]);
+
+      // A theme switch restyles every node: the view and its caption must survive it.
+      await page.getByTestId("theme-toggle").click();
+      await page.getByRole("menuitemradio", { name: "Dark" }).click();
+      await expect(page.locator("html")).toHaveClass(/dark/);
+      await page.waitForTimeout(300);
+      await expect(page.getByText("This view could not be shown")).toHaveCount(0);
+      await expect(graph.locator("canvas").first()).toBeVisible();
+      const captions = await graph.evaluate((el) => {
+        type N = { data: (k: string) => unknown };
+        const cy = (el as unknown as { _cyreg: { cy: { nodes: (s: string) => { toArray: () => N[] } } } })._cyreg.cy;
+        return cy.nodes(".caption").toArray().map((n) => String(n.data("label")));
+      });
+      expect(captions).toEqual([expect.stringMatching(/^48 researchers · /)]);
     });
   }
 

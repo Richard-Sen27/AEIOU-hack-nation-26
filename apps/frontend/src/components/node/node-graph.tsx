@@ -107,7 +107,7 @@ function captionText(count: number, type: string, relation: string, style: Label
 function layoutItems(cy: Core, centerId: string, highlight: Set<string>): LayoutItem[] {
   const center = cy.getElementById(centerId);
   return cy
-    .nodes(":not(.caption)")
+    .nodes("[^caption]")
     .filter((n) => n.id() !== centerId)
     .toArray()
     .map((n) => {
@@ -254,7 +254,7 @@ export const NodeGraph = forwardRef<NodeGraphHandle, Props>(function NodeGraph(p
       cy.nodes(".caption").forEach((c) => {
         c.data("label", captionText(c.data("count"), c.data("type"), c.data("relation"), labelStyle));
       });
-      cy.nodes(":not(.caption)").forEach((n) => {
+      cy.nodes("[^caption]").forEach((n) => {
         const type = n.data("type") as NodeType;
         const name = truncate(n.data("name") as string);
         const isCenter = n.id() === centerId;
@@ -396,7 +396,7 @@ export const NodeGraph = forwardRef<NodeGraphHandle, Props>(function NodeGraph(p
       cy.edges().forEach((e) => {
         e.toggleClass("hidden", props.hiddenFamilies.has(e.data("family")));
       });
-      cy.nodes(":not(.caption)").forEach((n) => {
+      cy.nodes("[^caption]").forEach((n) => {
         if (n.id() === props.centerId) return;
         const visible = n.connectedEdges().filter(".hidden").length < n.connectedEdges().length;
         n.toggleClass("hidden", !visible && n.connectedEdges().length > 0);
@@ -415,7 +415,7 @@ export const NodeGraph = forwardRef<NodeGraphHandle, Props>(function NodeGraph(p
       cy.nodes(".match").removeStyle("font-size text-outline-width");
       cy.elements().removeClass("faded match");
       if (!f) return;
-      cy.nodes(":not(.caption)").forEach((n) => {
+      cy.nodes("[^caption]").forEach((n) => {
         if (n.id() === centerId) return;
         const hit = f.nodes.has(n.id());
         n.toggleClass("match", hit);
@@ -489,7 +489,7 @@ export const NodeGraph = forwardRef<NodeGraphHandle, Props>(function NodeGraph(p
       syncCaptions(cy);
       applyFilter();
       const labelled = mode === "force" ? items.length : labelledCount(placement, items.length);
-      cy.nodes(":not(.caption)").data("minLabel", minLabelPx(labelled));
+      cy.nodes("[^caption]").data("minLabel", minLabelPx(labelled));
     });
     const ring: LayoutOptions = {
       name: "preset",
@@ -517,7 +517,7 @@ export const NodeGraph = forwardRef<NodeGraphHandle, Props>(function NodeGraph(p
     const layout = cy.layout(options);
     // The ring's end positions are known up front: frame them first, then let the nodes move in.
     if (options === ring) {
-      const before = cy.nodes(":not(.caption)").map((n) => ({ n, p: { ...n.position() } }));
+      const before = cy.nodes("[^caption]").map((n) => ({ n, p: { ...n.position() } }));
       cy.nodes().positions((n) => positions[n.id()] ?? n.position());
       fitCapped(cy, false);
       before.forEach(({ n, p }) => n.position(p));
