@@ -388,6 +388,76 @@ def check_core(t: dict[str, pl.DataFrame], min_qualified: int | None) -> list[di
     return out
 
 
+def lineage_fanout(lineages: dict[str, list]) -> tuple[int, int]:
+    """(first-level groups, largest number of children of any group) of the tree the lineages
+    span, after splicing single-child chains as the Atlas does; clusters are the leaves."""
+    kids: dict[str, set[str]] = {}
+    for cid, lin in lineages.items():
+        path = ["", *(g["id"] for g in lin), cid]
+        for a, b in zip(path, path[1:], strict=False):
+            kids.setdefault(a, set()).add(b)
+
+    def children(node: str) -> set[str]:
+        out = set()
+        for k in kids.get(node, ()):
+            while len(kids.get(k, ())) == 1:
+                k = next(iter(kids[k]))
+            out.add(k)
+        return out
+
+    return len(children("")), max((len(children(k)) for k in kids), default=0)
+
+
+def check_cluster_lineage(t: dict[str, pl.DataFrame], max_roots: int | None) -> list[dict]:
+    """Every cluster carries attrs.lineage (organ system down to its parent group), and the
+    clusters holding focus diseases start from at most ``max_roots`` first-level groups."""
+    nodes = t["nodes"]
+    tier = {
+        nid: (json.loads(a) if a else {}).get("tier")
+        for nid, a in nodes.filter(pl.col("type") == "disease").select("id", "attrs").iter_rows()
+    }
+    lineages: dict[str, list] = {}
+    focus: dict[str, list] = {}
+    bad = []
+    for cid, attrs in nodes.filter(pl.col("type") == "cluster").select("id", "attrs").iter_rows():
+        a = json.loads(attrs) if attrs else {}
+        lin = a.get("lineage")
+        if (
+            not isinstance(lin, list)
+            or not lin
+            or not all(isinstance(g, dict) and g.get("id") and g.get("label") for g in lin)
+        ):
+            bad.append(cid)
+            continue
+        lineages[cid] = lin
+        if any(tier.get(m) == "focus" for m in a.get("members", [])):
+            focus[cid] = lin
+    f_roots, f_max = lineage_fanout(focus)
+    a_roots, a_max = lineage_fanout(lineages)
+    out = [
+        {
+            "check": "every cluster has a lineage",
+            "ok": not bad,
+            "detail": {"clusters": len(lineages) + len(bad), "missing": bad[:20], "n": len(bad)},
+        }
+    ]
+    if max_roots:
+        out.append(
+            {
+                "check": f"clusters with focus diseases start from at most {max_roots} groups",
+                "ok": f_roots <= max_roots,
+                "detail": {
+                    "focus_clusters": len(focus),
+                    "focus_first_level": f_roots,
+                    "focus_max_children": f_max,
+                    "all_first_level": a_roots,
+                    "all_max_children": a_max,
+                },
+            }
+        )
+    return out
+
+
 def _report_counts(r: dict[str, Any]) -> tuple[int, int, int]:
     """(checked, passed, rejected) from a Stage 3 report.json or quote_report.json."""
     if "checked" in r:
@@ -426,6 +496,7 @@ def run() -> bool:
     results += check_golden(t, resolve, seeds.get("golden", []))
     results += check_counterexamples(t, resolve, seeds.get("counterexamples", []))
     results += check_core(t, seeds.get("min_qualified_diseases"))
+    results += check_cluster_lineage(t, seeds.get("max_focus_cluster_roots"))
     quotes = quote_reports()
     report = {
         "data_version": t["nodes"]["data_version"][0],

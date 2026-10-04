@@ -504,3 +504,76 @@ def test_check_core_counts_tiers_and_hpo_terms():
     g = _graph()
     g["hpo_terms"] = pl.DataFrame({"id": ["HP:9"]})
     assert not validate.check_core(g, None)[-1]["ok"]
+
+
+# ---------------------------------------------------------------- cluster lineage
+
+LINEAGE_PARENTS = {
+    "HP:0000118": [],
+    "HP:NERV": ["HP:0000118"],
+    "HP:EYE": ["HP:0000118"],
+    "HP:SEIZ": ["HP:NERV"],
+    "HP:FOCAL": ["HP:SEIZ"],
+    "HP:ABS": ["HP:SEIZ"],
+    "HP:ATAX": ["HP:NERV"],
+    "HP:NYST": ["HP:EYE", "HP:NERV"],  # two organ systems
+}
+
+
+def test_cluster_lineage_follows_the_dominant_organ_system_and_shares_groups():
+    labels = {t: t.split(":")[1].title() for t in LINEAGE_PARENTS}
+    members = {1: ["D1", "D2"], 2: ["D3"], 3: ["D4"], 4: ["D5"]}
+    dis_ph = {
+        "D1": {"HP:FOCAL", "HP:NYST"},
+        "D2": {"HP:FOCAL"},
+        "D3": {"HP:ABS"},
+        "D4": {"HP:NYST", "HP:EYE"},
+        "D5": set(),
+    }
+    ranked = {1: ["HP:NYST", "HP:FOCAL"], 2: ["HP:ABS"], 3: ["HP:NYST"], 4: []}
+    ic = {t: 3.0 for t in LINEAGE_PARENTS}
+    lin = analytics.cluster_lineages(members, dis_ph, ranked, ic, LINEAGE_PARENTS, labels)
+    ids = {c: [g["id"] for g in v] for c, v in lin.items()}
+    # cluster 1: both members record nervous-system terms; its top term lies under it too
+    assert ids[1] == ["HP:NERV", "HP:NYST"]
+    assert ids[2] == ["HP:NERV", "HP:SEIZ", "HP:ABS"]
+    # cluster 3: nervous system and eye tie (one member each); the smaller id wins
+    assert ids[3][0] == min("HP:EYE", "HP:NERV")
+    assert ids[4] == []  # no recorded phenotype
+    assert lin[2][0] == {"id": "HP:NERV", "label": "Nerv"}
+    # generic anchors (low IC) are skipped: the cluster hangs under its organ system
+    low = analytics.cluster_lineages(
+        {5: ["D3"]}, dis_ph, {5: ["HP:ABS"]}, {"HP:ABS": 0.5}, LINEAGE_PARENTS, labels
+    )
+    assert [g["id"] for g in low[5]] == ["HP:NERV"]
+    again = analytics.cluster_lineages(members, dis_ph, ranked, ic, LINEAGE_PARENTS, labels)
+    assert again == lin
+
+
+def test_check_cluster_lineage_fanout():
+    def cluster(cid, lineage, members):
+        return {
+            "id": cid,
+            "type": "cluster",
+            "attrs": json.dumps({"lineage": lineage, "members": members}),
+        }
+
+    g = lambda i: {"id": i, "label": i}  # noqa: E731
+    rows = [
+        {"id": "M:1", "type": "disease", "attrs": json.dumps({"tier": "focus"})},
+        {"id": "M:2", "type": "disease", "attrs": json.dumps({"tier": "core"})},
+        cluster("CLUSTER:1", [g("A"), g("A1")], ["M:1"]),
+        cluster("CLUSTER:2", [g("A"), g("A2")], ["M:1"]),
+        cluster("CLUSTER:3", [g("B")], ["M:2"]),
+    ]
+    t = {"nodes": pl.DataFrame(rows)}
+    res = validate.check_cluster_lineage(t, 1)
+    assert [r["ok"] for r in res] == [True, True]
+    d = res[1]["detail"]
+    assert (d["focus_first_level"], d["focus_max_children"]) == (1, 2)
+    assert (d["all_first_level"], d["all_max_children"]) == (2, 2)
+    assert validate.lineage_fanout({"C1": [g("A"), g("A1")]}) == (1, 1)  # spliced chain
+    rows.append(cluster("CLUSTER:4", [g("C")], ["M:1"]))
+    rows.append(cluster("CLUSTER:5", [], ["M:2"]))
+    res = validate.check_cluster_lineage({"nodes": pl.DataFrame(rows)}, 1)
+    assert [r["ok"] for r in res] == [False, False]

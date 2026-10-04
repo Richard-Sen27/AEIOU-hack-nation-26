@@ -1240,6 +1240,68 @@ def template_cluster_label(
     return " · ".join(parts)
 
 
+LINEAGE_MIN_IC = SPECIFIC_IC  # the term a cluster hangs under must be specific
+
+
+def cluster_lineages(
+    members: dict[int, list[str]],
+    dis_ph: dict[str, set[str]],
+    ranked_ph: dict[int, list[str]],
+    ic: dict[str, float],
+    parents: dict[str, list[str]],
+    hpo_labels: dict[str, str],
+) -> dict[int, list[dict]]:
+    """Coarse-to-fine groups above each cluster, from HPO: ``[{"id", "label"}, ...]`` from an
+    organ system down to the cluster's direct parent group.
+
+    1. Organ system: the direct child of Phenotypic abnormality recorded (through any of its
+       descendants) by the most member diseases; ties go to the smallest id.
+    2. Anchor term: the cluster's most distinctive phenotype (``distinctive_phenotypes``) that is
+       specific (IC >= 2) and lies under that organ system; without one the cluster hangs
+       directly under the organ system.
+    3. Path: from the anchor up to the organ system through is_a parents under that system,
+       preferring the parent shared by the most anchors (then the smallest id), so clusters
+       with related anchors share their upper groups.
+    Clusters without any recorded phenotype get an empty lineage."""
+    anc = taxonomy.ancestor_fn(parents)
+    systems = taxonomy.organ_systems(parents)
+    chosen: dict[int, tuple[str | None, str | None]] = {}
+    for c, ds in sorted(members.items()):
+        votes: Counter[str] = Counter()
+        for d in ds:
+            votes.update({x for p in dis_ph.get(d, ()) for x in (anc(p) | {p}) & systems})
+        if not votes:
+            chosen[c] = (None, None)
+            continue
+        system = min(votes, key=lambda x: (-votes[x], x))
+        anchor = next(
+            (
+                p
+                for p in ranked_ph.get(c, [])
+                if ic.get(p, 0.0) >= LINEAGE_MIN_IC and system in anc(p)
+            ),
+            None,
+        )
+        chosen[c] = (system, anchor)
+    shared: Counter[str] = Counter()
+    for _system, anchor in chosen.values():
+        if anchor:
+            shared.update(anc(anchor) | {anchor})
+    out: dict[int, list[dict]] = {}
+    for c, (system, anchor) in chosen.items():
+        if system is None:
+            out[c] = []
+            continue
+        chain, cur = [], anchor
+        while cur and cur != system:
+            chain.append(cur)
+            up = [p for p in parents.get(cur, ()) if p == system or system in anc(p)]
+            cur = min(up, key=lambda p: (-shared[p], p)) if up else None
+        chain.append(system)
+        out[c] = [{"id": t, "label": hpo_labels.get(t, t)} for t in reversed(chain)]
+    return out
+
+
 class ClusterLabel(BaseModel):
     label: str
     mechanism_summary: str
@@ -1257,6 +1319,7 @@ async def label_clusters(
     tables: dict[str, pl.DataFrame],
     mech: dict,
     data_version: str,
+    ic: dict[str, float] | None = None,
 ) -> list[dict]:
     nodes, edges = tables["nodes"], tables["edges"]
     labels = dict(nodes.select("id", "label").iter_rows())
@@ -1288,6 +1351,8 @@ async def label_clusters(
     df_pw = Counter(p for cnt in cluster_pws.values() for p in cnt)
     n_clusters = max(1, len(members))
     ranked_ph = distinctive_phenotypes(members, dis_ph, labels)
+    hpo_parents, hpo_labels = taxonomy.hpo()
+    lineages = cluster_lineages(members, dis_ph, ranked_ph, ic or {}, hpo_parents, hpo_labels)
     mech_by_disease: dict[str, list[dict]] = defaultdict(list)
     for (_g, d), m in sorted(mech.items()):
         mech_by_disease[d].append(m)
@@ -1363,6 +1428,7 @@ async def label_clusters(
                         "top_pathways": top_pw,
                         "top_phenotypes": top_ph,
                         "distinctive_phenotypes": [labels.get(p, p) for p in distinct_ph[:3]],
+                        "lineage": lineages.get(c, []),
                         "mechanisms": dict(mechs),
                     }
                 ),
@@ -1753,7 +1819,7 @@ async def run() -> dict[str, Any]:
     )
     version = assign_version(digest)
     sync_scope_version(version)
-    clusters = await label_clusters(membership, tables, mech, version)
+    clusters = await label_clusters(membership, tables, mech, version, corpus.ic)
     tables["clusters"] = pl.DataFrame(clusters)
     tables["nodes"] = pl.concat(
         [tables["nodes"], cluster_nodes(clusters, tables["nodes"])], how="vertical_relaxed"

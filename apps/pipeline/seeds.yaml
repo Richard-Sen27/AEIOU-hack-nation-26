@@ -96,6 +96,9 @@ validation:
     - {source: "MONDO:0014203", relation: caused_by_variant_in, target: DNAAF4}
   # Wide core: at least this many diseases with a gene and a recorded symptom each.
   min_qualified_diseases: 7000
+  # Disease clusters hang under HPO groups (attrs.lineage); the map's focus clusters start
+  # from at most this many first-level groups.
+  max_focus_cluster_roots: 6
   # Same gene, opposite mechanism: these must never share a mechanism cluster.
   counterexamples:
     - gene: SCN2A
