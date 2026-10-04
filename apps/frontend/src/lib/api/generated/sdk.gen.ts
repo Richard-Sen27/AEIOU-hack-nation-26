@@ -282,6 +282,7 @@ export const findPath = <ThrowOnError extends boolean = false>(options: Options<
  * With `subject_node_id` the edges are that node's connections (the Atlas summary), not an
  * ordered path; it has its own cache key. With `steps` a new text streams its progress
  * (reading, writing, checking) first; the text is sent only after it passed the checks.
+ * A new text counts against the account's explanation and model limits (429).
  */
 export const explainPath = <ThrowOnError extends boolean = false>(options: Options<ExplainPathData, ThrowOnError, ExplainPathResponse>): Promise<ServerSentEventsResult<ExplainPathResponses>> => (options.client ?? client).sse.post<ExplainPathResponses, ExplainPathErrors, ThrowOnError>({
     url: '/explain',
@@ -299,7 +300,8 @@ export const explainPath = <ThrowOnError extends boolean = false>(options: Optio
  *
  * The turn runs on the server and keeps running when this stream is closed; follow it again
  * with streamChatRun. 409 when the session is still answering. Needs the health_data
- * consent: the message may carry the user's health data.
+ * consent: the message may carry the user's health data. 429 when the account's or the
+ * server's model limits are reached (reason busy or budget).
  */
 export const chat = <ThrowOnError extends boolean = false>(options: Options<ChatData, ThrowOnError, ChatResponse>): Promise<ServerSentEventsResult<ChatResponses>> => (options.client ?? client).sse.post<ChatResponses, ChatErrors, ThrowOnError>({
     url: '/chat',
@@ -379,7 +381,8 @@ export const listDocuments = <ThrowOnError extends boolean = false>(options?: Op
 /**
  * Upload Document
  *
- * Upload a document for extraction; returns the job to follow.
+ * Upload a document for extraction; returns the job to follow. Counts against the
+ * account's daily model budget (jobs queue, two at a time per process).
  */
 export const uploadDocument = <ThrowOnError extends boolean = false>(options: Options<UploadDocumentData, ThrowOnError>): RequestResult<UploadDocumentResponses, UploadDocumentErrors, ThrowOnError> => (options.client ?? client).post<UploadDocumentResponses, UploadDocumentErrors, ThrowOnError>({
     ...formDataBodySerializer,
