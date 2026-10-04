@@ -20,7 +20,9 @@ from backend.api.services.chat.tools import (
     build_tools,
     extract,
     extraction_mentions,
+    match_phenotypes,
     resolve,
+    symptoms_only,
 )
 from backend.api.services.explanation.common import (
     AI_NOTICES,
@@ -97,7 +99,12 @@ How to work:
 - What to do next: one action (reuse_asset, contact, join_trial or fund) with edge_ids,
   timeline_today (how long this takes today), timeline_proposed (with the proposed route) and
   the assumptions behind it. Mark viable=true only if all its edges are observed and active.
-- Symptoms only, no diagnosis: show clusters "to discuss with a clinical geneticist".
+- Symptoms only, no diagnosis: the server already ran match_phenotypes on them (its result
+  follows the message). Present its results as "conditions in the atlas whose recorded
+  symptoms overlap", with the overlap count ("3 of your 4 symptoms are recorded for it"), and
+  cite the has_phenotype edge_ids it lists. Never give a probability, likelihood or
+  percentage, never write "you have" or "this is", never call one a diagnosis; they are to
+  discuss with a clinical geneticist. Call match_phenotypes only for symptoms it lacks.
 - Expert mode: mechanism queries go to search_graph with expert=true; rank the clusters.
 - If several clusters remain and one answer would separate them, call ask_followup once.
 - Starting point for this role: {start}.
@@ -392,8 +399,7 @@ async def run_agent(
                     context = await _entities_first(llm, state, clock, status)
             except TimeoutError:
                 raise LLMError("timeout", "turn exceeded its deadline") from None
-            if context is not None:
-                items.append({"role": "developer", "content": context})
+            items += [{"role": "developer", "content": c} for c in context]
             elapsed = time.monotonic() - started
             result = await llm.run_tools(
                 instructions=instructions,
@@ -468,10 +474,12 @@ async def _entities_first(
     state: TurnState,
     clock: _TurnClock,
     status: Callable[[str | None, str], Any],
-) -> str | None:
+) -> list[str]:
     """extract_entities and resolve_to_ids in code before the first round, so the first round
-    can already use the ids. Returns the resolution as a tool result for the model, or None.
-    Bad extraction output is not fatal: the model can still resolve terms itself."""
+    can already use the ids; for a symptoms-only message also match_phenotypes, so the first
+    round already has the conditions whose recorded symptoms overlap (no search rounds, no
+    extra model call). Returns these results as tool results for the model ([] when there are
+    none). Bad extraction output is not fatal: the model can still resolve terms itself."""
     await status("extract_entities", "extract_entities")
     started = time.monotonic()
     try:
@@ -481,16 +489,27 @@ async def _entities_first(
         clock.tool_calls += 1
         if exc.code != "bad_output":
             raise
-        return None
+        return []
     clock.tool_calls += 1
     clock.step("tool", "extract_entities", (time.monotonic() - started) * 1000)
     mentions = extraction_mentions(extraction)
     if not mentions:
-        return None
+        return []
     await status("resolve_to_ids", "resolve_to_ids")
     started = time.monotonic()
     resolution = await resolve(state, mentions)
     clock.tool_calls += 1
     clock.step("tool", "resolve_to_ids", (time.monotonic() - started) * 1000)
     payload = json.dumps({**resolution, "note": CONTEXT_NOTE}, ensure_ascii=False)
-    return f'<tool_result name="resolve_to_ids">{payload}</tool_result>'
+    context = [f'<tool_result name="resolve_to_ids">{payload}</tool_result>']
+    if symptoms_only(extraction):
+        await status("match_phenotypes", "match_phenotypes")
+        started = time.monotonic()
+        present = [m.english or m.text for m in extraction.symptoms if not m.negated]
+        absent = [m.english or m.text for m in extraction.symptoms if m.negated]
+        matches = match_phenotypes(state, present, absent)
+        clock.tool_calls += 1
+        clock.step("tool", "match_phenotypes", (time.monotonic() - started) * 1000)
+        payload = json.dumps(matches, ensure_ascii=False)
+        context.append(f'<tool_result name="match_phenotypes">{payload}</tool_result>')
+    return context

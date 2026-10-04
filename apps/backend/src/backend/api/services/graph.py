@@ -126,6 +126,7 @@ class GraphStore:
     contrib_incident: dict[str, list[str]] = field(default_factory=dict)
     atlas_cache: tuple[bytes, str] | None = None
     tree_cache: Any = None  # atlas_tree.TreeCache, reset together with atlas_cache
+    phenotype_index: Any = None  # phenotype_match.PhenotypeIndex, built at load (pipeline edges)
 
 
 _store = GraphStore()
@@ -265,8 +266,23 @@ async def load_graph(db: AsyncSession) -> GraphStore:
         except Exception as exc:  # noqa: BLE001 - overlays are optional at startup
             log.warning("%s failed (%s)", refresh.__name__, type(exc).__name__)
     # /atlas.json is no longer used by the frontend: its payload is built on first request.
-    from backend.api.services import atlas_tree, search
+    from backend.api.services import atlas_tree, phenotype_match, search
 
+    terms_started = time.perf_counter()
+    n_terms = 0
+    try:
+        async with db.begin_nested():
+            n_terms = await phenotype_match.load_terms(db)
+    except Exception as exc:  # noqa: BLE001 - e.g. the hpo_terms migration not applied yet
+        phenotype_match.set_terms(None)
+        log.warning("hpo_terms not loaded (%s)", type(exc).__name__)
+    phenotype_match.get_index(store)
+    log.info(
+        "hpo terms and symptom index in %.2fs: %d terms (%s)",
+        time.perf_counter() - terms_started,
+        n_terms,
+        "hpo_terms" if n_terms else "phenotype nodes stand in",
+    )
     atlas_tree.tree_payload()
     log.info(
         "graph store built in %.2fs: %d nodes, %d edges",

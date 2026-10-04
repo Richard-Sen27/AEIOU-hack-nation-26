@@ -1,8 +1,9 @@
 """The orchestrator's tools as typed Pydantic tools over the backend services.
 
 `extract_entities` and the first `resolve_to_ids` run in code before the first model round
-(`extract` + `resolve`), so the model starts with resolved chips; the model is offered the
-other five tools. Every tool output the model sees is recorded in TurnState; the post-checks
+(`extract` + `resolve`), so the model starts with resolved chips; for a symptoms-only message
+`match_phenotypes` runs there too. The model is offered the other six tools. Every tool output
+the model sees is recorded in TurnState; the post-checks
 only accept edge and node IDs that a tool returned in this turn."""
 
 from collections import Counter
@@ -14,6 +15,7 @@ from pydantic import BaseModel, Field
 from backend.api.errors import ApiError
 from backend.api.services import graph as graph_service
 from backend.api.services import path as path_service
+from backend.api.services import phenotype_match
 from backend.api.services import search as search_service
 from backend.api.services.explanation.common import base_language, pick
 from backend.db.session import user_transaction
@@ -71,6 +73,10 @@ STATUS_TEXT = {
     "find_path": {
         "en": "Finding the most trustworthy route",
         "de": "Verlässlichste Verbindung wird gesucht",
+    },
+    "match_phenotypes": {
+        "en": "Comparing symptoms across the atlas",
+        "de": "Symptome werden mit dem Atlas verglichen",
     },
     "ask_followup": {"en": "Choosing one question", "de": "Eine Rückfrage wird gewählt"},
     "answer": {"en": "Writing the answer", "de": "Antwort wird geschrieben"},
@@ -151,6 +157,15 @@ class PathIn(BaseModel):
         None,
         description="Route through variants of uncertain significance (VUS). Leave null/false; "
         "set true only when the user explicitly asks to include uncertain variants.",
+    )
+
+
+class PhenotypesIn(BaseModel):
+    present: list[str] = Field(
+        description="Symptoms the user reports, as English HPO-style terms (or HP ids)."
+    )
+    absent: list[str] | None = Field(
+        None, description="Symptoms the user says are absent (same form)."
     )
 
 
@@ -364,6 +379,102 @@ async def resolve(state: TurnState, mentions: list[MentionIn]) -> dict:
     return {"resolved": resolved, "unresolved": unresolved, "chips_are_unconfirmed": True}
 
 
+MAX_SYMPTOMS = 20
+MAX_SHARED_PER_SYMPTOM = 2
+MATCH_NOTE = (
+    "These are conditions in the atlas whose recorded symptoms overlap the user's symptoms, "
+    "ranked by overlap; `overlap` counts the user's symptoms recorded for the condition. "
+    "Cite the edge_id of each shared symptom. The score is a similarity, not a probability: "
+    "never give probabilities, likelihoods or percentages, never write 'you have' or 'this "
+    "is', never call any of them a diagnosis; they are conditions to discuss with a clinical "
+    "geneticist."
+)
+
+
+def symptoms_only(ex: Extraction) -> bool:
+    """A message that names symptoms (at least one present) and no disease, gene or variant."""
+    return (
+        any(not m.negated for m in ex.symptoms)
+        and not ex.diseases
+        and not ex.genes
+        and not ex.variants
+    )
+
+
+def match_phenotypes(state: TurnState, present: list[str], absent: list[str]) -> dict:
+    """match_phenotypes: symptom mentions resolved against the HPO term table, then the
+    diseases of the atlas ranked by symptom overlap (phenotype_match.rank). Every shared
+    symptom carries its has_phenotype edge id, recorded in the turn so claims can cite it."""
+    store = graph_service.get_graph()
+    terms = phenotype_match.get_terms(store)
+    resolved, unresolved = [], []
+    present_ids: list[str] = []
+    absent_ids: list[str] = []
+    mentions = [(m, False) for m in present[:MAX_SYMPTOMS]]
+    mentions += [(m, True) for m in absent[:MAX_SYMPTOMS]]
+    for mention, negated in mentions:
+        term = terms.resolve(mention)
+        if term is None:
+            unresolved.append(mention[:80])
+            continue
+        (absent_ids if negated else present_ids).append(term)
+        resolved.append(
+            {"mention": mention[:80], "id": term, "label": terms.label(term), "absent": negated}
+        )
+        if (node := store.nodes.get(term)) is not None:
+            state.see_node(node)
+
+    def item(s: phenotype_match.SharedTerm) -> dict[str, Any] | None:
+        edge = graph_service.get_edge(s.edge_id)
+        if edge is None:
+            return None
+        state.see_edge(edge)
+        if (node := store.nodes.get(s.term)) is not None:
+            state.see_node(node)
+        out = {
+            "user_symptom": terms.label(s.query),
+            "recorded_as": node.label if node else terms.label(s.term),
+            "match": s.match,
+            "edge_id": edge.id,
+        }
+        if label := (edge.features or {}).get("frequency_label"):
+            out["frequency"] = label
+        return out
+
+    results = []
+    absent_set = set(absent_ids)
+    for m in phenotype_match.rank(present_ids, absent_ids, store=store):
+        disease = store.nodes[m.disease_id]
+        state.see_node(disease)
+        shown: list[dict[str, Any]] = []
+        per_symptom: Counter[str] = Counter()
+        for s in m.shared:
+            if per_symptom[s.query] < MAX_SHARED_PER_SYMPTOM and (view := item(s)):
+                per_symptom[s.query] += 1
+                shown.append(view)
+        result: dict[str, Any] = {
+            "id": disease.id,
+            "label": disease.label,
+            "overlap": m.overlap,
+            "of": len(present_ids),
+            "score": round(m.score, 3),
+            "shared": shown,
+        }
+        if conflicts := [v for s in m.conflicts if s.query in absent_set and (v := item(s))]:
+            result["recorded_but_absent_for_user"] = conflicts
+        if m.excluded:
+            result["recorded_as_not_present"] = [terms.label(t) for t in m.excluded]
+        if disease.cluster_id:
+            result["cluster_id"] = disease.cluster_id
+        results.append(result)
+    return {
+        "resolved": resolved,
+        "unresolved": unresolved,
+        "results": results,
+        "note": MATCH_NOTE,
+    }
+
+
 def build_tools(state: TurnState, llm: LLMClient) -> list[Tool]:
     """The tools offered to the model (extract_entities runs before the loop, see `extract`)."""
     lens = state.lens
@@ -415,7 +526,7 @@ def build_tools(state: TurnState, llm: LLMClient) -> list[Tool]:
 
     async def get_neighborhood(params: NeighborhoodIn) -> dict:
         try:
-            nb = graph_service.neighborhood(params.node_id, lens)
+            nb, total = graph_service.neighborhood_with_total(params.node_id, lens)
         except ApiError as exc:
             return {"error": exc.message, "code": exc.code.value}
         center = nb.center
@@ -444,13 +555,16 @@ def build_tools(state: TurnState, llm: LLMClient) -> list[Tool]:
                 "mechanism": nb.cluster.mechanism_summary,
                 "label_origin": "inferred",
             }
-        return {
+        out = {
             "center": _node_view(center),
             "cluster": cluster,
             "nodes": [_node_view(n) for n in nodes],
             "edges": [_edge_view(e) for e in shown],
             "omitted_edges": max(0, len(edges) - len(shown)),
         }
+        if total > len(nb.nodes) - 1:  # a hub: only its strongest neighbours were read
+            out["neighbours_total"] = total
+        return out
 
     async def find_path(params: PathIn) -> dict:
         try:
@@ -483,6 +597,9 @@ def build_tools(state: TurnState, llm: LLMClient) -> list[Tool]:
                 "gap_search_available": True,
             }
         return out
+
+    async def match_phenotypes_tool(params: PhenotypesIn) -> dict:
+        return match_phenotypes(state, list(params.present), list(params.absent or []))
 
     async def ask_followup(params: FollowupIn) -> dict:
         if state.follow_up is not None:
@@ -524,6 +641,15 @@ def build_tools(state: TurnState, llm: LLMClient) -> list[Tool]:
             "when the user explicitly asks to include uncertain variants.",
             PathIn,
             find_path,
+        ),
+        Tool(
+            "match_phenotypes",
+            "Conditions in the atlas whose recorded symptoms overlap the user's symptoms "
+            "(present and absent), ranked over every condition, with overlap counts and the "
+            "has_phenotype edge ids to cite. Already run before the first round for a "
+            "symptoms-only message. An overlap ranking, never a probability or a diagnosis.",
+            PhenotypesIn,
+            match_phenotypes_tool,
         ),
         Tool(
             "ask_followup",
