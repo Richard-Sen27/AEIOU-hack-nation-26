@@ -55,29 +55,29 @@ export function EntryPoints({ onStartFromSymptoms }: { onStartFromSymptoms: () =
       icon: Activity,
       title: "Patients and families",
       body: disease
-        ? `Start at ${disease.label}, with similar conditions and patient groups.`
-        : "Start at your condition, with similar conditions and patient groups, in plain words.",
+        ? "Similar conditions and patient groups."
+        : "Your condition, in plain words.",
       cta: disease ? `Open ${disease.label}` : "Find your condition",
     },
     {
       role: "doctor",
       icon: PersonStanding,
       title: "Doctors",
-      body: "Start from a symptom profile, with centers of expertise, studies and variant classifications.",
+      body: "Symptoms, experts and studies.",
       cta: "Start from symptoms",
     },
     {
       role: "researcher",
       icon: Boxes,
       title: "Researchers",
-      body: "Start at mechanism clusters, with variants, pathways, papers and funding, IDs shown.",
+      body: "Mechanisms, genes, papers.",
       cta: "Browse clusters",
     },
     {
       role: "guest",
       icon: Compass,
       title: "Just looking",
-      body: "A short guided tour of the atlas in very simple language. No account needed.",
+      body: "Quick tour, no account.",
       cta: "Take the tour",
     },
   ];
@@ -102,14 +102,9 @@ export function EntryPoints({ onStartFromSymptoms }: { onStartFromSymptoms: () =
 
   return (
     <section aria-labelledby="entry-heading" className="mx-auto w-full max-w-5xl px-4 pb-16 sm:px-6">
-      <div className="mb-4 flex flex-wrap items-end justify-between gap-2">
-        <h2 id="entry-heading" className="text-lg font-semibold tracking-tight">
-          Where to start
-        </h2>
-        <p className="text-[13px] text-muted-foreground">
-          Your view decides the starting point and the wording, never what you can see.
-        </p>
-      </div>
+      <h2 id="entry-heading" className="mb-4 text-lg font-semibold tracking-tight">
+        Where to start
+      </h2>
 
       {demoMode && (
         <div
@@ -120,8 +115,7 @@ export function EntryPoints({ onStartFromSymptoms }: { onStartFromSymptoms: () =
           <div className="flex-1 text-sm">
             <p className="font-medium">Try the demo journey</p>
             <p className="text-muted-foreground">
-              One family, from a new STXBP1 diagnosis to a related community, a shared registry and
-              a next step.
+              One family, from STXBP1 diagnosis to a next step.
             </p>
           </div>
           <button
