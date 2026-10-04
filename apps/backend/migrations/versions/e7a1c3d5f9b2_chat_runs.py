@@ -53,9 +53,7 @@ def upgrade() -> None:
         sa.UniqueConstraint("session_id"),
     )
     op.create_index("ix_chat_runs_user_id", "chat_runs", ["user_id"], unique=False)
-    op.create_index(
-        "ix_chat_runs_user_message_id", "chat_runs", ["user_message_id"], unique=False
-    )
+    op.create_index("ix_chat_runs_user_message_id", "chat_runs", ["user_message_id"], unique=False)
     op.execute(
         "ALTER TABLE chat_runs ENABLE ROW LEVEL SECURITY;\n"
         "ALTER TABLE chat_runs FORCE ROW LEVEL SECURITY;\n"

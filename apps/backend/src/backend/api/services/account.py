@@ -15,8 +15,8 @@ from sqlalchemy.exc import IntegrityError
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from backend.api.errors import ApiError
-from backend.api.services import connect as connect_service
 from backend.api.services import calls as calls_service
+from backend.api.services import connect as connect_service
 from backend.api.services import follows as follows_service
 from backend.api.services import messaging as messaging_service
 from backend.api.services import signups as signups_service
