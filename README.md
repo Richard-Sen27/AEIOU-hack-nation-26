@@ -1,11 +1,13 @@
 # Amber — Rare Disease Atlas
 
-Amber is a sourced knowledge graph for one cluster of rare diseases, developmental and epileptic
-encephalopathies and channelopathies (seed genes such as STXBP1, SCN1A, SCN2A, KCNQ2, CDKL5),
-with a web app to explore it. It connects diseases, genes, variants, mechanisms, pathways,
-symptoms, papers, researchers, clinicians, trials, grants, patient organizations and registries.
-Every edge carries its sources, a confidence score and an observed or inferred label. Guests can
-search and explore the whole graph. People who sign in with ChatGPT also get the chat agent,
+Amber is a sourced knowledge graph of rare diseases with a web app to explore it. It holds every
+rare disease the open sources describe with a known gene and a recorded symptom, and a focus set
+(developmental and epileptic encephalopathies and channelopathies, seed genes such as STXBP1,
+SCN1A, SCN2A, KCNQ2, CDKL5, plus diseases named in `seeds.yaml`) that also has literature, trials,
+people and communities and is drawn on the Atlas map. It connects diseases, genes, variants,
+mechanisms, pathways, symptoms, papers, researchers, clinicians, trials, grants, patient
+organizations and registries. Every edge carries its sources, a confidence score and an observed
+or inferred label. Guests can search and explore the whole graph. People who sign in with ChatGPT also get the chat agent,
 document upload with findings review, and on-demand explanations. Those model calls run on their
 own ChatGPT plan.
 
@@ -34,13 +36,14 @@ Live service · per request
   OIDC + PKCE (auth.openai.com)                       OpenAI API (billed to the user's plan)
 ```
 
-**Offline pipeline** (`apps/pipeline`). Eight stages, each a Typer command and a target in
+**Offline pipeline** (`apps/pipeline`). Ten steps, each a Typer command and a target in
 `apps/pipeline/Makefile`. They are idempotent and cached under `apps/pipeline/data`. `seeds.yaml`
 defines the scope. The pipeline downloads public data, resolves identities to MONDO, HGNC, HPO,
 PMID and NCT ids, and extracts relations from abstracts with a model, keeping an exact quote for
 each relation and checking that quote against the source text. It merges evidence into edges with
-a confidence score and computes symptom similarity, mechanism edges, Leiden clusters, layouts and
-centrality. It then validates the result, loads it into Postgres and exports a snapshot.
+a confidence score and computes links (symptom similarity, shared genes and pathways, mechanism,
+chromosome proximity), Leiden clusters, layouts and centrality. It then validates the result,
+loads it into Postgres and exports a snapshot.
 
 **Live service** (`apps/backend`, `apps/frontend`). FastAPI loads `nodes` and `edges` into memory
 at startup. Postgres handles search (pg_trgm, unaccent, pgvector with local fastembed embeddings),
@@ -153,8 +156,9 @@ Open the app at `http://127.0.0.1:3100`, not `http://localhost:3100`:
 
 ## Reproduce the dataset
 
-The dataset is defined by `apps/pipeline/seeds.yaml` (seed genes and diseases plus expansion
-rules) and the curated inputs in `apps/pipeline/curated/`. One command runs everything:
+The dataset is defined by `apps/pipeline/seeds.yaml` (the rule for which rare diseases qualify,
+the seed genes, diseases and expansion rules of the focus set, and the extra focus diseases) and
+the curated inputs in `apps/pipeline/curated/`. One command runs everything:
 
 ```sh
 make pipeline          # dev mode: cd apps/pipeline && uv run atlas-pipeline all
@@ -167,13 +171,13 @@ source):
 
 | Step | Command | What it does |
 | --- | --- | --- |
-| 1 (bulk) | `fetch --phase bulk` | Public bulk downloads into `data/raw/<source>/`, each with URL, time, SHA-256 and version: MONDO, HGNC, HPO (`hp.json`, `phenotype.hpoa`, `genes_to_phenotype.txt`), ClinVar `variant_summary.txt.gz`, ClinGen, Reactome, GO, Orphanet, OMIM (only with `OMIM_API_KEY`) |
-| 0 | `scope` | Resolves `seeds.yaml` into `data/scope/scope.json` (genes, diseases, phenotypes in scope) |
-| 1 (scoped) | `fetch --phase scoped` | Per-scope API queries: PubMed abstracts and authors, ClinicalTrials.gov studies, NIH RePORTER grants, patient organization pages (curated list, plus Bright Data search when configured) |
+| 1 (bulk) | `fetch --phase bulk` | Public bulk downloads into `data/raw/<source>/`, each with URL, time, SHA-256 and version: MONDO, HGNC, HPO (`hp.json`, `phenotype.hpoa`, `genes_to_phenotype.txt`), NCBI MANE gene coordinates, ClinGen, Reactome, GO, Orphanet, OMIM (only with `OMIM_API_KEY`) |
+| 0 | `scope` | Resolves `seeds.yaml` into `data/scope/scope.json`: the qualifying diseases, genes and phenotypes, each marked focus or core |
+| 1 (scoped) | `fetch --phase scoped` | ClinVar `variant_summary.txt.gz` (variants of focus genes, counts for all genes) and per-focus-disease API queries: PubMed abstracts and authors, ClinicalTrials.gov studies, NIH RePORTER grants, patient organization pages (curated list, plus Bright Data search when configured) |
 | 2 | `normalize` | Contract tables under `data/normalized/<source>/` with standard ids, a synonyms table, and linking of leftover names (trigram + embedding candidates, model decision when signed in, every decision logged in `data/logs/linking.jsonl`) |
 | 3 | `extract` | Model extraction of relations from abstracts and patient-organization pages, with quote verification |
 | 4 | `build` | Merges evidence into edges with tier-weighted confidence, prunes weakly linked researchers and orphan nodes |
-| 5 | `analytics` | Symptom similarity, mechanism edges, shared researchers, Leiden clusters and their labels, layouts, centrality |
+| 5 | `analytics` | Computed links (symptom similarity, shared gene, shared pathway, mechanism, chromosome proximity, shared researchers), each with a one-line explanation and a capped confidence; HPO term data; Leiden clusters and their labels; layouts, centrality |
 | 6 | `validate` | Fails the run unless every check passes (evidence per edge, no orphans, golden facts, the SCN2A counterexample) |
 | 7a | `load` | `psql \copy` into `staging` as `atlas_pipeline`, then promotes into the graph tables and records the run in `ingestion_runs` |
 | 7b | `snapshot` | Writes `data/snapshot/<data_version>/` (Parquet files for nodes, synonyms, edges, evidence, clusters and mechanisms, plus `manifest.json` with source versions, hashes, counts, thresholds and quote-verification results). `data/snapshot/latest` points to it |
@@ -214,11 +218,12 @@ Without a login the pipeline still finishes:
 - Extraction uses only results already cached in `data/cache/llm/`. The manifest records
   `skipped_not_logged_in` for the extractors.
 - Leftover names that need a model decision stay unlinked.
-- Cluster labels are built from the members' genes and pathways.
+- Cluster labels are built from the cluster's most distinctive symptom and its top gene.
 - Explanations are generated from templates over the edge data instead of by a model.
 
-`PIPELINE_LLM_MAX_CALLS` (default 300) caps the uncached model calls per run, and
-`PIPELINE_LLM_DISABLED=true` turns them off entirely.
+`PIPELINE_LLM_MAX_CALLS` (default 300) caps the uncached model calls per run for extraction and
+cluster labels (linking decisions are not counted), and `PIPELINE_LLM_DISABLED=true` turns every
+model call off.
 
 ## Tests
 
