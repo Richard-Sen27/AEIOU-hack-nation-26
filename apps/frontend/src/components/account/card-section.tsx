@@ -440,15 +440,17 @@ function CardSettingsBlock({
   async function put(nextVisible: boolean, what: "visible" | "save") {
     setBusy(what);
     setError(null);
+    // The switch sends the saved settings, so an unsaved (or invalid) draft never blocks switching off.
+    const s = what === "save" ? draft : saved;
     try {
       const c = await unwrap(
         putMyCard({
           body: {
             visible: nextVisible,
-            headline: draft.headline.trim() || null,
-            accepts_patient_messages: draft.accepts,
-            show_institutions: draft.showInst,
-            show_atlas_entry: draft.showAtlas,
+            headline: s.headline.trim() || null,
+            accepts_patient_messages: s.accepts,
+            show_institutions: s.showInst,
+            show_atlas_entry: s.showAtlas,
           },
           meta: { quiet: true },
         }),
