@@ -22,6 +22,7 @@ const LOCAL_LIMIT = 8;
 /** `searchTree` stops at its limit in tree order, so take a wider pool and rank it here. */
 const LOCAL_POOL = 300;
 const SERVER_LIMIT = 5;
+const EXACT_SYNONYM_TYPES = new Set(["disease", "gene", "phenotype"]);
 const DEBOUNCE_MS = 220;
 
 type Server =
@@ -147,8 +148,11 @@ export function AtlasSearch({ index, onPick, onAskWu, className }: AtlasSearchPr
       return node ? { key: hit.id, kind: "node", node, synonym } : { key: hit.id, kind: "offmap", hit, synonym };
     };
     const hits = server.kind === "done" && server.q === q ? server.hits : [];
-    // An exact id or exact name/symbol match from the API (also one not on the map) comes first.
-    const exact = hits.filter((h) => h.match_kind === "exact" && !h.matched_synonym).slice(0, SERVER_LIMIT);
+    // An exact id or exact name/symbol match from the API (also one not on the map) comes first,
+    // and so does an exact synonym of a condition, gene or symptom ("FOP", "ORPHA:337").
+    const exact = hits
+      .filter((h) => h.match_kind === "exact" && (!h.matched_synonym || EXACT_SYNONYM_TYPES.has(h.type)))
+      .slice(0, SERVER_LIMIT);
     const out: Option[] = exact.map(toOption);
     const seen = new Set(exact.map((h) => h.id));
     for (const node of local) {
