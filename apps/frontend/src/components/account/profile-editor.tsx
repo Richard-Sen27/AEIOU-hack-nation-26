@@ -430,7 +430,7 @@ export function ProfileEditor() {
         </div>
       </Group>
 
-      <Group title="About" description="Amber never asks for names, birth dates, addresses or patient numbers.">
+      <Group title="About" description="Your health profile never asks for names, birth dates, addresses or patient numbers.">
         <div className="grid gap-4 sm:grid-cols-2">
           <fieldset className="space-y-2 text-sm sm:col-span-2">
             <legend className="mb-1 font-medium">Age</legend>

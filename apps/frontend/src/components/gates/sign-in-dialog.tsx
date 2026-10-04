@@ -66,7 +66,8 @@ export function SignInDialog({
             <li>
               <span className="text-foreground">From OpenAI:</span> your name, email address and
               ChatGPT account ID to create your account, and an access token, stored encrypted, so
-              Dr. Wu&apos;s requests run on your ChatGPT plan.
+              Dr. Wu&apos;s requests run on your ChatGPT plan. Doctors and researchers may add work
+              details later, optional and private.
             </li>
             <li>
               <span className="text-foreground">A session cookie</span> that keeps you signed in.

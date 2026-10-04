@@ -111,6 +111,7 @@ export default function PrivacyPage() {
                   "From OpenAI when you sign in with ChatGPT: your name, e-mail address and ChatGPT account ID.",
                   "An access token, stored encrypted, so the assistant can run on your own ChatGPT plan.",
                   "Your settings: role, language, expert mode, the time you confirmed you are 16 or older, and whether your browser sent a Global Privacy Control signal.",
+                  "Only if you are a doctor or researcher and add them: your first and last name, up to three institutions, your ORCID iD and a private link to your entry in the atlas. Visible only to you, not a verification.",
                   "A session cookie that keeps you signed in. It is strictly necessary; we set no optional cookies, so there is no cookie banner.",
                   "Technical logs (error types, not content) for security, kept at most 30 days.",
                 ]}
@@ -140,6 +141,11 @@ export default function PrivacyPage() {
               head={["Purpose", "Data", "Legal basis"]}
               rows={[
                 ["Your account and the features you ask for", "Account data, settings", "Contract (GDPR Art. 6(1)(b))"],
+                [
+                  "Optional work details of doctors and researchers, to find your entry in the atlas",
+                  "Name, institutions, ORCID iD, the entry you link",
+                  "Contract (Art. 6(1)(b))",
+                ],
                 [
                   "Your chats with Dr. Wu, your private profile and reading your documents, to find connections for you",
                   "Health and genetic data you type, confirm or upload",
@@ -230,6 +236,7 @@ export default function PrivacyPage() {
                 ["Contributions", "Until you remove them, withdraw contribute consent, or delete your account"],
                 ["Consent records", "Until you delete your account (kept after withdrawal as proof of what you agreed to)"],
                 ["Account and settings", "Until you delete your account"],
+                ["Work details (doctors and researchers)", "Until you remove them, switch your role to patient, or delete your account"],
                 ["ChatGPT access token", "Until you sign out or delete your account"],
                 ["Logs and AI traces (no content, or redacted only)", "At most 30 days"],
                 ["Backups", "Deleted data disappears within one backup cycle (at most 30 days)"],
