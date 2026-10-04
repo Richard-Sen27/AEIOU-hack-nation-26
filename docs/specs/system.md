@@ -503,7 +503,9 @@ Detailed design in [`agent.md`](agent.md).
 ### Calls
 
 - Verified doctors and researchers with a visible card write surveys, studies and trials looking for participants (`calls`); a study or trial needs an ethics reference, a trial a registry ID (NCT, EU CT / EudraCT, DRKS); atlas IDs must exist.
-- Draft -> submit (wording check: no offer, promise or price of a treatment) -> the operator approves or rejects with `backend.cli calls ...` through the definer functions `pending_calls()` and `review_call()`, every action logged in `call_reviews`; the trigger `calls_guard` stops the API role from publishing. Published calls are listed to every signed-in user while the publisher's card stays visible (`call_publisher_cards()` joined with `professional_cards()`); nothing about readers is stored. `backend.cli demo-calls` seeds labelled demo calls locally.
+- Default (`CALLS_REVIEW_REQUIRED=false`): draft -> submit (wording check: no offer, promise or price of a treatment) -> published at once through the definer function `publish_own_call()`, which takes only the caller's own draft or pending call live, re-checks the visible verified card, sets `calls.self_published` and logs a `self_published` row in `call_reviews`. Such a call shows "Published by the expert. Not reviewed by the Amber team."; `GET /me/calls` returns `review_required` so the form labels its button.
+- With `CALLS_REVIEW_REQUIRED=true`: draft -> submit (same wording check) -> the operator approves or rejects with `backend.cli calls ...` through the definer functions `pending_calls()` and `review_call()`, every action logged in `call_reviews`.
+- The trigger `calls_guard` stops the API role from publishing any other way, from changing review fields, `demo` or `self_published`, and from editing a published call. Published calls are listed to every signed-in user while the publisher's card stays visible (`call_publisher_cards()` joined with `professional_cards()`); nothing about readers is stored. `backend.cli demo-calls` seeds labelled demo calls locally.
 
 ### Proposal export and data rights
 
@@ -561,7 +563,7 @@ Detailed design in [`agent.md`](agent.md).
 | GET | `/calls?kind=` · `/calls/{id}` | Signed in (16+), rate-limited | Every published, still open call with its publisher's card, the review badge and the "ask your doctor" notice · one call |
 | GET | `/me/calls` · `/me/calls/{id}` | Signed in | Own calls in every status with review note and wording-check result · one |
 | POST · PUT | `/me/calls` · `/me/calls/{id}` | Verified doctor or researcher with a visible card, rate-limited | New draft (at most 10 open calls) · replace a draft, rejected or pending call (back to draft) |
-| POST | `/me/calls/{id}/submit` · `/close` · DELETE `/me/calls/{id}` | Submit: as above, 10 a day; close and delete: owner | To review (wording check) · close a published call or withdraw an unpublished one · delete |
+| POST | `/me/calls/{id}/submit` · `/close` · DELETE `/me/calls/{id}` | Submit: as above, 10 a day; close and delete: owner | Publish at once after the wording check (to review instead when `CALLS_REVIEW_REQUIRED` is on) · close a published call or withdraw an unpublished one · delete |
 | GET | `/me/export` · DELETE `/me` | Signed in | Data export · account deletion |
 
 ## Build order

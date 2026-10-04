@@ -115,7 +115,7 @@ Work deliberately left for later. Add an item when you leave something for later
 ## Calls
 
 - **Moderation UI:** calls are reviewed only through `backend.cli calls pending|approve|reject`; an operator screen is missing.
-- **No auto-publish in local demos:** the planned shortcut that publishes a submitted call at once in local settings (labelled "demo, not reviewed") was not built (a definer function the API role may call was refused as weakening the review guarantee); demos use `backend.cli demo-calls` or the operator command.
+- **Calls go live without review by default:** the user decided that an expert publishes a call from the form (`CALLS_REVIEW_REQUIRED=false`; the call says it was not reviewed by the Amber team). Before real patients use this, set `CALLS_REVIEW_REQUIRED=true` so every call waits for the operator, and decide what happens to calls that were self-published before the switch (they stay live with their "not reviewed" label).
 - **Operator log noise:** `calls approve` lists the pending calls first for the wording check, which logs a "viewed" row for every pending call, not only the approved one.
 - **Expired calls** stay `published` after `closes_at` (only hidden from the list); no job closes them.
 - **Wording check** (`WORDING_RULES` in `api/services/calls.py`) is a coarse English/German blocklist; counsel should review the drug-advertising wording before real use.
