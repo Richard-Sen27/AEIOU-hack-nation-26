@@ -89,7 +89,7 @@ export function EntityPicker({
   const hits = results.filter((h) => !exclude.includes(h.id)).slice(0, 8);
   const typed = q.trim();
   const open = typed.length >= 2;
-  const freeText = !!onFreeText && open && typed.length <= freeTextMax && !hits.some((h) => h.label.toLowerCase() === typed.toLowerCase());
+  const freeText = !!onFreeText && open && state !== "loading" && typed.length <= freeTextMax && !hits.some((h) => h.label.toLowerCase() === typed.toLowerCase());
   const meta = nodeTypeMeta(types[0]);
 
   return (
