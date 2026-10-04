@@ -428,6 +428,50 @@ export type AtlasNode = {
 };
 
 /**
+ * AtlasStats
+ *
+ * Headline counts of the loaded graph, computed once per data version.
+ */
+export type AtlasStats = {
+    /**
+     * Data Version
+     *
+     * Data version the counts were computed from.
+     */
+    data_version: string | null;
+    /**
+     * Diseases
+     *
+     * Disease nodes in the graph.
+     */
+    diseases: number;
+    /**
+     * Genes
+     *
+     * Gene nodes in the graph.
+     */
+    genes: number;
+    /**
+     * Symptoms
+     *
+     * Symptom (phenotype) nodes in the graph.
+     */
+    symptoms: number;
+    /**
+     * Links Cited
+     *
+     * Links with origin observed (backed by a source).
+     */
+    links_cited: number;
+    /**
+     * Links Computed
+     *
+     * Links with origin inferred (computed hypotheses).
+     */
+    links_computed: number;
+};
+
+/**
  * AtlasSummary
  */
 export type AtlasSummary = {
@@ -4443,6 +4487,22 @@ export type GetAtlasSummaryResponses = {
 };
 
 export type GetAtlasSummaryResponse = GetAtlasSummaryResponses[keyof GetAtlasSummaryResponses];
+
+export type GetStatsData = {
+    body?: never;
+    path?: never;
+    query?: never;
+    url: '/stats';
+};
+
+export type GetStatsResponses = {
+    /**
+     * Successful Response
+     */
+    200: AtlasStats;
+};
+
+export type GetStatsResponse = GetStatsResponses[keyof GetStatsResponses];
 
 export type FindPathData = {
     body?: never;

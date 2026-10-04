@@ -1389,6 +1389,31 @@
         }
       }
     },
+    "/stats": {
+      "get": {
+        "tags": [
+          "graph"
+        ],
+        "summary": "Get Stats",
+        "description": "Headline counts of the graph (computed once per data version, ETag on it).",
+        "operationId": "getStats",
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/AtlasStats"
+                }
+              }
+            }
+          },
+          "304": {
+            "description": "Not modified (If-None-Match matched the ETag)."
+          }
+        }
+      }
+    },
     "/path": {
       "get": {
         "tags": [
@@ -3600,6 +3625,58 @@
           "label"
         ],
         "title": "AtlasNode"
+      },
+      "AtlasStats": {
+        "properties": {
+          "data_version": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Data Version",
+            "description": "Data version the counts were computed from."
+          },
+          "diseases": {
+            "type": "integer",
+            "title": "Diseases",
+            "description": "Disease nodes in the graph."
+          },
+          "genes": {
+            "type": "integer",
+            "title": "Genes",
+            "description": "Gene nodes in the graph."
+          },
+          "symptoms": {
+            "type": "integer",
+            "title": "Symptoms",
+            "description": "Symptom (phenotype) nodes in the graph."
+          },
+          "links_cited": {
+            "type": "integer",
+            "title": "Links Cited",
+            "description": "Links with origin observed (backed by a source)."
+          },
+          "links_computed": {
+            "type": "integer",
+            "title": "Links Computed",
+            "description": "Links with origin inferred (computed hypotheses)."
+          }
+        },
+        "type": "object",
+        "required": [
+          "data_version",
+          "diseases",
+          "genes",
+          "symptoms",
+          "links_cited",
+          "links_computed"
+        ],
+        "title": "AtlasStats",
+        "description": "Headline counts of the loaded graph, computed once per data version."
       },
       "AtlasSummary": {
         "properties": {

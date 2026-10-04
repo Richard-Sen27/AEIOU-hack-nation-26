@@ -24,6 +24,7 @@ from backend.api.routes import (
     path,
     proposal,
     session,
+    stats,
 )
 from backend.api.services.documents import MAX_UPLOAD_BYTES
 from backend.config import Settings, get_settings
@@ -39,6 +40,7 @@ ROUTERS = (
     account,
     graph,
     atlas,
+    stats,
     path,
     explain,
     chat,
