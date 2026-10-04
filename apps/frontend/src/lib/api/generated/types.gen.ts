@@ -825,9 +825,15 @@ export type Call = {
      */
     demo: boolean;
     /**
+     * Self Published
+     *
+     * The expert published it without a review by the Amber team (CALLS_REVIEW_REQUIRED off).
+     */
+    self_published?: boolean;
+    /**
      * Review Badge
      *
-     * Show on every published call.
+     * Show on every published call, exactly as sent: either the review badge or, for a self-published call, that it was not reviewed. On the publisher's unpublished calls it is the badge the call would get when it goes live.
      */
     review_badge?: string;
     /**
@@ -966,6 +972,10 @@ export type CallExport = {
      * Demo
      */
     demo: boolean;
+    /**
+     * Self Published
+     */
+    self_published?: boolean;
     /**
      * Created At
      */
@@ -2002,6 +2012,12 @@ export type ConnectStatus = {
      */
     consent_active: boolean;
     /**
+     * Consent Current
+     *
+     * The active consent was given to the current text. Suggestions and sign-ups need it (the earlier text named messaging only): ask again when false.
+     */
+    consent_current: boolean;
+    /**
      * Self-declared at the first connect action; null until stated.
      */
     age_group: AgeGroup | null;
@@ -2076,7 +2092,7 @@ export type ConsentGrant = {
     /**
      * Version
      *
-     * Consent text version shown; must be the current version for the type (health_data: health-data-2026-10-04, contribute: contribute-2026-10-04, connect: connect-2026-10-04).
+     * Consent text version shown; must be the current version for the type (health_data: health-data-2026-10-04, contribute: contribute-2026-10-04, connect: connect-signups-2026-10-04).
      */
     version: string;
     /**
@@ -2319,6 +2335,10 @@ export type DataExport = {
      * Review decisions about the user's calls.
      */
     call_reviews?: Array<CallReviewExport>;
+    /**
+     * The suggestions setting and the user's own sign-ups to calls.
+     */
+    signups?: SignupsExport | null;
 };
 
 /**
@@ -3518,6 +3538,110 @@ export type MyCard = {
 };
 
 /**
+ * MySignup
+ */
+export type MySignup = {
+    /**
+     * Id
+     */
+    id: string;
+    /**
+     * Call Id
+     *
+     * Null once the call was deleted.
+     */
+    call_id: string | null;
+    /**
+     * Call Title
+     *
+     * The call's title when I signed up.
+     */
+    call_title: string;
+    /**
+     * Call Open
+     *
+     * The call is still published and open.
+     */
+    call_open: boolean;
+    /**
+     * Recipient
+     *
+     * Who received it, as named in the authorization.
+     */
+    recipient: string;
+    /**
+     * Display Name
+     */
+    display_name: string;
+    shared: SharedItems;
+    /**
+     * Note
+     */
+    note: string | null;
+    status: SignupStatus;
+    /**
+     * About Child
+     */
+    about_child: boolean;
+    /**
+     * Authorization Version
+     */
+    authorization_version: string;
+    /**
+     * Authorized At
+     */
+    authorized_at: string;
+    /**
+     * Guardian Agreed At
+     */
+    guardian_agreed_at: string | null;
+    /**
+     * Guardian Text Version
+     */
+    guardian_text_version: string | null;
+    /**
+     * Created At
+     */
+    created_at: string;
+    /**
+     * Withdrawn At
+     */
+    withdrawn_at: string | null;
+    /**
+     * Declined At
+     */
+    declined_at: string | null;
+    /**
+     * Call Ended At
+     */
+    call_ended_at: string | null;
+    /**
+     * Delete After
+     *
+     * When this sign-up is deleted for good.
+     */
+    delete_after: string | null;
+    /**
+     * Thread Id
+     *
+     * The conversation opened with this sign-up.
+     */
+    thread_id: string | null;
+};
+
+/**
+ * MySignupList
+ */
+export type MySignupList = {
+    /**
+     * Items
+     *
+     * Newest first.
+     */
+    items: Array<MySignup>;
+};
+
+/**
  * Neighborhood
  */
 export type Neighborhood = {
@@ -3675,13 +3799,13 @@ export type Notification = {
      */
     id: string;
     /**
-     * added: a paper, trial, grant or patient group newly linked to the disease in the atlas; now_recruiting: a trial whose status changed to recruiting.
+     * added: a paper, trial, grant or patient group newly linked to the disease in the atlas; now_recruiting: a trial whose status changed to recruiting; call_match: a published call matches your profile (suggestions switched on; link to the call).
      */
     kind: NotificationKind;
     /**
      * Disease Id
      *
-     * The followed disease.
+     * The followed disease (call_match: the matching disease, if any).
      */
     disease_id: string | null;
     /**
@@ -3693,9 +3817,15 @@ export type Notification = {
     /**
      * Item Id
      *
-     * Node ID of the new item; link to its node page.
+     * Node ID of the new item; link to its node page. call_match: the call id.
      */
     item_id: string;
+    /**
+     * Call Id
+     *
+     * call_match only: the call to open.
+     */
+    call_id?: string | null;
     /**
      * paper, trial, grant or patient_org; null if no longer in the atlas.
      */
@@ -3703,7 +3833,7 @@ export type Notification = {
     /**
      * Item Label
      *
-     * Null if no longer in the atlas.
+     * Null if no longer in the atlas. call_match: the call's title.
      */
     item_label: string | null;
     /**
@@ -3721,7 +3851,7 @@ export type Notification = {
     /**
      * Gone
      *
-     * The item or the disease has left the atlas since; render without a link.
+     * The item or the disease has left the atlas since (call_match: the call is no longer published and open); render without a link.
      */
     gone: boolean;
     /**
@@ -3777,7 +3907,7 @@ export type NotificationExport = {
 /**
  * NotificationKind
  */
-export type NotificationKind = 'added' | 'now_recruiting';
+export type NotificationKind = 'added' | 'now_recruiting' | 'call_match';
 
 /**
  * NotificationList
@@ -4009,9 +4139,15 @@ export type OwnCall = {
      */
     demo: boolean;
     /**
+     * Self Published
+     *
+     * The expert published it without a review by the Amber team (CALLS_REVIEW_REQUIRED off).
+     */
+    self_published?: boolean;
+    /**
      * Review Badge
      *
-     * Show on every published call.
+     * Show on every published call, exactly as sent: either the review badge or, for a self-published call, that it was not reviewed. On the publisher's unpublished calls it is the badge the call would get when it goes live.
      */
     review_badge?: string;
     /**
@@ -4083,6 +4219,12 @@ export type OwnCallList = {
      * The user is a verified doctor or researcher with a visible card.
      */
     can_publish: boolean;
+    /**
+     * Review Required
+     *
+     * False (the default): `submitCall` publishes the call at once, so the form's button reads 'Publish'. True: it sends the call to the Amber team for review.
+     */
+    review_required: boolean;
     /**
      * Open Limit
      *
@@ -4888,6 +5030,105 @@ export type RankedCluster = {
 };
 
 /**
+ * ReceivedSignup
+ *
+ * A sign-up to one of my calls, as the study team sees it. Never an account id or e-mail.
+ */
+export type ReceivedSignup = {
+    /**
+     * Id
+     */
+    id: string;
+    /**
+     * Display Name
+     */
+    display_name: string;
+    shared: SharedItems;
+    /**
+     * Note
+     */
+    note: string | null;
+    /**
+     * withdrawn: show 'withdrew' (a stub, items deleted).
+     */
+    status: SignupStatus;
+    /**
+     * About Child
+     *
+     * The sign-up is about a child (a parent signs up).
+     */
+    about_child: boolean;
+    /**
+     * Minor
+     *
+     * The participant said they are 16 or 17.
+     */
+    minor: boolean;
+    /**
+     * Minor Label
+     *
+     * Show when minor is true.
+     */
+    minor_label: string | null;
+    /**
+     * Authorization Version
+     */
+    authorization_version: string;
+    /**
+     * Authorized At
+     */
+    authorized_at: string;
+    /**
+     * Created At
+     */
+    created_at: string;
+    /**
+     * Withdrawn At
+     */
+    withdrawn_at: string | null;
+    /**
+     * Declined At
+     */
+    declined_at: string | null;
+    /**
+     * Thread Id
+     *
+     * The conversation the participant opened, if any.
+     */
+    thread_id: string | null;
+};
+
+/**
+ * ReceivedSignupList
+ */
+export type ReceivedSignupList = {
+    /**
+     * Call Id
+     */
+    call_id: string;
+    /**
+     * Call Title
+     */
+    call_title: string;
+    /**
+     * Active Count
+     *
+     * Active sign-ups of this call.
+     */
+    active_count: number;
+    /**
+     * Max Signups
+     */
+    max_signups: number | null;
+    /**
+     * Items
+     *
+     * Newest first; stubs included.
+     */
+    items: Array<ReceivedSignup>;
+};
+
+/**
  * Relation
  */
 export type Relation = 'caused_by_variant_in' | 'acts_via' | 'participates_in' | 'has_phenotype' | 'same_gene_same_mechanism' | 'same_gene_different_mechanism' | 'shared_pathway' | 'similar_symptoms' | 'shared_researcher' | 'shared_gene' | 'near_on_chromosome' | 'candidate_phenotype' | 'suggested_by_neighbour' | 'asserts' | 'authored' | 'pi_of' | 'funds_research_on' | 'serves' | 'runs' | 'studies' | 'investigator_of' | 'affiliated_with' | 'variant_of' | 'observed_in' | 'member_of' | 'about';
@@ -5168,6 +5409,359 @@ export type SettingsUpdate = {
 };
 
 /**
+ * SharedItem
+ */
+export type SharedItem = {
+    /**
+     * Id
+     *
+     * Atlas id (MONDO, HGNC, HP) or ClinVar id.
+     */
+    id?: string | null;
+    /**
+     * Label
+     */
+    label: string;
+    /**
+     * Detail
+     */
+    detail?: string | null;
+};
+
+/**
+ * SharedItems
+ *
+ * Exactly what the patient ticked; empty after a withdrawal or a decline.
+ */
+export type SharedItems = {
+    /**
+     * Diagnoses
+     */
+    diagnoses?: Array<SharedItem>;
+    /**
+     * Genes
+     */
+    genes?: Array<SharedItem>;
+    /**
+     * Variants
+     */
+    variants?: Array<SharedItem>;
+    /**
+     * Symptoms
+     */
+    symptoms?: Array<SharedItem>;
+    /**
+     * Age Range
+     */
+    age_range?: string | null;
+    /**
+     * Country
+     */
+    country?: string | null;
+};
+
+/**
+ * SignupAvailability
+ */
+export type SignupAvailability = {
+    /**
+     * Can Sign Up
+     *
+     * Offer the sign-up button. The consent and the age group are asked just in time on the sign-up screen and do not block it here.
+     */
+    can_sign_up: boolean;
+    blocked_by?: SignupBlock | null;
+    /**
+     * Label
+     *
+     * Text to show instead of the button, if any.
+     */
+    label?: string | null;
+    /**
+     * Signup Id
+     *
+     * My active or declined sign-up, if any.
+     */
+    signup_id?: string | null;
+};
+
+/**
+ * SignupBlock
+ *
+ * Why the sign-up button is not offered (the call stays visible in every case).
+ */
+export type SignupBlock = 'not_patient' | 'own_call' | 'for_adults' | 'already_signed_up' | 'declined' | 'not_open_yet';
+
+/**
+ * SignupExport
+ */
+export type SignupExport = {
+    /**
+     * Id
+     */
+    id: string;
+    /**
+     * Call Id
+     */
+    call_id: string | null;
+    /**
+     * Call Title Snapshot
+     */
+    call_title_snapshot: string;
+    /**
+     * Recipient Name
+     */
+    recipient_name: string;
+    /**
+     * Display Name
+     */
+    display_name: string;
+    shared: SharedItems;
+    /**
+     * About Child
+     */
+    about_child: boolean;
+    /**
+     * Note
+     */
+    note: string | null;
+    /**
+     * Authorization Version
+     */
+    authorization_version: string;
+    /**
+     * Authorized At
+     */
+    authorized_at: string;
+    /**
+     * Guardian Agreed At
+     */
+    guardian_agreed_at: string | null;
+    /**
+     * Guardian Text Version
+     */
+    guardian_text_version: string | null;
+    status: SignupStatus;
+    /**
+     * Withdrawn At
+     */
+    withdrawn_at: string | null;
+    /**
+     * Declined At
+     */
+    declined_at: string | null;
+    /**
+     * Call Ended At
+     */
+    call_ended_at: string | null;
+    /**
+     * Purge After
+     */
+    purge_after: string | null;
+    /**
+     * Thread Id
+     */
+    thread_id: string | null;
+    /**
+     * Created At
+     */
+    created_at: string;
+};
+
+/**
+ * SignupOption
+ *
+ * One item the patient may tick. Only confirmed, non-excluded profile items that the call
+ * asks for (requested_fields) and targets (its diseases, genes, symptoms) are offered.
+ */
+export type SignupOption = {
+    /**
+     * Key
+     *
+     * Send back in SignupRequest.items to share it.
+     */
+    key: string;
+    kind: SignupOptionKind;
+    /**
+     * Label
+     */
+    label: string;
+    /**
+     * Detail
+     *
+     * Variant notation and classification, if any.
+     */
+    detail?: string | null;
+    /**
+     * Preselected
+     *
+     * Only a matching diagnosis is pre-ticked.
+     */
+    preselected: boolean;
+};
+
+/**
+ * SignupOptionKind
+ */
+export type SignupOptionKind = 'diagnosis' | 'gene' | 'variant' | 'symptom' | 'age_range' | 'country';
+
+/**
+ * SignupOptions
+ */
+export type SignupOptions = {
+    /**
+     * Call Id
+     */
+    call_id: string;
+    /**
+     * Call Title
+     */
+    call_title: string;
+    /**
+     * Recipient
+     *
+     * Card name and first institution ('who runs this call').
+     */
+    recipient: string;
+    /**
+     * Recipient Name
+     *
+     * Card name.
+     */
+    recipient_name: string;
+    /**
+     * Options
+     */
+    options: Array<SignupOption>;
+    /**
+     * Authorization Text
+     *
+     * With the recipient filled in; replace {items} with the ticked items.
+     */
+    authorization_text: string;
+    /**
+     * Authorization Version
+     */
+    authorization_version?: string;
+    /**
+     * Consent Active
+     *
+     * An active `connect` consent of the current text; ask for it before sending.
+     */
+    consent_active: boolean;
+    /**
+     * Age Group Needed
+     *
+     * Ask for the age group before sending.
+     */
+    age_group_needed: boolean;
+    /**
+     * Guardian Required
+     *
+     * The user said 16 or 17: show guardian_text as one more required checkbox.
+     */
+    guardian_required: boolean;
+    /**
+     * Guardian Text
+     *
+     * With the recipient filled in.
+     */
+    guardian_text: string;
+    /**
+     * Guardian Text Version
+     */
+    guardian_text_version: string;
+    /**
+     * About Child
+     *
+     * The profile describes a child (parental responsibility).
+     */
+    about_child: boolean;
+    availability: SignupAvailability;
+    /**
+     * Max Note
+     */
+    max_note?: number;
+};
+
+/**
+ * SignupRequest
+ */
+export type SignupRequest = {
+    /**
+     * Display Name
+     *
+     * How the study team sees you (1-60 characters). Your e-mail, account name and profile are never shown.
+     */
+    display_name: string;
+    /**
+     * Items
+     *
+     * Keys of the ticked SignupOptions; anything not offered is refused (422).
+     */
+    items?: Array<string>;
+    /**
+     * Note
+     *
+     * Optional note to the study team, plain text.
+     */
+    note?: string | null;
+    /**
+     * Authorized
+     *
+     * The authorization was shown and ticked; must be true.
+     */
+    authorized: boolean;
+    /**
+     * Authorization Version
+     *
+     * Must be the current authorization version.
+     */
+    authorization_version: string;
+    /**
+     * Guardian Agreed
+     *
+     * Required true when the age group is 16_17.
+     */
+    guardian_agreed?: boolean;
+    /**
+     * Open Conversation
+     *
+     * Also open a conversation with the study team (no message yet; counts towards 5 new conversations a day).
+     */
+    open_conversation?: boolean;
+};
+
+/**
+ * SignupStatus
+ *
+ * active; withdrawn (by the patient: items deleted, stub for 30 days); declined (by the
+ * study team: items deleted, stub for 30 days); call_closed (the call closed or was deleted:
+ * deleted 90 days after it closed, at once if it was deleted).
+ */
+export type SignupStatus = 'active' | 'withdrawn' | 'declined' | 'call_closed';
+
+/**
+ * SignupsExport
+ */
+export type SignupsExport = {
+    /**
+     * Suggestions Enabled
+     */
+    suggestions_enabled: boolean;
+    /**
+     * Suggestions Enabled At
+     */
+    suggestions_enabled_at: string | null;
+    /**
+     * Signups
+     *
+     * My own sign-ups (not those to my calls).
+     */
+    signups: Array<SignupExport>;
+};
+
+/**
  * SourceCount
  */
 export type SourceCount = {
@@ -5191,6 +5785,42 @@ export type SourceCount = {
 export type StartLayout = 'ring' | 'force' | 'hierarchy' | 'cluster' | 'tour';
 
 /**
+ * SuggestedCall
+ */
+export type SuggestedCall = {
+    call: Call;
+    /**
+     * Score
+     *
+     * disease 3, gene 2, symptoms 1, summed; higher first.
+     */
+    score: number;
+    /**
+     * Reasons
+     */
+    reasons: Array<SuggestionReason>;
+    /**
+     * Sentence
+     *
+     * Show as is: 'Suggested because your profile lists ...'.
+     */
+    sentence: string;
+    /**
+     * Age Fits
+     *
+     * Information only, never used to hide: the profile's age or age range fits the call's ages; null when either side gives none.
+     */
+    age_fits: boolean | null;
+    /**
+     * Country Listed
+     *
+     * Information only: the profile's country is one of the call's countries; null when the profile has no country or the call lists none.
+     */
+    country_listed: boolean | null;
+    signup: SignupAvailability;
+};
+
+/**
  * SuggestedName
  *
  * Prefill from the sign-in account, computed on request and never stored.
@@ -5208,6 +5838,100 @@ export type SuggestedName = {
      * Source
      */
     source?: 'chatgpt' | 'google';
+};
+
+/**
+ * SuggestionList
+ */
+export type SuggestionList = {
+    /**
+     * Consent Active
+     *
+     * An active `connect` consent of the current text.
+     */
+    consent_active: boolean;
+    /**
+     * Enabled
+     *
+     * The user switched suggestions on.
+     */
+    enabled: boolean;
+    /**
+     * Items
+     *
+     * Empty unless consent_active and enabled. Strongest first, then newest.
+     */
+    items: Array<SuggestedCall>;
+    /**
+     * Notice
+     */
+    notice?: string;
+};
+
+/**
+ * SuggestionReason
+ */
+export type SuggestionReason = {
+    kind: SuggestionReasonKind;
+    /**
+     * Items
+     *
+     * The matching atlas entries, labels from the atlas.
+     */
+    items: Array<AtlasRef>;
+    /**
+     * Via Variant
+     *
+     * gene only: at least one gene came from a variant in the profile.
+     */
+    via_variant?: boolean;
+};
+
+/**
+ * SuggestionReasonKind
+ *
+ * disease: an exact disease of the profile is a disease of the call (strong); gene: a gene
+ * of the profile, or the gene of a profile variant, is a gene of the call; symptoms: at least
+ * two exact symptoms (HPO ids) of the profile are symptoms of the call.
+ */
+export type SuggestionReasonKind = 'disease' | 'gene' | 'symptoms';
+
+/**
+ * SuggestionSettings
+ */
+export type SuggestionSettings = {
+    /**
+     * Enabled
+     *
+     * Suggestions are switched on (off by default).
+     */
+    enabled: boolean;
+    /**
+     * Enabled At
+     */
+    enabled_at: string | null;
+    /**
+     * Consent Active
+     *
+     * An active `connect` consent of the current text.
+     */
+    consent_active: boolean;
+    /**
+     * Notice
+     */
+    notice?: string;
+};
+
+/**
+ * SuggestionSettingsUpdate
+ */
+export type SuggestionSettingsUpdate = {
+    /**
+     * Enabled
+     *
+     * Switching on needs the connect consent (403 consent_required). Switching off deletes the call_match notifications.
+     */
+    enabled: boolean;
 };
 
 /**
@@ -8684,6 +9408,344 @@ export type UnblockResponses = {
 };
 
 export type UnblockResponse = UnblockResponses[keyof UnblockResponses];
+
+export type ListSuggestedCallsData = {
+    body?: never;
+    path?: never;
+    query?: never;
+    url: '/calls/suggested';
+};
+
+export type ListSuggestedCallsErrors = {
+    /**
+     * sign_in_required: guest, or the session expired.
+     */
+    401: ErrorResponse;
+    /**
+     * consent_required (no active consent of the needed type) or forbidden.
+     */
+    403: ErrorResponse;
+    /**
+     * rate_limited
+     */
+    429: ErrorResponse;
+};
+
+export type ListSuggestedCallsError = ListSuggestedCallsErrors[keyof ListSuggestedCallsErrors];
+
+export type ListSuggestedCallsResponses = {
+    /**
+     * Successful Response
+     */
+    200: SuggestionList;
+};
+
+export type ListSuggestedCallsResponse = ListSuggestedCallsResponses[keyof ListSuggestedCallsResponses];
+
+export type GetSuggestionSettingsData = {
+    body?: never;
+    path?: never;
+    query?: never;
+    url: '/me/connect/suggestions';
+};
+
+export type GetSuggestionSettingsErrors = {
+    /**
+     * sign_in_required: guest, or the session expired.
+     */
+    401: ErrorResponse;
+    /**
+     * consent_required (no active consent of the needed type) or forbidden.
+     */
+    403: ErrorResponse;
+};
+
+export type GetSuggestionSettingsError = GetSuggestionSettingsErrors[keyof GetSuggestionSettingsErrors];
+
+export type GetSuggestionSettingsResponses = {
+    /**
+     * Successful Response
+     */
+    200: SuggestionSettings;
+};
+
+export type GetSuggestionSettingsResponse = GetSuggestionSettingsResponses[keyof GetSuggestionSettingsResponses];
+
+export type SetSuggestionSettingsData = {
+    body: SuggestionSettingsUpdate;
+    path?: never;
+    query?: never;
+    url: '/me/connect/suggestions';
+};
+
+export type SetSuggestionSettingsErrors = {
+    /**
+     * sign_in_required: guest, or the session expired.
+     */
+    401: ErrorResponse;
+    /**
+     * consent_required (no active consent of the needed type) or forbidden.
+     */
+    403: ErrorResponse;
+    /**
+     * validation_error: lists invalid field names only.
+     */
+    422: ErrorResponse;
+};
+
+export type SetSuggestionSettingsError = SetSuggestionSettingsErrors[keyof SetSuggestionSettingsErrors];
+
+export type SetSuggestionSettingsResponses = {
+    /**
+     * Successful Response
+     */
+    200: SuggestionSettings;
+};
+
+export type SetSuggestionSettingsResponse = SetSuggestionSettingsResponses[keyof SetSuggestionSettingsResponses];
+
+export type GetSignupOptionsData = {
+    body?: never;
+    path: {
+        /**
+         * Call Id
+         */
+        call_id: string;
+    };
+    query?: never;
+    url: '/calls/{call_id}/signup';
+};
+
+export type GetSignupOptionsErrors = {
+    /**
+     * sign_in_required: guest, or the session expired.
+     */
+    401: ErrorResponse;
+    /**
+     * consent_required (no active consent of the needed type) or forbidden.
+     */
+    403: ErrorResponse;
+    /**
+     * not_found
+     */
+    404: ErrorResponse;
+    /**
+     * conflict
+     */
+    409: ErrorResponse;
+    /**
+     * Validation Error
+     */
+    422: HttpValidationError;
+};
+
+export type GetSignupOptionsError = GetSignupOptionsErrors[keyof GetSignupOptionsErrors];
+
+export type GetSignupOptionsResponses = {
+    /**
+     * Successful Response
+     */
+    200: SignupOptions;
+};
+
+export type GetSignupOptionsResponse = GetSignupOptionsResponses[keyof GetSignupOptionsResponses];
+
+export type SignUpToCallData = {
+    body: SignupRequest;
+    path: {
+        /**
+         * Call Id
+         */
+        call_id: string;
+    };
+    query?: never;
+    url: '/calls/{call_id}/signup';
+};
+
+export type SignUpToCallErrors = {
+    /**
+     * sign_in_required: guest, or the session expired.
+     */
+    401: ErrorResponse;
+    /**
+     * consent_required (no active consent of the needed type) or forbidden.
+     */
+    403: ErrorResponse;
+    /**
+     * not_found
+     */
+    404: ErrorResponse;
+    /**
+     * conflict
+     */
+    409: ErrorResponse;
+    /**
+     * validation_error: lists invalid field names only.
+     */
+    422: ErrorResponse;
+    /**
+     * rate_limited
+     */
+    429: ErrorResponse;
+};
+
+export type SignUpToCallError = SignUpToCallErrors[keyof SignUpToCallErrors];
+
+export type SignUpToCallResponses = {
+    /**
+     * Successful Response
+     */
+    201: MySignup;
+};
+
+export type SignUpToCallResponse = SignUpToCallResponses[keyof SignUpToCallResponses];
+
+export type ListMySignupsData = {
+    body?: never;
+    path?: never;
+    query?: never;
+    url: '/me/signups';
+};
+
+export type ListMySignupsErrors = {
+    /**
+     * sign_in_required: guest, or the session expired.
+     */
+    401: ErrorResponse;
+};
+
+export type ListMySignupsError = ListMySignupsErrors[keyof ListMySignupsErrors];
+
+export type ListMySignupsResponses = {
+    /**
+     * Successful Response
+     */
+    200: MySignupList;
+};
+
+export type ListMySignupsResponse = ListMySignupsResponses[keyof ListMySignupsResponses];
+
+export type WithdrawSignupData = {
+    body?: never;
+    path: {
+        /**
+         * Signup Id
+         */
+        signup_id: string;
+    };
+    query?: never;
+    url: '/me/signups/{signup_id}';
+};
+
+export type WithdrawSignupErrors = {
+    /**
+     * sign_in_required: guest, or the session expired.
+     */
+    401: ErrorResponse;
+    /**
+     * not_found
+     */
+    404: ErrorResponse;
+    /**
+     * Validation Error
+     */
+    422: HttpValidationError;
+};
+
+export type WithdrawSignupError = WithdrawSignupErrors[keyof WithdrawSignupErrors];
+
+export type WithdrawSignupResponses = {
+    /**
+     * Successful Response
+     */
+    204: void;
+};
+
+export type WithdrawSignupResponse = WithdrawSignupResponses[keyof WithdrawSignupResponses];
+
+export type ListCallSignupsData = {
+    body?: never;
+    path: {
+        /**
+         * Call Id
+         */
+        call_id: string;
+    };
+    query?: never;
+    url: '/me/calls/{call_id}/signups';
+};
+
+export type ListCallSignupsErrors = {
+    /**
+     * sign_in_required: guest, or the session expired.
+     */
+    401: ErrorResponse;
+    /**
+     * not_found
+     */
+    404: ErrorResponse;
+    /**
+     * Validation Error
+     */
+    422: HttpValidationError;
+};
+
+export type ListCallSignupsError = ListCallSignupsErrors[keyof ListCallSignupsErrors];
+
+export type ListCallSignupsResponses = {
+    /**
+     * Successful Response
+     */
+    200: ReceivedSignupList;
+};
+
+export type ListCallSignupsResponse = ListCallSignupsResponses[keyof ListCallSignupsResponses];
+
+export type DeclineCallSignupData = {
+    body?: never;
+    path: {
+        /**
+         * Call Id
+         */
+        call_id: string;
+        /**
+         * Signup Id
+         */
+        signup_id: string;
+    };
+    query?: never;
+    url: '/me/calls/{call_id}/signups/{signup_id}/decline';
+};
+
+export type DeclineCallSignupErrors = {
+    /**
+     * sign_in_required: guest, or the session expired.
+     */
+    401: ErrorResponse;
+    /**
+     * not_found
+     */
+    404: ErrorResponse;
+    /**
+     * conflict
+     */
+    409: ErrorResponse;
+    /**
+     * Validation Error
+     */
+    422: HttpValidationError;
+};
+
+export type DeclineCallSignupError = DeclineCallSignupErrors[keyof DeclineCallSignupErrors];
+
+export type DeclineCallSignupResponses = {
+    /**
+     * Successful Response
+     */
+    200: ReceivedSignup;
+};
+
+export type DeclineCallSignupResponse = DeclineCallSignupResponses[keyof DeclineCallSignupResponses];
 
 export type ListCallsData = {
     body?: never;

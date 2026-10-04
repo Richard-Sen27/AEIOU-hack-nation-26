@@ -5040,6 +5040,583 @@
         }
       }
     },
+    "/calls/suggested": {
+      "get": {
+        "tags": [
+          "calls"
+        ],
+        "summary": "List Suggested Calls",
+        "description": "Published calls that overlap my confirmed profile, with the reasons. Computed now in my\nown account and never stored; empty unless the connect consent is active and suggestions are\nswitched on (see the flags).",
+        "operationId": "listSuggestedCalls",
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/SuggestionList"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "sign_in_required: guest, or the session expired.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "consent_required (no active consent of the needed type) or forbidden.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "429": {
+            "description": "rate_limited",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/me/connect/suggestions": {
+      "get": {
+        "tags": [
+          "connect"
+        ],
+        "summary": "Get Suggestion Settings",
+        "description": "Whether suggestions are switched on (off by default).",
+        "operationId": "getSuggestionSettings",
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/SuggestionSettings"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "sign_in_required: guest, or the session expired.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "consent_required (no active consent of the needed type) or forbidden.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          }
+        }
+      },
+      "put": {
+        "tags": [
+          "connect"
+        ],
+        "summary": "Set Suggestion Settings",
+        "description": "Switch suggestions on (403 consent_required without the current connect consent) or off\n(deletes the suggestion notifications).",
+        "operationId": "setSuggestionSettings",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/SuggestionSettingsUpdate"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/SuggestionSettings"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "sign_in_required: guest, or the session expired.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "consent_required (no active consent of the needed type) or forbidden.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "validation_error: lists invalid field names only.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/calls/{call_id}/signup": {
+      "get": {
+        "tags": [
+          "calls"
+        ],
+        "summary": "Get Signup Options",
+        "description": "The sign-up screen for a published, open call: the items I may tick (only confirmed\nprofile items the call asks for and targets; only a matching diagnosis pre-ticked), the\nauthorization and guardian texts, and whether the consent or the age group must be asked\nfirst. The profile is read only while the connect consent is active.",
+        "operationId": "getSignupOptions",
+        "parameters": [
+          {
+            "name": "call_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid",
+              "title": "Call Id"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/SignupOptions"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "sign_in_required: guest, or the session expired.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "consent_required (no active consent of the needed type) or forbidden.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "not_found",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "conflict",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      },
+      "post": {
+        "tags": [
+          "calls"
+        ],
+        "summary": "Sign Up To Call",
+        "description": "Send the ticked items to the call's publisher. 403 consent_required, age_group_required,\nguardian_agreement_required (16 or 17), forbidden (doctors and researchers, or a call for\nadults and a 16- or 17-year-old); 404 closed or unknown call; 409 expired, full, duplicate,\ndeclined before, own call, not open yet, or the publisher's card is hidden; 422 names the\nfield (an item not offered, the authorization); 429 with open_conversation at 5 new\nconversations a day.",
+        "operationId": "signUpToCall",
+        "parameters": [
+          {
+            "name": "call_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid",
+              "title": "Call Id"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/SignupRequest"
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/MySignup"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "sign_in_required: guest, or the session expired.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "consent_required (no active consent of the needed type) or forbidden.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "not_found",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "conflict",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "validation_error: lists invalid field names only.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "429": {
+            "description": "rate_limited",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/me/signups": {
+      "get": {
+        "tags": [
+          "calls"
+        ],
+        "summary": "List My Signups",
+        "description": "My sign-ups, newest first, stubs included. Ones past their time are deleted first.",
+        "operationId": "listMySignups",
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/MySignupList"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "sign_in_required: guest, or the session expired.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/me/signups/{signup_id}": {
+      "delete": {
+        "tags": [
+          "calls"
+        ],
+        "summary": "Withdraw Signup",
+        "description": "Withdraw a sign-up: the shared items and the note are deleted at once; the study team\nkeeps a 'withdrew' stub for 30 days; its conversation closes. Idempotent.",
+        "operationId": "withdrawSignup",
+        "parameters": [
+          {
+            "name": "signup_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid",
+              "title": "Signup Id"
+            }
+          }
+        ],
+        "responses": {
+          "204": {
+            "description": "Successful Response"
+          },
+          "401": {
+            "description": "sign_in_required: guest, or the session expired.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "not_found",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/me/calls/{call_id}/signups": {
+      "get": {
+        "tags": [
+          "calls"
+        ],
+        "summary": "List Call Signups",
+        "description": "The sign-ups to one of my calls: display name, the ticked items, the note, the status and\nthe 16-17 label. Never an account id or e-mail; 404 unless it is my call.",
+        "operationId": "listCallSignups",
+        "parameters": [
+          {
+            "name": "call_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid",
+              "title": "Call Id"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ReceivedSignupList"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "sign_in_required: guest, or the session expired.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "not_found",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/me/calls/{call_id}/signups/{signup_id}/decline": {
+      "post": {
+        "tags": [
+          "calls"
+        ],
+        "summary": "Decline Call Signup",
+        "description": "Decline an active sign-up to my call: its items and note are deleted at once and a stub\nstays for 30 days. Idempotent for a declined one; 409 for a withdrawn or closed one.",
+        "operationId": "declineCallSignup",
+        "parameters": [
+          {
+            "name": "call_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid",
+              "title": "Call Id"
+            }
+          },
+          {
+            "name": "signup_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid",
+              "title": "Signup Id"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ReceivedSignup"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "sign_in_required: guest, or the session expired.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "not_found",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "conflict",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
     "/calls": {
       "get": {
         "tags": [
@@ -5212,7 +5789,7 @@
           "calls"
         ],
         "summary": "List My Calls",
-        "description": "The user's own calls in every status, and whether they may publish.",
+        "description": "The user's own calls in every status, whether they may publish, and whether publishing\ngoes through a review (`review_required`).",
         "operationId": "listMyCalls",
         "responses": {
           "200": {
@@ -5386,7 +5963,7 @@
           "calls"
         ],
         "summary": "Update Call",
-        "description": "Replace a draft, rejected or pending call; it becomes a draft and must be submitted again.\n409 for published, closed and withdrawn calls.",
+        "description": "Replace a draft, rejected or pending call; it becomes a draft (publish or submit it\nagain). 409 for published, closed and withdrawn calls.",
         "operationId": "updateCall",
         "parameters": [
           {
@@ -5545,7 +6122,7 @@
           "calls"
         ],
         "summary": "Submit Call",
-        "description": "Send the call to the Amber team for review (status pending_review). 422 when the wording\ncheck finds an offer, promise or price of a treatment (the message names field and rule) or\nan atlas ID has left the atlas.",
+        "description": "Publish the call at once (status published; it is marked as not reviewed by the Amber\nteam). When `review_required` is true (see `listMyCalls`) it is sent to the Amber team for\nreview instead (status pending_review). 422 when the wording check finds an offer, promise or\nprice of a treatment (the message names field and rule) or an atlas ID has left the atlas;\n409 for a rejected call that was not edited, or a closed or withdrawn one.",
         "operationId": "submitCall",
         "parameters": [
           {
@@ -7192,10 +7769,16 @@
             "title": "Demo",
             "description": "Seeded demo data: label it 'Demo, not a real study'."
           },
+          "self_published": {
+            "type": "boolean",
+            "title": "Self Published",
+            "description": "The expert published it without a review by the Amber team (CALLS_REVIEW_REQUIRED off).",
+            "default": false
+          },
           "review_badge": {
             "type": "string",
             "title": "Review Badge",
-            "description": "Show on every published call.",
+            "description": "Show on every published call, exactly as sent: either the review badge or, for a self-published call, that it was not reviewed. On the publisher's unpublished calls it is the badge the call would get when it goes live.",
             "default": "Reviewed by the Amber team for wording, ethics and registry numbers, not for scientific quality"
           },
           "notice": {
@@ -7506,6 +8089,11 @@
           "demo": {
             "type": "boolean",
             "title": "Demo"
+          },
+          "self_published": {
+            "type": "boolean",
+            "title": "Self Published",
+            "default": false
           },
           "created_at": {
             "type": "string",
@@ -9148,6 +9736,11 @@
             "title": "Consent Active",
             "description": "An active `connect` consent exists."
           },
+          "consent_current": {
+            "type": "boolean",
+            "title": "Consent Current",
+            "description": "The active consent was given to the current text. Suggestions and sign-ups need it (the earlier text named messaging only): ask again when false."
+          },
           "age_group": {
             "anyOf": [
               {
@@ -9192,6 +9785,7 @@
         "type": "object",
         "required": [
           "consent_active",
+          "consent_current",
           "age_group",
           "guardian_text",
           "guardian_text_version",
@@ -9268,7 +9862,7 @@
             "maxLength": 40,
             "minLength": 1,
             "title": "Version",
-            "description": "Consent text version shown; must be the current version for the type (health_data: health-data-2026-10-04, contribute: contribute-2026-10-04, connect: connect-2026-10-04)."
+            "description": "Consent text version shown; must be the current version for the type (health_data: health-data-2026-10-04, contribute: contribute-2026-10-04, connect: connect-signups-2026-10-04)."
           },
           "about_child": {
             "type": "boolean",
@@ -9662,6 +10256,17 @@
             "type": "array",
             "title": "Call Reviews",
             "description": "Review decisions about the user's calls."
+          },
+          "signups": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/SignupsExport"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "The suggestions setting and the user's own sign-ups to calls."
           }
         },
         "type": "object",
@@ -11556,6 +12161,208 @@
         "title": "MyCard",
         "description": "The user's own verification state, card settings and a preview of the card."
       },
+      "MySignup": {
+        "properties": {
+          "id": {
+            "type": "string",
+            "format": "uuid",
+            "title": "Id"
+          },
+          "call_id": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "uuid"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Call Id",
+            "description": "Null once the call was deleted."
+          },
+          "call_title": {
+            "type": "string",
+            "title": "Call Title",
+            "description": "The call's title when I signed up."
+          },
+          "call_open": {
+            "type": "boolean",
+            "title": "Call Open",
+            "description": "The call is still published and open."
+          },
+          "recipient": {
+            "type": "string",
+            "title": "Recipient",
+            "description": "Who received it, as named in the authorization."
+          },
+          "display_name": {
+            "type": "string",
+            "title": "Display Name"
+          },
+          "shared": {
+            "$ref": "#/components/schemas/SharedItems"
+          },
+          "note": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Note"
+          },
+          "status": {
+            "$ref": "#/components/schemas/SignupStatus"
+          },
+          "about_child": {
+            "type": "boolean",
+            "title": "About Child"
+          },
+          "authorization_version": {
+            "type": "string",
+            "title": "Authorization Version"
+          },
+          "authorized_at": {
+            "type": "string",
+            "format": "date-time",
+            "title": "Authorized At"
+          },
+          "guardian_agreed_at": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "date-time"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Guardian Agreed At"
+          },
+          "guardian_text_version": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Guardian Text Version"
+          },
+          "created_at": {
+            "type": "string",
+            "format": "date-time",
+            "title": "Created At"
+          },
+          "withdrawn_at": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "date-time"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Withdrawn At"
+          },
+          "declined_at": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "date-time"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Declined At"
+          },
+          "call_ended_at": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "date-time"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Call Ended At"
+          },
+          "delete_after": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "date-time"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Delete After",
+            "description": "When this sign-up is deleted for good."
+          },
+          "thread_id": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "uuid"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Thread Id",
+            "description": "The conversation opened with this sign-up."
+          }
+        },
+        "type": "object",
+        "required": [
+          "id",
+          "call_id",
+          "call_title",
+          "call_open",
+          "recipient",
+          "display_name",
+          "shared",
+          "note",
+          "status",
+          "about_child",
+          "authorization_version",
+          "authorized_at",
+          "guardian_agreed_at",
+          "guardian_text_version",
+          "created_at",
+          "withdrawn_at",
+          "declined_at",
+          "call_ended_at",
+          "delete_after",
+          "thread_id"
+        ],
+        "title": "MySignup"
+      },
+      "MySignupList": {
+        "properties": {
+          "items": {
+            "items": {
+              "$ref": "#/components/schemas/MySignup"
+            },
+            "type": "array",
+            "title": "Items",
+            "description": "Newest first."
+          }
+        },
+        "type": "object",
+        "required": [
+          "items"
+        ],
+        "title": "MySignupList"
+      },
       "Neighborhood": {
         "properties": {
           "center": {
@@ -11828,7 +12635,7 @@
           },
           "kind": {
             "$ref": "#/components/schemas/NotificationKind",
-            "description": "added: a paper, trial, grant or patient group newly linked to the disease in the atlas; now_recruiting: a trial whose status changed to recruiting."
+            "description": "added: a paper, trial, grant or patient group newly linked to the disease in the atlas; now_recruiting: a trial whose status changed to recruiting; call_match: a published call matches your profile (suggestions switched on; link to the call)."
           },
           "disease_id": {
             "anyOf": [
@@ -11840,7 +12647,7 @@
               }
             ],
             "title": "Disease Id",
-            "description": "The followed disease."
+            "description": "The followed disease (call_match: the matching disease, if any)."
           },
           "disease_label": {
             "anyOf": [
@@ -11857,7 +12664,20 @@
           "item_id": {
             "type": "string",
             "title": "Item Id",
-            "description": "Node ID of the new item; link to its node page."
+            "description": "Node ID of the new item; link to its node page. call_match: the call id."
+          },
+          "call_id": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "uuid"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Call Id",
+            "description": "call_match only: the call to open."
           },
           "item_type": {
             "anyOf": [
@@ -11880,7 +12700,7 @@
               }
             ],
             "title": "Item Label",
-            "description": "Null if no longer in the atlas."
+            "description": "Null if no longer in the atlas. call_match: the call's title."
           },
           "registry_id": {
             "anyOf": [
@@ -11909,7 +12729,7 @@
           "gone": {
             "type": "boolean",
             "title": "Gone",
-            "description": "The item or the disease has left the atlas since; render without a link."
+            "description": "The item or the disease has left the atlas since (call_match: the call is no longer published and open); render without a link."
           },
           "data_version": {
             "anyOf": [
@@ -12028,7 +12848,8 @@
         "type": "string",
         "enum": [
           "added",
-          "now_recruiting"
+          "now_recruiting",
+          "call_match"
         ],
         "title": "NotificationKind"
       },
@@ -12421,10 +13242,16 @@
             "title": "Demo",
             "description": "Seeded demo data: label it 'Demo, not a real study'."
           },
+          "self_published": {
+            "type": "boolean",
+            "title": "Self Published",
+            "description": "The expert published it without a review by the Amber team (CALLS_REVIEW_REQUIRED off).",
+            "default": false
+          },
           "review_badge": {
             "type": "string",
             "title": "Review Badge",
-            "description": "Show on every published call.",
+            "description": "Show on every published call, exactly as sent: either the review badge or, for a self-published call, that it was not reviewed. On the publisher's unpublished calls it is the badge the call would get when it goes live.",
             "default": "Reviewed by the Amber team for wording, ethics and registry numbers, not for scientific quality"
           },
           "notice": {
@@ -12573,6 +13400,11 @@
             "title": "Can Publish",
             "description": "The user is a verified doctor or researcher with a visible card."
           },
+          "review_required": {
+            "type": "boolean",
+            "title": "Review Required",
+            "description": "False (the default): `submitCall` publishes the call at once, so the form's button reads 'Publish'. True: it sends the call to the Amber team for review."
+          },
           "open_limit": {
             "type": "integer",
             "title": "Open Limit",
@@ -12583,7 +13415,8 @@
         "type": "object",
         "required": [
           "items",
-          "can_publish"
+          "can_publish",
+          "review_required"
         ],
         "title": "OwnCallList"
       },
@@ -13972,6 +14805,175 @@
         ],
         "title": "RankedCluster"
       },
+      "ReceivedSignup": {
+        "properties": {
+          "id": {
+            "type": "string",
+            "format": "uuid",
+            "title": "Id"
+          },
+          "display_name": {
+            "type": "string",
+            "title": "Display Name"
+          },
+          "shared": {
+            "$ref": "#/components/schemas/SharedItems"
+          },
+          "note": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Note"
+          },
+          "status": {
+            "$ref": "#/components/schemas/SignupStatus",
+            "description": "withdrawn: show 'withdrew' (a stub, items deleted)."
+          },
+          "about_child": {
+            "type": "boolean",
+            "title": "About Child",
+            "description": "The sign-up is about a child (a parent signs up)."
+          },
+          "minor": {
+            "type": "boolean",
+            "title": "Minor",
+            "description": "The participant said they are 16 or 17."
+          },
+          "minor_label": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Minor Label",
+            "description": "Show when minor is true."
+          },
+          "authorization_version": {
+            "type": "string",
+            "title": "Authorization Version"
+          },
+          "authorized_at": {
+            "type": "string",
+            "format": "date-time",
+            "title": "Authorized At"
+          },
+          "created_at": {
+            "type": "string",
+            "format": "date-time",
+            "title": "Created At"
+          },
+          "withdrawn_at": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "date-time"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Withdrawn At"
+          },
+          "declined_at": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "date-time"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Declined At"
+          },
+          "thread_id": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "uuid"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Thread Id",
+            "description": "The conversation the participant opened, if any."
+          }
+        },
+        "type": "object",
+        "required": [
+          "id",
+          "display_name",
+          "shared",
+          "note",
+          "status",
+          "about_child",
+          "minor",
+          "minor_label",
+          "authorization_version",
+          "authorized_at",
+          "created_at",
+          "withdrawn_at",
+          "declined_at",
+          "thread_id"
+        ],
+        "title": "ReceivedSignup",
+        "description": "A sign-up to one of my calls, as the study team sees it. Never an account id or e-mail."
+      },
+      "ReceivedSignupList": {
+        "properties": {
+          "call_id": {
+            "type": "string",
+            "format": "uuid",
+            "title": "Call Id"
+          },
+          "call_title": {
+            "type": "string",
+            "title": "Call Title"
+          },
+          "active_count": {
+            "type": "integer",
+            "title": "Active Count",
+            "description": "Active sign-ups of this call."
+          },
+          "max_signups": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Max Signups"
+          },
+          "items": {
+            "items": {
+              "$ref": "#/components/schemas/ReceivedSignup"
+            },
+            "type": "array",
+            "title": "Items",
+            "description": "Newest first; stubs included."
+          }
+        },
+        "type": "object",
+        "required": [
+          "call_id",
+          "call_title",
+          "active_count",
+          "max_signups",
+          "items"
+        ],
+        "title": "ReceivedSignupList"
+      },
       "Relation": {
         "type": "string",
         "enum": [
@@ -14462,6 +15464,589 @@
         "type": "object",
         "title": "SettingsUpdate"
       },
+      "SharedItem": {
+        "properties": {
+          "id": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Id",
+            "description": "Atlas id (MONDO, HGNC, HP) or ClinVar id."
+          },
+          "label": {
+            "type": "string",
+            "title": "Label"
+          },
+          "detail": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Detail"
+          }
+        },
+        "type": "object",
+        "required": [
+          "label"
+        ],
+        "title": "SharedItem"
+      },
+      "SharedItems": {
+        "properties": {
+          "diagnoses": {
+            "items": {
+              "$ref": "#/components/schemas/SharedItem"
+            },
+            "type": "array",
+            "title": "Diagnoses"
+          },
+          "genes": {
+            "items": {
+              "$ref": "#/components/schemas/SharedItem"
+            },
+            "type": "array",
+            "title": "Genes"
+          },
+          "variants": {
+            "items": {
+              "$ref": "#/components/schemas/SharedItem"
+            },
+            "type": "array",
+            "title": "Variants"
+          },
+          "symptoms": {
+            "items": {
+              "$ref": "#/components/schemas/SharedItem"
+            },
+            "type": "array",
+            "title": "Symptoms"
+          },
+          "age_range": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Age Range"
+          },
+          "country": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Country"
+          }
+        },
+        "type": "object",
+        "title": "SharedItems",
+        "description": "Exactly what the patient ticked; empty after a withdrawal or a decline."
+      },
+      "SignupAvailability": {
+        "properties": {
+          "can_sign_up": {
+            "type": "boolean",
+            "title": "Can Sign Up",
+            "description": "Offer the sign-up button. The consent and the age group are asked just in time on the sign-up screen and do not block it here."
+          },
+          "blocked_by": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/SignupBlock"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "label": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Label",
+            "description": "Text to show instead of the button, if any."
+          },
+          "signup_id": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "uuid"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Signup Id",
+            "description": "My active or declined sign-up, if any."
+          }
+        },
+        "type": "object",
+        "required": [
+          "can_sign_up"
+        ],
+        "title": "SignupAvailability"
+      },
+      "SignupBlock": {
+        "type": "string",
+        "enum": [
+          "not_patient",
+          "own_call",
+          "for_adults",
+          "already_signed_up",
+          "declined",
+          "not_open_yet"
+        ],
+        "title": "SignupBlock",
+        "description": "Why the sign-up button is not offered (the call stays visible in every case)."
+      },
+      "SignupExport": {
+        "properties": {
+          "id": {
+            "type": "string",
+            "format": "uuid",
+            "title": "Id"
+          },
+          "call_id": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "uuid"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Call Id"
+          },
+          "call_title_snapshot": {
+            "type": "string",
+            "title": "Call Title Snapshot"
+          },
+          "recipient_name": {
+            "type": "string",
+            "title": "Recipient Name"
+          },
+          "display_name": {
+            "type": "string",
+            "title": "Display Name"
+          },
+          "shared": {
+            "$ref": "#/components/schemas/SharedItems"
+          },
+          "about_child": {
+            "type": "boolean",
+            "title": "About Child"
+          },
+          "note": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Note"
+          },
+          "authorization_version": {
+            "type": "string",
+            "title": "Authorization Version"
+          },
+          "authorized_at": {
+            "type": "string",
+            "format": "date-time",
+            "title": "Authorized At"
+          },
+          "guardian_agreed_at": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "date-time"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Guardian Agreed At"
+          },
+          "guardian_text_version": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Guardian Text Version"
+          },
+          "status": {
+            "$ref": "#/components/schemas/SignupStatus"
+          },
+          "withdrawn_at": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "date-time"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Withdrawn At"
+          },
+          "declined_at": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "date-time"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Declined At"
+          },
+          "call_ended_at": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "date-time"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Call Ended At"
+          },
+          "purge_after": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "date-time"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Purge After"
+          },
+          "thread_id": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "uuid"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Thread Id"
+          },
+          "created_at": {
+            "type": "string",
+            "format": "date-time",
+            "title": "Created At"
+          }
+        },
+        "type": "object",
+        "required": [
+          "id",
+          "call_id",
+          "call_title_snapshot",
+          "recipient_name",
+          "display_name",
+          "shared",
+          "about_child",
+          "note",
+          "authorization_version",
+          "authorized_at",
+          "guardian_agreed_at",
+          "guardian_text_version",
+          "status",
+          "withdrawn_at",
+          "declined_at",
+          "call_ended_at",
+          "purge_after",
+          "thread_id",
+          "created_at"
+        ],
+        "title": "SignupExport"
+      },
+      "SignupOption": {
+        "properties": {
+          "key": {
+            "type": "string",
+            "title": "Key",
+            "description": "Send back in SignupRequest.items to share it."
+          },
+          "kind": {
+            "$ref": "#/components/schemas/SignupOptionKind"
+          },
+          "label": {
+            "type": "string",
+            "title": "Label"
+          },
+          "detail": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Detail",
+            "description": "Variant notation and classification, if any."
+          },
+          "preselected": {
+            "type": "boolean",
+            "title": "Preselected",
+            "description": "Only a matching diagnosis is pre-ticked."
+          }
+        },
+        "type": "object",
+        "required": [
+          "key",
+          "kind",
+          "label",
+          "preselected"
+        ],
+        "title": "SignupOption",
+        "description": "One item the patient may tick. Only confirmed, non-excluded profile items that the call\nasks for (requested_fields) and targets (its diseases, genes, symptoms) are offered."
+      },
+      "SignupOptionKind": {
+        "type": "string",
+        "enum": [
+          "diagnosis",
+          "gene",
+          "variant",
+          "symptom",
+          "age_range",
+          "country"
+        ],
+        "title": "SignupOptionKind"
+      },
+      "SignupOptions": {
+        "properties": {
+          "call_id": {
+            "type": "string",
+            "format": "uuid",
+            "title": "Call Id"
+          },
+          "call_title": {
+            "type": "string",
+            "title": "Call Title"
+          },
+          "recipient": {
+            "type": "string",
+            "title": "Recipient",
+            "description": "Card name and first institution ('who runs this call')."
+          },
+          "recipient_name": {
+            "type": "string",
+            "title": "Recipient Name",
+            "description": "Card name."
+          },
+          "options": {
+            "items": {
+              "$ref": "#/components/schemas/SignupOption"
+            },
+            "type": "array",
+            "title": "Options"
+          },
+          "authorization_text": {
+            "type": "string",
+            "title": "Authorization Text",
+            "description": "With the recipient filled in; replace {items} with the ticked items."
+          },
+          "authorization_version": {
+            "type": "string",
+            "title": "Authorization Version",
+            "default": "signup-authorization-2026-10-04"
+          },
+          "consent_active": {
+            "type": "boolean",
+            "title": "Consent Active",
+            "description": "An active `connect` consent of the current text; ask for it before sending."
+          },
+          "age_group_needed": {
+            "type": "boolean",
+            "title": "Age Group Needed",
+            "description": "Ask for the age group before sending."
+          },
+          "guardian_required": {
+            "type": "boolean",
+            "title": "Guardian Required",
+            "description": "The user said 16 or 17: show guardian_text as one more required checkbox."
+          },
+          "guardian_text": {
+            "type": "string",
+            "title": "Guardian Text",
+            "description": "With the recipient filled in."
+          },
+          "guardian_text_version": {
+            "type": "string",
+            "title": "Guardian Text Version"
+          },
+          "about_child": {
+            "type": "boolean",
+            "title": "About Child",
+            "description": "The profile describes a child (parental responsibility)."
+          },
+          "availability": {
+            "$ref": "#/components/schemas/SignupAvailability"
+          },
+          "max_note": {
+            "type": "integer",
+            "title": "Max Note",
+            "default": 1000
+          }
+        },
+        "type": "object",
+        "required": [
+          "call_id",
+          "call_title",
+          "recipient",
+          "recipient_name",
+          "options",
+          "authorization_text",
+          "consent_active",
+          "age_group_needed",
+          "guardian_required",
+          "guardian_text",
+          "guardian_text_version",
+          "about_child",
+          "availability"
+        ],
+        "title": "SignupOptions"
+      },
+      "SignupRequest": {
+        "properties": {
+          "display_name": {
+            "type": "string",
+            "title": "Display Name",
+            "description": "How the study team sees you (1-60 characters). Your e-mail, account name and profile are never shown."
+          },
+          "items": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array",
+            "maxItems": 200,
+            "title": "Items",
+            "description": "Keys of the ticked SignupOptions; anything not offered is refused (422)."
+          },
+          "note": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Note",
+            "description": "Optional note to the study team, plain text."
+          },
+          "authorized": {
+            "type": "boolean",
+            "title": "Authorized",
+            "description": "The authorization was shown and ticked; must be true."
+          },
+          "authorization_version": {
+            "type": "string",
+            "title": "Authorization Version",
+            "description": "Must be the current authorization version."
+          },
+          "guardian_agreed": {
+            "type": "boolean",
+            "title": "Guardian Agreed",
+            "description": "Required true when the age group is 16_17.",
+            "default": false
+          },
+          "open_conversation": {
+            "type": "boolean",
+            "title": "Open Conversation",
+            "description": "Also open a conversation with the study team (no message yet; counts towards 5 new conversations a day).",
+            "default": false
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "required": [
+          "display_name",
+          "authorized",
+          "authorization_version"
+        ],
+        "title": "SignupRequest"
+      },
+      "SignupStatus": {
+        "type": "string",
+        "enum": [
+          "active",
+          "withdrawn",
+          "declined",
+          "call_closed"
+        ],
+        "title": "SignupStatus",
+        "description": "active; withdrawn (by the patient: items deleted, stub for 30 days); declined (by the\nstudy team: items deleted, stub for 30 days); call_closed (the call closed or was deleted:\ndeleted 90 days after it closed, at once if it was deleted)."
+      },
+      "SignupsExport": {
+        "properties": {
+          "suggestions_enabled": {
+            "type": "boolean",
+            "title": "Suggestions Enabled"
+          },
+          "suggestions_enabled_at": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "date-time"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Suggestions Enabled At"
+          },
+          "signups": {
+            "items": {
+              "$ref": "#/components/schemas/SignupExport"
+            },
+            "type": "array",
+            "title": "Signups",
+            "description": "My own sign-ups (not those to my calls)."
+          }
+        },
+        "type": "object",
+        "required": [
+          "suggestions_enabled",
+          "suggestions_enabled_at",
+          "signups"
+        ],
+        "title": "SignupsExport"
+      },
       "SourceCount": {
         "properties": {
           "source": {
@@ -14492,6 +16077,68 @@
           "tour"
         ],
         "title": "StartLayout"
+      },
+      "SuggestedCall": {
+        "properties": {
+          "call": {
+            "$ref": "#/components/schemas/Call"
+          },
+          "score": {
+            "type": "integer",
+            "title": "Score",
+            "description": "disease 3, gene 2, symptoms 1, summed; higher first."
+          },
+          "reasons": {
+            "items": {
+              "$ref": "#/components/schemas/SuggestionReason"
+            },
+            "type": "array",
+            "title": "Reasons"
+          },
+          "sentence": {
+            "type": "string",
+            "title": "Sentence",
+            "description": "Show as is: 'Suggested because your profile lists ...'."
+          },
+          "age_fits": {
+            "anyOf": [
+              {
+                "type": "boolean"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Age Fits",
+            "description": "Information only, never used to hide: the profile's age or age range fits the call's ages; null when either side gives none."
+          },
+          "country_listed": {
+            "anyOf": [
+              {
+                "type": "boolean"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Country Listed",
+            "description": "Information only: the profile's country is one of the call's countries; null when the profile has no country or the call lists none."
+          },
+          "signup": {
+            "$ref": "#/components/schemas/SignupAvailability"
+          }
+        },
+        "type": "object",
+        "required": [
+          "call",
+          "score",
+          "reasons",
+          "sentence",
+          "age_fits",
+          "country_listed",
+          "signup"
+        ],
+        "title": "SuggestedCall"
       },
       "SuggestedName": {
         "properties": {
@@ -14530,6 +16177,130 @@
         "type": "object",
         "title": "SuggestedName",
         "description": "Prefill from the sign-in account, computed on request and never stored."
+      },
+      "SuggestionList": {
+        "properties": {
+          "consent_active": {
+            "type": "boolean",
+            "title": "Consent Active",
+            "description": "An active `connect` consent of the current text."
+          },
+          "enabled": {
+            "type": "boolean",
+            "title": "Enabled",
+            "description": "The user switched suggestions on."
+          },
+          "items": {
+            "items": {
+              "$ref": "#/components/schemas/SuggestedCall"
+            },
+            "type": "array",
+            "title": "Items",
+            "description": "Empty unless consent_active and enabled. Strongest first, then newest."
+          },
+          "notice": {
+            "type": "string",
+            "title": "Notice",
+            "default": "Suggestions compare the confirmed items of your profile with published calls, inside your own account. Nobody else sees them, and study teams never learn who was suggested. Every published call stays listed for everyone; suggestions only point to some of them."
+          }
+        },
+        "type": "object",
+        "required": [
+          "consent_active",
+          "enabled",
+          "items"
+        ],
+        "title": "SuggestionList"
+      },
+      "SuggestionReason": {
+        "properties": {
+          "kind": {
+            "$ref": "#/components/schemas/SuggestionReasonKind"
+          },
+          "items": {
+            "items": {
+              "$ref": "#/components/schemas/AtlasRef"
+            },
+            "type": "array",
+            "title": "Items",
+            "description": "The matching atlas entries, labels from the atlas."
+          },
+          "via_variant": {
+            "type": "boolean",
+            "title": "Via Variant",
+            "description": "gene only: at least one gene came from a variant in the profile.",
+            "default": false
+          }
+        },
+        "type": "object",
+        "required": [
+          "kind",
+          "items"
+        ],
+        "title": "SuggestionReason"
+      },
+      "SuggestionReasonKind": {
+        "type": "string",
+        "enum": [
+          "disease",
+          "gene",
+          "symptoms"
+        ],
+        "title": "SuggestionReasonKind",
+        "description": "disease: an exact disease of the profile is a disease of the call (strong); gene: a gene\nof the profile, or the gene of a profile variant, is a gene of the call; symptoms: at least\ntwo exact symptoms (HPO ids) of the profile are symptoms of the call."
+      },
+      "SuggestionSettings": {
+        "properties": {
+          "enabled": {
+            "type": "boolean",
+            "title": "Enabled",
+            "description": "Suggestions are switched on (off by default)."
+          },
+          "enabled_at": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "date-time"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Enabled At"
+          },
+          "consent_active": {
+            "type": "boolean",
+            "title": "Consent Active",
+            "description": "An active `connect` consent of the current text."
+          },
+          "notice": {
+            "type": "string",
+            "title": "Notice",
+            "default": "Suggestions compare the confirmed items of your profile with published calls, inside your own account. Nobody else sees them, and study teams never learn who was suggested. Every published call stays listed for everyone; suggestions only point to some of them."
+          }
+        },
+        "type": "object",
+        "required": [
+          "enabled",
+          "enabled_at",
+          "consent_active"
+        ],
+        "title": "SuggestionSettings"
+      },
+      "SuggestionSettingsUpdate": {
+        "properties": {
+          "enabled": {
+            "type": "boolean",
+            "title": "Enabled",
+            "description": "Switching on needs the connect consent (403 consent_required). Switching off deletes the call_match notifications."
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "required": [
+          "enabled"
+        ],
+        "title": "SuggestionSettingsUpdate"
       },
       "SummaryItem": {
         "properties": {
