@@ -766,13 +766,34 @@ def clusters() -> list[ClusterSummary]:
     return [store.clusters[k] for k in sorted(store.clusters)]
 
 
+def atlas_edges(within: set[str] | None = None, store: GraphStore | None = None) -> list[AtlasEdge]:
+    """Every edge as an AtlasEdge (flag overlay applied, contribution edges last); with
+    `within`, only edges whose both ends are in that set."""
+    store = store or get_graph()
+    all_edges = [effective_edge(store, e) for e in store.edges.values()] + list(
+        store.contrib_edges.values()
+    )
+    return [
+        AtlasEdge(
+            id=e.id,
+            source=e.source_id,
+            target=e.target_id,
+            relation=e.relation,
+            family=e.family,
+            confidence=e.confidence,
+            origin=e.origin,
+            status=e.status,
+            explanation=e.explanation,
+        )
+        for e in all_edges
+        if within is None or (e.source_id in within and e.target_id in within)
+    ]
+
+
 def atlas_layout() -> AtlasLayout:
     """Compact whole-graph layout for the Atlas view."""
     store = get_graph()
     all_nodes = list(store.nodes.values()) + list(store.contrib_nodes.values())
-    all_edges = [effective_edge(store, e) for e in store.edges.values()] + list(
-        store.contrib_edges.values()
-    )
     return AtlasLayout(
         nodes=[
             AtlasNode(
@@ -786,20 +807,7 @@ def atlas_layout() -> AtlasLayout:
             )
             for n in all_nodes
         ],
-        edges=[
-            AtlasEdge(
-                id=e.id,
-                source=e.source_id,
-                target=e.target_id,
-                relation=e.relation,
-                family=e.family,
-                confidence=e.confidence,
-                origin=e.origin,
-                status=e.status,
-                explanation=e.explanation,
-            )
-            for e in all_edges
-        ],
+        edges=atlas_edges(),
         clusters=clusters(),
         data_version=store.data_version,
     )

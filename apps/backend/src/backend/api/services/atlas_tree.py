@@ -1,8 +1,11 @@
 """Atlas tree: the logo hub (``T:root``) with one radial tree per category.
 
 The tree is a navigation structure only; it never changes how nodes are connected. Every
-store node (contribution overlay included) appears exactly once as an entity node, and every
+focus node (contribution overlay included) appears exactly once as an entity node, and every
 level below a category derives from stored data (attributes, edges, cluster membership).
+Temporary exception to "every entity once" (wide scope, stage A): nodes with `attrs.tier`
+"core" stay off the map (see `is_focus`); they are found through search and Dr. Wu. Clusters
+without a focus disease and edges touching an off-map node are left out with them.
 
 Layout: each category owns an angular sector (clockwise from 12 o'clock, so angles decrease
 from pi/2; standard polar angles, counter-clockwise from +x, y up). Inside a sector the tree
@@ -207,12 +210,18 @@ def _split_leaves(d: _Draft) -> None:
 class _Index:
     """Outgoing neighbours per (source, relation), sorted, from the pipeline edges."""
 
-    def __init__(self, store: graph.GraphStore) -> None:
+    def __init__(self, store: graph.GraphStore, on_map: set[str] | None = None) -> None:
         out: dict[tuple[str, Relation], list[str]] = defaultdict(list)
         for edge in store.edges.values():
             out[(edge.source_id, edge.relation)].append(edge.target_id)
         self.out = {k: sorted(v) for k, v in out.items()}
         self.nodes = store.nodes
+        if on_map is not None:  # fields come from map nodes in map clusters only
+            self.nodes = {
+                nid: n
+                for nid, n in store.nodes.items()
+                if nid in on_map and (n.cluster_id is None or n.cluster_id in on_map)
+            }
 
     def targets(self, source: str, relation: Relation) -> list[str]:
         return self.out.get((source, relation), [])
@@ -1084,14 +1093,49 @@ def _build_community(store: graph.GraphStore, nodes: list[Node]) -> list[_Draft]
     return out
 
 
+TIERED_TYPES = frozenset({NodeType.disease, NodeType.gene, NodeType.phenotype})
+
+
+def is_focus(node: Node) -> bool:
+    """On the map: a disease, gene or phenotype whose `attrs.tier` is "focus" or absent, or a
+    node of any other type (those exist for the focus set only; papers use `attrs.tier` for
+    their publication tier). Core-only nodes are found through search and Dr. Wu instead."""
+    if node.type not in TIERED_TYPES:
+        return True
+    tier = node.attrs.get("tier")
+    return tier is None or tier == "focus"
+
+
+def _has_focus_member(store: graph.GraphStore, cluster_id: str) -> bool:
+    return any(
+        (m := store.nodes.get(mid)) is not None and m.type == NodeType.disease and is_focus(m)
+        for mid in store.members.get(cluster_id, ())
+    )
+
+
+def _map_nodes(store: graph.GraphStore) -> list[Node]:
+    """Focus nodes, plus clusters with at least one focus disease member, sorted by id."""
+    out = [
+        node
+        for node in [*store.nodes.values(), *store.contrib_nodes.values()]
+        if (_has_focus_member(store, node.id) if node.type == NodeType.cluster else is_focus(node))
+    ]
+    return sorted(out, key=lambda n: n.id)
+
+
 def _build_drafts(store: graph.GraphStore) -> list[_Draft]:
     by_category: dict[AtlasCategory, list[Node]] = {c: [] for c in CATEGORY_ORDER}
-    for node in sorted([*store.nodes.values(), *store.contrib_nodes.values()], key=lambda n: n.id):
+    map_nodes = _map_nodes(store)
+    for node in map_nodes:
         if node.id.startswith(graph.CONTRIB_NODE_PREFIX):
             by_category[AtlasCategory.community].append(node)
         else:
             by_category[TYPE_CATEGORY.get(node.type, AtlasCategory.community)].append(node)
-    ix = _Index(store)
+    on_map = {n.id for n in map_nodes}
+    if len(on_map) == len(store.nodes) + len(store.contrib_nodes):
+        ix = _Index(store)
+    else:  # map clusters: the cluster nodes kept and clusters with a focus disease
+        ix = _Index(store, on_map | {c for c in store.clusters if _has_focus_member(store, c)})
     builders: dict[AtlasCategory, Callable[[list[Node]], list[_Draft]]] = {
         AtlasCategory.researchers: lambda ns: _build_researchers(store, ns, ix),
         AtlasCategory.institutions: lambda ns: _build_institutions(store, ns),
@@ -1632,15 +1676,15 @@ def build_tree(store: graph.GraphStore) -> AtlasTree:
             )
         )
 
-    layout = graph.atlas_layout()
+    on_map = {n.id for n in out if n.kind == TreeNodeKind.entity}
     return AtlasTree(
         data_version=store.data_version,
         layout_version=LAYOUT_VERSION,
         root_id=ROOT_ID,
         categories=categories,
         nodes=out,
-        edges=layout.edges,
-        clusters=layout.clusters,
+        edges=graph.atlas_edges(within=on_map, store=store),
+        clusters=[store.clusters[k] for k in sorted(store.clusters) if _has_focus_member(store, k)],
     )
 
 
