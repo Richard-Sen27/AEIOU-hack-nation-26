@@ -49,7 +49,9 @@ ModelKind = Literal["main", "small"]
 ToolMode = Literal["namespace", "function", "json"]
 TOOL_NAMESPACE = "amber"
 _TOOL_MODES: tuple[ToolMode, ...] = ("namespace", "function", "json")
-_MODELS_TTL_S = 600.0
+# Model lists change rarely; an uncached listing costs about 2 s before the first model call.
+_MODELS_TTL_S = 6 * 3600.0
+Effort = Literal["minimal", "low", "medium", "high"]
 
 _USAGE_LIMIT_CODES = {"subscription_sharing_usage_limit_exceeded", "usage_limit_exceeded"}
 _UNAVAILABLE_CODES = {
@@ -74,10 +76,12 @@ class _Capabilities:
     json_schema: bool = True
     tool_mode: ToolMode = "namespace"
     include_reasoning: bool = True
+    reasoning_effort: bool = True
 
 
 _capabilities: dict[str, _Capabilities] = {}
 _models_cache: dict[tuple[str, str], tuple[float, list[ModelInfo]]] = {}
+_models_inflight: dict[tuple[str, str], "asyncio.Future[list[ModelInfo]]"] = {}
 
 # (step, model, duration_ms, error code or None): told about every model call, nothing else.
 CallObserver = Callable[[str, str, float, str | None], None]
@@ -194,6 +198,17 @@ def _dump(obj: Any) -> dict[str, Any]:
     return obj.model_dump(mode="json", exclude_none=True)
 
 
+def _reasoning_levels(raw: dict[str, Any]) -> tuple[str, ...]:
+    """Efforts a model-list entry advertises (`supported_reasoning_levels`: strings or
+    objects with `effort`)."""
+    levels = []
+    for item in raw.get("supported_reasoning_levels") or []:
+        effort = item.get("effort") if isinstance(item, dict) else item
+        if isinstance(effort, str) and effort:
+            levels.append(effort.lower())
+    return tuple(levels)
+
+
 def _pick_model(models: list[ModelInfo], kind: ModelKind) -> str | None:
     visible = [m for m in models if m.visibility in (None, "list")] or models
     if not visible:
@@ -273,10 +288,24 @@ class LLMClient:
 
     async def list_models(self) -> list[ModelInfo]:
         token = await self.bearer()
-        key = (self.base_url, hashlib.sha256(token.encode()).hexdigest()[:16])
+        # Per account, not per access token: a refreshed token must not empty the cache.
+        account = getattr(self.token_provider, "user_id", None)
+        identity = f"user:{account}" if account is not None else token
+        key = (self.base_url, hashlib.sha256(identity.encode()).hexdigest()[:16])
         cached = _models_cache.get(key)
         if cached and time.monotonic() - cached[0] < _MODELS_TTL_S:
             return cached[1]
+        # Concurrent callers (a prefetch and the turn itself) share one request.
+        task = _models_inflight.get(key)
+        if task is None or task.get_loop() is not asyncio.get_running_loop():
+            task = asyncio.ensure_future(self._fetch_models(token, key))
+            _models_inflight[key] = task
+            task.add_done_callback(
+                lambda t: _models_inflight.pop(key) if _models_inflight.get(key) is t else None
+            )
+        return await asyncio.shield(task)
+
+    async def _fetch_models(self, token: str, key: tuple[str, str]) -> list[ModelInfo]:
         try:
             resp = await self._openai.with_options(api_key=token).get(
                 "/models", cast_to=httpx.Response
@@ -295,11 +324,18 @@ class LLMClient:
         for raw in body.get("models") or []:
             if isinstance(raw, dict) and raw.get("slug"):
                 models.append(
-                    ModelInfo(raw["slug"], raw.get("display_name"), raw.get("visibility"))
+                    ModelInfo(
+                        raw["slug"],
+                        raw.get("display_name"),
+                        raw.get("visibility"),
+                        _reasoning_levels(raw),
+                    )
                 )
         for raw in body.get("data") or []:
             if isinstance(raw, dict) and raw.get("id"):
-                models.append(ModelInfo(raw["id"], raw.get("display_name"), "list"))
+                models.append(
+                    ModelInfo(raw["id"], raw.get("display_name"), "list", _reasoning_levels(raw))
+                )
         _models_cache[key] = (time.monotonic(), models)
         return models
 
@@ -312,6 +348,28 @@ class LLMClient:
                 raise LLMError("usage_unavailable", "no models available for this account")
             self._resolved[kind] = slug
         return self._resolved[kind]
+
+    async def reasoning(self, model: str, effort: Effort | None) -> dict[str, str] | None:
+        """`reasoning` request parameter for `effort`, only when the model list advertises that
+        effort for this model and the upstream has not rejected the parameter; else None (the
+        model's default effort)."""
+        if effort is None or not self._caps.reasoning_effort:
+            return None
+        try:
+            models = await self.list_models()
+        except LLMError:
+            return None
+        info = next((m for m in models if m.slug == model), None)
+        if info is None or effort not in info.reasoning_levels:
+            return None
+        return {"effort": effort}
+
+    def _effort_rejected(self, exc: "_BadRequest") -> bool:
+        """A 400 about the reasoning effort: stop sending it to this upstream."""
+        if exc.param.startswith("reasoning") or exc.mentions("effort"):
+            self._caps.reasoning_effort = False
+            return True
+        return False
 
     # ---- low level streaming ------------------------------------------------------------
 
@@ -424,11 +482,30 @@ class LLMClient:
                 yield value
 
     async def complete_text(
-        self, *, instructions: str, input: str | list, kind: ModelKind = "main"
+        self,
+        *,
+        instructions: str,
+        input: str | list,
+        kind: ModelKind = "main",
+        effort: Effort | None = None,
     ) -> str:
+        """`effort`: reasoning effort to ask for, used only when the model advertises it."""
         model = await self.resolve_model(kind)
-        params = {"model": model, "instructions": instructions, "input": _as_items(input)}
-        return (await self._collect(params, step="complete_text")).text
+        params: dict[str, Any] = {
+            "model": model,
+            "instructions": instructions,
+            "input": _as_items(input),
+        }
+        reasoning = await self.reasoning(model, effort)
+        if reasoning is not None:
+            params["reasoning"] = reasoning
+        try:
+            return (await self._collect(params, step="complete_text")).text
+        except _BadRequest as exc:
+            if reasoning is None or not self._effort_rejected(exc):
+                raise
+            params.pop("reasoning")
+            return (await self._collect(params, step="complete_text")).text
 
     # ---- structured -----------------------------------------------------------------------
 
@@ -440,7 +517,9 @@ class LLMClient:
         input: str | list,
         kind: ModelKind = "small",
         max_retries: int = 2,
+        effort: Effort | None = None,
     ) -> T:
+        """`effort`: reasoning effort to ask for, used only when the model advertises it."""
         model = await self.resolve_model(kind)
         items = _as_items(input)
         json_schema, strict = strict_json_schema(schema)
@@ -448,6 +527,9 @@ class LLMClient:
         attempts = 0
         while True:
             params: dict[str, Any] = {"model": model, "input": items}
+            reasoning = await self.reasoning(model, effort)
+            if reasoning is not None:
+                params["reasoning"] = reasoning
             if use_format:
                 params["instructions"] = instructions
                 params["text"] = {
@@ -463,6 +545,8 @@ class LLMClient:
             try:
                 result = await self._collect(params, step=f"structured:{schema_name(schema)}")
             except _BadRequest as exc:
+                if reasoning is not None and self._effort_rejected(exc):
+                    continue
                 if use_format and exc.mentions("text", "format", "schema", "json"):
                     if exc.unsupported:
                         self._caps.json_schema = False
@@ -498,7 +582,19 @@ class LLMClient:
         max_tool_calls: int = 8,
         deadline_s: float = 30.0,
         on_event: OnEvent | None = None,
+        max_rounds: int | None = None,
+        tools_for_s: float | None = None,
+        final_note: str | None = None,
+        tool_effort: Effort | None = None,
     ) -> ToolRunResult[T]:
+        """Tool loop with a hard `deadline_s`. The budget is enforced here, not by the model:
+        after `max_rounds` rounds that called tools, once `tools_for_s` seconds have passed, or
+        once `max_tool_calls` is used up, the next call is the final answer with tools disabled
+        (`tool_choice: none`), preceded by `final_note` as a developer message. `tool_effort`
+        is the reasoning effort for rounds that may still call tools (only when advertised);
+        the final round keeps the model's default."""
+        until = None if tools_for_s is None else time.monotonic() + tools_for_s
+        budget = _Budget(max_rounds, until)
         try:
             async with asyncio.timeout(deadline_s):
                 return await self._run_tools(
@@ -509,6 +605,9 @@ class LLMClient:
                     kind=kind,
                     max_tool_calls=max_tool_calls,
                     on_event=on_event,
+                    budget=budget,
+                    final_note=final_note,
+                    tool_effort=tool_effort,
                 )
         except TimeoutError:
             raise LLMError("timeout", "tool run exceeded its deadline") from None
@@ -523,11 +622,24 @@ class LLMClient:
         kind: ModelKind,
         max_tool_calls: int,
         on_event: OnEvent | None,
+        budget: "_Budget | None" = None,
+        final_note: str | None = None,
+        tool_effort: Effort | None = None,
     ) -> ToolRunResult[T]:
         model = await self.resolve_model(kind)
         items = _as_items(input)
         while True:
-            run = _ToolRun(self, model, tools, final_schema, max_tool_calls, on_event)
+            run = _ToolRun(
+                self,
+                model,
+                tools,
+                final_schema,
+                max_tool_calls,
+                on_event,
+                budget or _Budget(None, None),
+                final_note,
+                await self.reasoning(model, tool_effort),
+            )
             mode = self._caps.tool_mode if tools else "namespace"
             try:
                 if mode == "json":
@@ -539,6 +651,8 @@ class LLMClient:
 
     def _downgrade(self, exc: "_BadRequest", mode: ToolMode, run: "_ToolRun") -> bool:
         caps = self._caps
+        if run.used_effort and self._effort_rejected(exc):
+            return True
         if mode != "json" and run.used_include and exc.mentions("include", "reasoning", "encrypt"):
             caps.include_reasoning = False
             return True
@@ -562,6 +676,26 @@ def _output_text(items: list[dict[str, Any]]) -> str:
     return "".join(parts)
 
 
+@dataclass
+class _Budget:
+    """How many tool rounds may run, and until when (monotonic seconds)."""
+
+    max_rounds: int | None
+    tools_until: float | None
+
+    def spent(self, tool_rounds: int) -> str | None:
+        if self.max_rounds is not None and tool_rounds >= self.max_rounds:
+            return "rounds"
+        if self.tools_until is not None and time.monotonic() >= self.tools_until:
+            return "time"
+        return None
+
+
+FINAL_NOW = (
+    "The tool budget for this turn is used up: answer now, from the tool results above only."
+)
+
+
 class _ToolRun:
     def __init__(
         self,
@@ -571,6 +705,9 @@ class _ToolRun:
         final_schema: type[BaseModel] | None,
         max_tool_calls: int,
         on_event: OnEvent | None,
+        budget: _Budget,
+        final_note: str | None,
+        tool_reasoning: dict[str, str] | None,
     ):
         self.llm = llm
         self.model = model
@@ -578,11 +715,17 @@ class _ToolRun:
         self.final_schema = final_schema
         self.max_tool_calls = max_tool_calls
         self.on_event = on_event
+        self.budget = budget
+        self.final_note = final_note
+        self.tool_reasoning = tool_reasoning
         self.usage = Usage()
         self.records: list[ToolCallRecord] = []
         self.rounds = 0
+        self.tool_rounds = 0
+        self.forced: str | None = None
         self.used_include = False
         self.used_format = False
+        self.used_effort = False
         self.final_json, self.final_strict = (
             strict_json_schema(final_schema) if final_schema else (None, False)
         )
@@ -676,13 +819,29 @@ class _ToolRun:
             model=self.model,
             tool_mode=mode,
             rounds=self.rounds,
+            forced_final=self.forced,
         )
+
+    async def _check_budget(self, items: list[Any], *, json_mode: bool = False) -> None:
+        """After a tool round: if the budget is spent, switch to the final answer (once)."""
+        if self.forced is not None:
+            return
+        reason = "calls" if len(self.records) >= self.max_tool_calls else None
+        reason = reason or self.budget.spent(self.tool_rounds)
+        if reason is None:
+            return
+        self.forced = reason
+        note = FINAL_NOW + (" " + self.final_note if self.final_note else "")
+        if json_mode:
+            note += ' Reply with {"final": ...} now; tools are disabled.'
+        items.append({"role": "developer", "content": note})
+        await _emit(self.on_event, ToolEvent("final_round", name=reason))
 
     async def native(self, instructions: str, items: list[Any], mode: ToolMode) -> ToolRunResult:
         caps = self.llm._caps
         items = list(items)
-        budget_exhausted = False
         bad_outputs = 0
+        forced_rounds = 0
 
         async def on_delta(delta: str) -> None:
             await _emit(self.on_event, ToolEvent("text_delta", delta=delta))
@@ -693,8 +852,11 @@ class _ToolRun:
             if self.tools:
                 params["tools"] = self._tools_param(mode)
                 params["parallel_tool_calls"] = True
-                if budget_exhausted:
+                if self.forced is not None:
                     params["tool_choice"] = "none"
+                elif self.tool_reasoning is not None and caps.reasoning_effort:
+                    params["reasoning"] = self.tool_reasoning
+                    self.used_effort = True
             if caps.include_reasoning:
                 params["include"] = ["reasoning.encrypted_content"]
                 self.used_include = True
@@ -718,11 +880,16 @@ class _ToolRun:
             calls = [i for i in result.items if i.get("type") == "function_call"]
             items.extend(_replayable(i) for i in result.items)
             if calls:
+                if self.forced is not None:
+                    forced_rounds += 1
+                    if forced_rounds > 1:
+                        raise LLMError("bad_output", "model kept calling tools after the budget")
+                else:
+                    self.tool_rounds += 1
                 for call in calls:
                     call_id = call.get("call_id") or call.get("id") or ""
-                    if len(self.records) >= self.max_tool_calls:
+                    if len(self.records) >= self.max_tool_calls or self.forced is not None:
                         output = {"error": "tool call budget exhausted; answer now"}
-                        budget_exhausted = True
                     else:
                         output = await self._call_tool(
                             call.get("name", ""), call_id, call.get("arguments") or "{}"
@@ -734,8 +901,7 @@ class _ToolRun:
                             "output": json.dumps(output, default=str),
                         }
                     )
-                if len(self.records) >= self.max_tool_calls:
-                    budget_exhausted = True
+                await self._check_budget(items)
                 continue
             if self.final_schema is None:
                 return self._result(result.text, None, mode)
@@ -766,6 +932,7 @@ class _ToolRun:
         items = list(items)
         bad_outputs = 0
         call_no = 0
+        forced_calls = 0
         while True:
             result = await self.llm._collect(
                 {"model": self.model, "instructions": instr, "input": items}, step="tool_round"
@@ -781,7 +948,11 @@ class _ToolRun:
                 items.append({"role": "assistant", "content": text})
                 call_no += 1
                 call_id = f"json_call_{call_no}"
-                if len(self.records) >= self.max_tool_calls:
+                if self.forced is None:
+                    self.tool_rounds += 1
+                elif (forced_calls := forced_calls + 1) > 1:
+                    raise LLMError("bad_output", "model kept calling tools after the budget")
+                if len(self.records) >= self.max_tool_calls or self.forced is not None:
                     output = {"error": "tool call budget exhausted; give the final answer now"}
                 else:
                     output = await self._call_tool(
@@ -794,6 +965,7 @@ class _ToolRun:
                         f"{json.dumps(output, default=str)}</tool_result>",
                     }
                 )
+                await self._check_budget(items, json_mode=True)
                 continue
             final = action.get("final") if isinstance(action, dict) and "final" in action else None
             if self.final_schema is None:

@@ -366,3 +366,97 @@ async def test_agents_sdk_streamed_run(mock_openai):
     assert "e_0123456789ab" in run.final_output
     for body in _bodies(mock_openai):
         _assert_plan_safe(body)
+
+
+SEARCH = {"tool_calls": [{"name": "search_graph", "arguments": {"query": "a"}}]}
+
+
+@pytest.fixture
+def fresh_models(mock_openai):
+    """Model list and learned capabilities are cached per upstream: start clean, end clean."""
+    from backend.llm import client
+
+    client._models_cache.clear()
+    yield
+    client._models_cache.clear()
+    client._capabilities.pop(mock_openai.api_base.rstrip("/"), None)
+
+
+def _advertise(mock, levels):
+    models = [dict(m) for m in mock.state.config.models]
+    for m in models:
+        m["supported_reasoning_levels"] = [{"effort": e} for e in levels]
+    mock.configure(models=models)
+
+
+async def test_round_budget_and_reasoning_effort(mock_openai, fresh_models):
+    _advertise(mock_openai, ["low", "medium", "high"])
+    mock_openai.enqueue(SEARCH, {"text": "done"})
+    events: list[ToolEvent] = []
+    result = await _llm(mock_openai).run_tools(
+        instructions="x",
+        input="hi",
+        tools=_tools([]),
+        max_rounds=1,
+        final_note="Say what you could not check.",
+        tool_effort="low",
+        on_event=events.append,
+    )
+    first, last = _bodies(mock_openai)
+    assert first["reasoning"] == {"effort": "low"} and "tool_choice" not in first
+    assert last["tool_choice"] == "none" and "reasoning" not in last  # final: default effort
+    notes = [i["content"] for i in last["input"] if i.get("role") == "developer"]
+    assert len(notes) == 1 and notes[0].endswith("Say what you could not check.")
+    assert result.forced_final == "rounds" and len(result.tool_calls) == 1
+    assert result.text == "done"
+    assert [e.name for e in events if e.type == "final_round"] == ["rounds"]
+
+
+async def test_reasoning_effort_needs_advertising(mock_openai, fresh_models):
+    llm = _llm(mock_openai)
+    await llm.run_tools(instructions="x", input="hi", tools=_tools([]), tool_effort="low")
+    await llm.structured(Answer, instructions="x", input="See e_0123456789ab.", effort="low")
+    assert all("reasoning" not in b for b in _bodies(mock_openai))
+
+
+async def test_reasoning_effort_rejected_is_dropped(mock_openai, fresh_models):
+    _advertise(mock_openai, ["low"])
+    rejection = {
+        "status": 400,
+        "code": "subscription_sharing_unsupported_capability",
+        "param": "reasoning.effort",
+        "message": "Unsupported parameter: reasoning.effort",
+    }
+    mock_openai.enqueue({"error": rejection})
+    llm = _llm(mock_openai)
+    result = await llm.run_tools(instructions="x", input="hi", tools=_tools([]), tool_effort="low")
+    assert result.text
+    bodies = _bodies(mock_openai)
+    assert bodies[0]["reasoning"] == {"effort": "low"}
+    assert all("reasoning" not in b for b in bodies[1:])
+    assert "include" in bodies[-1]  # the include capability is untouched
+
+
+async def test_time_budget_forces_final(mock_openai, fresh_models):
+    mock_openai.enqueue(SEARCH, {"text": "done"})
+    result = await _llm(mock_openai).run_tools(
+        instructions="x", input="hi", tools=_tools([]), tools_for_s=0.0
+    )
+    assert result.forced_final == "time" and result.text == "done"
+    assert _bodies(mock_openai)[1]["tool_choice"] == "none"
+
+
+async def test_concurrent_model_listings_share_one_request(mock_openai, fresh_models, monkeypatch):
+    fetches = []
+    original = LLMClient._fetch_models
+
+    async def counted(self, token, key):
+        fetches.append(key)
+        return await original(self, token, key)
+
+    monkeypatch.setattr(LLMClient, "_fetch_models", counted)
+    llm = _llm(mock_openai)
+    first, second = await asyncio.gather(llm.list_models(), llm.list_models())
+    assert first == second and len(fetches) == 1
+    await llm.list_models()
+    assert len(fetches) == 1  # cached

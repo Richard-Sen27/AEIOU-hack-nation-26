@@ -68,6 +68,8 @@ class ModelInfo:
     slug: str
     display_name: str | None = None
     visibility: str | None = None
+    # Reasoning efforts the model list advertises for this model (empty: none advertised).
+    reasoning_levels: tuple[str, ...] = ()
 
 
 @dataclass
@@ -90,9 +92,11 @@ class Usage:
 
 @dataclass
 class ToolEvent:
-    """Progress event from `run_tools`. `text_delta` carries `delta`; tool events carry the rest."""
+    """Progress event from `run_tools`. `text_delta` carries `delta`; tool events carry the rest.
+    `final_round` says the next model call must answer without tools; `name` is the reason
+    (`rounds`, `time` or `calls`)."""
 
-    type: Literal["tool_start", "tool_end", "text_delta"]
+    type: Literal["tool_start", "tool_end", "text_delta", "final_round"]
     name: str | None = None
     call_id: str | None = None
     arguments: dict[str, Any] | None = None
@@ -121,6 +125,7 @@ class ToolRunResult(Generic[T]):  # noqa: UP046
     model: str | None = None
     tool_mode: str | None = None
     rounds: int = 0
+    forced_final: str | None = None  # why the last round ran without tools, if it was forced
 
 
 OnEvent = Callable[[ToolEvent], Any]
