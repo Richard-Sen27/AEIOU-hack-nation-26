@@ -133,6 +133,7 @@ Work deliberately left for later. Add an item when you leave something for later
 - **Dev-only error** "Router action dispatched before initialization" has made specs fail and pass on rerun.
 - **GPU:** the Atlas needs a real GPU; software rendering is too slow for e2e.
 - **Auto-reload** (`make backend`, `--reload`): the dev API restarts on every saved backend file and cuts open chat streams.
+- **Phone check (open):** many tap targets are 28 px (map and graph zoom buttons, filter chips, Graph/List, cluster "Map"/"Open"); a pinch that starts on the Atlas centre logo zooms the page instead of the map; on 360 px the node filter placeholder is cut ("Filter connectior"); the node graph (62vh) takes touch drags, so the page scrolls only beside or outside it; landscape Atlas leaves about 160 px for the map under two bars. Not checked on a real iPhone or Android device.
 
 ## Agent architecture
 
