@@ -9,6 +9,7 @@ import type { ConsentType } from "@/lib/api/types";
 export const CONSENT_VERSION: Record<ConsentType, string> = {
   health_data: "health-data-2026-10-04",
   contribute: "contribute-2026-10-04",
+  connect: "connect-2026-10-04",
 };
 
 export type ConsentNotice = {
@@ -82,6 +83,29 @@ export const CONSENT_NOTICES: Record<ConsentType, ConsentNotice> = {
       "I explicitly consent to Amber publishing the contributions I submit in the shared atlas, labelled as patient-reported, as described above.",
     grantLabel: "I agree, continue",
   },
+  connect: {
+    summary:
+      "Studies, surveys and contacts: Amber lets you write to verified doctors and researchers who accept messages. This is a separate purpose, so we ask for your separate consent.",
+    processed: [
+      "The messages you write and receive, and the display name you choose for a conversation.",
+      "Your age group (18 or older, or 16 or 17) and, if you are 16 or 17, that a parent or guardian agrees (self-declared, not checked).",
+    ],
+    purpose:
+      "Only to let you contact the person you choose. Messages are not a medical consultation or a medical record.",
+    safeguards: [
+      "Messages are stored encrypted and shown only to you and the person you write to.",
+      "No AI model reads them. The Amber team reads a conversation only when you report it, and every such access is logged.",
+      "Your e-mail, account name and profile are never shown to the other person.",
+    ],
+    retention: [
+      "Messages: until you delete them, withdraw this consent or delete your account; conversations inactive for 12 months are deleted.",
+    ],
+    withdrawal:
+      "You can withdraw at any time in your profile with one click. Withdrawing deletes your messages and closes your conversations.",
+    agreement:
+      "I consent to Amber processing my messages and age group so I can contact doctors and researchers, as described above.",
+    grantLabel: "I agree, continue",
+  },
 };
 
 /** What withdrawing deletes, for the profile's consent section. */
@@ -89,6 +113,7 @@ export const WITHDRAWAL_EFFECT: Record<ConsentType, string> = {
   health_data:
     "Withdrawing deletes your profile, your chats with Dr. Wu, and your documents with their findings and processing jobs. Your account, settings and contributions stay.",
   contribute: "Withdrawing removes all your contributions from the shared atlas.",
+  connect: "Withdrawing deletes your messages and closes your conversations.",
 };
 
 export const CONSENT_LABELS: Record<ConsentType, { title: string; description: string }> = {
@@ -99,5 +124,9 @@ export const CONSENT_LABELS: Record<ConsentType, { title: string; description: s
   contribute: {
     title: "Contribute to the shared atlas",
     description: "Lets you publish patient-reported symptom profiles and resources in the atlas.",
+  },
+  connect: {
+    title: "Studies, surveys and contacts",
+    description: "Lets you write to verified doctors and researchers who accept messages.",
   },
 };

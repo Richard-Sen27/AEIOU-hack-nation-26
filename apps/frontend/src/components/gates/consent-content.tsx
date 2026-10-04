@@ -29,6 +29,7 @@ export type ConsentContentProps = {
 export const CONSENT_TITLES: Record<ConsentType, string> = {
   health_data: "Use of your health information",
   contribute: "Before you contribute to the shared atlas",
+  connect: "Studies, surveys and contacts",
 };
 
 type Subject = "self" | "child";
