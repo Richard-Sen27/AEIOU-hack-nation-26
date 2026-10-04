@@ -21,6 +21,10 @@ DEFAULT_MESSAGES: dict[ErrorCode, str] = {
     ErrorCode.bad_request: "The request could not be processed.",
     ErrorCode.sign_in_required: "Sign in to use this feature.",
     ErrorCode.consent_required: "This feature needs your consent first.",
+    ErrorCode.age_group_required: "Tell us your age group before you contact anyone.",
+    ErrorCode.guardian_agreement_required: (
+        "Confirm that a parent or guardian knows about this and agrees."
+    ),
     ErrorCode.forbidden: "You do not have access to this resource.",
     ErrorCode.not_found: "Not found.",
     ErrorCode.conflict: "The request conflicts with the current state.",

@@ -15,7 +15,9 @@ from sqlalchemy.exc import IntegrityError
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from backend.api.errors import ApiError
+from backend.api.services import connect as connect_service
 from backend.api.services import follows as follows_service
+from backend.api.services import messaging as messaging_service
 from backend.api.services.chat import message_from_row as chat_message_from_row
 from backend.api.services.chat import runs as chat_runs
 from backend.api.services.contributions import contribution_from_row, refresh_shared_graph
@@ -130,6 +132,7 @@ async def on_role_change(db: AsyncSession, user_id: UUID, new_role: Role) -> Non
         await clear_professional(db, user_id)
     else:
         await clear_verification(db, user_id)
+    await messaging_service.on_role_change(db, user_id, new_role)
 
 
 async def update_settings(db: AsyncSession, user: CurrentUser, body: SettingsUpdate) -> SessionUser:
@@ -286,6 +289,7 @@ async def revoke_consent(db: AsyncSession, user: CurrentUser, consent_type: Cons
     details and the contribute consent with its contributions stay (work details are not health
     data and not held under this consent).
     contribute: every contribution, which removes it from the shared graph.
+    connect: the user's messages and stated age group; their threads close (connect.withdraw).
     """
     existing = await _active_consent(db, user.id, consent_type)
     if existing is None:
@@ -305,6 +309,8 @@ async def revoke_consent(db: AsyncSession, user: CurrentUser, consent_type: Cons
             await db.execute(text(f"DELETE FROM {table} WHERE user_id = :uid"), params)
         await db.execute(text("DELETE FROM patient_profiles WHERE user_id = :uid"), params)
         await follows_service.delete_health_data(db, user.id)
+    elif consent_type == ConsentType.connect:
+        await connect_service.withdraw(db, user.id)
     else:
         await db.execute(text("DELETE FROM contributions WHERE user_id = :uid"), params)
         await refresh_shared_graph(db, contributions=True)
@@ -685,6 +691,7 @@ async def export_data(db: AsyncSession, user: CurrentUser) -> DataExport:
         jobs=[Job.model_validate(dict(j)) for j in jobs],
         follows=follows,
         notifications=notifications,
+        connect=await messaging_service.export(db, uid),
     )
 
 
@@ -713,6 +720,7 @@ async def delete_account(db: AsyncSession, user: CurrentUser) -> None:
     """
     await chat_runs.discard_user(user.id)  # running turns stop and store nothing
     await _revoke_openai_tokens(db, user)
+    await messaging_service.on_account_delete(db, user.id)
     deleted = await db.scalar(
         text("DELETE FROM users WHERE id = :uid RETURNING id"), {"uid": user.id}
     )

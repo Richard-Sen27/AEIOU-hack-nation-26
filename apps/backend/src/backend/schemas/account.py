@@ -12,6 +12,7 @@ from backend.schemas.contributions import Contribution, EdgeFlag
 from backend.schemas.documents import Document, Finding, Job
 from backend.schemas.enums import AuthProvider, ConsentType, NodeType, Role
 from backend.schemas.follows import FollowExport, NotificationExport
+from backend.schemas.messaging import ConnectExport
 from backend.schemas.profile import PatientProfile
 
 
@@ -44,6 +45,7 @@ class Consent(ApiModel):
 CONSENT_TEXT_VERSIONS: dict[ConsentType, str] = {
     ConsentType.health_data: "health-data-2026-10-04",
     ConsentType.contribute: "contribute-2026-10-04",
+    ConsentType.connect: "connect-2026-10-04",
 }
 
 
@@ -53,7 +55,8 @@ class ConsentGrant(ApiModel):
         min_length=1,
         max_length=40,
         description="Consent text version shown; must be the current version for the type "
-        "(health_data: health-data-2026-10-04, contribute: contribute-2026-10-04).",
+        "(health_data: health-data-2026-10-04, contribute: contribute-2026-10-04, connect: "
+        "connect-2026-10-04).",
     )
     about_child: bool = Field(False, description="Consent covers data about a child.")
     parental_responsibility_confirmed: bool = Field(
@@ -385,4 +388,8 @@ class DataExport(ApiModel):
     follows: list[FollowExport] = Field(description="Followed diseases.")
     notifications: list[NotificationExport] = Field(
         description="In-app notifications (no stored text)."
+    )
+    connect: ConnectExport | None = Field(
+        None,
+        description="Age group, conversations with the user's own messages, blocks and reports.",
     )

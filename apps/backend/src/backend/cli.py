@@ -40,6 +40,7 @@ import asyncio
 import logging
 import re
 import sys
+import uuid
 from collections.abc import Sequence
 from dataclasses import dataclass, field
 from datetime import UTC, datetime
@@ -424,6 +425,47 @@ def _run(coro):
     return asyncio.run(_main())
 
 
+MESSAGING_COMMANDS = (
+    "list-reports",
+    "read-reported-thread",
+    "purge-messages",
+    "rotate-message-key",
+)
+
+
+def _add_messaging_commands(sub) -> None:
+    """Operator commands for messaging (run as atlas_owner, MIGRATION_DATABASE_URL)."""
+    sub.add_parser("list-reports", help="List reports of conversations (no message content)")
+    read = sub.add_parser(
+        "read-reported-thread",
+        help="Read a reported conversation; the access is logged with operator and reason",
+    )
+    read.add_argument("report_id", type=uuid.UUID)
+    read.add_argument("--operator", required=True, help="Your name (logged)")
+    read.add_argument("--reason", required=True, help="Why you read it, 10-500 chars (logged)")
+    sub.add_parser(
+        "purge-messages",
+        help="Delete conversations inactive for 12 months, old reports and access-log rows",
+    )
+    sub.add_parser(
+        "rotate-message-key", help="Re-encrypt every message under the first MESSAGE_ENCRYPTION_KEY"
+    )
+
+
+def _run_messaging_command(args) -> int:
+    from backend.api.services.messaging import operator
+
+    if args.command == "list-reports":
+        operator.list_reports()
+    elif args.command == "read-reported-thread":
+        operator.read_reported_thread(args.report_id, operator=args.operator, reason=args.reason)
+    elif args.command == "purge-messages":
+        operator.purge()
+    else:
+        operator.rotate_key()
+    return 0
+
+
 def main(argv: list[str] | None = None) -> int:
     logging.basicConfig(level=logging.WARNING, format="%(levelname)s %(name)s %(message)s")
     logging.getLogger("presidio-analyzer").setLevel(logging.ERROR)
@@ -473,7 +515,11 @@ def main(argv: list[str] | None = None) -> int:
     decision.add_argument("--reject", action="store_true", help="Reject the pending request")
     decision.add_argument("--revoke", action="store_true", help="End any verification")
 
+    _add_messaging_commands(sub)
+
     args = parser.parse_args(argv)
+    if args.command in MESSAGING_COMMANDS:
+        return _run_messaging_command(args)
     if args.command == "verification-requests":
         verification_requests()
         return 0

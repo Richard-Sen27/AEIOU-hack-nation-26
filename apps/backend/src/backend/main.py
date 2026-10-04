@@ -22,6 +22,7 @@ from backend.api.routes import (
     gap,
     graph,
     health,
+    messaging,
     path,
     people,
     proposal,
@@ -52,6 +53,7 @@ ROUTERS = (
     proposal,
     follows,
     people,
+    messaging,
 )
 
 

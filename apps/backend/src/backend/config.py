@@ -47,6 +47,11 @@ class Settings(BaseSettings):
     brightdata_serp_zone: str | None = None
     ncbi_api_key: str | None = None
 
+    # Fernet key(s) for message bodies at rest, comma-separated, newest first (rotation). Separate
+    # from TOKEN_ENCRYPTION_KEY. Empty: on loopback a key derived from SESSION_SECRET (demo only),
+    # elsewhere messaging answers 501.
+    message_encryption_key: str = ""
+
     # ORCID sign-in confirms a doctor's or researcher's ORCID iD (public API, scope /authenticate).
     # Real ORCID needs a registered client: ORCID_CLIENT_ID and ORCID_CLIENT_SECRET, plus
     # ORCID_BASE_URL (https://sandbox.orcid.org for testing, https://orcid.org for production).

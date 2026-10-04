@@ -200,10 +200,12 @@ class AuthProvider(StrEnum):
 
 class ConsentType(StrEnum):
     """health_data: one consent to process the user's own health and genetic data (chat,
-    profile, documents); contribute: share data with the atlas, a separate purpose."""
+    profile, documents); contribute: share data with the atlas, a separate purpose; connect:
+    studies, surveys and contacts with other people (messaging), a separate purpose."""
 
     health_data = "health_data"
     contribute = "contribute"
+    connect = "connect"
 
 
 class ConfidenceLevel(StrEnum):
@@ -382,6 +384,8 @@ class ErrorCode(StrEnum):
     sign_in_required = "sign_in_required"
     consent_required = "consent_required"
     age_confirmation_required = "age_confirmation_required"
+    age_group_required = "age_group_required"
+    guardian_agreement_required = "guardian_agreement_required"
     forbidden = "forbidden"
     not_found = "not_found"
     conflict = "conflict"
