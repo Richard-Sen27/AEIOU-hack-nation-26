@@ -111,6 +111,7 @@ class SummarySectionKey(StrEnum):
     patient_orgs = "patient_orgs"
     registries = "registries"
     networks = "networks"
+    claims = "claims"
 
 
 class SummaryItem(ApiModel):

@@ -7888,7 +7888,8 @@
           "grants",
           "patient_orgs",
           "registries",
-          "networks"
+          "networks",
+          "claims"
         ],
         "title": "SummarySectionKey"
       },

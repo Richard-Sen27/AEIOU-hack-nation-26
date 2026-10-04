@@ -3179,7 +3179,7 @@ export type SummarySection = {
 /**
  * SummarySectionKey
  */
-export type SummarySectionKey = 'clusters' | 'diseases' | 'similar_diseases' | 'genes' | 'variants' | 'mechanisms' | 'pathways' | 'symptoms' | 'researchers' | 'doctors' | 'institutions' | 'papers' | 'trials' | 'grants' | 'patient_orgs' | 'registries' | 'networks';
+export type SummarySectionKey = 'clusters' | 'diseases' | 'similar_diseases' | 'genes' | 'variants' | 'mechanisms' | 'pathways' | 'symptoms' | 'researchers' | 'doctors' | 'institutions' | 'papers' | 'trials' | 'grants' | 'patient_orgs' | 'registries' | 'networks' | 'claims';
 
 /**
  * TreeNodeKind
