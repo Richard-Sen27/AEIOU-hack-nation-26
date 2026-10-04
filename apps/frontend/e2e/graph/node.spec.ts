@@ -288,6 +288,58 @@ test.describe("node view", () => {
     expect(await zoom()).toBeCloseTo(userZoom, 5);
   });
 
+  // A paper with 48 authors and one gene: no layout may lay the authors out as one long line.
+  for (const layout of ["ring", "hierarchy", "cluster", "force"]) {
+    test(`49 neighbours in the ${layout} layout: no long line, one captioned group`, async ({ page }) => {
+      await page.setViewportSize({ width: 1440, height: 900 });
+      const paper = { id: "PMID:1", type: "paper", label: "A paper with many authors", attrs: {} };
+      const gene = { id: "HGNC:1", type: "gene", label: "CACNA1E", attrs: {} };
+      const authors = Array.from({ length: 48 }, (_, i) => ({ id: `RES:${i}`, type: "researcher", label: `Author Number ${i}`, attrs: {} }));
+      const edge = (id: string, source: string, target: string, relation: string) => ({
+        id, source_id: source, target_id: target, relation, family: "research", confidence: 0.9, confidence_level: "high",
+        origin: "curated", status: "active", flagged: false, evidence_count: 1, contradiction_count: 0, data_version: "fixture",
+      });
+      const hood = {
+        center: paper,
+        nodes: [paper, gene, ...authors],
+        edges: [edge("e-gene", paper.id, gene.id, "about"), ...authors.map((a, i) => edge(`e-${i}`, a.id, paper.id, "authored"))],
+        cluster: null,
+        hints: { start_layout: layout, label_style: "plain", highlight_family: [], highlight_node_types: [], show_ids: false },
+        data_version: "fixture",
+      };
+      await mockApi(page, graphMocks({
+        "GET /neighborhood/*": { json: hood },
+        "GET /node/*": { json: { node: paper, synonyms: [], summary: null, classification: null, relation_counts: [] } },
+      }));
+      await page.goto("/node/PMID%3A1");
+      const graph = page.getByTestId("node-graph");
+      await expect(graph.locator("canvas").first()).toBeVisible({ timeout: 30_000 });
+      await page.waitForTimeout(1500);
+      const m = await graph.evaluate((el) => {
+        type N = { id: () => string; hasClass: (c: string) => boolean; position: () => { x: number; y: number }; data: (k: string) => unknown };
+        const cy = (el as unknown as { _cyreg: { cy: { nodes: () => { toArray: () => N[] } } } })._cyreg.cy;
+        const all = cy.nodes().toArray();
+        const nodes = all.filter((n) => !n.hasClass("caption"));
+        const lines = new Map<number, number>();
+        for (const n of nodes) {
+          const y = Math.round(n.position().y / 4);
+          lines.set(y, (lines.get(y) ?? 0) + 1);
+        }
+        const xs = nodes.map((n) => n.position().x);
+        const ys = nodes.map((n) => n.position().y);
+        return {
+          widestLine: Math.max(...lines.values()),
+          width: Math.max(...xs) - Math.min(...xs),
+          height: Math.max(...ys) - Math.min(...ys),
+          captions: all.filter((n) => n.hasClass("caption")).map((n) => String(n.data("label"))),
+        };
+      });
+      expect(m.widestLine, `${layout}: most nodes on one line`).toBeLessThanOrEqual(10);
+      expect(m.width, `${layout}: width ${m.width} vs height ${m.height}`).toBeLessThanOrEqual(3 * Math.max(m.height, 1));
+      expect(m.captions).toEqual([expect.stringMatching(/^48 researchers · /)]);
+    });
+  }
+
   test("the map key is collapsed until opened and closes with Escape", async ({ page }) => {
     await mockApi(page, graphMocks());
     await page.goto(DRAVET);

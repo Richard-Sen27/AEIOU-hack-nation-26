@@ -13,10 +13,11 @@ import fcose from "cytoscape-fcose";
 import { forwardRef, useEffect, useImperativeHandle, useLayoutEffect, useRef } from "react";
 
 import type { Schemas } from "@/lib/api";
-import { relationLabel, type LabelStyle } from "@/lib/graph/meta";
+import { nodeTypeMeta, relationLabel, type LabelStyle } from "@/lib/graph/meta";
 import { DASH, lineStyleFor, nodeSize, type GraphTheme } from "@/lib/graph/style";
 import type { EdgeFamily, NodeType } from "@/lib/graph/types";
 
+import { BIG_GROUP, groupItems, LABEL_WIDTH, labelledCount, placeNeighbourhood, ringArc, type LayoutItem, type LayoutMode } from "./graph-layouts";
 import type { LayoutHints } from "./lens-hints";
 
 let registered = false;
@@ -53,7 +54,6 @@ function truncate(s: string, n = 26) {
  * small text size (11 × 1.1 ≈ 12 px) instead of being blown up to fill the card.
  */
 const LABEL_SIZE = 11;
-const LABEL_WIDTH = 110;
 const CENTER_SIZE = 34;
 const NODE_SIZE = { min: 12, max: 22 };
 const MAX_FIT_ZOOM = 1.1;
@@ -63,11 +63,6 @@ const FIT_PADDING = 40;
 const HOVER_LABEL_PX = 12;
 /** Neighbour labels drawn smaller than this (zoomed out on a big neighbourhood) are hidden until hover or zoom-in. */
 const MIN_LABEL_PX = 8;
-
-/** Distance between neighbours on a ring: one label width while labels fit, tighter for big hubs. */
-function ringArc(count: number) {
-  return count <= 40 ? LABEL_WIDTH + 24 : count <= 120 ? 64 : 40;
-}
 
 /**
  * Neighbour labels appear once neighbours sit about a label width apart on
@@ -99,47 +94,34 @@ function fitCapped(cy: Core, animate: boolean) {
   else cy.viewport(vp);
 }
 
-/**
- * Rings around the centre: direct neighbours first (the lens's highlighted
- * families innermost), then the rest. Each ring holds as many nodes as fit at
- * one label width apart, so labels do not overlap in small and mid-sized
- * neighbourhoods; big hubs pack tighter and show names on hover.
- */
-function ringPositions(cy: Core, centerId: string, highlight: Set<string>) {
+/** "48 researchers · wrote": a block's caption names its type and relation once. */
+function captionText(count: number, type: string, relation: string, style: LabelStyle) {
+  const plural = nodeTypeMeta(type as NodeType).plural[style];
+  const lower = /^[A-Z][a-z]/.test(plural) ? plural[0].toLowerCase() + plural.slice(1) : plural;
+  return `${count} ${lower} · ${relationLabel(relation, style)}`;
+}
+
+/** Neighbours with their rank and their relation to the centre, for the layouts. */
+function layoutItems(cy: Core, centerId: string, highlight: Set<string>): LayoutItem[] {
   const center = cy.getElementById(centerId);
-  const rank = (n: cytoscape.NodeSingular) => {
-    const direct = n.edgesWith(center);
-    if (direct.length === 0) return 2;
-    return direct.some((e) => highlight.has(e.data("family"))) ? 0 : 1;
-  };
-  const others = cy
-    .nodes()
+  return cy
+    .nodes(":not(.caption)")
     .filter((n) => n.id() !== centerId)
     .toArray()
-    .map((n, i) => ({ id: n.id(), rank: rank(n as cytoscape.NodeSingular), i }))
-    .sort((a, b) => a.rank - b.rank || a.i - b.i);
-  const count = others.length;
-  const arc = ringArc(count);
-  const gap = count <= 40 ? 96 : 52;
-  const positions: Record<string, { x: number; y: number }> = { [centerId]: { x: 0, y: 0 } };
-  let radius = count <= 8 ? 120 : 140;
-  let placed = 0;
-  let ring = 0;
-  while (placed < count) {
-    const capacity = Math.max(4, Math.floor((2 * Math.PI * radius) / arc));
-    const left = count - placed;
-    // Spread a last, partly filled ring evenly instead of bunching it on one side.
-    const onRing = left <= capacity ? left : capacity;
-    const offset = ring % 2 ? Math.PI / onRing : 0;
-    for (let i = 0; i < onRing; i++) {
-      const a = -Math.PI / 2 + offset + (2 * Math.PI * i) / onRing;
-      positions[others[placed + i].id] = { x: radius * Math.cos(a), y: radius * Math.sin(a) };
-    }
-    placed += onRing;
-    radius += gap;
-    ring += 1;
-  }
-  return positions;
+    .map((n) => {
+      const direct = (n as cytoscape.NodeSingular).edgesWith(center).toArray();
+      const lead = direct.find((e) => highlight.has(e.data("family"))) ?? direct[0];
+      const rank: 0 | 1 | 2 = !lead ? 2 : highlight.has(lead.data("family")) ? 0 : 1;
+      return { id: n.id(), type: n.data("type") as string, relation: lead ? (lead.data("relation") as string) : null, rank };
+    });
+}
+
+/** A caption is shown while at least one of its members is. */
+function syncCaptions(cy: Core) {
+  cy.nodes(".caption").forEach((c) => {
+    const members = (c.data("members") as string[]).map((id) => cy.getElementById(id));
+    c.toggleClass("hidden", members.every((m) => m.hasClass("hidden")));
+  });
 }
 
 export const NodeGraph = forwardRef<NodeGraphHandle, Props>(function NodeGraph(props, ref) {
@@ -176,7 +158,15 @@ export const NodeGraph = forwardRef<NodeGraphHandle, Props>(function NodeGraph(p
     const elements: ElementDefinition[] = [
       ...nodes.map((n) => ({
         group: "nodes" as const,
-        data: { id: n.id, type: n.type, name: n.label, fullName: n.label, centrality: n.centrality ?? 0, center: n.id === centerId },
+        data: {
+          id: n.id,
+          type: n.type,
+          name: n.label,
+          fullName: n.label,
+          centrality: n.centrality ?? 0,
+          center: n.id === centerId,
+          minLabel: minLabelPx(nodes.length - 1),
+        },
         position: n.x != null && n.y != null ? { x: n.x, y: n.y } : undefined,
         classes: n.id === centerId ? "center" : undefined,
       })),
@@ -203,7 +193,9 @@ export const NodeGraph = forwardRef<NodeGraphHandle, Props>(function NodeGraph(p
     const scaleCenterLabel = () => {
       const c = cy.getElementById(propsRef.current.centerId);
       const size = Math.max(LABEL_SIZE + 1, HOVER_LABEL_PX / cy.zoom());
-      if (c.nonempty()) c.style({ "font-size": size, "text-outline-width": Math.max(2.5, 3 / cy.zoom()) });
+      const outline = Math.max(2.5, 3 / cy.zoom());
+      if (c.nonempty()) c.style({ "font-size": size, "text-outline-width": outline });
+      cy.nodes(".caption").style({ "font-size": Math.max(LABEL_SIZE, HOVER_LABEL_PX / cy.zoom()), "text-outline-width": outline });
     };
     cy.on("zoom", scaleCenterLabel);
     cy.on("tap", "node", (e) => {
@@ -253,7 +245,10 @@ export const NodeGraph = forwardRef<NodeGraphHandle, Props>(function NodeGraph(p
     const highlightTypes = new Set(hints.highlight_node_types ?? []);
     const byId = new Map(edges.map((e) => [e.id, e]));
     cy.batch(() => {
-      cy.nodes().forEach((n) => {
+      cy.nodes(".caption").forEach((c) => {
+        c.data("label", captionText(c.data("count"), c.data("type"), c.data("relation"), labelStyle));
+      });
+      cy.nodes(":not(.caption)").forEach((n) => {
         const type = n.data("type") as NodeType;
         const name = truncate(n.data("name") as string);
         const isCenter = n.id() === centerId;
@@ -293,7 +288,8 @@ export const NodeGraph = forwardRef<NodeGraphHandle, Props>(function NodeGraph(p
           color: theme.label,
           "font-family": getComputedStyle(document.body).fontFamily,
           "font-size": LABEL_SIZE,
-          "min-zoomed-font-size": minLabelPx(cy.nodes().length - 1),
+          // Set per layout: depends on how many neighbours keep a labelled place.
+          "min-zoomed-font-size": "data(minLabel)" as never,
           "text-wrap": "wrap",
           "text-max-width": `${LABEL_WIDTH}px`,
           "text-valign": "bottom",
@@ -320,6 +316,26 @@ export const NodeGraph = forwardRef<NodeGraphHandle, Props>(function NodeGraph(p
           "z-index": 10,
         },
       },
+      // Members of a compact block: the caption names the group, each name shows on hover.
+      { selector: "node.member", style: { label: "" } },
+      {
+        selector: "node.caption",
+        style: {
+          "background-opacity": 0,
+          "border-width": 0,
+          width: 1,
+          height: 1,
+          label: "data(label)",
+          // Grows upwards from the caption point, so a wrapped caption never covers the block.
+          "text-valign": "top",
+          "text-margin-y": 0,
+          "font-weight": 600,
+          "text-max-width": "260px",
+          "min-zoomed-font-size": 0,
+          events: "no",
+          "z-index": 5,
+        },
+      },
       { selector: "node.hover", style: { "underlay-color": theme.highlight, "underlay-opacity": 0.25, "underlay-padding": 6 } },
       {
         selector: "edge",
@@ -341,6 +357,9 @@ export const NodeGraph = forwardRef<NodeGraphHandle, Props>(function NodeGraph(p
         },
       },
       { selector: "edge.dim", style: { opacity: 0.4 } },
+      // One faint line per block member: the block reads as one group, not dozens of equal spokes.
+      { selector: "edge.grouped", style: { opacity: 0.16, width: 1 } },
+      { selector: "edge.grouped-far", style: { opacity: 0.05, width: 1 } },
       { selector: "edge.peripheral", style: { opacity: 0.18, width: 1 } },
       { selector: "edge.flagged", style: { label: "data(label)", "font-size": 9, "text-opacity": 0.85 } },
       { selector: "edge.hover, edge.selected", style: { label: "data(label)", opacity: 1, "z-index": 20, "overlay-opacity": 0.08, "overlay-color": theme.highlight } },
@@ -357,11 +376,12 @@ export const NodeGraph = forwardRef<NodeGraphHandle, Props>(function NodeGraph(p
       cy.edges().forEach((e) => {
         e.toggleClass("hidden", props.hiddenFamilies.has(e.data("family")));
       });
-      cy.nodes().forEach((n) => {
+      cy.nodes(":not(.caption)").forEach((n) => {
         if (n.id() === props.centerId) return;
         const visible = n.connectedEdges().filter(".hidden").length < n.connectedEdges().length;
         n.toggleClass("hidden", !visible && n.connectedEdges().length > 0);
       });
+      syncCaptions(cy);
     });
   }, [props.hiddenFamilies, props.centerId, props.nodes, props.edges]);
 
@@ -378,23 +398,61 @@ export const NodeGraph = forwardRef<NodeGraphHandle, Props>(function NodeGraph(p
     if (!cy) return;
     const { hints, centerId, reducedMotion } = propsRef.current;
     const highlight = new Set<string>(hints.highlight_family ?? []);
-    const hasPositions = cy.nodes().filter((n) => n.position("x") === 0 && n.position("y") === 0).length === 0;
     const animate = !reducedMotion && cy.nodes().length < 300;
     let options: LayoutOptions;
     // Layouts place nodes only; the viewport is fitted afterwards with a zoom cap.
-    const positions = ringPositions(cy, centerId, highlight);
+    // Rings, hierarchy and clusters are computed here (graph-layouts.ts), with big
+    // same-type groups as captioned blocks. The force layout is used only while no
+    // such group exists; with one it falls back to the rings.
+    const items = layoutItems(cy, centerId, highlight);
+    const hasBigGroup = groupItems(items, BIG_GROUP).groups.length > 0;
+    const mode: LayoutMode | "force" =
+      hints.start_layout === "hierarchy"
+        ? "hierarchy"
+        : hints.start_layout === "cluster"
+          ? "cluster"
+          : hints.start_layout === "force" && !hasBigGroup
+            ? "force"
+            : "ring";
+    const placement = mode === "force" ? { positions: {}, groups: [] } : placeNeighbourhood(centerId, items, mode);
+    const positions = placement.positions;
+    cy.batch(() => {
+      cy.remove(cy.nodes(".caption"));
+      cy.nodes().removeClass("member");
+      cy.edges().removeClass("grouped grouped-far");
+      const { labelStyle } = propsRef.current;
+      for (const g of placement.groups) {
+        const members = cy.nodes().filter((n) => g.ids.includes(n.id()));
+        if (g.compact) {
+          members.addClass("member");
+          members.edgesWith(cy.getElementById(centerId)).addClass("grouped");
+          members.connectedEdges().not(".grouped").addClass("grouped-far");
+        }
+        const id = `caption:${g.key}`;
+        positions[id] = g.caption;
+        cy.add({
+          group: "nodes",
+          data: { id, caption: true, count: g.ids.length, type: g.type, relation: g.relation, members: g.ids, label: captionText(g.ids.length, g.type, g.relation, labelStyle) },
+          position: g.caption,
+          classes: "caption",
+        });
+      }
+      syncCaptions(cy);
+      const labelled = mode === "force" ? items.length : labelledCount(placement, items.length);
+      cy.nodes(":not(.caption)").data("minLabel", minLabelPx(labelled));
+    });
     const ring: LayoutOptions = {
       name: "preset",
-      positions: (n: cytoscape.NodeSingular) => positions[n.id()],
+      positions: (n: cytoscape.NodeSingular) => positions[n.id()] ?? n.position(),
       fit: false,
       animate,
       animationDuration: 350,
     } as LayoutOptions;
-    switch (hints.start_layout) {
+    switch (mode) {
       case "force":
         options = {
           name: "fcose",
-          randomize: !hasPositions,
+          randomize: true,
           quality: "default",
           animate,
           animationDuration: 400,
@@ -403,20 +461,14 @@ export const NodeGraph = forwardRef<NodeGraphHandle, Props>(function NodeGraph(p
           fit: false,
         } as unknown as LayoutOptions;
         break;
-      case "hierarchy":
-        options = { name: "breadthfirst", roots: [centerId], directed: false, spacingFactor: 1.1, animate, fit: false } as LayoutOptions;
-        break;
-      case "cluster":
-        options = hasPositions ? ({ name: "preset", fit: false } as LayoutOptions) : ring;
-        break;
       default:
         options = ring;
     }
     const layout = cy.layout(options);
     // The ring's end positions are known up front: frame them first, then let the nodes move in.
     if (options === ring) {
-      const before = cy.nodes().map((n) => ({ n, p: { ...n.position() } }));
-      cy.nodes().positions((n) => positions[n.id()]);
+      const before = cy.nodes(":not(.caption)").map((n) => ({ n, p: { ...n.position() } }));
+      cy.nodes().positions((n) => positions[n.id()] ?? n.position());
       fitCapped(cy, false);
       before.forEach(({ n, p }) => n.position(p));
     }
