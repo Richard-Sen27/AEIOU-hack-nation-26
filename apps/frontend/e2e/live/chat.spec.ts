@@ -65,6 +65,10 @@ test.describe("chat with Dr. Wu", () => {
       await expect(turn.getByTestId("summary")).not.toBeEmpty();
       await expect(turn).toContainText(/Checked the atlas in \d+ steps?/);
       await expect(turn.getByText("AI-generated · Dr. Wu")).toBeVisible();
+      // Claims cite real edges; their evidence opens with sources.
+      const claim = turn.getByTestId("claim").first();
+      await expect(claim).toBeVisible();
+      await expect(claim.getByTestId("origin-badge").first()).toBeVisible();
       await shot(page, "chat-reply", { fullPage: true });
 
       // Confirm the first matched chip; the profile takes the consent's child answer.
