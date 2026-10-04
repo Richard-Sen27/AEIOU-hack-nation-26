@@ -20,6 +20,7 @@ import { LimitContact, useLimitMessage } from "@/components/ui/limit-notice";
 import { Sheet, SheetContent, SheetDescription, SheetHeader, SheetTitle } from "@/components/ui/sheet";
 import { GrowSmoothly, RevealText, riseClass, riseStyle, useSmoothReveal } from "@/components/ui/smooth-reveal";
 import { Spinner } from "@/components/ui/spinner";
+import { trackEvent } from "@/lib/analytics";
 import { nodeTypeMeta } from "@/lib/graph/meta";
 import { cn } from "@/lib/utils";
 
@@ -376,6 +377,7 @@ function SignedInDock({
     async (text: string) => {
       if (await requireConsent("health_data", "Dr. Wu needs your consent to use the health information you share.")) {
         send(text);
+        trackEvent("wu_question", { surface: "dock" });
         return;
       }
       setDraft(text);

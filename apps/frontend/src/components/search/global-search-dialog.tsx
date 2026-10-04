@@ -18,6 +18,7 @@ import { Kbd } from "@/components/ui/kbd";
 import { Spinner } from "@/components/ui/spinner";
 import type { SearchHit } from "@/lib/api/types";
 import { announce } from "@/lib/a11y";
+import { trackEvent } from "@/lib/analytics";
 import { nodeTypeMeta } from "@/lib/graph/meta";
 import { NODE_TYPES } from "@/lib/graph/types";
 import { isEntityQuery, searchEntities, SEARCH_MAX_CHARS } from "@/lib/search";
@@ -95,6 +96,7 @@ export function GlobalSearchDialog({
   }, [state]);
 
   const go = (href: string) => {
+    trackEvent("search_used", { surface: "header" });
     onOpenChange(false);
     router.push(href);
   };

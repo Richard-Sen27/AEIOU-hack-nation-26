@@ -30,6 +30,7 @@ import { Skeleton } from "@/components/ui/skeleton";
 import { Spinner } from "@/components/ui/spinner";
 import { buildUrl, getNeighborhood, getNode, type ApiError, type Schemas } from "@/lib/api";
 import { announce } from "@/lib/a11y";
+import { trackEvent } from "@/lib/analytics";
 import { CONFIDENCE_LABEL, confidenceLevel, EDGE_FAMILY_META, nodeTypeMeta, ORIGIN_META, relationLabel } from "@/lib/graph/meta";
 import { useGraphTheme } from "@/lib/graph/use-graph-theme";
 import { EDGE_FAMILIES, isVus, type EdgeFamily, type EdgeStatus } from "@/lib/graph/types";
@@ -370,10 +371,10 @@ export function NodeView({ nodeId }: { nodeId: string }) {
                 </PopoverDescription>
               </PopoverHeader>
               <div className="grid gap-1.5">
-                <a href={exportUrl("csv")} download className={cn(buttonVariants({ variant: "outline", size: "sm" }), "justify-start")} data-testid="export-csv">
+                <a href={exportUrl("csv")} download onClick={() => trackEvent("export", { format: "csv" })} className={cn(buttonVariants({ variant: "outline", size: "sm" }), "justify-start")} data-testid="export-csv">
                   CSV <span className="text-muted-foreground">· spreadsheets</span>
                 </a>
-                <a href={exportUrl("graphml")} download className={cn(buttonVariants({ variant: "outline", size: "sm" }), "justify-start")} data-testid="export-graphml">
+                <a href={exportUrl("graphml")} download onClick={() => trackEvent("export", { format: "graphml" })} className={cn(buttonVariants({ variant: "outline", size: "sm" }), "justify-start")} data-testid="export-graphml">
                   GraphML <span className="text-muted-foreground">· Gephi, Cytoscape</span>
                 </a>
               </div>

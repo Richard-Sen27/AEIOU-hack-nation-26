@@ -18,6 +18,7 @@ import { Skeleton } from "@/components/ui/skeleton";
 import { Textarea } from "@/components/ui/textarea";
 import { createCall, getMyCall, listMyCalls, submitCall, updateCall } from "@/lib/api";
 import { announce } from "@/lib/a11y";
+import { trackEvent } from "@/lib/analytics";
 import type { ApiError } from "@/lib/api/errors";
 import type { NodeType } from "@/lib/api/generated/types.gen";
 import { nodeTypeMeta } from "@/lib/graph/meta";
@@ -438,6 +439,7 @@ function CallFormBody({ initial, review }: { initial: OwnCall | null; review: bo
         return;
       }
       invalidatePublishedCalls();
+      trackEvent("call_submitted", { outcome: data.status === "published" ? "published" : "review" });
       if (data.status === "published") {
         toast("Published", { description: "It is listed now." });
         announce("Published.");

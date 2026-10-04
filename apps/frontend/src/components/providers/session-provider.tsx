@@ -11,6 +11,7 @@ import {
   useSyncExternalStore,
 } from "react";
 
+import { trackEvent } from "@/lib/analytics";
 import { apiUrl } from "@/lib/api/config";
 import { getSession, logout, unwrap } from "@/lib/api";
 import type { SessionInfo, SessionUser } from "@/lib/api/types";
@@ -90,6 +91,7 @@ export function SessionProvider({ children }: { children: React.ReactNode }) {
       // Keep only the path: query strings could carry user input.
       const target = safeReturnTo(returnTo ?? pathname ?? "/");
       const start = method === "google" ? "/auth/google/start" : "/auth/chatgpt/start";
+      trackEvent("sign_in_started", { provider: method === "google" ? "google" : "openai" });
       // Full navigation to the API's OAuth start (another origin).
       // eslint-disable-next-line @next/next/no-location-assign-relative-destination
       window.location.assign(`${apiUrl(start)}?return_to=${encodeURIComponent(target)}`);

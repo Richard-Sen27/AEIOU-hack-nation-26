@@ -10,6 +10,7 @@ import { useSession } from "@/components/providers/session-provider";
 import { Button } from "@/components/ui/button";
 import { Spinner } from "@/components/ui/spinner";
 import { announce } from "@/lib/a11y";
+import { trackEvent } from "@/lib/analytics";
 import { createProposal, type Schemas } from "@/lib/api";
 import type { ApiError } from "@/lib/api/errors";
 import { nodeTypeMeta, relationLabel } from "@/lib/graph/meta";
@@ -170,6 +171,7 @@ export function ActionView({ path, fromLabel, toLabel }: { path: PathT; fromLabe
       );
       return;
     }
+    trackEvent("export", { format: "proposal" });
     const url = URL.createObjectURL(new Blob([data], { type: "text/html" }));
     if (win && !win.closed) {
       win.location.href = url;

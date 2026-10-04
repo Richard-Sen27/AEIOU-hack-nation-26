@@ -3,6 +3,7 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 
 import { announce } from "@/lib/a11y";
+import { trackEvent } from "@/lib/analytics";
 import { ApiError, reportApiError } from "@/lib/api/errors";
 import { limitInfo, type LimitInfo } from "@/lib/api/limits";
 import { apiFetch } from "@/lib/api/fetch";
@@ -82,6 +83,7 @@ export function useUploads({ onDone }: { onDone?: (done: UploadDone) => void } =
       }
       patch(key, { status: "processing", stage: "queued", percent: 5, documentId: job.document_id });
       announce("Upload received. Reading the document.");
+      trackEvent("report_uploaded");
 
       const ctrl = new AbortController();
       ctrls.current.add(ctrl);

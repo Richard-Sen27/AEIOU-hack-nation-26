@@ -2,6 +2,7 @@
 
 import { useEffect, useState } from "react";
 
+import { trackEvent } from "@/lib/analytics";
 import { findPath, getNode } from "@/lib/api";
 import type { ApiError } from "@/lib/api/errors";
 
@@ -37,6 +38,7 @@ export function usePathQuery(from: string | null, to: string | null, family: Fam
         setState({ kind: "error", error: err });
       } else if (data) {
         setState({ kind: "ready", data: data as PathResponse });
+        trackEvent("path_search");
       }
     });
     return () => ctrl.abort();

@@ -2,6 +2,7 @@ import type { Metadata, Viewport } from "next";
 import { Archivo, JetBrains_Mono } from "next/font/google";
 
 import { Providers } from "@/components/providers";
+import { PageCounter } from "@/components/shell/page-counter";
 import { SiteFooter } from "@/components/shell/site-footer";
 import { SiteHeader } from "@/components/shell/site-header";
 
@@ -26,6 +27,8 @@ export const metadata: Metadata = {
     "A sourced knowledge graph of rare diseases: find who shares your disease's mechanism or symptoms, what research, registries and trials already exist, and what to do together next. Every connection is cited and rated for confidence.",
   applicationName: "Amber",
   robots: { index: true, follow: true },
+  // Other sites, including the page counter, get the origin only, never a disease or chat URL.
+  referrer: "strict-origin-when-cross-origin",
 };
 
 export const viewport: Viewport = {
@@ -56,6 +59,8 @@ export default function RootLayout({ children }: LayoutProps<"/">) {
           </main>
           <SiteFooter />
         </Providers>
+        {/* Hosted site only; dev builds never load it (src/lib/analytics.ts). */}
+        {process.env.NODE_ENV === "production" && <PageCounter />}
       </body>
     </html>
   );

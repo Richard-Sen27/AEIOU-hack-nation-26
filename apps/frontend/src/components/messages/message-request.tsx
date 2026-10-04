@@ -14,6 +14,7 @@ import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
 import { ApiError } from "@/lib/api/errors";
 import { openThread, unwrap } from "@/lib/api";
+import { trackEvent } from "@/lib/analytics";
 
 import { Busy, guardianText, messagingErrorText, useConnectFlow, type ConnectStatus } from "./connect-flow";
 import { MAX_BODY, MAX_NAME, PatientBanner } from "./labels";
@@ -102,6 +103,7 @@ function MessageRequestDialog({
         }),
       );
       toast("Request sent.");
+      trackEvent("message_sent", { kind: "request" });
       onClose();
       router.push(`/messages/${detail.thread.id}`);
     } catch (e) {

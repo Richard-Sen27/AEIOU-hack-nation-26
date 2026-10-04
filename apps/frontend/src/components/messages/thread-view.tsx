@@ -29,6 +29,7 @@ import {
 import { Skeleton } from "@/components/ui/skeleton";
 import { Textarea } from "@/components/ui/textarea";
 import { announce } from "@/lib/a11y";
+import { trackEvent } from "@/lib/analytics";
 import { ApiError, backgroundPaused } from "@/lib/api/errors";
 import {
   acceptThread,
@@ -360,6 +361,7 @@ function Composer({
       );
       setBody("");
       setGuardian(false);
+      trackEvent("message_sent", { kind: "reply" });
       await onSent();
     } catch (e) {
       const code = e instanceof ApiError ? e.code : "";

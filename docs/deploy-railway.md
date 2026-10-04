@@ -74,6 +74,7 @@ Leave unset: `ORCID_MOCK` (refused off loopback; experts verify through the manu
 | `API_PROXY_TARGET` | `http://${{backend.RAILWAY_PRIVATE_DOMAIN}}:8000` |
 | `NEXT_PUBLIC_PRIVACY_EMAIL` | the privacy contact address |
 | `PORT` | `3100` |
+| `NEXT_PUBLIC_ANALYTICS` | optional build argument: `off` stops the page counter (it runs only on the host name in `ANALYTICS_HOSTNAMES`, `src/lib/analytics.ts`) |
 
 ## Steps
 

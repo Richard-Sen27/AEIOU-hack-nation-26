@@ -21,6 +21,7 @@ import { Button, buttonVariants } from "@/components/ui/button";
 import { Skeleton } from "@/components/ui/skeleton";
 import { closeCall, deleteCall, listMyCalls, submitCall, type Schemas } from "@/lib/api";
 import { announce } from "@/lib/a11y";
+import { trackEvent } from "@/lib/analytics";
 import type { ApiError } from "@/lib/api/errors";
 
 import { callErrorText, callHref, fieldLabel, formatDate, reviewRequired, type OwnCall } from "./call-meta";
@@ -109,6 +110,7 @@ function OwnCallItem({
       return;
     }
     const next = data as OwnCall;
+    if (action === "submit") trackEvent("call_submitted", { outcome: next.status === "published" ? "published" : "review" });
     onChange(next);
     const msg =
       action === "submit"

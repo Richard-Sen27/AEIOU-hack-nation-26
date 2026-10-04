@@ -7,6 +7,7 @@ import { useEffect, useLayoutEffect, useRef, useState } from "react";
 import { ConfidenceBadge } from "@/components/graph-ui";
 import { Button } from "@/components/ui/button";
 import { announce } from "@/lib/a11y";
+import { trackEvent } from "@/lib/analytics";
 import { cn } from "@/lib/utils";
 
 type Step = {
@@ -137,6 +138,7 @@ export function AtlasTour({
     if (open) {
       // eslint-disable-next-line react-hooks/set-state-in-effect -- restart from step 1 on open
       setI(0);
+      trackEvent("tour_started");
     }
   }, [open]);
 
@@ -226,7 +228,7 @@ export function AtlasTour({
               <Button
                 ref={nextRef}
                 size="sm"
-                onClick={() => (last ? close() : go(1))}
+                onClick={() => (last ? (trackEvent("tour_finished"), close()) : go(1))}
                 data-testid="tour-next"
               >
                 {last ? "Start exploring" : "Next"}

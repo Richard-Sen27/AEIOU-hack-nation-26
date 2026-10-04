@@ -23,6 +23,7 @@ import { Button } from "@/components/ui/button";
 import { LimitContact, LimitText } from "@/components/ui/limit-notice";
 import { Spinner } from "@/components/ui/spinner";
 import { announce } from "@/lib/a11y";
+import { trackEvent } from "@/lib/analytics";
 import { createContribution, streamSSE } from "@/lib/api";
 import type { ApiError } from "@/lib/api/errors";
 import { limitInfo, type LimitInfo } from "@/lib/api/limits";
@@ -205,6 +206,7 @@ export function GapSearchPanel({
     setEnding(null);
     setSubmits({});
     announce("Gap search started.");
+    trackEvent("gap_search");
     let ended = false;
     try {
       await streamSSE<GapSearchEvent>("/gap-search", {

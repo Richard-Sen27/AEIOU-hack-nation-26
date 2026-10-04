@@ -1,16 +1,23 @@
 # Amber — an AI atlas for rare diseases
 
-Amber is a sourced knowledge graph of rare diseases with a web app to explore it. It is built for
-the people the challenge brief names: patient-group leaders, newly diagnosed families, biotech
-scouts and researchers. You type a disease, and Amber shows its mechanism group, related diseases,
-genes, symptoms, patient organisations, trials, registries, papers, grants and researchers. Every
-connection says where it comes from, how confident it is, and whether it is a cited fact or a
-computed hypothesis. A chat agent, Dr. Wu, answers questions over the same graph and cites the
-edges it uses.
+**Not only connect the dots, connect the people.**
+
+Amber is a sourced knowledge graph of rare diseases with a web app to explore it, built for the
+people the challenge brief names: patient-group leaders, newly diagnosed families, biotech scouts
+and researchers.
+
+- **The dots are the science.** Type a disease and see its mechanism group, related diseases,
+  genes, symptoms, pathways, patient organisations, trials, registries, papers, grants and
+  researchers. Every connection says where it comes from, how confident it is, and whether it is
+  a cited fact or a computed hypothesis. Dr. Wu, a chat agent, answers over the same graph and
+  cites the edges it uses.
+- **The people are patients, families, doctors and researchers.** Amber lets them find each
+  other: follow a disease, find a verified expert, sign up to a study, send a message.
 
 **Live prototype: <https://frontend-production-aa5a.up.railway.app>** (hosted on Railway). Guests
 can use the Atlas map, search, clusters and node pages without signing in. Sign-in there is with
-Google and unlocks Dr. Wu, document upload, follows, studies and messaging.
+Google and unlocks Dr. Wu, document upload, follows, studies and messaging. The app's own guide is
+at `/guide`.
 
 Built for Hack-Nation 7 (2026), Challenge 05 "AI Atlas for the World's Rare Diseases". Specs:
 [`docs/specs/system.md`](docs/specs/system.md) (system) and
@@ -20,56 +27,122 @@ Built for Hack-Nation 7 (2026), Challenge 05 "AI Atlas for the World's Rare Dise
 
 ## Contents
 
-1. [A journey through the atlas](#a-journey-through-the-atlas)
-2. [How Amber answers the brief](#how-amber-answers-the-brief)
-3. [Architecture](#architecture)
-4. [Data model](#data-model)
-5. [Reproduce the dataset](#reproduce-the-dataset)
-6. [Run it locally](#run-it-locally)
-7. [Trust, safety and privacy](#trust-safety-and-privacy)
-8. [The 10x case](#the-10x-case)
-9. [Limits and what is next](#limits-and-what-is-next)
-10. [Submission](#submission)
+1. [What you can do](#what-you-can-do)
+2. [An example: Dravet syndrome](#an-example-dravet-syndrome)
+3. [How Amber answers the brief](#how-amber-answers-the-brief)
+4. [Architecture](#architecture)
+5. [Data model](#data-model)
+6. [Reproduce the dataset](#reproduce-the-dataset)
+7. [Run it locally](#run-it-locally)
+8. [Trust, safety and privacy](#trust-safety-and-privacy)
+9. [The 10x case](#the-10x-case)
+10. [Limits and what is next](#limits-and-what-is-next)
+11. [Submission](#submission)
 
-## A journey through the atlas
+## What you can do
 
-The example below uses Dravet syndrome. Every item was checked against the loaded data
-(`GET /neighborhood/MONDO:0100135` on the API) and on the hosted site, signed out, on 4 October
-2026, data version `2026-10-04.24`.
+### Connect the dots
 
-1. **Search.** Type "Dravet" (or "SME", "severe myoclonic epilepsy of infancy") in the global
-   search. One search box covers diseases, genes, symptoms, trials, organisations and people, and
-   matches synonyms, acronyms and ids. Typing "FOP" finds fibrodysplasia ossificans progressiva
-   (`MONDO:0007606`) as an exact synonym match; its card shows its Orphanet (`ORPHA:337`) and OMIM
-   (`135100`) ids.
-2. **Summary card and drawn connections.** Selecting the disease on the map draws its connections
-   and opens a card: the description from MONDO, its mechanism group, and similar conditions. Each
-   similar condition is labelled "Computed link", has a confidence level and a one-line reason, for
-   example "Similar symptom profile: both list Sudden unexpected death in epilepsy, Epileptic
-   encephalopathy and Autistic behavior (6 of 44 specific recorded symptoms in common) … A
-   hypothesis, not an established fact."
+Everyone, no account needed:
+
+- **Search** diseases, genes, symptoms, trials, organisations and people by name, synonym,
+  acronym or id.
+- **Atlas map:** the whole graph, one tree per kind of thing. Click a dot to draw its links and open
+  a summary card. List view and a five-step tour. The map draws the 169 best-covered diseases;
+  search finds all 7,432.
+- **Node pages:** one item and everything linked to it, as graph or list, with CSV or GraphML
+  export. Each link opens its sources: database, record id, and for papers the exact quote from
+  the abstract.
+- **Cited or computed:** solid links come from a database or a quoted paper; dashed links are
+  computed by Amber, give a one-line reason and are never rated "High".
+- **Mechanism groups** (Clusters page): diseases grouped by shared genes, pathways or symptoms,
+  labelled as a hypothesis.
+- **Find a path** between two things, each step with confidence and sources, or an honest "no
+  supported route".
+
+Signed in:
+
+- **Ask Dr. Wu** in your own words; the answer cites the links it used.
+- **Describe symptoms** and get conditions ranked by how many of them they list, with sources. A
+  ranking, not a diagnosis.
+- **Dr. Wu on the map:** "Find …" rings matching dots, "How is X connected to Y?" draws the route,
+  "Write a summary" fills a card.
+- **Gap search:** where no route is supported, an agent looks in PubMed, ClinicalTrials.gov and the
+  web. Candidates carry a checked quote and stay private unless you share them.
+- **Export a proposal:** a supported path or a Dr. Wu answer becomes a one-page sourced proposal
+  (print to PDF).
+- **Flag a link** that looks wrong; it shows as under review while the flag is open.
+
+### Connect the people
+
+Patients and families:
+
+- **Follow a disease:** news about it and new studies for it arrive under the bell.
+- **Find an expert:** verified doctors and researchers show as cards on disease pages ("Reachable
+  in Amber") and on their studies.
+- **Browse studies:** surveys, studies and trials from verified experts, each with its ethics
+  approval and registry entry.
+- **Sign up and choose what to share:** the study team gets only the items you tick, under a
+  display name. Withdraw, and it is deleted at once.
+- **Suggestions** (off by default): your profile is compared with open studies inside your
+  account; study teams never learn who was suggested.
+- **Write to an expert:** you write first under a display name; the expert accepts or declines.
+  Messages are stored encrypted. You can block or report a conversation.
+- **Ages 16 and 17:** sign-ups and messages need one more box: a parent or guardian agrees.
+
+Doctors and researchers:
+
+- **Work details:** name, institutions, ORCID iD and your atlas entry, private to you.
+- **Get verified** with ORCID or a manual review, then switch on a public card that shows only what
+  you choose.
+- **Publish a study** for patients to sign up to; a wording check refuses any offer of treatment.
+- **See sign-ups:** display name, ticked items and note, never an e-mail or account.
+- **Answer messages:** accept or decline patients' requests; experts never write first.
+
+### Your own data
+
+- **Health profile** of confirmed diagnoses, genes and symptoms; Dr. Wu uses it as context.
+- **Upload a report** (PDF, photo, Word or text, up to 20 MB): only findings you confirm are kept,
+  and the file is deleted after reading.
+- **Contribute** a candidate link to the shared atlas as "pending review", with its own consent.
+- **Download, delete, withdraw:** all your data as JSON, account deletion, or withdrawal of a
+  consent and what was held under it.
+
+## An example: Dravet syndrome
+
+Every item was checked against the loaded data (`GET /neighborhood/MONDO:0100135` on the API) and
+on the hosted site, signed out, on 4 October 2026, data version `2026-10-04.24`.
+
+1. **Search.** "Dravet", "SME" or "severe myoclonic epilepsy of infancy" all find it. "FOP" finds
+   fibrodysplasia ossificans progressiva (`MONDO:0007606`) as an exact synonym match; its card
+   shows its Orphanet (`ORPHA:337`) and OMIM (`135100`) ids.
+2. **Summary card.** Selecting the disease on the map draws its connections and opens a card: the
+   description from MONDO, its mechanism group, and similar conditions. Each similar condition is
+   labelled "Computed link", with a confidence level and a one-line reason, for example "Similar
+   symptom profile: both list Sudden unexpected death in epilepsy, Epileptic encephalopathy and
+   Autistic behavior (6 of 44 specific recorded symptoms in common) … A hypothesis, not an
+   established fact."
 3. **Mechanism and a related disease.** Dravet syndrome is caused by variants in SCN1A (a cited
-   edge, confidence 1.0, 40 evidence rows, 605 pathogenic ClinVar variants). The same gene also
-   causes familial hemiplegic migraine type 3, but there the records point to gain of function and
-   in Dravet to loss of function. Amber draws this as a dashed `same_gene_different_mechanism`
-   link (confidence 0.79): "the same gene may act differently in them". Shared-gene diseases with
-   the *same* mechanism, such as generalized epilepsy with febrile seizures plus type 2 (SCN1A,
-   loss of function), get a `same_gene_same_mechanism` link instead.
+   edge, confidence 1.0, 40 evidence rows, 605 pathogenic ClinVar variants). SCN1A also causes
+   familial hemiplegic migraine type 3, but there the records point to gain of function, in Dravet
+   to loss of function. Amber draws a dashed `same_gene_different_mechanism` link (confidence
+   0.79): "the same gene may act differently in them". Generalized epilepsy with febrile seizures
+   plus type 2 (SCN1A, loss of function) gets a `same_gene_same_mechanism` link instead.
 4. **Patient groups.** Ten organisations serve Dravet syndrome in the data, among them the Dravet
    Syndrome Foundation, Dravet Syndrome UK, Dravet Canada, Dravet Italia Onlus, Dravet-Syndrom
    e.V. and Fundación Síndrome de Dravet, each linked to the page it was read from.
-5. **Existing trials and registries.** ClinicalTrials.gov studies linked to the disease include
-   the ETX101 gene therapy trial in SCN1A-positive Dravet syndrome (`NCT05419492`) and the SCN1A
-   Horizons natural history study (`NCT06504511`); registries include ENVISION (`NCT04537832`).
+5. **Trials and registries** from ClinicalTrials.gov: the ETX101 gene therapy trial in
+   SCN1A-positive Dravet syndrome (`NCT05419492`), the SCN1A Horizons natural history study
+   (`NCT06504511`), and the ENVISION registry (`NCT04537832`).
 6. **Sources.** The node page lists every connection with its confidence and a "Sources" link to
-   the evidence: source database, record id, and for literature the exact quote from the abstract.
+   its evidence.
 7. **What is not known.** The mechanism group is itself labelled "Hypothesis" ("grouped in this
-   cluster by the atlas, not a direct link"), and in this data version the group is a poor fit:
-   Dravet syndrome sits in "Developmental disorders with skeletal and neurological features ·
-   CTNNB1". That is a known clustering weakness (see [Limits](#limits-and-what-is-next)). Dravet
-   syndrome has no ORPHA or OMIM id in the data, because Orphanet maps its entry to a MONDO id that
-   is out of scope. When two diseases have no route above the confidence threshold, the path view
-   says "no supported route" instead of drawing a weak one.
+   cluster by the atlas, not a direct link"), and here it is a poor fit: Dravet syndrome sits in
+   "Developmental disorders with skeletal and neurological features · CTNNB1", a known clustering
+   weakness (see [Limits](#limits-and-what-is-next)). It has no ORPHA or OMIM id in the data,
+   because Orphanet maps its entry to a MONDO id that is out of scope. When two diseases have no
+   route above the confidence threshold, the path view says "no supported route" instead of
+   drawing a weak one.
 
 ![Dravet syndrome selected on the Atlas: drawn connections and the summary card with its mechanism group and computed similar conditions](docs/images/atlas-dravet-selected.jpg)
 
@@ -90,7 +163,7 @@ The example below uses Dravet syndrome. Every item was checked against the loade
 | Person | What Amber gives them | Where |
 | --- | --- | --- |
 | Maria, patient-group leader | Related diseases by mechanism and symptoms, the organisations and registries serving them, researchers shared between diseases. | Node page (Patient and care community, Shared research), Clusters page |
-| Devon, newly diagnosed caregiver | Plain-language summary, a patient lens with a reading-grade target of 6, Dr. Wu in patient mode, studies to sign up to, follow a disease and get notifications. | Atlas card, Ask Dr. Wu, Studies |
+| Devon, newly diagnosed caregiver | Plain-language summary, a patient lens with a reading-grade target of 8, Dr. Wu in patient mode, studies to sign up to, follow a disease and get notifications. | Atlas card, Ask Dr. Wu, Studies |
 | Priya, biotech scout | Mechanism groups, same-gene-same-mechanism links across diseases, active trials and grants per disease, export of a subgraph. | Clusters, node page "Export", path view |
 | Dr. Osei, researcher | Evidence with quotes and record ids, counterexamples, path finding between two entities, a verified public card that patients can find and message. | Edge evidence sheet, "Find a path to…", People cards |
 
@@ -126,43 +199,41 @@ flowchart LR
   FE --> U(("Browser"))
 ```
 
-**Ingestion pipeline** (`apps/pipeline`). Ten stages, each a Typer command (`atlas-pipeline
-<stage>`) and a Make target. They download public data, resolve names to standard ids, extract
-relations from abstracts and patient-organisation pages with a model (keeping the exact quote and
-checking it against the source text), merge evidence into edges, compute links and clusters, run
-38 validation checks, load Postgres and export a versioned Parquet snapshot. Details in
-[Reproduce the dataset](#reproduce-the-dataset).
+- **Ingestion pipeline** (`apps/pipeline`). `atlas-pipeline all` runs eleven steps, each also a
+  Typer command (`atlas-pipeline <stage>`) and a Make target, from public downloads to a loaded
+  Postgres, a versioned Parquet snapshot and precomputed explanations. **It needs no LLM:** the
+  model steps are optional and fall back to cached answers or templates. With a model, extraction
+  keeps the exact quote and checks it against the source text. Details in
+  [Reproduce the dataset](#reproduce-the-dataset).
+- **Database.** One Postgres 18 database with pgvector. The graph tables (`nodes`, `edges`,
+  `evidence`, synonyms, clusters) are written only by the pipeline role. Search uses pg_trgm,
+  unaccent and pgvector with local fastembed embeddings (`BAAI/bge-small-en-v1.5`, no model API).
+  User tables have `FORCE ROW LEVEL SECURITY`; the API connects as a role that cannot bypass it.
+- **Backend** (`apps/backend`, FastAPI). Loads all nodes and edges into an in-memory graph store at
+  startup, so neighbourhood, cluster and path queries never hit the database. Path finding is a
+  shortest-path search on −log(confidence); a path counts as supported only when every edge
+  clears the confidence threshold, otherwise the answer is `no_supported_route` with a coverage
+  report.
+- **Dr. Wu, the chat agent** (`api/services/chat/`). Each turn is a LangGraph graph: safety →
+  emergency or entities → agent → partial → post-check → persist. Six tools: `resolve_to_ids`,
+  `search_graph`, `get_neighborhood`, `find_path`, `match_phenotypes` and `ask_followup`.
+  `match_phenotypes` ranks all diseases by symptom overlap in code, with the same HPO similarity
+  measure the pipeline uses for `similar_symptoms`; the model does not rank. The post-check runs
+  in code on every turn before anything is shown: every citation must point at an edge a tool
+  actually returned, origin and confidence are stated, contradictions and variants of uncertain
+  significance are flagged, diagnosis wording is blocked, and patient-lens text goes through a
+  reading-grade gate (rewritten up to twice if it reads too hard).
+- **Frontend** (`apps/frontend`, Next.js). Every feature in [What you can do](#what-you-can-do),
+  plus a profile and an "About the data" page with sources and licences. It talks to the API with
+  a session cookie and never sees model tokens.
+- **Sign-in.** Locally the default is Sign in with ChatGPT (OpenID Connect with PKCE against
+  `auth.openai.com`); model calls then run on the user's own ChatGPT plan. That flow only
+  redirects to `127.0.0.1`, so the hosted site uses Google sign-in instead, and Dr. Wu runs on the
+  operator's OpenAI API key. Guests never trigger a model call.
 
-**Database.** One Postgres 18 database with pgvector. The graph tables (`nodes`, `edges`,
-`evidence`, synonyms, clusters) are written only by the pipeline role. Search uses pg_trgm,
-unaccent and pgvector with local fastembed embeddings (`BAAI/bge-small-en-v1.5`, no model API).
-User tables have `FORCE ROW LEVEL SECURITY`; the API connects as a role that cannot bypass it.
-
-**Backend** (`apps/backend`, FastAPI). Loads all nodes and edges into an in-memory graph store at
-startup, so neighbourhood, cluster and path queries never hit the database. Path finding is a
-shortest-path search on −log(confidence); a path counts as supported only when every edge clears
-the confidence threshold, otherwise the answer is `no_supported_route` with a coverage report.
-
-**Dr. Wu, the chat agent** (`api/services/chat/`). Each turn is a LangGraph graph: safety →
-emergency or entities → agent → partial → post-check → persist. The agent has six tools:
-`resolve_to_ids`, `search_graph`, `get_neighborhood`, `find_path`, `match_phenotypes` and
-`ask_followup`. `match_phenotypes` ranks all diseases by symptom overlap in code, with the same
-HPO similarity measure the pipeline uses for `similar_symptoms`; the model does not rank. The post-check runs in code on every turn before
-anything is shown: every citation must point at an edge a tool actually returned, origin and
-confidence are stated, contradictions and variants of uncertain significance are flagged,
-diagnosis wording is blocked, and patient-lens text must pass a reading-grade gate.
-
-**Frontend** (`apps/frontend`, Next.js). Atlas map (WebGL), node pages with a graph and list view,
-clusters, path view, Dr. Wu, document upload with a findings review, studies and sign-ups, expert
-cards, messaging, follows and notifications, a profile, and an "About the data" page with sources
-and licences. It talks to the API with a session cookie and never sees model tokens.
-
-**Sign-in.** Locally the default is Sign in with ChatGPT (OpenID Connect with PKCE against
-`auth.openai.com`); model calls then run on the user's own ChatGPT plan. That flow only redirects
-to `127.0.0.1`, so the hosted site uses Google sign-in instead, and Dr. Wu runs on the operator's
-OpenAI API key. Guests never trigger a model call.
-
-**Where OpenAI models are used, and where not.**
+**Where OpenAI models are used, and where not.** In the pipeline (Extract, Reconcile, Name and the
+precomputed explanations) every model use is optional; in the app, Dr. Wu and on-demand
+explanations and summaries need a signed-in user.
 
 | Used | Not used (code decides) |
 | --- | --- |
@@ -178,11 +249,13 @@ OpenAI API key. Guests never trigger a model call.
 paper, claim, trial, registry, grant, researcher, doctor, institution, patient organisation and
 network.
 
-**Main relations.** Cited: `caused_by_variant_in`, `has_phenotype`, `variant_of`, `observed_in`,
-`participates_in`, `acts_via`, `about`, `asserts`, `authored`, `affiliated_with`, `studies`,
-`serves`, `runs`, `funds_research_on`, `pi_of`, `investigator_of`, `member_of`. Computed:
-`similar_symptoms`, `shared_gene`, `shared_pathway`, `same_gene_same_mechanism`,
-`same_gene_different_mechanism`, `near_on_chromosome`, `shared_researcher`.
+**Main relations.**
+
+- Cited: `caused_by_variant_in`, `has_phenotype`, `variant_of`, `observed_in`, `participates_in`,
+  `acts_via`, `about`, `asserts`, `authored`, `affiliated_with`, `studies`, `serves`, `runs`,
+  `funds_research_on`, `pi_of`, `investigator_of`, `member_of`.
+- Computed: `similar_symptoms`, `shared_gene`, `shared_pathway`, `same_gene_same_mechanism`,
+  `same_gene_different_mechanism`, `near_on_chromosome`, `shared_researcher`.
 
 **Evidence tiers** and their base weights in the confidence formula: curated database 0.9,
 peer-reviewed 0.7, review 0.5, preprint 0.4, model-inferred 0.3, patient-reported 0.2,
@@ -190,17 +263,17 @@ computed 0.79. Several independent sources raise confidence; contradictions are 
 edge.
 
 **Cited facts versus computed hypotheses.** A cited edge comes from a source record or a verified
-quote. A computed edge (`origin = inferred`) is always drawn dashed, carries a method, a
-one-line explanation and a confidence basis, and is capped below "High" (0.79; 0.45 for
-chromosome proximity). Validation fails the build if any computed edge lacks these, exceeds its
-cap, or sits on a supported path as a proximity link. Model-written text (summaries, cluster
-names, Dr. Wu) is labelled as AI-written in the app.
+quote. A computed edge (`origin = inferred`) is always drawn dashed, carries a method, a one-line
+explanation and a confidence basis, and is capped below "High" (0.79; 0.45 for chromosome
+proximity). Validation fails the build if any computed edge lacks these, exceeds its cap, or sits
+on a supported path as a proximity link. Model-written text (summaries, cluster names, Dr. Wu) is
+labelled as AI-written in the app.
 
-**Clustering.** Diseases are clustered with Leiden on a weighted graph of computed links: same
-gene and same mechanism 1.0, similar symptoms 0.6, shared gene with unknown mechanism 0.5, shared
-pathway 0.4, shared researcher 0.15. `shared_gene` and chromosome proximity are left out. A pair
-with `same_gene_different_mechanism` gets a negative weight and never pulls together. Clusters
-are named by a model from their genes, pathways and symptoms (or by a template without a model).
+**Clustering.** Leiden on a weighted graph of computed links: same gene and same mechanism 1.0,
+similar symptoms 0.6, shared gene with unknown mechanism 0.5, shared pathway 0.4, shared
+researcher 0.15. `shared_gene` and chromosome proximity are left out. A pair with
+`same_gene_different_mechanism` gets a negative weight and never pulls together. Clusters are
+named by a model from their genes, pathways and symptoms (or by a template without a model).
 
 **Counterexamples.** Two checks in `apps/pipeline/src/pipeline/validate.py`
 (`check_counterexamples`, cases in `seeds.yaml`) require that diseases where the same gene acts by
@@ -235,32 +308,41 @@ at the 98th percentile of random similarity.
 
 The dataset is defined by `apps/pipeline/seeds.yaml` (which rare diseases qualify, the seed genes
 and expansion rules of the focus set, extra focus diseases, golden facts and counterexamples) and
-the curated inputs in `apps/pipeline/curated/`. One command runs everything:
+the curated inputs in `apps/pipeline/curated/`.
+
+**No LLM needed.** The pipeline reads no OpenAI API key. Its model steps run only after
+`make pipeline-login` (a ChatGPT sign-in); without it the run still finishes and builds the full
+graph from the public sources (see [Without a model](#without-a-model) for what is missing).
+
+One command runs everything:
 
 ```sh
 make setup             # once: env file, uv sync, pnpm install
 make up && make migrate
 make pipeline-login    # optional: ChatGPT login for the model steps (host only, opens a browser)
-make pipeline          # = cd apps/pipeline && uv run atlas-pipeline all
-make explain           # precompute path explanations
+make pipeline          # = cd apps/pipeline && uv run atlas-pipeline all (explanations included)
+make explain           # optional: precompute path explanations again, without the rest
 # then restart the API: it loads the graph into memory at startup
 ```
 
-`make pipeline-docker` runs the same in containers. `atlas-pipeline all` runs these stages in
-order; each is also `uv run atlas-pipeline <stage>` or `make -C apps/pipeline <stage>`:
+`make pipeline-docker` runs the same in containers (`all --skip-explain`, then explanations in
+their own container). `atlas-pipeline all` runs these eleven steps in order: ten commands, with
+`fetch` twice, then `explain` last (`--skip-explain` leaves it out). Each is also
+`uv run atlas-pipeline <stage>` or `make -C apps/pipeline <stage>`:
 
-| Step | Command | What it does |
-| --- | --- | --- |
-| 1 (bulk) | `fetch --phase bulk` | Bulk downloads into `data/raw/<source>/`, each with URL, time, SHA-256 and version |
-| 0 | `scope` | Resolves `seeds.yaml` into the qualifying diseases, genes and phenotypes, marked focus or core |
-| 1 (scoped) | `fetch --phase scoped` | ClinVar variants, and per focus disease: PubMed, ClinicalTrials.gov, NIH RePORTER, patient-organisation pages |
-| 2 | `normalize` | Standard ids, synonyms, linking of leftover names (trigram + embedding, model decision when signed in) |
-| 3 | `extract` | Model extraction from abstracts and organisation pages, with quote verification |
-| 4 | `build` | Merges evidence into edges with tier-weighted confidence, prunes weakly linked researchers and orphans |
-| 5 | `analytics` | Computed links with explanations and capped confidence, Leiden clusters and labels, layouts, centrality |
-| 6 | `validate` | 38 checks; the run stops unless all pass |
-| 7a | `load` | `psql \copy` into `staging`, then promotes into the graph tables and records the run |
-| 7b | `snapshot` | `data/snapshot/<data_version>/`: Parquet files plus `manifest.json` with source versions, hashes, counts, thresholds and quote-verification results |
+| # | Command | What it does | Model? |
+| --- | --- | --- | --- |
+| 1 | `fetch --phase bulk` | Bulk downloads into `data/raw/<source>/`, each with URL, time, SHA-256 and version | – |
+| 2 | `scope` | Resolves `seeds.yaml` into the qualifying diseases, genes and phenotypes, marked focus or core | – |
+| 3 | `fetch --phase scoped` | ClinVar variants, and per focus disease: PubMed, ClinicalTrials.gov, NIH RePORTER, patient-organisation pages | – |
+| 4 | `normalize` | Standard ids, synonyms, linking of leftover names (trigram + local embedding; a model decides the rest when signed in) | optional |
+| 5 | `extract` | Model extraction from abstracts and organisation pages, with quote verification | optional |
+| 6 | `build` | Merges evidence into edges with tier-weighted confidence, prunes weakly linked researchers and orphans | – |
+| 7 | `analytics` | Computed links with explanations and capped confidence, Leiden clusters and labels, layouts, centrality | optional (cluster names) |
+| 8 | `validate` | 38 checks; the run stops unless all pass | – |
+| 9 | `load` | `psql \copy` into `staging`, then promotes into the graph tables and records the run | – |
+| 10 | `snapshot` | `data/snapshot/<data_version>/`: Parquet files plus `manifest.json` with source versions, hashes, counts, thresholds and quote-verification results | – |
+| 11 | `explain` | Precomputes explanations for demo paths in English and German (backend `precompute-explanations`) | optional |
 
 **Sources** (from the app's "About the data" page):
 
@@ -284,19 +366,36 @@ OMIM numbers come from HPO, MONDO and ClinVar cross-references; OMIM's own files
 with an `OMIM_API_KEY` and not for the published atlas.
 
 **Keys and logins.** All optional, in `apps/pipeline/.env` (see
-[`apps/pipeline/.env.example`](apps/pipeline/.env.example)): `NCBI_API_KEY` (faster PubMed),
-`OMIM_API_KEY`, `BRIGHTDATA_API_KEY` + `BRIGHTDATA_SERP_ZONE` (search for more patient
-organisations). The model steps have no team API key: they run on the ChatGPT plan of whoever ran
-`make pipeline-login`. `PIPELINE_LLM_MAX_CALLS` (default 300) caps uncached model calls per run
-for extraction and cluster labels; `PIPELINE_LLM_DISABLED=true` turns every model call off.
-Without a login the run still finishes: extraction uses only cached answers, leftover names stay
-unlinked, cluster labels and explanations come from templates.
+[`apps/pipeline/.env.example`](apps/pipeline/.env.example)):
 
-**Time and caching.** A full run on cached data took about 12 minutes, about 10 of them for the
-literature fetches. The first run is longer (the ClinVar download alone takes about 90 seconds,
-the first embedding pass about 5 minutes). API responses are cached for 30 days, bulk files are
-kept, and every model answer is cached in `data/cache/llm/`, so re-runs make no repeat calls.
-`apps/pipeline/data` is about 720 MB.
+- `NCBI_API_KEY` (faster PubMed), `OMIM_API_KEY`, `BRIGHTDATA_API_KEY` + `BRIGHTDATA_SERP_ZONE`
+  (search for more patient organisations).
+- The model steps have no team API key: they run on the ChatGPT plan of whoever ran
+  `make pipeline-login`. `PIPELINE_LLM_MAX_CALLS` (default 300) caps uncached model calls per run
+  for extraction and cluster labels; `PIPELINE_LLM_DISABLED=true` turns every model call off.
+
+### Without a model
+
+Without a login (or with `PIPELINE_LLM_DISABLED=true`) the run still finishes; the golden facts
+and counterexamples in validation do not depend on model output. Every model step falls back:
+
+| Step | With a model | Without |
+| --- | --- | --- |
+| `extract` | Relations read from abstracts, each with a quote checked against the text: the 1,180 claims and their `asserts` links, plus quoted evidence on existing links; 8 extra evidence rows from patient-organisation pages | Cached answers only. On a fresh clone there is no cache (`apps/pipeline/data` is not in git), so 0 claims; papers, `about` links and curated organisations are still there |
+| `normalize` (linking) | Decides leftover disease names that trigram and embedding matching could not link (4 in this data version) | They stay unlinked (`skipped_no_llm` in `data/logs/linking.jsonl`) |
+| `analytics` (names) | Cluster names and mechanism summaries (148 of 225 clusters in this data version) | Template names from the most distinctive symptom and the top gene, for example "Ectopic ossification in muscle tissue · ACVR1"; single-disease clusters keep the disease's name either way |
+| `explain` | Model-written path explanations | Template explanations (English and German) |
+
+So the claim count, the "quote checked against the source text" figures in
+[The judging criteria](#the-judging-criteria) and the model-written cluster names exist only after
+the model steps. Everything else in the [numbers table](#data-model) comes from the public sources
+and code.
+
+**Caching and size.** On a first run the ClinVar download alone takes about 90 seconds and the
+first embedding pass about 5 minutes. API responses are cached for 30 days, bulk files are kept,
+and every model answer is cached in `data/cache/llm/`, so re-runs make no repeat calls.
+`apps/pipeline/data` measures about 1.1 GB (`du`, 5 October 2026), mostly raw downloads
+(525 MB), build outputs (319 MB), caches (178 MB) and the current snapshot (44 MB).
 
 **What is not reproducible bit for bit.** Model-written parts (extracted relations, linking
 decisions, cluster names, explanations) can differ between runs unless the cache is reused.
@@ -359,7 +458,8 @@ the Google sign-in setup are in [`docs/deploy-railway.md`](docs/deploy-railway.m
 - **Labels everywhere.** Data versus hypothesis, confidence level, and an AI notice on
   model-written text.
 - **Privacy.** The rules are in [`docs/compliance.md`](docs/compliance.md) (GDPR and California;
-  the stricter rule wins) and [`docs/retention.md`](docs/retention.md). Guests are stateless. One
+  the stricter rule wins) and [`docs/retention.md`](docs/retention.md). Guests are stateless; the
+  hosted site only counts page types and feature use anonymously (self-hosted, no cookies). One
   general consent (`health_data`) covers chat, profile, uploads and follows; sharing into the
   atlas (`contribute`) and contact with other people (`connect`) each need their own consent.
   Personal data is redacted with Presidio before any model call, raw uploads are deleted after
@@ -390,7 +490,7 @@ months of part-time work per disease and misses mechanism-level relatives with d
 relatives with the reason for each link, the trials, registries and organisations of each, and the
 researchers shared between them, all with sources; Dr. Wu answers follow-up questions over the
 same graph; a verified expert can be messaged or a study signed up to from the same app. For
-Dravet syndrome this is minutes, as the journey above shows.
+Dravet syndrome this is minutes, as [the example](#an-example-dravet-syndrome) shows.
 
 **Assumptions behind 10x.**
 
@@ -408,7 +508,6 @@ From [`docs/homework.md`](docs/homework.md), the full list of deferred work:
 - **Candidate links for little-studied diseases** (`candidate_phenotype`,
   `suggested_by_neighbour`) are specified, capped and validated, but no stage writes them yet;
   they need a "how well studied" measure first.
-- **Papers, trials, grants and people** are collected for the 169 focus diseases only.
 - **Cluster quality:** some groupings are wrong (FOP sits in a craniofacial and cardiac group,
   Dravet syndrome in a skeletal and neurological one), and 77 of 225 clusters hold one disease.
 - **Model-inferred relations** from abstracts (697 of 1,877) are left out of the graph; whether to
@@ -423,11 +522,3 @@ From [`docs/homework.md`](docs/homework.md), the full list of deferred work:
 - **Phone layout:** several small tap targets and map gestures are open; not checked on a real
   device.
 - **The API keeps the old graph** until it is restarted after a load.
-
-## Submission
-
-- **Live prototype:** <https://frontend-production-aa5a.up.railway.app>
-- **Team video:** link added on submission.
-- **One-minute walkthrough:** link added on submission.
-- **Source code:** this repository.
-- **Team:** _to be filled in by the team._

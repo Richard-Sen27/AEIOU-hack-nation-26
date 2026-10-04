@@ -12,6 +12,7 @@ import { AiDisclosure } from "@/components/shell/ai-disclosure";
 import { Button } from "@/components/ui/button";
 import { Sheet, SheetContent, SheetHeader, SheetTitle } from "@/components/ui/sheet";
 import { Spinner } from "@/components/ui/spinner";
+import { trackEvent } from "@/lib/analytics";
 import { setPendingUploads, takePendingChatMessage } from "@/lib/handoff";
 
 import { AssistantTurnView } from "./assistant-turn";
@@ -49,6 +50,7 @@ export function ChatView() {
     async (text: string) => {
       if (await requireConsent("health_data", "Dr. Wu needs your consent to use the health information you share.")) {
         send(text);
+        trackEvent("wu_question", { surface: "full" });
         return;
       }
       composer.current?.fill(text);

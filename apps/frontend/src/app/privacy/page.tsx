@@ -17,7 +17,7 @@ export const metadata: Metadata = {
   description: "What Amber collects, why, how long it is kept, and how to use your rights.",
 };
 
-const LAST_UPDATED = "4 October 2026";
+const LAST_UPDATED = "5 October 2026";
 
 const TOC = [
   { id: "who", title: "Who is responsible" },
@@ -55,7 +55,7 @@ export default function PrivacyPage() {
             items={[
               {
                 title: "Exploring is anonymous",
-                body: "Searching and browsing the atlas needs no account, and we keep no data about guests.",
+                body: "Searching and browsing the atlas needs no account, and we keep no data about guests. We only count, anonymously, which kinds of pages and features are used.",
               },
               {
                 title: "Health data only with your consent",
@@ -67,7 +67,7 @@ export default function PrivacyPage() {
               },
               {
                 title: "Nothing sold, nothing shared",
-                body: "No advertising, no trackers, no data brokers, no training of AI models on your data.",
+                body: "No advertising, no third-party trackers, no data brokers, no training of AI models on your data.",
               },
               {
                 title: "You are in control",
@@ -100,9 +100,22 @@ export default function PrivacyPage() {
           <NoticeSection id="what" title="What we collect">
             <NoticeSub title="If you only explore">
               <p>
-                Nothing about you. Guests have no account and no stored data. Your browser keeps two small settings on your
-                own device, your theme (light or dark) and the explanation style you picked; they contain no health
-                information and are never sent to us.
+                Nothing that identifies you. Guests have no account and no stored data; visits are only counted
+                anonymously (see Usage counts). Your browser keeps two small settings on your own device, your theme
+                (light or dark) and the explanation style you picked; they contain no health information and are never
+                sent to us.
+              </p>
+            </NoticeSub>
+            <NoticeSub title="Usage counts">
+              <p>
+                On the hosted site, Amber counts how it is used, with Umami running on the operator&apos;s own server. A
+                count holds the kind of page (&ldquo;a disease page&rdquo;, &ldquo;a conversation&rdquo;, never which
+                disease or which conversation), the website you came from (its address only), your screen size and
+                browser language. For a few features Amber counts that they were used, for example that a question was
+                sent to Dr. Wu, never what it said. Nothing that names you, your account or anything you type is sent,
+                no cookies are set and nothing is stored in your browser. Like any web server, the counting server also
+                receives your IP address and your browser&apos;s user agent (browser, operating system, device type) with
+                each request. The counts apply to every visitor of the hosted site.
               </p>
             </NoticeSub>
             <NoticeSub title="Account data">
@@ -158,6 +171,11 @@ export default function PrivacyPage() {
                   "Your separate explicit consent for contributing (Art. 9(2)(a))",
                 ],
                 ["Security and abuse prevention", "Technical logs, rate-limit counters", "Legitimate interest (Art. 6(1)(f))"],
+                [
+                  "Anonymous usage counts, to see when Amber is used and which features help",
+                  "Kind of page, feature used, referring website, screen size, language; the IP address and user agent every web request carries",
+                  "Legitimate interest (Art. 6(1)(f))",
+                ],
               ]}
             />
             <p>
@@ -177,7 +195,8 @@ export default function PrivacyPage() {
                   audiences.
                 </>,
                 <>
-                  <strong>No trackers or analytics cookies.</strong>
+                  <strong>No third-party trackers and no analytics cookies.</strong> Usage is only counted anonymously, on
+                  the operator&apos;s own server.
                 </>,
                 <>
                   <strong>No training of AI models</strong> on your data, by us or by any vendor.
@@ -207,6 +226,13 @@ export default function PrivacyPage() {
                 ],
                 ["Google (only if you sign in with Google)", "Nothing from us; Google tells us your name, e-mail address and account ID at sign-in", "Sign-in only."],
                 ["Public data sources (PubMed, ClinicalTrials.gov, and others)", "No user data", "The atlas is built from them; searches use public terms only."],
+                [
+                  "Our usage counter (Umami, on the operator's own server)",
+                  "The usage counts above, with the IP address and user agent every web request carries",
+                  <>
+                    Anonymous usage counts (<ToBeCompleted>analytics server hosting provider and region</ToBeCompleted>).
+                  </>,
+                ],
                 [
                   "Our own infrastructure",
                   "Everything else",
@@ -243,7 +269,8 @@ export default function PrivacyPage() {
                 ["Google sign-in", "Only your Google account ID with the account data; no Google tokens are kept"],
                 ["Logs and AI traces (no content, or redacted only)", "At most 30 days"],
                 ["Backups", "Deleted data disappears within one backup cycle (at most 30 days)"],
-                ["Guests", "Nothing is stored"],
+                ["Guests", "Nothing is stored about you; visits only add to the usage counts"],
+                ["Usage counts", <ToBeCompleted key="usage-retention">retention of usage counts on the analytics server</ToBeCompleted>],
               ]}
             />
           </NoticeSection>
@@ -315,8 +342,8 @@ export default function PrivacyPage() {
               items={[
                 <>
                   <strong>Categories collected:</strong> identifiers (name, e-mail, ChatGPT or Google account ID), account
-                  login credentials (an encrypted ChatGPT access token), and sensitive personal information about health and genetics that
-                  you add. Purposes and retention are listed above.
+                  login credentials (an encrypted ChatGPT access token), sensitive personal information about health and genetics that
+                  you add, and internet activity (the anonymous usage counts). Purposes and retention are listed above.
                 </>,
                 <>
                   <strong>No sale or sharing:</strong> we do not sell personal information or share it for cross-context
@@ -324,7 +351,8 @@ export default function PrivacyPage() {
                 </>,
                 <>
                   <strong>Global Privacy Control:</strong> we honour the GPC signal from your browser as an opt-out of sale and
-                  sharing and record it on your account. Your profile shows whether it was received.
+                  sharing and record it on your account. Your profile shows whether it was received. The anonymous usage
+                  counts on our own server are neither sale nor sharing, so the signal does not switch them off.
                 </>,
                 <>
                   <strong>Sensitive personal information</strong> is used only to provide the service you asked for, so the

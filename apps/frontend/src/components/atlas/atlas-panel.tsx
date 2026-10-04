@@ -29,6 +29,7 @@ import { LimitContact, LimitText } from "@/components/ui/limit-notice";
 import { Skeleton } from "@/components/ui/skeleton";
 import { fadeWords, useSmoothReveal } from "@/components/ui/smooth-reveal";
 import { announce } from "@/lib/a11y";
+import { trackEvent } from "@/lib/analytics";
 import { getAtlasSummary, streamSSE, type Schemas } from "@/lib/api";
 import type { ApiError } from "@/lib/api/errors";
 import { limitInfo, type LimitInfo } from "@/lib/api/limits";
@@ -369,8 +370,10 @@ function EntityPanel({
     getAtlasSummary({ path: { node_id: nodeId }, query: { role }, meta: { quiet: true } })
       .then(({ data, error }) => {
         if (!alive) return;
-        if (data) setLoad({ kind: "ready", data });
-        else setLoad({ kind: (error as ApiError | undefined)?.code === "not_found" ? "not_found" : "error" });
+        if (data) {
+          setLoad({ kind: "ready", data });
+          trackEvent("node_selected", { kind: data.node.type });
+        } else setLoad({ kind: (error as ApiError | undefined)?.code === "not_found" ? "not_found" : "error" });
       })
       .catch(() => alive && setLoad({ kind: "error" }));
     return () => {
@@ -882,6 +885,7 @@ function WrittenSummary({
           clearTimeout(watchdog);
           working((s) => ({ ...s, text: e.text, final: e }));
           announce(e.cached ? "Summary loaded." : "Summary finished.");
+          trackEvent("summary_written");
         } else if (e.type === "error") {
           // The server's own short line tells a time-out from an unavailable model.
           fail(e.code, e.code === "upstream_error" ? e.message : undefined);

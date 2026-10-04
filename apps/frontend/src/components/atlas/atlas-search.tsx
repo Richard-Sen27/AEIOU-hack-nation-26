@@ -8,6 +8,7 @@ import { Kbd } from "@/components/ui/kbd";
 import { Spinner } from "@/components/ui/spinner";
 import type { SearchHit } from "@/lib/api/types";
 import { announce } from "@/lib/a11y";
+import { trackEvent } from "@/lib/analytics";
 import type { LabelStyle } from "@/lib/graph/meta";
 import { nodeTypeMeta } from "@/lib/graph/meta";
 import { isEntityQuery, searchEntities, SEARCH_MAX_CHARS } from "@/lib/search";
@@ -226,6 +227,7 @@ export function AtlasSearch({ index, onPick, onAskWu, className }: AtlasSearchPr
 
   const choose = (opt: Option | undefined) => {
     if (!opt) return;
+    trackEvent("search_used", { surface: "atlas" });
     if (opt.kind === "ask") {
       onAskWu(q);
       announce("Your question is ready for Dr. Wu.");

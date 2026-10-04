@@ -10,6 +10,7 @@ import { Checkbox } from "@/components/ui/checkbox";
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
+import { trackEvent } from "@/lib/analytics";
 import { signUpToCall, unwrap } from "@/lib/api";
 import { ApiError } from "@/lib/api/errors";
 import { cn } from "@/lib/utils";
@@ -91,6 +92,7 @@ export function SignupDialog({
         }),
       );
       setSent(signup);
+      trackEvent("signup_submitted");
       onSent(signup);
     } catch (e) {
       const code = e instanceof ApiError ? e.code : "";

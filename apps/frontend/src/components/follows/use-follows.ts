@@ -3,6 +3,7 @@
 import { useCallback, useEffect, useSyncExternalStore } from "react";
 
 import { useSession } from "@/components/providers/session-provider";
+import { trackEvent } from "@/lib/analytics";
 import { followDisease, followProfileDiseases, listFollows, unfollowDisease, type Schemas } from "@/lib/api";
 import type { ApiError } from "@/lib/api/errors";
 
@@ -69,6 +70,7 @@ export function useFollows() {
     const { data, error } = await followDisease({ body: { node_id: nodeId }, meta: { quiet: true } });
     if (!data) return { ok: false, error: error as unknown as ApiError };
     set({ items: [data, ...state.items.filter((f) => f.node_id !== nodeId)] });
+    trackEvent("follow", { source: "disease" });
     return { ok: true };
   }, []);
 
@@ -77,6 +79,7 @@ export function useFollows() {
     const { error } = await unfollowDisease({ body: { node_id: nodeId }, meta: { quiet: true } });
     if (error) return { ok: false, error: error as unknown as ApiError };
     set({ items: state.items.filter((f) => f.node_id !== nodeId) });
+    trackEvent("unfollow");
     return { ok: true };
   }, []);
 
@@ -86,6 +89,7 @@ export function useFollows() {
     if (!data) return { ok: false, error: error as unknown as ApiError };
     const added = new Set(data.added.map((f) => f.node_id));
     set({ items: [...data.added, ...state.items.filter((f) => !added.has(f.node_id))] });
+    trackEvent("follow", { source: "profile" });
     return { ok: true, result: data };
   }, []);
 

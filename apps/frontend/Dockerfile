@@ -19,8 +19,11 @@ ARG NEXT_PUBLIC_API_URL=http://127.0.0.1:8000
 ARG NEXT_PUBLIC_PRIVACY_EMAIL=
 # Hosted only: where the /api and /auth rewrites send requests (see next.config.ts). Empty locally.
 ARG API_PROXY_TARGET=
+# Optional off switch for the page counter (src/lib/analytics.ts): "off" disables it.
+ARG NEXT_PUBLIC_ANALYTICS=
 ENV NEXT_PUBLIC_API_URL=${NEXT_PUBLIC_API_URL} \
     NEXT_PUBLIC_PRIVACY_EMAIL=${NEXT_PUBLIC_PRIVACY_EMAIL} \
+    NEXT_PUBLIC_ANALYTICS=${NEXT_PUBLIC_ANALYTICS} \
     API_PROXY_TARGET=${API_PROXY_TARGET} \
     NEXT_OUTPUT=standalone
 RUN pnpm build
