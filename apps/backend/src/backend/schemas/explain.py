@@ -15,3 +15,8 @@ class ExplainRequest(ApiModel):
     subject_node_id: str | None = Field(
         None, max_length=200, description="Summarise how this node is connected via the edges."
     )
+    steps: bool = Field(
+        False,
+        description="Also stream `status` events while a new text is written (reading, "
+        "writing, checking). Off by default, so the stream is delta..., final as before.",
+    )

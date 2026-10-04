@@ -113,6 +113,17 @@ class ChatEvent(
 
 # --- explain -----------------------------------------------------------------------------
 
+ExplainStep = Literal["reading", "writing", "checking", "fixing_sources", "simplifying"]
+
+
+class ExplainStatusEvent(ApiModel):
+    type: Literal["status"] = "status"
+    step: ExplainStep = Field(
+        description="reading the links, writing, checking the sources, rewriting to fix the "
+        "sources, or rewriting in simpler words."
+    )
+    message: str = Field(description="Short progress text in the lens language.")
+
 
 class ExplainDeltaEvent(ApiModel):
     type: Literal["delta"] = "delta"
@@ -138,12 +149,13 @@ class ExplainErrorEvent(StreamError):
 class ExplainEvent(
     RootModel[
         Annotated[
-            ExplainDeltaEvent | ExplainFinalEvent | ExplainErrorEvent,
+            ExplainStatusEvent | ExplainDeltaEvent | ExplainFinalEvent | ExplainErrorEvent,
             Field(discriminator="type"),
         ]
     ]
 ):
-    """One event of the POST /explain stream."""
+    """One event of the POST /explain stream. `status` events come only with `steps: true`,
+    while a new text is written; the text itself is sent only after it passed the checks."""
 
 
 # --- gap search --------------------------------------------------------------------------
@@ -228,6 +240,7 @@ AnyEvent = (
     | ChatFollowUpEvent
     | ChatFinalEvent
     | ChatErrorEvent
+    | ExplainStatusEvent
     | ExplainDeltaEvent
     | ExplainFinalEvent
     | ExplainErrorEvent

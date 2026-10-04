@@ -1,6 +1,7 @@
 """LLM explanation of one path: role prompt, citation validation, trust rules, reading gate."""
 
 import json
+from collections.abc import Callable
 from dataclasses import dataclass, field
 
 from backend.api.services.explanation.common import (
@@ -20,6 +21,7 @@ from backend.api.services.explanation.pathdata import (
 from backend.api.services.explanation.templates import enforce_trust_rules
 from backend.llm import LLMClient
 from backend.schemas.enums import Role, confidence_level
+from backend.schemas.events import ExplainStep
 from backend.schemas.graph import Edge
 
 MAX_ATTEMPTS = 3
@@ -164,22 +166,35 @@ def _citation_problem(text: str, allowed: set[str], *, subject: bool = False) ->
 
 
 async def generate_explanation(
-    llm: LLMClient, data: PathData, role: Role, language: str, *, max_attempts: int = MAX_ATTEMPTS
+    llm: LLMClient,
+    data: PathData,
+    role: Role,
+    language: str,
+    *,
+    max_attempts: int = MAX_ATTEMPTS,
+    on_step: Callable[[ExplainStep], None] | None = None,
 ) -> Explanation:
     """Generate, validate and (if needed) regenerate. Raises ExplanationError when no attempt
-    cites only path edges; accepts the simplest valid attempt when the reading gate fails."""
+    cites only path edges; accepts the simplest valid attempt when the reading gate fails.
+    `on_step` hears each step (writing, checking, fixing_sources, simplifying) as it starts."""
+    step = on_step or (lambda _: None)
     allowed = set(data.edge_ids)
     payload = json.dumps(path_payload(data), ensure_ascii=False)
     items: list[dict] = [{"role": "user", "content": payload}]
     best: Explanation | None = None
+    next_step: ExplainStep = "writing"
     for attempt in range(1, max_attempts + 1):
         subject = data.subject_id is not None
+        step(next_step)
         raw = await llm.complete_text(
             instructions=instructions(role, language, subject=subject), input=items, kind="main"
         )
+        step("checking")
         text = _clean(raw)
         problem = _citation_problem(text, allowed, subject=subject)
+        next_step = "fixing_sources"
         if problem is None:
+            next_step = "simplifying"
             text, added = enforce_trust_rules(text, data, language)
             grade = reading_grade(text, language)
             candidate = Explanation(

@@ -23,7 +23,11 @@ async def _replay(cached: ExplainFinalEvent) -> AsyncIterator[ExplainEvent]:
     "/explain",
     response_class=EventStream,
     responses={
-        **sse_doc(ExplainEvent, "Stream of ExplainEvent (delta..., final)."),
+        **sse_doc(
+            ExplainEvent,
+            "Stream of ExplainEvent (delta..., final); with `steps: true` a new text is "
+            "preceded by status events (status..., delta..., final).",
+        ),
         **responses(401, 403, 404, 422, 429, 501),
     },
     operation_id="explainPath",
@@ -32,7 +36,8 @@ async def explain(body: ExplainRequest, db: DB, user: OptionalUser) -> EventStre
     """Role-specific explanation with citation IDs. Cached: anyone; new: signed in.
 
     With `subject_node_id` the edges are that node's connections (the Atlas summary), not an
-    ordered path; it has its own cache key."""
+    ordered path; it has its own cache key. With `steps` a new text streams its progress
+    (reading, writing, checking) first; the text is sent only after it passed the checks."""
     lens = build_lens(user, body.role, body.language)
     subject = body.subject_node_id
     if subject is not None and graph.get_node(subject) is None:
@@ -42,4 +47,7 @@ async def explain(body: ExplainRequest, db: DB, user: OptionalUser) -> EventStre
     if cached is not None:
         return sse_response(_replay(cached))
     await require_user(await require_signed_in(user))
-    return sse_response(await explanation.start_generation(body.edge_ids, lens, user, **scope))
+    stream = await explanation.start_generation(
+        body.edge_ids, lens, user, steps=body.steps, **scope
+    )
+    return sse_response(stream)
