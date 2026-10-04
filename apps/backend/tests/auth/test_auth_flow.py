@@ -57,7 +57,9 @@ async def sign_in(browser, user="alice", return_to="/atlas?x=1") -> httpx.Respon
 
 async def _user_id(connect_as, sub: str):
     conn = await connect_as("atlas")
-    return await conn.fetchval("SELECT id FROM users WHERE chatgpt_sub = $1", sub)
+    return await conn.fetchval(
+        "SELECT id FROM users WHERE auth_provider = 'openai' AND auth_subject = $1", sub
+    )
 
 
 async def _token_row(connect_as, uid):
@@ -104,7 +106,7 @@ async def test_work_details_prefill(browser, mock_openai, connect_as, user, sugg
     conn = await connect_as("atlas")
     row = await conn.fetchrow(
         "SELECT p.first_name, p.last_name, u.name FROM profiles p JOIN users u ON u.id = p.user_id"
-        " WHERE u.chatgpt_sub = $1",
+        " WHERE u.auth_provider = 'openai' AND u.auth_subject = $1",
         f"user-mock-{user}-000{1 if user == 'alice' else 3}",
     )
     assert row["first_name"] is None and row["last_name"] is None  # nothing stored

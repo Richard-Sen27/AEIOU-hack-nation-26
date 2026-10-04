@@ -173,7 +173,10 @@ async def test_user_cannot_write_other_users_rows(two_users):
             " VALUES ($1, 'added', 'PMID:FX0001', 'other')",
             (b,),
         ),
-        "users": ("INSERT INTO users (id, chatgpt_sub) VALUES ($1, 'spoof')", (b,)),
+        "users": (
+            "INSERT INTO users (id, auth_provider, auth_subject) VALUES ($1, 'openai', 'spoof')",
+            (b,),
+        ),
     }
     assert set(inserts) == set(USER_TABLES)
     for sql, args in inserts.values():
@@ -253,7 +256,7 @@ async def test_auth_find_or_create_user(connect_as):
     assert row["email"] == "new@x.test" and row["last_login_at"] >= before
     profile = await su.fetchrow("SELECT role, language FROM profiles WHERE user_id = $1", first)
     assert profile["role"] is None and profile["language"] == "en"
-    assert await su.fetchval("SELECT count(*) FROM users WHERE chatgpt_sub = $1", sub) == 1
+    assert await su.fetchval("SELECT count(*) FROM users WHERE auth_subject = $1", sub) == 1
 
 
 async def test_edge_flag_counts_without_identities(two_users):

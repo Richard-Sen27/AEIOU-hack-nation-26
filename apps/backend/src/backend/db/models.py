@@ -222,10 +222,17 @@ GRAPH_TABLES = (
 
 
 class User(Base):
+    """One account per sign-in identity: (auth_provider, auth_subject). Never merged by e-mail."""
+
     __tablename__ = "users"
+    __table_args__ = (
+        UniqueConstraint("auth_provider", "auth_subject", name="uq_users_auth_provider_subject"),
+        CheckConstraint("auth_provider IN ('openai', 'google')", name="ck_users_auth_provider"),
+    )
 
     id: Mapped[uuid.UUID] = _uuid_pk()
-    chatgpt_sub: Mapped[str] = mapped_column(Text, nullable=False, unique=True)
+    auth_provider: Mapped[str] = mapped_column(Text, nullable=False)  # "openai" | "google"
+    auth_subject: Mapped[str] = mapped_column(Text, nullable=False)  # the provider's `sub`
     email: Mapped[str | None] = mapped_column(Text)
     name: Mapped[str | None] = mapped_column(Text)
     created_at: Mapped[datetime] = _created()
