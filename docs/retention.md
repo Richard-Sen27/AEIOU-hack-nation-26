@@ -6,7 +6,7 @@ All user tables live in Postgres under row-level security. Every row references 
 
 There are two consents (Art. 9(2)(a)), each with a text version the server pins:
 
-- `health_data`: one consent to process the user's own health and genetic data. Required for chat, saving the patient profile, document upload and confirming or rejecting findings; not for reading, exporting or deleting one's own data. Withdrawing it (`DELETE /consents/health_data`) stops that processing and deletes the patient profile, chat sessions and messages, documents, findings and document extraction jobs. The account, settings, the `contribute` consent and contributions stay.
+- `health_data`: one consent to process the user's own health and genetic data. Required for chat, saving the patient profile, document upload and confirming or rejecting findings; not for reading, exporting or deleting one's own data. Withdrawing it (`DELETE /consents/health_data`) stops that processing and deletes the patient profile, chat sessions and messages, documents, findings and document extraction jobs. The account, settings, the work details of doctors and researchers, the `contribute` consent and contributions stay.
 - `contribute`: sharing de-identified data with the atlas, a separate purpose. Withdrawing it deletes every contribution.
 
 ## Guests
@@ -21,6 +21,7 @@ There are two consents (Art. 9(2)(a)), each with a text version the server pins:
 | --- | --- | --- | --- |
 | Account: ChatGPT subject ID, e-mail, name, sign-in times | `users` | Until account deletion | `DELETE /me` |
 | Settings: role, language, expert mode, 16+ confirmation time, GPC opt-out | `profiles` | Until account deletion | `DELETE /me` |
+| Work details of doctors and researchers (optional, self-declared, private): first and last name, up to three institutions, ORCID iD, linked atlas entry | `profiles` | Until the user clears them, switches the role to patient, or deletes the account | `DELETE /me/professional`, `PATCH /me/settings` (role switch to patient), `DELETE /me` |
 | OpenAI tokens (encrypted), scopes, expiry | `openai_tokens` | Until logout, failed refresh or account deletion | `POST /auth/logout` revokes (best effort) and deletes; `DELETE /me` does the same, then cascades |
 | Consent records: type, text version, granted and revoked times, child flags | `consents` | Until account deletion (kept after revocation as proof of consent history) | `DELETE /me` |
 | Patient profile (diseases, genes, variants, phenotypes, age, country) | `patient_profiles` | Until the user edits it, withdraws `health_data` consent, or deletes the account | `PUT /profile`, `DELETE /consents/health_data`, `DELETE /me` |

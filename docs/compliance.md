@@ -10,7 +10,7 @@ The atlas processes health and genetic data of EU residents, often about childre
 
 ### What counts as personal data here
 
-- **Account data:** email, name, ChatGPT or Google identity, ORCID iD, IP addresses, session and log data.
+- **Account data:** email, name, ChatGPT or Google identity, ORCID iD, IP addresses, session and log data. For doctors and researchers who add them, the optional work details: first and last name, up to three institutions, ORCID iD and a private link to their own entry in the atlas.
 - **Special-category data (Art. 9):** patient profiles, chat messages about symptoms or diagnoses, uploaded documents, extracted findings, patient contributions. Health and genetic data, always.
 - **Professional nodes:** researchers and doctors built from public sources are still personal data; Art. 14 (data not collected from the person) applies.
 - **Not personal data:** the graph built from public literature and databases, as long as it contains no individual patients.
@@ -20,12 +20,13 @@ The atlas processes health and genetic data of EU residents, often about childre
 - **Health and genetic data:** explicit consent (Art. 9(2)(a)). One general consent (`health_data`) covers all processing of the user's own health and genetic data for the service: chat messages, the patient profile, uploaded documents and extracted findings. A purpose that goes beyond the user's own use MUST have its own separate consent; today that is `contribute` (sharing into the shared graph). Consent MUST NOT be bundled with sign-up, is asked just in time before the first such processing, and is as easy to withdraw as to give (Art. 7(3)). Store consent type, text version and timestamp.
 - **Children:** many patients are minors. Accounts are for users aged 16 or older (the strictest age of digital consent in the EU, Art. 8). When a user uploads or describes data about a child, they MUST confirm they hold parental responsibility.
 - **Account and core service:** performance of a contract (Art. 6(1)(b)).
+- **Work details of doctors and researchers:** performance of a contract (Art. 6(1)(b)): a feature the user sets up and can delete at any time (`DELETE /me/professional`). No new consent type. The details are self-declared and private to the account: never shown to other users, never part of the atlas data, never sent to a model and never logged. They verify nothing: `role_verified` stays false.
 - **Security logs and abuse prevention:** legitimate interest (Art. 6(1)(f)).
 - **Researcher and doctor nodes:** legitimate interest, limited to public professional information (papers, grants, institution pages, trial listings). Provide a public "about this data" page (Art. 14 notice) and a claim-or-remove flow (right to object, Art. 21).
 
 ### Engineering rules from the GDPR principles (Art. 5 and 25)
 
-- **Data minimization:** collect only the fields in `PatientProfile`. Never ask for names, birth dates (age in years or an age range is enough), addresses or patient IDs. Country is optional and used only to find nearby patient groups.
+- **Data minimization:** collect only the fields in `PatientProfile`. Health data and the patient profile never ask for names, birth dates (age in years or an age range is enough), addresses or patient IDs. The one exception to the name rule is the optional, private work details of doctors and researchers (see Lawful basis), which are kept apart from the patient profile. Country is optional and used only to find nearby patient groups.
 - **Purpose limitation:** user data is used only to find connections for that user. Never for advertising, profiling, analytics resale or model training. Contributions go into the shared graph only with "contribute" consent.
 - **Storage limitation:** raw uploads deleted immediately after extraction; anonymous sessions purged after 30 days of inactivity; application logs and traces kept at most 30 days; full-account data kept until the user deletes it or withdraws consent. Keep this retention table in `/docs/retention.md`.
 - **Accuracy:** extracted findings are confirmed by the user before use; every profile field is editable (Art. 16).
@@ -50,7 +51,7 @@ Respond within one month. Signed-in users are verified by their session; never a
 | Rectification (Art. 16) | Edit profile and findings in the app |
 | Erasure (Art. 17) | `DELETE /me` with cascade; contributions removed from the shared graph; deleted from backups within the backup cycle |
 | Withdraw consent (Art. 7(3)) | `DELETE /consents/{type}`: stops processing and deletes data held under that consent (`health_data`: profile, chats, documents and findings; `contribute`: contributions) |
-| Object (Art. 21) | Researchers and doctors: claim-or-remove flow for their node |
+| Object (Art. 21) | Researchers and doctors: claim-or-remove flow for their node. Linking one's account to an atlas entry in the work details is not a claim and proves nothing; any change to a node still goes through this flow |
 | Automated decisions (Art. 22) | The atlas makes no decisions with legal or similarly significant effect. It shows information, never a diagnosis or trial eligibility verdict; such questions are labeled "needs expert review" |
 
 ### Transparency (Art. 12–14)
