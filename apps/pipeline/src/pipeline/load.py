@@ -35,6 +35,80 @@ STAGING_DDL = {
     "hpo_terms": "id text, label text, synonyms text, parents text, ic double precision",
 }
 
+# Content node types whose arrival is recorded per disease, the relation that ties each to its
+# disease (content -> disease), and the order in which they fill the per-disease quota.
+CHANGE_TYPES = ("trial", "patient_org", "grant", "paper")
+CHANGE_RELATIONS = ("about", "studies", "funds_research_on", "serves")
+CHANGES_PER_DISEASE = 20
+CHANGES_KEEP_VERSIONS = 10
+PAPER_YEARS = 2  # papers count as new only when published this year or last year
+
+# Records what this load adds for diseases that already existed, before the graph tables are
+# emptied (in-app notifications read it). Skipped when the graph_changes table is missing (its
+# migration not applied yet) and on a first load into an empty database.
+CHANGES = f"""
+SELECT to_regclass('public.graph_changes') IS NOT NULL AS has_changes_table,
+       EXISTS (SELECT 1 FROM nodes) AS has_previous,
+       COALESCE((SELECT data_version FROM nodes LIMIT 1), '') AS previous_version
+\\gset
+\\if :has_changes_table
+\\if :has_previous
+WITH prev_diseases AS (
+  SELECT id FROM nodes WHERE type = 'disease'
+), content AS (
+  SELECT sn.id AS node_id, sn.type AS node_type, se.target_id AS disease_id, se.id AS edge_id,
+         COALESCE(sn.attrs, '{{}}')::jsonb AS attrs, (n.id IS NOT NULL) AS existed,
+         n.attrs AS old_attrs
+  FROM staging.nodes sn
+  JOIN staging.edges se
+    ON se.source_id = sn.id AND se.relation IN ({", ".join(f"'{r}'" for r in CHANGE_RELATIONS)})
+  JOIN prev_diseases d ON d.id = se.target_id
+  LEFT JOIN nodes n ON n.id = sn.id
+  WHERE sn.type IN ({", ".join(f"'{t}'" for t in CHANGE_TYPES)})
+), candidates AS (
+  SELECT node_id, node_type, disease_id, edge_id, attrs, 'added' AS change
+  FROM content
+  WHERE NOT existed
+    AND (node_type <> 'paper'
+         OR ((attrs->>'year') ~ '^[0-9]{{4}}$'
+             AND (attrs->>'year')::int >= extract(year FROM now())::int - {PAPER_YEARS - 1}))
+  UNION ALL
+  SELECT node_id, node_type, disease_id, edge_id, attrs, 'now_recruiting' AS change
+  FROM content
+  WHERE existed AND node_type = 'trial' AND attrs->>'status' = 'RECRUITING'
+    AND (old_attrs->>'status') IS DISTINCT FROM 'RECRUITING'
+), deduped AS (
+  SELECT DISTINCT ON (disease_id, node_id, change) *
+  FROM candidates ORDER BY disease_id, node_id, change, edge_id
+), ranked AS (
+  SELECT *, row_number() OVER (
+    PARTITION BY disease_id
+    ORDER BY array_position(ARRAY[{", ".join(f"'{t}'" for t in CHANGE_TYPES)}], node_type),
+             COALESCE(attrs->>'start_date', attrs->'fiscal_years'->>-1, attrs->>'year') DESC
+               NULLS LAST,
+             node_id
+  ) AS rank
+  FROM deduped
+)
+INSERT INTO graph_changes (data_version, previous_version, disease_id, node_id, node_type,
+                           change, edge_id)
+  SELECT :'version', NULLIF(:'previous_version', ''), disease_id, node_id, node_type, change,
+         edge_id
+  FROM ranked
+  WHERE rank <= {CHANGES_PER_DISEASE} AND :'previous_version' <> :'version'
+  ON CONFLICT DO NOTHING;
+DELETE FROM graph_changes WHERE data_version NOT IN (
+  SELECT data_version FROM graph_changes GROUP BY data_version
+  ORDER BY max(created_at) DESC LIMIT {CHANGES_KEEP_VERSIONS});
+\\echo graph_changes: recorded what this load adds
+\\else
+\\echo graph_changes: empty database, first load records nothing
+\\endif
+\\else
+\\echo graph_changes: table missing (migration not applied); diff skipped
+\\endif
+"""
+
 HPO_TERMS = """
 SELECT to_regclass('public.hpo_terms') IS NOT NULL AS has_hpo_terms_table \\gset
 \\if :has_hpo_terms_table
@@ -53,6 +127,9 @@ INSERT INTO hpo_terms (id, label, synonyms, parents, ic)
 PROMOTE = (
     """
 BEGIN;
+"""
+    + CHANGES
+    + """
 DELETE FROM explanations_cache WHERE data_version IS DISTINCT FROM :'version';
 TRUNCATE evidence, edges, node_synonyms, nodes, clusters;
 INSERT INTO clusters (id, label, mechanism_summary, member_count, attrs, data_version)
