@@ -812,6 +812,7 @@ class CallSignupRecord(Base):
         UUID(as_uuid=True), ForeignKey("users.id", ondelete="CASCADE"), nullable=False
     )
     call_title_snapshot: Mapped[str] = mapped_column(Text, nullable=False)
+    call_closes_at: Mapped[date | None] = mapped_column(Date)  # snapshot; for the 90-day purge
     recipient_name: Mapped[str] = mapped_column(Text, nullable=False)  # named in the authorization
     display_name: Mapped[str] = mapped_column(Text, nullable=False)
     shared: Mapped[dict[str, Any]] = mapped_column(

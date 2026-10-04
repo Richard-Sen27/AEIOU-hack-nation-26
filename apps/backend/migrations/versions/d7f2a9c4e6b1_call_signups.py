@@ -24,7 +24,7 @@ time). Policies:
   (clears shared and note, keeps a stub for 30 days).
 - the trigger call_signups_admit (SECURITY DEFINER) admits a new sign-up only to a published,
   unexpired call of somebody else whose card is visible and verified, below max_signups
-  (serialized per call).
+  (serialized per call), and copies the call's closing date (call_closes_at) for the purge.
 - the trigger calls_end_signups (SECURITY DEFINER) marks the active sign-ups of a call that
   closes or is withdrawn as call_closed, purged 90 days later; a deleted call turns its sign-ups
   into stubs at once (call_signups_guard on the ON DELETE SET NULL update).
@@ -102,6 +102,7 @@ BEGIN
                                WHERE s.call_id = NEW.call_id AND s.status = 'active') >= v_max THEN
         RAISE EXCEPTION 'amber:full' USING ERRCODE = 'check_violation';
     END IF;
+    NEW.call_closes_at := v_closes;  -- from the call, never from the client
     RETURN NEW;
 END
 $$;
@@ -292,6 +293,9 @@ def upgrade() -> None:
         sa.Column("call_id", sa.UUID(), nullable=True),
         sa.Column("patient_id", sa.UUID(), nullable=False),
         sa.Column("call_title_snapshot", sa.Text(), nullable=False),
+        # The call's closing date when the sign-up was made (a published call is never edited),
+        # so the 90-day purge after a call ends by date needs no access to calls.
+        sa.Column("call_closes_at", sa.Date(), nullable=True),
         sa.Column("recipient_name", sa.Text(), nullable=False),
         sa.Column("display_name", sa.Text(), nullable=False),
         sa.Column(
