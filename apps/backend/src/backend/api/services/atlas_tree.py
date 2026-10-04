@@ -34,7 +34,7 @@ from backend.schemas.atlas import (
 from backend.schemas.enums import NodeType, Relation
 from backend.schemas.graph import Node
 
-LAYOUT_VERSION = 3
+LAYOUT_VERSION = 4
 ROOT_ID = "T:root"
 MAX_LEAVES = 30
 
@@ -303,13 +303,16 @@ _CLINICAL = re.compile(
     r"hospita|hôpital|hopital|ospedal|spital|klinik|clinic|clínic|clinique|policlinic|"
     r"\bchu\b|\bchru\b|\bnhs\b|\birccs\b|medical cent|medical complex|health system|"
     r"healthcare|health care|ap-hp|assistance publique|children's health|"
-    r"kinderspital|universitätsmedizin|klinikum",
+    r"kinderspital|universitätsmedizin|klinikum|krankenhaus|\bhosp\b|\bumc\b|health service|"
+    r"children's|(epilep\w*|headache|autism) cent|reference cent|centre (de )?référence|"
+    r"centre référence|centre de compétence|consultants|specialists|\bhealth$",
     re.IGNORECASE,
 )
 _ACADEMIC = re.compile(
-    r"universit|univ\.|college|school|faculty|institut|istituto|instituto|academ|"
-    r"research|recherche|laborator|\blabs?\b|\binserm\b|\bcnrs\b|\bnih\b|national institutes|"
-    r"centre for|center for|centro de|consortium|max-planck|riken|broad",
+    r"universit|\buniv\b|\bcoll\b|med sch|medicine$|college|school|faculty|institut|"
+    r"istituto|instituto|academ|research|recherche|laborat|\blabs?\b|genetic|genom|"
+    r"génétique|génomique|\binserm\b|\bcnrs\b|\bnih\b|national institutes|centre for|"
+    r"center for|centro de|consortium|max-planck|riken|broad",
     re.IGNORECASE,
 )
 
@@ -321,9 +324,10 @@ INSTITUTION_KIND_LABELS = {
 
 
 def institution_kind(name: str) -> str:
-    """'clinical' when the name mentions a hospital, clinic or medical centre (checked first:
-    "University Hospital X" is clinical), else 'academic' for a university, college, school,
-    institute, laboratory or research centre, else 'other'."""
+    """'clinical' when the name mentions a hospital, clinic, medical or reference centre, an
+    epilepsy centre, a health service or a children's hospital (checked first: "University
+    Hospital X" is clinical), else 'academic' for a university, college, school, institute,
+    laboratory, research or genetics centre, else 'other' (companies, foundations, ...)."""
     if _CLINICAL.search(name):
         return "clinical"
     if _ACADEMIC.search(name):
