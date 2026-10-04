@@ -1,7 +1,7 @@
 import { expect, test, type Page } from "@playwright/test";
 
 import { errorEnvelope, guestSession, mockApi, setTheme, shot, signedInSession, sseBody, trackConsoleErrors } from "../helpers";
-import { fecTree, summaryMock } from "../graph/atlas-fec-mocks";
+import { atlasTreePayload, summaryMock } from "../graph/fixtures";
 import { emptyReply, graphMocks, reply, SESSION_ID, STORY, turnBody } from "./fixtures";
 
 type Req = { url: string; method: string; body: unknown };
@@ -539,7 +539,7 @@ test.describe("chat", () => {
   test("show in graph hands the finds to the Atlas in memory, never in a URL or storage", async ({ page }) => {
     await signedIn(page, {
       "POST /chat": turnBody(),
-      "GET /atlas/tree.json": fecTree(),
+      "GET /atlas/tree.json": atlasTreePayload(),
       "GET /atlas/summary/*": summaryMock(),
     });
     await page.goto("/chat");

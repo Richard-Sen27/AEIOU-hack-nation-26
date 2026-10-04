@@ -1,14 +1,14 @@
 import { expect, test, type Page } from "@playwright/test";
 
 import { errorEnvelope, guestSession, mockApi, setTheme, signedInSession, sseBody, trackConsoleErrors } from "../helpers";
-import { explainEvents, fecTree, GENE_GROUP, stxbp1Summary, summaryMock } from "./atlas-fec-mocks";
+import { atlasTreePayload, explainEvents, GENE_GROUP, stxbp1Summary, summaryMock } from "./fixtures";
 
 type Req = { url: string; method: string; body: unknown };
 
 async function atlas(page: Page, mocks: Record<string, unknown> = {}, session: unknown = guestSession) {
   await mockApi(page, {
     "GET /auth/session": session,
-    "GET /atlas/tree.json": fecTree(),
+    "GET /atlas/tree.json": atlasTreePayload(),
     "GET /atlas/summary/*": summaryMock(),
     "GET /chat/sessions": [],
     ...mocks,
@@ -107,7 +107,7 @@ test.describe("atlas summary panel", () => {
   });
 
   test("institution groups explain the name keyword rule", async ({ page }) => {
-    const tree = fecTree();
+    const tree = atlasTreePayload();
     tree.nodes.push({
       id: "T:institutions/clinical", kind: "group", label: "Clinical", parent_id: "T:institutions", category: "institutions",
       depth: 2, x: 10, y: 10, angle: 0, entity_type: null, group_basis: "institution_kind", ref_id: "clinical",

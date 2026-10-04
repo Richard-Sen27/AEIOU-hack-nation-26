@@ -1,7 +1,7 @@
 import { expect, test, type Page } from "@playwright/test";
 
 import { hit, mockApi, setTheme, shot, trackConsoleErrors } from "../helpers";
-import { treeMocks } from "./tree-mock";
+import { graphMocks } from "./fixtures";
 
 async function openAtlas(page: Page) {
   await page.goto("/atlas");
@@ -12,7 +12,7 @@ async function openAtlas(page: Page) {
 
 test.describe("search the map", () => {
   test("matches groups and entities locally, with type and breadcrumb", async ({ page }) => {
-    await mockApi(page, treeMocks({ "GET /search": { results: [] } }));
+    await mockApi(page, graphMocks({ "GET /search": { results: [] } }));
     const errors = trackConsoleErrors(page);
     const { search, input } = await openAtlas(page);
 
@@ -35,7 +35,7 @@ test.describe("search the map", () => {
   });
 
   test("is operable with the keyboard and picks a result", async ({ page }) => {
-    await mockApi(page, treeMocks({ "GET /search": { results: [] } }));
+    await mockApi(page, graphMocks({ "GET /search": { results: [] } }));
     const { search, input } = await openAtlas(page);
 
     await input.focus();
@@ -75,7 +75,7 @@ test.describe("search the map", () => {
     const queries: string[] = [];
     await mockApi(
       page,
-      treeMocks({
+      graphMocks({
         "GET /search": ({ url }: { url: string }) => {
           queries.push(new URL(url).searchParams.get("q") ?? "");
           return {
@@ -104,7 +104,7 @@ test.describe("search the map", () => {
     const urls: string[] = [];
     page.on("request", (r) => urls.push(r.url()));
     let searched = 0;
-    await mockApi(page, treeMocks({ "GET /search": () => ((searched += 1), { json: { results: [] } }) }));
+    await mockApi(page, graphMocks({ "GET /search": () => ((searched += 1), { json: { results: [] } }) }));
     const { search, input } = await openAtlas(page);
 
     const text = "my daughter has seizures when she has a fever";
@@ -124,7 +124,7 @@ test.describe("search the map", () => {
   });
 
   test("says when nothing matches", async ({ page }) => {
-    await mockApi(page, treeMocks({ "GET /search": { results: [] } }));
+    await mockApi(page, graphMocks({ "GET /search": { results: [] } }));
     const { search, input } = await openAtlas(page);
     await input.fill("zzqx");
     await expect(search).toContainText("Nothing on the map by that name");
@@ -133,7 +133,7 @@ test.describe("search the map", () => {
 
   test("screenshots", async ({ page }) => {
     await page.emulateMedia({ reducedMotion: "reduce" });
-    await mockApi(page, treeMocks({ "GET /search": { results: [] } }));
+    await mockApi(page, graphMocks({ "GET /search": { results: [] } }));
     for (const theme of ["light", "dark"] as const) {
       await setTheme(page, theme);
       const { search, input } = await openAtlas(page);
@@ -146,7 +146,7 @@ test.describe("search the map", () => {
 
 test("search on a phone @mobile", async ({ page }) => {
   await page.emulateMedia({ reducedMotion: "reduce" });
-  await mockApi(page, treeMocks({ "GET /search": { results: [] } }));
+  await mockApi(page, graphMocks({ "GET /search": { results: [] } }));
   const { search, input } = await openAtlas(page);
   await input.fill("seiz");
   await expect(search.getByTestId("atlas-search-option").first()).toBeVisible();

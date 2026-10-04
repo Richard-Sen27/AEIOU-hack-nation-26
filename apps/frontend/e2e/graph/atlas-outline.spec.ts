@@ -1,7 +1,7 @@
 import { expect, test, type Page } from "@playwright/test";
 
 import { mockApi, setTheme, shot, trackConsoleErrors } from "../helpers";
-import { treeMocks } from "./tree-mock";
+import { graphMocks } from "./fixtures";
 
 async function openOutline(page: Page, url = "/atlas") {
   await page.goto(url);
@@ -15,7 +15,7 @@ const item = (page: Page, id: string) => page.locator(`[data-testid="atlas-outli
 
 test.describe("outline view", () => {
   test("shows the nine trees as a collapsed treeview", async ({ page }) => {
-    await mockApi(page, treeMocks());
+    await mockApi(page, graphMocks());
     const errors = trackConsoleErrors(page);
     const { outline, tree } = await openOutline(page);
     const rows = outline.getByTestId("atlas-outline-item");
@@ -30,7 +30,7 @@ test.describe("outline view", () => {
   });
 
   test("arrows, Home/End, typeahead and Enter", async ({ page }) => {
-    await mockApi(page, treeMocks());
+    await mockApi(page, graphMocks());
     const { outline } = await openOutline(page);
     const rows = outline.getByTestId("atlas-outline-item");
 
@@ -73,7 +73,7 @@ test.describe("outline view", () => {
   });
 
   test("filters by name and reveals the matches", async ({ page }) => {
-    await mockApi(page, treeMocks());
+    await mockApi(page, graphMocks());
     const { outline } = await openOutline(page);
     await outline.getByTestId("atlas-outline-filter").fill("febrile");
     await expect(outline.getByTestId("atlas-outline-status")).toContainText("2 matches");
@@ -88,7 +88,7 @@ test.describe("outline view", () => {
   });
 
   test("reveals and marks the selected node", async ({ page }) => {
-    await mockApi(page, treeMocks());
+    await mockApi(page, graphMocks());
     const { outline } = await openOutline(page, "/atlas?focus=HP%3A0012469");
     const selected = item(page, "HP:0012469");
     await expect(selected).toBeVisible();
@@ -100,7 +100,7 @@ test.describe("outline view", () => {
 
   test("screenshots", async ({ page }) => {
     await page.emulateMedia({ reducedMotion: "reduce" });
-    await mockApi(page, treeMocks());
+    await mockApi(page, graphMocks());
     for (const theme of ["light", "dark"] as const) {
       await setTheme(page, theme);
       await openOutline(page, "/atlas?focus=HP%3A0012469");
@@ -112,7 +112,7 @@ test.describe("outline view", () => {
 
 test("outline on a phone @mobile", async ({ page }) => {
   await page.emulateMedia({ reducedMotion: "reduce" });
-  await mockApi(page, treeMocks());
+  await mockApi(page, graphMocks());
   await openOutline(page, "/atlas?focus=HP%3A0012469");
   await expect(item(page, "HP:0012469")).toBeVisible();
   const width = await page.evaluate(() => document.documentElement.scrollWidth);

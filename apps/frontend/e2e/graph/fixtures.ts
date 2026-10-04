@@ -235,99 +235,130 @@ const TYPE_CATEGORY: Record<string, string> = {
   doctor: "doctors",
 };
 
+/** The chromosome group under Genes that holds the fixture's six genes. */
+export const GENE_GROUP = "T:genes/chr2";
+/** Symptoms drawn as kinds of "Seizure" (a graph phenotype that is also a branch). */
+const SEIZURE_KINDS = new Set(["HP:0002373", "HP:0012469", "HP:0002133"]);
+
+export type FxTreeNode = {
+  id: string;
+  kind: "root" | "category" | "group" | "entity";
+  label: string;
+  parent_id: string | null;
+  category: string | null;
+  depth: number;
+  x: number;
+  y: number;
+  angle: number;
+  entity_type: string | null;
+  group_basis: string | null;
+  ref_id: string | null;
+  entity_count: number;
+  child_count: number;
+  cluster_id: string | null;
+  centrality: number | null;
+  contributed: boolean;
+};
+
 /**
  * A valid `GET /atlas/tree.json` built from the fixture: root -> 9 categories
- * -> one group per node type -> entities, with simple polar positions
- * (sectors clockwise from 12 o'clock, angle counter-clockwise from +x).
+ * -> entities, with the branches the specs need: diseases under their
+ * cluster, genes under a chromosome group ("Chromosome 2") with their
+ * variants below them, and three kinds of seizure under "Seizure". Simple
+ * polar positions: each category its own sector clockwise from 12 o'clock
+ * (angle counter-clockwise from +x), 180 units to the categories, 140 per
+ * level after that; parents before children (pre-order).
  */
 export function atlasTreePayload() {
-  type TreeNode = {
-    id: string;
-    kind: "root" | "category" | "group" | "entity";
-    label: string;
-    parent_id: string | null;
-    category: string | null;
-    depth: number;
-    x: number;
-    y: number;
-    angle: number;
-    entity_type: string | null;
-    group_basis: string | null;
-    ref_id: string | null;
-    entity_count: number;
-    child_count: number;
-    cluster_id: string | null;
-    centrality: number | null;
-    contributed: boolean;
-  };
-  const byCat = new Map<string, Map<string, FxNode[]>>();
-  for (const n of fixture.nodes) {
-    const cat = TYPE_CATEGORY[n.type];
-    if (!byCat.has(cat)) byCat.set(cat, new Map());
-    const groups = byCat.get(cat)!;
-    if (!groups.has(n.type)) groups.set(n.type, []);
-    groups.get(n.type)!.push(n);
+  type Draft = Pick<FxTreeNode, "id" | "kind" | "label" | "parent_id" | "category" | "entity_type" | "group_basis" | "ref_id" | "cluster_id" | "centrality">;
+  const drafts: Draft[] = [];
+  const add = (n: Partial<Draft> & Pick<Draft, "id" | "kind" | "label" | "parent_id">) =>
+    drafts.push({ category: null, entity_type: null, group_basis: null, ref_id: null, cluster_id: null, centrality: null, ...n });
+  add({ id: "T:root", kind: "root", label: "Atlas", parent_id: null });
+  for (const c of CATEGORY_ORDER) add({ id: `T:${c}`, kind: "category", label: CATEGORY_LABELS[c], parent_id: "T:root", category: c });
+  add({ id: GENE_GROUP, kind: "group", label: "Chromosome 2", parent_id: "T:genes", category: "genes", group_basis: "chromosome", ref_id: "2" });
+  const variantGene = new Map(fixture.edges.filter((e) => e.relation === "variant_of").map((e) => [e.source_id, e.target_id]));
+  // Clusters first, so they lead their category and their diseases hang below them.
+  const ordered = [...fixture.nodes].sort((a, b) => Number(b.type === "cluster") - Number(a.type === "cluster"));
+  for (const n of ordered) {
+    const category = TYPE_CATEGORY[n.type];
+    let parent = `T:${category}`;
+    if (n.type === "disease" && n.cluster_id) parent = n.cluster_id;
+    if (n.type === "gene") parent = GENE_GROUP;
+    if (n.type === "variant" && variantGene.has(n.id)) parent = variantGene.get(n.id)!;
+    if (SEIZURE_KINDS.has(n.id)) parent = "HP:0001250";
+    add({ id: n.id, kind: "entity", label: n.label, parent_id: parent, category, entity_type: n.type, cluster_id: n.cluster_id, centrality: n.centrality });
   }
-  const total = fixture.nodes.length;
-  const gap = (3 * Math.PI) / 180;
-  const usable = 2 * Math.PI - gap * CATEGORY_ORDER.length;
-  const polar = (r: number, a: number) => ({ x: +(r * Math.cos(a)).toFixed(2), y: +(r * Math.sin(a)).toFixed(2), angle: +a.toFixed(5) });
-  const base = (over: Partial<TreeNode> & Pick<TreeNode, "id" | "kind" | "label">): TreeNode => ({
-    parent_id: null,
-    category: null,
-    depth: 0,
-    x: 0,
-    y: 0,
-    angle: 0,
-    entity_type: null,
-    group_basis: null,
-    ref_id: null,
-    entity_count: 0,
-    child_count: 0,
-    cluster_id: null,
-    centrality: null,
-    contributed: false,
-    ...over,
-  });
-  const nodes: TreeNode[] = [base({ id: "T:root", kind: "root", label: "Atlas", entity_count: total, child_count: 9 })];
-  const categories: Array<Record<string, unknown>> = [];
-  let start = Math.PI / 2;
-  for (const cat of CATEGORY_ORDER) {
-    const groups = byCat.get(cat) ?? new Map<string, FxNode[]>();
-    const count = [...groups.values()].reduce((s, g) => s + g.length, 0);
-    const span = Math.max((usable * count) / total, (14 * Math.PI) / 180);
-    const end = start - span;
-    const mid = (start + end) / 2;
-    const catId = `T:${cat}`;
-    nodes.push(
-      base({ id: catId, kind: "category", label: CATEGORY_LABELS[cat], parent_id: "T:root", category: cat, depth: 1, ...polar(180, mid), entity_count: count, child_count: groups.size }),
-    );
-    let gStart = start;
-    for (const [type, members] of groups) {
-      const gSpan = (span * members.length) / Math.max(count, 1);
-      const gMid = gStart - gSpan / 2;
-      const gid = `${catId}/${type}`;
-      nodes.push(
-        base({ id: gid, kind: "group", label: type, parent_id: catId, category: cat, depth: 2, ...polar(320, gMid), group_basis: "subcategory", entity_count: members.length, child_count: members.length }),
-      );
-      [...members]
-        .sort((a, b) => a.label.localeCompare(b.label))
-        .forEach((m, i) => {
-          const a = gStart - (gSpan * (i + 0.5)) / members.length;
-          nodes.push(
-            base({ id: m.id, kind: "entity", label: m.label, parent_id: gid, category: cat, depth: 3, ...polar(460 + (i % 3) * 40, a), entity_type: m.type, entity_count: 1, cluster_id: m.cluster_id, centrality: m.centrality }),
-          );
-        });
-      gStart -= gSpan;
+
+  const byId = new Map(drafts.map((n) => [n.id, n]));
+  const kids = new Map<string, Draft[]>();
+  for (const n of drafts) if (n.parent_id) kids.set(n.parent_id, [...(kids.get(n.parent_id) ?? []), n]);
+  const count = (id: string): number =>
+    (kids.get(id) ?? []).reduce((s, k) => s + count(k.id), byId.get(id)!.kind === "entity" ? 1 : 0);
+
+  const round = (v: number) => +v.toFixed(2);
+  const nodes: FxTreeNode[] = [];
+  let maxR = 0;
+  const walk = (n: Draft, depth: number, a0: number, a1: number) => {
+    const angle = (a0 + a1) / 2;
+    const r = depth === 0 ? 0 : 180 + (depth - 1) * 140;
+    maxR = Math.max(maxR, r);
+    const children = kids.get(n.id) ?? [];
+    nodes.push({
+      ...n,
+      depth,
+      x: round(r * Math.cos(angle)),
+      y: round(r * Math.sin(angle)),
+      angle: +angle.toFixed(5),
+      entity_count: count(n.id),
+      child_count: children.length,
+      contributed: false,
+    });
+    // Children share the parent's span in proportion to their subtree size.
+    const total = children.reduce((s, c) => s + Math.max(1, count(c.id)), 0);
+    let at = a0;
+    for (const c of children) {
+      const span = ((a1 - a0) * Math.max(1, count(c.id))) / Math.max(total, 1);
+      walk(c, depth + 1, at, at + span);
+      at += span;
     }
-    categories.push({ id: cat, node_id: catId, label: CATEGORY_LABELS[cat], entity_count: count, angle_start: start, angle_end: end, ...(() => { const p = polar(660, mid); return { label_x: p.x, label_y: p.y }; })() });
+  };
+
+  const total = count("T:root");
+  const gap = (3 * Math.PI) / 180;
+  const minSpan = (14 * Math.PI) / 180;
+  const raw = CATEGORY_ORDER.map((c) => Math.max(minSpan, ((2 * Math.PI - gap * CATEGORY_ORDER.length) * count(`T:${c}`)) / total));
+  const scale = (2 * Math.PI - gap * CATEGORY_ORDER.length) / raw.reduce((s, v) => s + v, 0);
+  const spans = raw.map((v) => v * scale);
+  nodes.push({ ...byId.get("T:root")!, depth: 0, x: 0, y: 0, angle: 0, entity_count: total, child_count: CATEGORY_ORDER.length, contributed: false });
+  const sectors: Array<{ start: number; end: number }> = [];
+  let start = Math.PI / 2;
+  CATEGORY_ORDER.forEach((c, i) => {
+    const end = start - spans[i];
+    // From the sector's counter-clockwise edge, so children run clockwise like the categories.
+    walk(byId.get(`T:${c}`)!, 1, start, end);
+    sectors.push({ start, end });
     start = end - gap;
-  }
+  });
+
   return {
     data_version: "fixture",
-    layout_version: 1,
+    layout_version: 4,
     root_id: "T:root",
-    categories,
+    categories: CATEGORY_ORDER.map((c, i) => {
+      const { start: s, end: e } = sectors[i];
+      const mid = (s + e) / 2;
+      return {
+        id: c,
+        node_id: `T:${c}`,
+        label: CATEGORY_LABELS[c],
+        entity_count: count(`T:${c}`),
+        angle_start: +s.toFixed(5),
+        angle_end: +e.toFixed(5),
+        label_x: round((maxR + 120) * Math.cos(mid)),
+        label_y: round((maxR + 120) * Math.sin(mid)),
+      };
+    }),
     nodes,
     edges: atlasPayload().edges,
     clusters,
@@ -413,6 +444,90 @@ export function atlasSummary(id: string) {
   };
 }
 
+function summaryItem(id: string, via: string[], extra: Record<string, unknown> = {}) {
+  const n = nodeById.get(id)!;
+  return {
+    id,
+    label: n.label,
+    type: n.type,
+    hops: Math.max(1, via.length),
+    score: 1,
+    best_confidence: 0.9,
+    inferred: false,
+    under_review: false,
+    via,
+    via_label: null,
+    ...extra,
+  };
+}
+
+/** Summary for STXBP1 encephalopathy, with each kind of item the panel must present. */
+export function stxbp1Summary() {
+  return {
+    node: apiNode(nodeById.get("MONDO:9900007")!),
+    tree_path: [
+      { id: "T:root", label: "Atlas", kind: "root" },
+      { id: "T:diseases", label: "Diseases", kind: "category" },
+      { id: "CLUSTER:3", label: "Synaptic and potassium channel encephalopathies", kind: "entity" },
+    ],
+    headline: "A rare genetic condition with early seizures. Linked to 2 genes and 4 researchers in the atlas.",
+    sections: [
+      {
+        key: "clusters",
+        node_type: "cluster",
+        total: 1,
+        items: [summaryItem("CLUSTER:3", [], { inferred: true, best_confidence: 0, via_label: "Member by analysis (hypothesis)" })],
+      },
+      {
+        key: "similar_diseases",
+        node_type: "disease",
+        total: 14,
+        items: [
+          summaryItem("MONDO:9900003", ["e_3b8845b635b8"], { inferred: true, under_review: true, best_confidence: 0.55 }),
+          summaryItem("MONDO:9900010", ["e_275854103db5"], { inferred: true, best_confidence: 0.4 }),
+        ],
+      },
+      { key: "genes", node_type: "gene", total: 1, items: [summaryItem("HGNC:11444", ["e_e5f778ac8a21"], { best_confidence: 0.97 })] },
+      {
+        key: "researchers",
+        node_type: "researcher",
+        total: 2,
+        items: [
+          summaryItem("RES:fx-alpha", ["e_e5f778ac8a21", "e_0af807385728"], { score: 4, via_label: "via 4 papers" }),
+          summaryItem("RES:fx-beta", ["e_e5f778ac8a21", "e_558f7d2a940d"], { score: 1, via_label: "via gene STXBP1" }),
+        ],
+      },
+    ],
+    explain_edge_ids: ["e_e5f778ac8a21", "e_3b8845b635b8"],
+    vus_notice: null,
+    data_version: "fixture",
+  };
+}
+
+/**
+ * `GET /atlas/summary/*` handler: the hand-written STXBP1 encephalopathy
+ * summary, 1-hop summaries for every other fixture entity, 404 otherwise.
+ * `overrides` maps an id to a ready mock result.
+ */
+export function summaryMock(overrides: Record<string, unknown> = {}) {
+  return ({ url }: { url: string }) => {
+    const id = decodeURIComponent(new URL(url).pathname.split("/").pop()!);
+    if (id in overrides) return overrides[id] as Record<string, unknown>;
+    const s = id === "MONDO:9900007" ? stxbp1Summary() : atlasSummary(id);
+    return s ? { json: s } : { status: 404, json: { error: { code: "not_found", message: "Not found" } } };
+  };
+}
+
+/** `POST /explain` SSE events: two deltas, then the final event. */
+export function explainEvents(text: string, cached: boolean) {
+  const mid = Math.floor(text.length / 2);
+  return [
+    { type: "delta", text: text.slice(0, mid) },
+    { type: "delta", text: text.slice(mid) },
+    { type: "final", path_id: "p_fixture", text, citations: ["e_e5f778ac8a21"], cached, role: "patient", language: "en", data_version: "fixture" },
+  ];
+}
+
 /** Mock table for every graph read endpoint. Role is read from `?role=`. */
 export function graphMocks(extra: Record<string, unknown> = {}) {
   const lastSegment = (url: string) => decodeURIComponent(new URL(url).pathname.split("/").pop()!);
@@ -420,10 +535,7 @@ export function graphMocks(extra: Record<string, unknown> = {}) {
     "GET /auth/session": { user: null, gpc: false, demo_mode: false, data_version: "fixture" },
     "GET /atlas.json": atlasPayload(),
     "GET /atlas/tree.json": atlasTreePayload(),
-    "GET /atlas/summary/*": ({ url }: { url: string }) => {
-      const d = atlasSummary(lastSegment(url));
-      return d ? { json: d } : { status: 404, json: { error: { code: "not_found", message: "Not found" } } };
-    },
+    "GET /atlas/summary/*": summaryMock(),
     "GET /clusters": clusters,
     "GET /node/*": ({ url }: { url: string }) => {
       const d = nodeDetail(lastSegment(url));
@@ -443,37 +555,93 @@ export function graphMocks(extra: Record<string, unknown> = {}) {
   };
 }
 
-/** Synthetic large Atlas: `n` nodes in clustered blobs, `m` edges. */
-export function largeAtlas(n = 3000, m = 20000) {
+/**
+ * Synthetic large `GET /atlas/tree.json`: `entities` entities spread over the
+ * nine categories, each category split into fields and then into
+ * alphabetical ranges of at most 10 (about 7,000 tree nodes for the
+ * default), and `edges` random real edges between entities. Plus a
+ * `/atlas/summary/*` handler for its ids.
+ */
+export function largeAtlasTree(entities = 6343, edges = 17000) {
   let seed = 42;
-  const rand = () => ((seed = (seed * 1664525 + 1013904223) >>> 0) / 4294967296);
-  const types = ["disease", "gene", "phenotype", "variant", "paper", "researcher", "patient_org", "trial", "pathway"];
+  const rand = () => (seed = (seed * 1664525 + 1013904223) >>> 0) / 4294967296;
+  const typesOf: Record<string, string[]> = {
+    researchers: ["researcher"],
+    institutions: ["institution"],
+    literature: ["paper", "trial", "grant"],
+    community: ["patient_org", "registry"],
+    pathways: ["pathway"],
+    genes: ["gene", "variant"],
+    diseases: ["disease"],
+    symptoms: ["phenotype"],
+    doctors: ["doctor"],
+  };
+  const share = [1333, 1294, 1241, 36, 660, 805, 177, 642, 155];
+  const shareTotal = share.reduce((s, v) => s + v, 0);
+  const perCat = share.map((v) => Math.max(10, Math.round((v / shareTotal) * entities)));
+  perCat[0] += entities - perCat.reduce((s, v) => s + v, 0);
+
+  const nodes: FxTreeNode[] = [];
+  const base = (o: Partial<FxTreeNode> & Pick<FxTreeNode, "id" | "kind" | "label" | "x" | "y" | "angle">): FxTreeNode => ({
+    parent_id: null, category: null, depth: 0, entity_type: null, group_basis: null, ref_id: null,
+    entity_count: 0, child_count: 0, cluster_id: null, centrality: null, contributed: false, ...o,
+  });
+  const polar = (r: number, a: number) => ({ x: +(r * Math.cos(a)).toFixed(2), y: +(r * Math.sin(a)).toFixed(2), angle: +a.toFixed(5) });
+  nodes.push(base({ id: "T:root", kind: "root", label: "Atlas", x: 0, y: 0, angle: 0, entity_count: entities, child_count: 9 }));
+  const gap = (3 * Math.PI) / 180;
+  const usable = 2 * Math.PI - gap * 9;
+  const spans = perCat.map((n) => Math.max((14 * Math.PI) / 180, (usable * n) / entities));
+  const k = usable / spans.reduce((s, v) => s + v, 0);
+  const categories: Array<Record<string, unknown>> = [];
+  const entityIds: string[] = [];
+  let start = Math.PI / 2;
+  let serial = 0;
+  CATEGORY_ORDER.forEach((cat, ci) => {
+    const span = spans[ci] * k;
+    const end = start - span;
+    const n = perCat[ci];
+    const catId = `T:${cat}`;
+    const fields = Math.max(1, Math.min(12, Math.round(n / 60)));
+    nodes.push(base({ id: catId, kind: "category", label: CATEGORY_LABELS[cat], parent_id: "T:root", category: cat, depth: 1, ...polar(180, (start + end) / 2), entity_count: n, child_count: fields }));
+    let done = 0;
+    for (let f = 0; f < fields; f++) {
+      const inField = Math.floor(n / fields) + (f < n % fields ? 1 : 0);
+      const f0 = start - (span * done) / n;
+      const f1 = start - (span * (done + inField)) / n;
+      const fieldId = `${catId}/f${f}`;
+      const ranges = Math.ceil(inField / 10);
+      nodes.push(base({ id: fieldId, kind: "group", label: `Field ${f + 1}`, parent_id: catId, category: cat, depth: 2, ...polar(320, (f0 + f1) / 2), group_basis: "research_field", entity_count: inField, child_count: ranges }));
+      for (let r = 0; r < ranges; r++) {
+        const inRange = Math.min(10, inField - r * 10);
+        const r0 = f0 + ((f1 - f0) * r * 10) / inField;
+        const r1 = f0 + ((f1 - f0) * (r * 10 + inRange)) / inField;
+        const rangeId = `${fieldId}/r${r}`;
+        nodes.push(base({ id: rangeId, kind: "group", label: `Range ${r + 1}`, parent_id: fieldId, category: cat, depth: 3, ...polar(460, (r0 + r1) / 2), group_basis: "alpha_range", entity_count: inRange, child_count: inRange }));
+        for (let e = 0; e < inRange; e++) {
+          const id = `SYN:${serial}`;
+          const types = typesOf[cat];
+          nodes.push(base({ id, kind: "entity", label: `Synthetic item ${serial}`, parent_id: rangeId, category: cat, depth: 4, ...polar(600 + (e % 3) * 40, r0 + ((r1 - r0) * (e + 0.5)) / inRange), entity_type: types[serial % types.length], entity_count: 1, centrality: rand() ** 3 }));
+          entityIds.push(id);
+          serial++;
+        }
+      }
+      done += inField;
+    }
+    const mid = (start + end) / 2;
+    categories.push({ id: cat, node_id: catId, label: CATEGORY_LABELS[cat], entity_count: n, angle_start: start, angle_end: end, label_x: +(820 * Math.cos(mid)).toFixed(2), label_y: +(820 * Math.sin(mid)).toFixed(2) });
+    start = end - gap;
+  });
+
   const families = ["dna", "symptoms", "research", "community"];
   const origins = ["observed", "observed", "observed", "inferred", "patient_reported"];
-  const k = 40;
-  const centers = Array.from({ length: k }, () => ({ x: (rand() - 0.5) * 4000, y: (rand() - 0.5) * 4000 }));
-  const nodes = Array.from({ length: n }, (_, i) => {
-    const c = i % k;
-    const r = rand() * 300;
-    const a = rand() * Math.PI * 2;
-    return {
-      id: `SYN:${i}`,
-      type: types[Math.floor(rand() * types.length)],
-      label: `Synthetic item ${i}`,
-      x: centers[c].x + Math.cos(a) * r,
-      y: centers[c].y + Math.sin(a) * r,
-      cluster_id: `CLUSTER:${c + 1}`,
-      centrality: rand() ** 3,
-    };
-  });
-  const edges = Array.from({ length: m }, (_, i) => {
-    const s = Math.floor(rand() * n);
-    let t = rand() < 0.8 ? s - (s % k) + Math.floor(rand() * k) : Math.floor(rand() * n);
-    if (t === s || t >= n) t = (s + 1) % n;
+  const realEdges = Array.from({ length: edges }, (_, i) => {
+    const s = Math.floor(rand() * entityIds.length);
+    let t = Math.floor(rand() * entityIds.length);
+    if (t === s) t = (s + 1) % entityIds.length;
     return {
       id: `e_syn${i}`,
-      source: `SYN:${s}`,
-      target: `SYN:${t}`,
+      source: entityIds[s],
+      target: entityIds[t],
       relation: "similar_symptoms",
       family: families[i % 4],
       confidence: rand(),
@@ -481,12 +649,25 @@ export function largeAtlas(n = 3000, m = 20000) {
       status: i % 997 === 0 ? "under_review" : "active",
     };
   });
-  const cl = centers.map((_, c) => ({
-    id: `CLUSTER:${c + 1}`,
-    label: `Synthetic group ${c + 1}`,
-    mechanism_summary: null,
-    member_count: Math.ceil(n / k),
-    origin: "inferred",
-  }));
-  return { nodes, edges, clusters: cl, data_version: "synthetic" };
+  const byId = new Map(nodes.map((n) => [n.id, n]));
+  const summary = ({ url }: { url: string }) => {
+    const id = decodeURIComponent(new URL(url).pathname.split("/").pop()!);
+    const n = byId.get(id);
+    if (!n || n.kind !== "entity") return { status: 404, json: { error: { code: "not_found", message: "Not found" } } };
+    return {
+      json: {
+        node: { id, type: n.entity_type, label: n.label, description: null, url: null, attrs: {}, cluster_id: null, x: n.x, y: n.y, centrality: n.centrality },
+        tree_path: [],
+        headline: `${n.label} in the atlas.`,
+        sections: [],
+        explain_edge_ids: [],
+        vus_notice: null,
+        data_version: "synthetic",
+      },
+    };
+  };
+  return {
+    tree: { data_version: "synthetic", layout_version: 4, root_id: "T:root", categories, nodes, edges: realEdges, clusters: [] },
+    summary,
+  };
 }

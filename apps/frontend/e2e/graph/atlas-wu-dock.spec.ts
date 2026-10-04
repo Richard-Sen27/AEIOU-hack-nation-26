@@ -1,7 +1,7 @@
 import { expect, test, type Page } from "@playwright/test";
 
 import { guestSession, mockApi, setTheme, signedInSession, sseBody, trackConsoleErrors } from "../helpers";
-import { fecTree, summaryMock } from "./atlas-fec-mocks";
+import { atlasTreePayload, summaryMock } from "./fixtures";
 
 const STORY = "My daughter has seizures since birth and I think it is a channel disorder.";
 // On the map: a disease, a gene and a patient group. Not on the map: the made-up id.
@@ -36,7 +36,7 @@ const turnBody = sseBody([
 async function atlas(page: Page, mocks: Record<string, unknown> = {}, session: unknown = guestSession) {
   await mockApi(page, {
     "GET /auth/session": session,
-    "GET /atlas/tree.json": fecTree(),
+    "GET /atlas/tree.json": atlasTreePayload(),
     "GET /atlas/summary/*": summaryMock(),
     "GET /chat/sessions": [],
     ...mocks,
