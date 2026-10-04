@@ -371,7 +371,8 @@ test.describe("node view", () => {
     const scn1a = nodes.find((n) => n.id === "HGNC:10585")!;
     expect(scn1a.match).toBe(true);
     expect(scn1a.opacity).toBe(1);
-    expect(nodes.filter((n) => !n.match).every((n) => n.opacity < 0.5)).toBe(true);
+    // The dimming eases over 200 ms, so wait for it to settle.
+    await expect.poll(async () => (await styles()).filter((n) => !n.match).every((n) => n.opacity < 0.5)).toBe(true);
 
     await page.getByRole("radio", { name: "List" }).click();
     const rows = page.getByTestId("node-list-row");
