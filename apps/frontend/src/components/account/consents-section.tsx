@@ -17,7 +17,7 @@ import type { ConsentType } from "@/lib/api/types";
 
 import { formatDate } from "./labels";
 
-const TYPES: ConsentType[] = ["health_data", "contribute"];
+const TYPES: ConsentType[] = ["health_data", "contribute", "connect"];
 
 /**
  * Current state and history of each consent. Granting and withdrawing are

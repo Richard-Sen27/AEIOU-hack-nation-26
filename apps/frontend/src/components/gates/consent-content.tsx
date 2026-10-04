@@ -56,7 +56,9 @@ function Bullets({ items }: { items: string[] }) {
 export function ConsentContent({ type, onGranted, onCancel }: ConsentContentProps) {
   const notice = CONSENT_NOTICES[type];
   const ids = useId();
-  const [subject, setSubject] = useState<Subject | null>(null);
+  // Messaging is always the user's own: no "whose information" question for `connect`.
+  const asksSubject = type !== "connect";
+  const [subject, setSubject] = useState<Subject | null>(asksSubject ? null : "self");
   const [parental, setParental] = useState(false);
   const [agreed, setAgreed] = useState(false);
   const [busy, setBusy] = useState(false);
@@ -130,6 +132,7 @@ export function ConsentContent({ type, onGranted, onCancel }: ConsentContentProp
       </div>
 
       <div className="space-y-3 rounded-lg border bg-muted/50 p-3">
+        {asksSubject && (
         <fieldset className="space-y-2">
           <legend className="mb-2 text-sm font-medium">
             {type === "health_data" ? "Whose health information is this?" : "Whose information will you contribute?"}
@@ -152,6 +155,7 @@ export function ConsentContent({ type, onGranted, onCancel }: ConsentContentProp
             </label>
           </RadioGroup>
         </fieldset>
+        )}
 
         {subject === "child" && (
           <label htmlFor={`${ids}-parental`} className="flex items-start gap-2.5 text-sm">
