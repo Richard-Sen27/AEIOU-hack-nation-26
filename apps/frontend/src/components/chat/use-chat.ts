@@ -306,7 +306,7 @@ export function useChat({ expertMode }: { expertMode: boolean }) {
           recoveries.current = 0;
           updateTurn(turnId, (t) => ({ ...t, phase: "error", error: { code: e.code, message: e.message } }));
           if (e.code === "reauth_required" || e.code === "sign_in_required") {
-            openSignIn("Your ChatGPT sign-in has expired. Sign in again to continue the conversation.");
+            openSignIn("Your sign-in has expired. Sign in again to continue the conversation.");
           }
           announce(`Dr. Wu could not finish: ${e.message}`, "assertive");
           void refreshSessions();

@@ -87,6 +87,12 @@ export function GateProvider({ children }: { children: React.ReactNode }) {
             setConsentType(contribute ? "contribute" : "health_data");
             return;
           }
+          case "assistant_unavailable":
+            toast("Dr. Wu is not available for this sign-in", {
+              id: "assistant-unavailable",
+              description: "The atlas works as usual.",
+            });
+            return;
           case "upstream_error":
             toast("A connected service did not respond", {
               id: "upstream-error",

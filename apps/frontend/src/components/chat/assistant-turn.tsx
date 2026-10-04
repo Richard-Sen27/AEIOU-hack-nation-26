@@ -88,8 +88,8 @@ function StatusLines({ turn }: { turn: Turn }) {
 const ERROR_COPY: Record<string, { icon: typeof CircleAlert; title: string; hint: string; retry: boolean }> = {
   rate_limited: {
     icon: Clock,
-    title: "Your ChatGPT plan's usage limit is reached",
-    hint: "Wait until your plan allows more requests.",
+    title: "The usage limit is reached",
+    hint: "Please try again later.",
     retry: true,
   },
   reauth_required: {
@@ -116,6 +116,12 @@ const ERROR_COPY: Record<string, { icon: typeof CircleAlert; title: string; hint
     title: "This answer was interrupted",
     hint: "",
     retry: true,
+  },
+  assistant_unavailable: {
+    icon: CircleAlert,
+    title: "Dr. Wu is not available for this sign-in",
+    hint: "The atlas works meanwhile.",
+    retry: false,
   },
   not_implemented: {
     icon: CircleAlert,

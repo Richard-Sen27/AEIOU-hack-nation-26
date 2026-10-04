@@ -178,7 +178,7 @@ export function HeroInput({ ref }: { ref?: React.Ref<HeroInputHandle> }) {
     ) : user ? (
       <>
         <Bot className="size-3.5 shrink-0 text-primary" aria-hidden />
-        <span>Goes to Dr. Wu, an AI assistant, on your ChatGPT plan.</span>
+        <span>Goes to Dr. Wu, an AI assistant{user.auth_provider === "google" ? "" : ", on your ChatGPT plan"}.</span>
       </>
     ) : (
       <>

@@ -65,6 +65,8 @@ function errorEnding(code: string): string {
       return "You've reached the gap-search usage limit for now. Please try again later.";
     case "reauth_required":
       return "Your ChatGPT sign-in has expired. Please sign in again to search.";
+    case "assistant_unavailable":
+      return "Gap search is not available for this sign-in.";
     case "upstream_error":
       return "A search service did not respond. Please try again in a moment.";
     case "not_implemented":
@@ -318,7 +320,7 @@ export function GapSearchPanel({
           </Button>
         )}
       </div>
-      {!user && phase === "idle" && <p className="text-xs text-muted-foreground">Gap search needs sign-in; it runs on your own ChatGPT plan.</p>}
+      {!user && phase === "idle" && <p className="text-xs text-muted-foreground">Gap search needs sign-in.</p>}
 
       {phase !== "idle" && <AiDisclosure />}
 

@@ -82,7 +82,7 @@ export function DocumentsPage() {
     return (
       <SignInPrompt
         title="Sign in to upload a report"
-        description="Reading reports uses AI on your own ChatGPT plan. The atlas stays open to everyone."
+        description="Reading reports uses AI. The atlas stays open to everyone."
         returnTo="/documents"
       />
     );

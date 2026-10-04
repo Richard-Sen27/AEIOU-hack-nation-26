@@ -18,7 +18,7 @@ import { ApiError } from "@/lib/api/errors";
 import { deleteMe, unwrap } from "@/lib/api";
 
 export const DELETED_ON_ACCOUNT_DELETION = [
-  "Your account, settings and ChatGPT connection",
+  "Your account, settings and any ChatGPT connection",
   "Your profile: diagnoses, genes, variants, symptoms",
   "Your chats with Dr. Wu",
   "Your documents and their findings",

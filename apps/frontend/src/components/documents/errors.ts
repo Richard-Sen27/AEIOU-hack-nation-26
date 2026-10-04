@@ -69,7 +69,9 @@ export function uploadErrorMessage(code: string, serverMessage?: string): string
     case "llm_reauth_required":
       return "Please sign in with ChatGPT again, then upload the document once more. Your original file has been deleted.";
     case "llm_usage_limit_exceeded":
-      return "Your ChatGPT plan's usage limit has been reached. You can review usage and update settings for your plan in your ChatGPT settings, then try again. Your original file has been deleted.";
+      return "The AI usage limit has been reached. Please try again later. Your original file has been deleted.";
+    case "assistant_unavailable":
+      return "Reading documents is not available for this sign-in. Your original file has been deleted.";
     case "timeout":
       return "Reading this document took too long. Please try again, or try a shorter document. Your original file has been deleted.";
     case "cancelled":

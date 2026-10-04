@@ -46,7 +46,7 @@ export const CONSENT_NOTICES: Record<ConsentType, ConsentNotice> = {
     safeguards: [
       "Names, birth dates, addresses and patient IDs are removed on our server before any AI model sees your text or documents.",
       "Original files are deleted right after the text is extracted. We never keep them.",
-      "Only redacted text goes to OpenAI, running on your own ChatGPT plan.",
+      "Only redacted text goes to OpenAI: on your own ChatGPT plan, or, if you signed in with Google, on Amber's own OpenAI account.",
       "Nothing is sold or shared. Nothing goes into the shared atlas unless you separately agree to contribute.",
     ],
     retention: [

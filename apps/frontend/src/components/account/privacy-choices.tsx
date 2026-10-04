@@ -83,7 +83,7 @@ export function DataRights() {
         <div className="space-y-1 text-sm">
           <p className="font-medium">Download my data</p>
           <p className="text-muted-foreground">
-            Everything Amber stores about you, as one JSON file. ChatGPT tokens are never included.
+            Everything Amber stores about you, as one JSON file. Sign-in tokens are never included.
           </p>
         </div>
         <Button variant="outline" size="lg" onClick={() => void exportData()} disabled={busy} className="mt-auto self-start" data-testid="export-data">

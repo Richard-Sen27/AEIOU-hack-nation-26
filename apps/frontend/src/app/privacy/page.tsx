@@ -109,7 +109,8 @@ export default function PrivacyPage() {
               <List
                 items={[
                   "From OpenAI when you sign in with ChatGPT: your name, e-mail address and ChatGPT account ID.",
-                  "An access token, stored encrypted, so the assistant can run on your own ChatGPT plan.",
+                  "From Google when you sign in with Google (where offered): your name, e-mail address and Google account ID. We keep no Google tokens.",
+                  "With ChatGPT only: an access token, stored encrypted, so the assistant can run on your own ChatGPT plan.",
                   "Your settings: role, language, expert mode, the time you confirmed you are 16 or older, and whether your browser sent a Global Privacy Control signal.",
                   "Only if you are a doctor or researcher and add them: your first and last name, up to three institutions, your ORCID iD and a private link to your entry in the atlas. Visible only to you, not a verification.",
                   "A session cookie that keeps you signed in. It is strictly necessary; we set no optional cookies, so there is no cookie banner.",
@@ -201,9 +202,10 @@ export default function PrivacyPage() {
               rows={[
                 [
                   "OpenAI",
-                  "Only redacted text (personal details removed) from your chats and documents, and your access token",
-                  "Runs Dr. Wu and document extraction on your own ChatGPT plan. OpenAI acts as a service provider bound by contract to this purpose.",
+                  "Only redacted text (personal details removed) from your chats and documents, and, with ChatGPT, your access token",
+                  "Runs Dr. Wu and document extraction: on your own ChatGPT plan if you signed in with ChatGPT, otherwise on Amber's own OpenAI account. OpenAI acts as a service provider bound by contract to this purpose.",
                 ],
+                ["Google (only if you sign in with Google)", "Nothing from us; Google tells us your name, e-mail address and account ID at sign-in", "Sign-in only."],
                 ["Public data sources (PubMed, ClinicalTrials.gov, and others)", "No user data", "The atlas is built from them; searches use public terms only."],
                 [
                   "Our own infrastructure",
@@ -238,6 +240,7 @@ export default function PrivacyPage() {
                 ["Account and settings", "Until you delete your account"],
                 ["Work details (doctors and researchers)", "Until you remove them, switch your role to patient, or delete your account"],
                 ["ChatGPT access token", "Until you sign out or delete your account"],
+                ["Google sign-in", "Only your Google account ID with the account data; no Google tokens are kept"],
                 ["Logs and AI traces (no content, or redacted only)", "At most 30 days"],
                 ["Backups", "Deleted data disappears within one backup cycle (at most 30 days)"],
                 ["Guests", "Nothing is stored"],
@@ -311,8 +314,8 @@ export default function PrivacyPage() {
             <List
               items={[
                 <>
-                  <strong>Categories collected:</strong> identifiers (name, e-mail, ChatGPT account ID), account login
-                  credentials (an encrypted access token), and sensitive personal information about health and genetics that
+                  <strong>Categories collected:</strong> identifiers (name, e-mail, ChatGPT or Google account ID), account
+                  login credentials (an encrypted ChatGPT access token), and sensitive personal information about health and genetics that
                   you add. Purposes and retention are listed above.
                 </>,
                 <>

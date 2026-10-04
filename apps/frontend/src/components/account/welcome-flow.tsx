@@ -85,7 +85,7 @@ export function WelcomeFlow({ next }: { next?: string }) {
     return (
       <SignInPrompt
         title="Sign in to set up your account"
-        description="Choosing how Amber explains things, and confirming your age, happens right after you sign in with ChatGPT."
+        description="Choosing how Amber explains things, and confirming your age, happens right after you sign in."
         returnTo="/welcome"
       />
     );
@@ -99,7 +99,8 @@ function WelcomeForm({ user, next }: { user: SessionUser; next?: string }) {
   const router = useRouter();
   const ids = useId();
   const firstSignIn = !user.role || user.role === "guest";
-  const [planNoticeOpen, setPlanNoticeOpen] = useState(firstSignIn);
+  // The ChatGPT-plan notice concerns ChatGPT accounts only.
+  const [planNoticeOpen, setPlanNoticeOpen] = useState(firstSignIn && user.auth_provider !== "google");
   const [role, setRole] = useState<SelectableRole | null>(
     user.role && user.role !== "guest" ? user.role : null,
   );

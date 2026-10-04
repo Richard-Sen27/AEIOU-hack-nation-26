@@ -370,7 +370,11 @@ export function WorkDetailsForm({
             />
           </label>
         </div>
-        {prefillShown && <p className="text-xs text-muted-foreground">From your ChatGPT account. Edit as needed.</p>}
+        {prefillShown && (
+          <p className="text-xs text-muted-foreground">
+            From your {saved.suggested?.source === "google" ? "Google" : "ChatGPT"} account. Edit as needed.
+          </p>
+        )}
       </div>
 
       <div className="space-y-2">
