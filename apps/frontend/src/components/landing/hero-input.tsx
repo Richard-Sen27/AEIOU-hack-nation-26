@@ -18,7 +18,7 @@ import { isEntityQuery, searchEntities } from "@/lib/search";
 import { cn } from "@/lib/utils";
 
 export const HERO_PROMPT =
-  "Tell us about the diagnosis, a gene, or the symptoms, in your own words. Or drop a report here.";
+  "A diagnosis, gene or symptoms, in your own words. Or drop a report.";
 
 /** Same list as the documents page, so every drop zone accepts what the API accepts. */
 export const UPLOAD_ACCEPT = ACCEPT;
@@ -130,7 +130,7 @@ export function HeroInput({ ref }: { ref?: React.Ref<HeroInputHandle> }) {
 
   const hint =
     mode === "empty" ? (
-      <>Type a name to search the atlas, or a few sentences for Dr. Wu, our AI assistant.</>
+      <>A name searches the atlas. A sentence goes to Dr. Wu, our AI assistant.</>
     ) : mode === "search" ? (
       <>
         <Search className="size-3.5 shrink-0 text-primary" aria-hidden />
@@ -141,15 +141,12 @@ export function HeroInput({ ref }: { ref?: React.Ref<HeroInputHandle> }) {
     ) : user ? (
       <>
         <Bot className="size-3.5 shrink-0 text-primary" aria-hidden />
-        <span>Goes to Dr. Wu, an AI assistant, running on your ChatGPT plan.</span>
+        <span>Goes to Dr. Wu, an AI assistant, on your ChatGPT plan.</span>
       </>
     ) : (
       <>
         <Bot className="size-3.5 shrink-0 text-primary" aria-hidden />
-        <span>
-          Sentences are answered by Dr. Wu, an AI assistant that needs sign-in. Nothing is sent
-          until you do.
-        </span>
+        <span>Dr. Wu, our AI assistant, needs sign-in. Nothing is sent until then.</span>
       </>
     );
 
