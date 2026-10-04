@@ -17,6 +17,7 @@ import {
 import Link from "next/link";
 import { Fragment, useEffect, useMemo, useState } from "react";
 
+import { FollowButton } from "@/components/follows/follow-button";
 import { ConfidenceBadge, OriginBadge, StatusFlag, VusNotice } from "@/components/graph-ui";
 import { useGate } from "@/components/providers/gate-provider";
 import { useLens } from "@/components/providers/lens-provider";
@@ -455,6 +456,9 @@ function EntityPanel({
             {data.vus_notice && <VusNotice compact />}
             {data.headline && <Headline text={data.headline} />}
             {data.coverage === "core" && <CoverageLine count={data.focus_disease_count} disease={data.node.type === "disease"} />}
+            {data.node.type === "disease" && (
+              <FollowButton nodeId={data.node.id} label={data.node.label} updatesAvailable={data.coverage !== "core"} />
+            )}
             {PEOPLE.has(data.node.type) && (
               <p className="text-[11px] text-muted-foreground">
                 Public info only ·{" "}
