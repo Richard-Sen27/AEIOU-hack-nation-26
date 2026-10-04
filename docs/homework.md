@@ -4,7 +4,7 @@ Work deliberately left for later. Add an item when you leave something for later
 
 ## Landing page
 
-- **Networking cards** (`apps/frontend/src/components/landing/landing-config.ts`, `CONNECT_STATUS`): follow is live (links to `/atlas`); calls and choose are "coming"; switch each to "live" (with its `CONNECT_HREF`) as its networking stage lands, so the card links there and drops "Coming soon".
+- **Networking cards** (`apps/frontend/src/components/landing/landing-config.ts`, `CONNECT_STATUS`): follow is live (links to `/atlas`), calls is live (links to `/calls`); choose is "coming"; switch each to "live" (with its `CONNECT_HREF`) as its networking stage lands, so the card links there and drops "Coming soon".
 
 ## Atlas view
 
