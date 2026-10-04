@@ -80,13 +80,20 @@ export function EntityPicker({
   return (
     <Command
       shouldFilter={false}
-      className={cn("h-auto rounded-lg! border bg-background p-0", className)}
+      className={cn(
+        // One control: the outer box carries the normal input look (border,
+        // background, focus ring); the shared CommandInput's own filled group
+        // is flattened into it.
+        "h-auto rounded-lg! border border-input bg-transparent p-0 text-foreground transition-colors focus-within:border-ring focus-within:ring-3 focus-within:ring-ring/50 dark:bg-input/30",
+        "**:data-[slot=command-input-wrapper]:p-0 **:data-[slot=input-group]:border-0! **:data-[slot=input-group]:bg-transparent! **:data-[slot=input-group]:ring-0!",
+        className,
+      )}
       data-testid={testId}
       label={label}
     >
       <CommandInput value={q} onValueChange={onChange} placeholder={placeholder} aria-label={label} />
       {open && (
-        <CommandList className="max-h-60 px-1 pb-1">
+        <CommandList className="max-h-60 border-t px-1 pt-1 pb-1">
           {state === "loading" && (
             <div className="flex items-center gap-2 px-2 py-2 text-xs text-muted-foreground">
               <Loader2 className="size-3.5 animate-spin" aria-hidden /> Searching…
