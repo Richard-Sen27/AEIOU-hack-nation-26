@@ -2929,7 +2929,7 @@ export type Follow = {
     /**
      * Updates Available
      *
-     * Papers, trials, grants and patient groups (and so updates) exist only for the atlas's focus diseases. False for core diseases and for diseases no longer in the atlas: following still works, but no notifications are expected.
+     * Papers, trials, grants and patient groups (and so atlas updates) exist only for the atlas's focus diseases. False for core diseases and for diseases no longer in the atlas: following still notifies about surveys, studies and trials published for the disease (call_published), but no atlas updates are expected.
      */
     updates_available: boolean;
     /**
@@ -3842,13 +3842,13 @@ export type Notification = {
      */
     id: string;
     /**
-     * added: a paper, trial, grant or patient group newly linked to the disease in the atlas; now_recruiting: a trial whose status changed to recruiting; call_match: a published call matches your profile (suggestions switched on; link to the call).
+     * added: a paper, trial, grant or patient group newly linked to the disease in the atlas; now_recruiting: a trial whose status changed to recruiting; call_match: a published call matches your profile (suggestions switched on; link to the call); call_published: a survey, study or trial was published for a followed disease after the follow started (link to the call). A call is notified once: when it is both, it is a call_match.
      */
     kind: NotificationKind;
     /**
      * Disease Id
      *
-     * The followed disease (call_match: the matching disease, if any).
+     * The followed disease (call_match: the matching disease, if any; call_published: the followed disease the call names).
      */
     disease_id: string | null;
     /**
@@ -3860,13 +3860,13 @@ export type Notification = {
     /**
      * Item Id
      *
-     * Node ID of the new item; link to its node page. call_match: the call id.
+     * Node ID of the new item; link to its node page. call_match, call_published: the call id.
      */
     item_id: string;
     /**
      * Call Id
      *
-     * call_match only: the call to open.
+     * call_match and call_published only: the call to open.
      */
     call_id?: string | null;
     /**
@@ -3876,7 +3876,7 @@ export type Notification = {
     /**
      * Item Label
      *
-     * Null if no longer in the atlas. call_match: the call's title.
+     * Null if no longer in the atlas. call_match, call_published: the call's title (null once the call is no longer listed).
      */
     item_label: string | null;
     /**
@@ -3894,7 +3894,7 @@ export type Notification = {
     /**
      * Gone
      *
-     * The item or the disease has left the atlas since (call_match: the call is no longer published and open); render without a link.
+     * The item or the disease has left the atlas since (call_match, call_published: the call is no longer listed: closed, expired, withdrawn or its publisher's card hidden); render without a link.
      */
     gone: boolean;
     /**
@@ -3950,7 +3950,7 @@ export type NotificationExport = {
 /**
  * NotificationKind
  */
-export type NotificationKind = 'added' | 'now_recruiting' | 'call_match';
+export type NotificationKind = 'added' | 'now_recruiting' | 'call_match' | 'call_published';
 
 /**
  * NotificationList
