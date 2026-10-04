@@ -8,6 +8,7 @@ to data/graph/final/.
 
 from __future__ import annotations
 
+import asyncio
 import bisect
 import hashlib
 import importlib
@@ -1307,11 +1308,60 @@ class ClusterLabel(BaseModel):
     mechanism_summary: str
 
 
-def _get_llm():
+CLUSTER_LABEL_INSTRUCTIONS = (
+    "Name a cluster of rare diseases in at most 8 words for patients and researchers, based only "
+    "on the given shared genes, pathways, mechanisms and phenotypes. Write the name in sentence "
+    "case: capitalize only the first word, gene symbols, abbreviations and proper names, and keep "
+    'every other word in lower case. Examples: "Neuronal signaling disorders with seizures", '
+    '"N-linked glycosylation disorders with developmental delay", "DNA repair disorders '
+    'with cancer risk", "Usher syndrome and related hearing loss". Do not end the name '
+    "with a gene symbol; the lead gene is added separately. Then summarize the shared mechanism "
+    "in one sentence, without claims beyond the data."
+)
+LABEL_SEPARATOR = " · "
+
+
+def _label_run():
+    """An LLMRun for cluster names: disk cache, ``llm_concurrency`` and the call budget. Without
+    a login it serves cached names only; None when the LLM module is unavailable."""
     try:
-        return importlib.import_module("pipeline.llm").get_llm()
+        return importlib.import_module("pipeline.llm").LLMRun.start()
     except Exception:  # noqa: BLE001
         return None
+
+
+def cluster_name(model_label: str, lead_gene: str | None) -> str:
+    """The model's name followed by the lead gene: "Neuronal signaling disorders · PRRT2". The
+    model's casing is kept as written (sentence case comes from the prompt); lowercasing here
+    would break gene symbols and terms such as DNA or N-linked."""
+    name = " ".join(model_label.split()).rstrip(" .")
+    return f"{name}{LABEL_SEPARATOR}{lead_gene}" if lead_gene else name
+
+
+def disambiguate_labels(items: list[tuple[str, str, str | None]]) -> dict[str, str]:
+    """{cluster id: unique name} for (cluster id, name, most distinctive phenotype) items.
+
+    Clusters whose full names coincide (ignoring case) each get their most distinctive phenotype
+    appended; any name still shared after that gets its cluster number. Deterministic: the result
+    depends only on the items, not on their order."""
+    out = {cid: name for cid, name, _ in items}
+    groups: dict[str, list[tuple[str, str | None]]] = defaultdict(list)
+    for cid, name, ph in items:
+        groups[name.casefold()].append((cid, ph))
+    for same in groups.values():
+        if len(same) < 2:
+            continue
+        for cid, ph in same:
+            if ph:
+                out[cid] = f"{out[cid]}{LABEL_SEPARATOR}{ph}"
+    groups = defaultdict(list)
+    for cid, name in out.items():
+        groups[name.casefold()].append(cid)
+    for same in groups.values():
+        if len(same) > 1:
+            for cid in same:
+                out[cid] = f"{out[cid]} (cluster {cid.split(':')[-1]})"
+    return out
 
 
 async def label_clusters(
@@ -1341,7 +1391,7 @@ async def label_clusters(
     members: dict[int, list[str]] = defaultdict(list)
     for d, c in membership.items():
         members[c].append(d)
-    llm = _get_llm()
+    run = _label_run()
     # Pathways are ranked by how distinctive they are for a cluster (count x inverse frequency
     # across clusters), so ubiquitous channel pathways do not label every cluster.
     cluster_pws = {
@@ -1357,6 +1407,7 @@ async def label_clusters(
     for (_g, d), m in sorted(mech.items()):
         mech_by_disease[d].append(m)
     out = []
+    pending: dict[int, tuple[str, str | None]] = {}  # cluster -> (model input, lead gene)
     for c, ds in sorted(members.items()):
         genes = Counter(g for d in ds for g in dg.get(d, ()))
         pws = cluster_pws[c]
@@ -1389,30 +1440,17 @@ async def label_clusters(
             )
         else:
             summary = "Mechanism not established for the member diseases"
-        origin = "template"
-        if llm is not None and len(ds) > 1:
-            try:
-                res = await llm.structured(
-                    ClusterLabel,
-                    instructions=(
-                        "Name a cluster of rare diseases in at most 8 words for patients and "
-                        "researchers, based only on the given shared genes, pathways, mechanisms "
-                        "and phenotypes. Then summarize the shared mechanism in one sentence, "
-                        "without claims beyond the data."
-                    ),
-                    input=json.dumps(
-                        {
-                            "diseases": [labels.get(d, d) for d in ds][:15],
-                            "genes": top_genes,
-                            "pathways": top_pw,
-                            "mechanisms": dict(mechs),
-                            "phenotypes": top_ph,
-                        }
-                    ),
-                )
-                label, summary, origin = res.label, res.mechanism_summary, "llm"
-            except Exception as exc:  # noqa: BLE001
-                log.warning("cluster %d: LLM label failed (%s); using template", c, exc)
+        if run is not None and len(ds) > 1:
+            payload = json.dumps(
+                {
+                    "diseases": [labels.get(d, d) for d in ds][:15],
+                    "genes": top_genes,
+                    "pathways": top_pw,
+                    "mechanisms": dict(mechs),
+                    "phenotypes": top_ph,
+                }
+            )
+            pending[c] = (payload, labels.get(top_gene[0]) if top_gene else None)
         out.append(
             {
                 "id": f"CLUSTER:{c}",
@@ -1422,7 +1460,7 @@ async def label_clusters(
                 "attrs": json.dumps(
                     {
                         "inferred": True,
-                        "label_origin": origin,
+                        "label_origin": "template",
                         "members": sorted(ds),
                         "top_genes": top_genes,
                         "top_pathways": top_pw,
@@ -1433,9 +1471,46 @@ async def label_clusters(
                     }
                 ),
                 "data_version": data_version,
+                "_distinct": labels.get(distinct_ph[0]) if distinct_ph else None,
             }
         )
+    await name_clusters(out, pending, run)
     return out
+
+
+async def name_clusters(out: list[dict], pending: dict[int, tuple[str, str | None]], run) -> None:
+    """Model names for multi-disease clusters, asked concurrently (``llm_concurrency``) through
+    the cached, budgeted ``run``; a cluster without an answer keeps its template label. Then every
+    name is made unique. Drops the helper key ``_distinct`` from the rows."""
+    if pending and run is not None:
+        ids = sorted(pending)
+        answers = await asyncio.gather(
+            *(
+                run.structured(
+                    ClusterLabel,
+                    instructions=CLUSTER_LABEL_INSTRUCTIONS,
+                    input=pending[c][0],
+                    kind="small",
+                )
+                for c in ids
+            )
+        )
+        by_id = {f"CLUSTER:{c}": (a, pending[c][1]) for c, a in zip(ids, answers, strict=True)}
+        for row in out:
+            res, gene = by_id.get(row["id"], (None, None))
+            if res is None or not res.label.strip():
+                continue
+            row["label"] = cluster_name(res.label, gene)
+            row["mechanism_summary"] = res.mechanism_summary
+            attrs = json.loads(row["attrs"])
+            attrs["label_origin"] = "llm"
+            attrs["model_label"] = res.label
+            row["attrs"] = json.dumps(attrs)
+        run.log_summary()
+    names = disambiguate_labels([(r["id"], r["label"], r.get("_distinct")) for r in out])
+    for row in out:
+        row["label"] = names[row["id"]]
+        row.pop("_distinct", None)
 
 
 # ---------------------------------------------------------------- layout / centrality / embeddings
