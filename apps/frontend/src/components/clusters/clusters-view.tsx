@@ -1,6 +1,6 @@
 "use client";
 
-import { ArrowRight, Boxes, Map as MapIcon, RotateCcw, Search, TriangleAlert, WifiOff } from "lucide-react";
+import { ArrowRight, Boxes, ChevronDown, ChevronUp, Map as MapIcon, RotateCcw, Search, TriangleAlert, WifiOff } from "lucide-react";
 import Link from "next/link";
 import { useDeferredValue, useEffect, useMemo, useState } from "react";
 
@@ -38,11 +38,22 @@ function idList(v: unknown): string[] {
   return Array.isArray(v) ? v.filter((x): x is string => typeof x === "string") : [];
 }
 
+/** Older API builds do not say; their clusters were all on the map. */
+const onMap = (c: Schemas.ClusterSummary) => c.on_map ?? true;
+
+const clusterNumber = (id: string) => Number(id.split(":").pop()) || Number.MAX_SAFE_INTEGER;
+
+/** On the map first, then by size, then by cluster number (as `GET /clusters` orders them). */
+function byMapThenSize(a: Schemas.ClusterSummary, b: Schemas.ClusterSummary) {
+  return Number(onMap(b)) - Number(onMap(a)) || b.member_count - a.member_count || clusterNumber(a.id) - clusterNumber(b.id);
+}
+
 export function ClustersView() {
   const { labelStyle } = useLens();
   const [load, setLoad] = useState<Load>({ kind: "loading" });
   const [attempt, setAttempt] = useState(0);
   const [q, setQ] = useState("");
+  const [showSingles, setShowSingles] = useState(false);
   const query = useDeferredValue(q.trim().toLowerCase());
 
   useEffect(() => {
@@ -61,12 +72,15 @@ export function ClustersView() {
     };
   }, [attempt]);
 
-  const clusters = useMemo(() => {
-    if (load.kind !== "ready") return [];
-    return load.data
+  // Groups of two or more by default; a cluster of one disease is not a group and waits behind a toggle.
+  const { clusters, singles } = useMemo(() => {
+    if (load.kind !== "ready") return { clusters: [], singles: [] };
+    const matches = load.data
       .filter((c) => !query || c.label.toLowerCase().includes(query) || (c.mechanism_summary ?? "").toLowerCase().includes(query) || c.id.toLowerCase().includes(query))
-      .sort((a, b) => b.member_count - a.member_count || a.id.localeCompare(b.id, "en", { numeric: true }));
+      .sort(byMapThenSize);
+    return { clusters: matches.filter((c) => c.member_count >= 2), singles: matches.filter((c) => c.member_count < 2) };
   }, [load, query]);
+  const groupTotal = load.kind === "ready" ? load.data.filter((c) => c.member_count >= 2).length : 0;
 
   const copy = COPY[labelStyle];
   const technical = labelStyle === "technical";
@@ -131,9 +145,12 @@ export function ClustersView() {
 
         {load.kind === "ready" && load.data.length > 0 && (
           <>
-            <p className="mb-3 text-xs text-muted-foreground" aria-live="polite">
-              {clusters.length} of {load.data.length} groups
+            <p className="mb-3 text-xs text-muted-foreground" aria-live="polite" data-testid="clusters-count">
+              {clusters.length} of {groupTotal} groups
             </p>
+            {clusters.length === 0 && (
+              <p className="rounded-xl border border-dashed bg-card/50 p-6 text-sm text-muted-foreground">No group matches.</p>
+            )}
             <ul className="grid gap-4 sm:grid-cols-2 xl:grid-cols-3" data-testid="clusters-list">
               {clusters.map((c) => {
                 // Older builds list gene ids under `genes`; current ones the lead symbols under `top_genes`.
@@ -152,7 +169,9 @@ export function ClustersView() {
                       </Link>
                     </h2>
                     {c.mechanism_summary && (
-                      <p className="mt-2 text-sm leading-relaxed text-pretty text-muted-foreground">{c.mechanism_summary}</p>
+                      <p className="mt-2 line-clamp-3 text-sm leading-relaxed text-pretty text-muted-foreground" title={c.mechanism_summary}>
+                        {c.mechanism_summary}
+                      </p>
                     )}
                     <p className="mt-1.5 text-[11px] text-muted-foreground italic">Name and summary written by analysis.</p>
                     {(technical || labelStyle === "clinical") && (genes.length > 0 || pathways.length > 0) && (
@@ -178,15 +197,24 @@ export function ClustersView() {
                     <div className="mt-auto flex items-center justify-between gap-2 pt-4">
                       <span className="text-sm">
                         <span className="font-semibold tabular">{c.member_count}</span>{" "}
-                        <span className="text-muted-foreground">{c.member_count === 1 ? "member" : "members"}</span>
+                        <span className="text-muted-foreground">members</span>
+                        {onMap(c) && (c.focus_member_count ?? 0) > 0 && (
+                          <span className="text-muted-foreground" data-testid="cluster-on-map">
+                            {" "}· <span className="tabular">{c.focus_member_count}</span> on the map
+                          </span>
+                        )}
                       </span>
                       <span className="relative z-10 flex items-center gap-1">
-                        <Link
-                          href={`/atlas?focus=${encodeURIComponent(c.id)}`}
-                          className={cn(buttonVariants({ variant: "ghost", size: "sm" }), "text-muted-foreground")}
-                        >
-                          Map<span className="sr-only">: show {c.label} on the Atlas</span>
-                        </Link>
+                        {/* Only clusters with focus diseases are drawn on the Atlas. */}
+                        {onMap(c) && (
+                          <Link
+                            href={`/atlas?focus=${encodeURIComponent(c.id)}`}
+                            className={cn(buttonVariants({ variant: "ghost", size: "sm" }), "text-muted-foreground")}
+                            data-testid="cluster-map-link"
+                          >
+                            Map<span className="sr-only">: show {c.label} on the Atlas</span>
+                          </Link>
+                        )}
                         <Link href={href} className={buttonVariants({ variant: "outline", size: "sm" })} aria-hidden tabIndex={-1}>
                           Open <ArrowRight data-icon="inline-end" aria-hidden />
                         </Link>
@@ -196,6 +224,39 @@ export function ClustersView() {
                 );
               })}
             </ul>
+
+            {singles.length > 0 && (
+              <div className="mt-8">
+                <Button
+                  variant="outline"
+                  size="sm"
+                  aria-expanded={showSingles}
+                  aria-controls="clusters-singles"
+                  onClick={() => setShowSingles((v) => !v)}
+                  data-testid="clusters-singles-toggle"
+                >
+                  {showSingles ? <ChevronUp data-icon="inline-start" aria-hidden /> : <ChevronDown data-icon="inline-start" aria-hidden />}
+                  {showSingles ? "Hide" : "Show"} {singles.length} single-disease {singles.length === 1 ? "group" : "groups"}
+                </Button>
+                {showSingles && (
+                  <ul id="clusters-singles" className="mt-4 grid gap-2 sm:grid-cols-2 xl:grid-cols-3" data-testid="clusters-singles">
+                    {singles.map((c) => (
+                      <li key={c.id} data-testid="cluster-single">
+                        <Link
+                          href={`/node/${encodeURIComponent(c.id)}`}
+                          className="flex h-full items-baseline gap-2 rounded-lg border bg-card px-3 py-2 text-sm transition-colors hover:bg-muted focus-visible:ring-2 focus-visible:ring-ring focus-visible:outline-none"
+                        >
+                          <span className="min-w-0 flex-1 truncate" title={c.label}>
+                            {c.label}
+                          </span>
+                          <span className="shrink-0 font-mono text-[11px] text-muted-foreground">{c.id}</span>
+                        </Link>
+                      </li>
+                    ))}
+                  </ul>
+                )}
+              </div>
+            )}
           </>
         )}
       </div>
